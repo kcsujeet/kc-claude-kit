@@ -143,7 +143,7 @@ Applies to functions, hooks, fields, props, components, arguments — anywhere a
 - **Stale names after refactor.** The function used to do what its name said; the behavior changed; the name didn't. Always a review opportunity when the surrounding logic moved.
 - **Familiar-shaped name hiding a constraint or different behavior.** A name that looks like a conventional pattern (`add`, `getAll`, `update`, `find`, `parse`, `validate`, anything readers reach for from muscle memory) but the actual implementation does something different or adds a hidden constraint. The familiarity makes readers skip the check — that's exactly when the name needs to surface the deviation. The signal to flag: the name maps to a well-known operation, but the parameters or behavior tell a different story (`add(a, b)` that subtracts, `getAll(id)` that hits a scoped-down endpoint, `parse(json)` that also mutates a cache, `validate(x)` that throws instead of returning a result). The hidden behavior belongs in the name.
 
-**Worked example.** Path builders that read as "log into the group / org" but actually return member-login URLs:
+**Worked example.** Path builders that read as "invite the group / org itself" but actually return member-invite URLs:
 
 Bad:
 
