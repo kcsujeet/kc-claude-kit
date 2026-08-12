@@ -1,0 +1,18 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "kc-claude-kit",
+  "owner": {
+    "name": "Sujeet Kc"
+  },
+  "metadata": {
+    "description": "Sujeet's personal Claude Code toolkit — reusable plugins for any codebase"
+  },
+  "plugins": [
+    {
+      "name": "code-review",
+      "source": "./plugins/code-review",
+      "description": "Gate-based code review: one subagent per rule file, per-box PASS/FAIL verdicts, zero rationalized skips",
+      "version": "1.0.0"
+    }
+  ]
+}
