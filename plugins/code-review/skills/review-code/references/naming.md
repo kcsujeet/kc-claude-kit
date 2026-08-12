@@ -7,7 +7,7 @@ Identifier-naming rules for the diff under review. Covers four independent failu
 The naming gate agent ticks every box against the diff. A box is FAIL if any matching identifier/expression violates the rule; the gate is FAIL if any box is FAIL. N/A only when the diff adds no new identifiers or boolean expressions.
 
 - [ ] §N1 Role-not-type names: new variables/functions describe the role, not the type (no `data`/`result`/`value`/`temp`/`item`/`obj` for behavior-bearing values); function names describe the effect, not just the trigger. (N/A: no new identifiers)
-- [ ] §N2 Inline boolean chains — evaluate the OPERANDS, not just the outer name: any `&&`/`||` chain with 2+ non-obvious operands (raw comparisons, enum (in)equalities, negations, `?.` field access) has EACH non-obvious operand extracted to its own named boolean. Assigning the whole chain to a named boolean does NOT satisfy this. Enumerate by grep, do not eyeball. (N/A: only when the grep returns 0 hits, stated as `grepped &&/||: 0 hits`)
+- [ ] §N2 Inline boolean chains — evaluate the OPERANDS, not just the outer name: any `&&`/`||` chain with 2+ non-obvious operands (raw comparisons, enum (in)equalities, negations, `?.` field access) has EACH non-obvious operand extracted to its own named boolean. Assigning the whole chain to a named boolean does NOT satisfy this. A parenthesized sub-expression in a mixed `&&`/`||` chain (e.g. `(a || b) && c`) also gets its own name — parentheses alone don't pass. Enumerate by grep, do not eyeball. (N/A: only when the grep returns 0 hits, stated as `grepped &&/||: 0 hits`)
 - [ ] §N3 Cross-call-site predicate: the same predicate repeated in 2+ places is extracted to a named helper (type guard when narrowing helps). (N/A: no repeated predicate)
 - [ ] §N4 Honest names: each new name reads as a sentence that matches the actual behavior/subject — no surface-word gluing, no subject elision, no context-as-subject, no stale-after-refactor names, no familiar-shaped name hiding a different behavior or constraint. (N/A: no new names)
 
@@ -96,6 +96,21 @@ const canSubmit = record.featureEnabled && hasItems && !isLocked
 ```
 
 The tell that this rule was skipped: a reviewer note that says a named boolean "matches the good-pattern example, so the box passes" without having read what its operands are. A chain passes only when its own operands are already named or trivially obvious — never because the assignment target has a good name. Always read the operands, on every hit, not just the ones that look complex at a glance.
+
+**Mixed `&&`/`||` chains also need their grouping named, not just parenthesized.** Parentheses tell the reader precedence, not meaning — `(a || b) && c` still forces them to figure out what the parenthesized group *represents* before they can read the rest. Extract the grouped sub-expression to its own name so the outer expression reads as a sentence.
+
+Bad — parentheses disambiguate precedence but the group is unnamed:
+
+```ts
+const canShow = (isAdmin || isOwner) && hasAccess
+```
+
+Good — the group gets a name, the outer expression reads as a sentence:
+
+```ts
+const hasElevatedRole = isAdmin || isOwner
+const canShow = hasElevatedRole && hasAccess
+```
 
 ## §N3. The same predicate repeated in 2+ places gets a named helper
 
