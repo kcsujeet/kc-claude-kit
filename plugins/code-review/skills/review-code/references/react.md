@@ -119,6 +119,8 @@ const rows = [{ label: t('a'), value: a }, { label: t('b'), value: b }, { label:
 
 Use a stable `key` (label or id), never the index. Threshold is **3+**; two explicit blocks are fine and not worth the indirection.
 
+Distinct from lookup-object dispatch (see the structure gate) — that's branch-selection of **one** value from a fixed set of cases; this is repeated **rendered siblings**.
+
 ### §R7. Keep hook-call assignments pure — derive on the next line
 
 Don't bury a subscription/selector hook call inside a larger expression that also transforms its result. Assign the hook's return to a named variable first, derive on the next line.
@@ -159,6 +161,8 @@ const Child = () => <div>...</div>
 
 Rule of thumb: read only the component's own return, ignoring every caller — if you can't tell it will render correctly, it's assuming its context.
 
+This is the mirror of the owns-container rule above: a child must own its **internal** container, and must not own the **external** placement that is the parent's.
+
 ### §R9. Conditional element assembly → a named local component
 
 Two inline smells: a `let` placeholder reassigned across `if`/`else` branches (`let cell = null; if (…) cell = <A/>; else cell = <B/>`), or a ternary (in JSX or assigned to a `const`) with multi-line/non-trivial branches choosing between element shapes.
@@ -173,12 +177,12 @@ else if (showFallback) cell = <Fallback value={fallback} />
 return <Cell>{cell}</Cell>
 
 // Better
-const ValueCell = ({ hasPrimary, showFallback, value, fallback }: Props) => {
+const ValueCell = ({ hasPrimary, value, showFallback, fallback }: Props) => {
   if (hasPrimary) return <Primary value={value} />
   if (showFallback) return <Fallback value={fallback} />
   return null
 }
-return <Cell><ValueCell {...props} /></Cell>
+return <Cell><ValueCell hasPrimary={hasPrimary} value={value} showFallback={showFallback} fallback={fallback} /></Cell>
 ```
 
 **Placement:** same file, next to sibling sub-components, while small; promote to its own file only once it grows large or picks up its own dependencies/tests — don't over-fragment for a few lines. **Do NOT flag** a short single-line ternary between two trivial values/elements, or a bare `{cond && <X />}` guard.
@@ -205,7 +209,7 @@ Suggested fix order (match whatever shape the target repo already uses for the c
 })}
 ```
 
-**`renderXxx()` inline render functions are an anti-pattern, not a fix.** A `const renderContent = () => (...)` called from the same component's return: re-runs on every parent render without its own reconciliation, doesn't show up in DevTools, hides a missing sub-component behind a method-shape that pretends to be cheap, and closures over scoped variables make later extraction harder. Flag any new `renderXxx` called from its own component's return; point at §R9's named-component extraction instead. **Acceptable:** a function handed to a render-prop API the library demands (`renderRow={(row) => ...}`). Further reading: Nadia Makarevich, *React re-renders guide*, ["Antipattern: creating components in render function"](https://www.developerway.com/posts/react-re-renders-guide#%EF%B8%8F-antipattern-creating-components-in-render-function).
+**`renderXxx()` inline render functions are an anti-pattern, not a fix.** A `const renderContent = () => (...)` called from the same component's return: re-runs on every parent render without its own reconciliation, doesn't show up in DevTools, hides a missing sub-component behind a method-shape that pretends to be cheap, obscures the JSX tree (readers scanning the return have to jump elsewhere to find the actual content), and closures over scoped variables make later extraction harder. Flag any new `renderXxx` called from its own component's return; point at §R9's named-component extraction instead. **Acceptable shapes:** a function handed to a render-prop API the library demands (`renderRow={(row) => ...}`); or a `useCallback`-wrapped handler that returns JSX for an event-driven mount (rare; usually still a missed component). Further reading: Nadia Makarevich, *React re-renders guide*, ["Antipattern: creating components in render function"](https://www.developerway.com/posts/react-re-renders-guide#%EF%B8%8F-antipattern-creating-components-in-render-function).
 
 ---
 
