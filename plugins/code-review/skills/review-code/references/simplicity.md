@@ -16,7 +16,7 @@ The simplicity gate agent ticks every box against the diff. A box is FAIL if any
 
 Apply this to every diff, not just the constructs called out elsewhere in this file. Evaluate every change against three questions and surface a finding whenever the answer is "no" — these are first-class smells with the same any-finding-fails weight as any other rule here, not stylistic extras to mention only if there's room.
 
-- **DRY (§P1)** — is any logic, value, literal, or markup duplicated that should be a single source? A copied block, a re-declared constant, a re-implemented helper, a repeated JSX shape. (Repeated *conversions* have their own rule, §P5 below; repeated *sibling JSX* is covered by a separate clarity rule — don't double-flag the same instance under both.)
+- **DRY (§P1)** — is any logic, value, literal, or markup duplicated that should be a single source? A copied block, a re-declared constant, a re-implemented helper, a repeated JSX shape. (Repeated *conversions* have their own rule, §P5 below; repeated *sibling JSX* is covered by the react gate's §R6 — don't double-flag the same instance under both.)
 - **YAGNI (§P2)** — is there speculative or unused code? Concretely: unused params/props; an abstraction built for a hypothetical second caller when there is only one; a config option nothing in the diff actually passes; a dead branch. A generality the PR doesn't use is a finding even if it "might be needed later."
 - **KISS (§P3)** — is there a materially simpler equivalent already available? Concretely: a lookup object beating nested conditionals; an early return beating nesting; an existing util or stdlib call beating a hand-roll. Fewer moving parts for the same behavior wins.
 
@@ -107,4 +107,4 @@ const isOn = (value?: Mode) => (value ?? Mode.ON) === Mode.ON
 const toMode = (on: boolean) => (on ? Mode.ON : Mode.OFF)
 ```
 
-Calibrate by cost: a trivial 2-site repeat is a `nitpick`; a both-directions encoding or 3+ sites is a `suggestion`. This is distinct from a repeated-*JSX*-block rule (which maps an array); this rule is about a repeated *expression/conversion* becoming a named helper.
+Calibrate by cost: a trivial 2-site repeat is a `nitpick`; a both-directions encoding or 3+ sites is a `suggestion`. This is distinct from the repeated-*JSX*-block rule (react gate §R6, which maps an array); this rule is about a repeated *expression/conversion* becoming a named helper.

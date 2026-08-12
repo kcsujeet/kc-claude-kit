@@ -1,6 +1,6 @@
 # Verification gate
 
-This is the receipts gate: it does not re-derive findings, it checks that every OTHER gate actually produced the evidence its own reference file demands. The verification gate agent owns this file. It walks the Always items on every diff, plus every trigger group below whose trigger the diff hits, and ticks each box PASS / FAIL / N/A with cited evidence. The gate is FAIL if any applicable box is FAIL.
+This is the receipts gate: it does not re-derive findings, it checks that every OTHER gate actually produced the evidence its own reference file demands. The verification gate agent owns this file, and is dispatched in a second phase, after the other eight gates have returned — its evidence source is the sibling gates' verdict blocks provided to you (their `GATE:`/`STATUS:`/`BOXES:`/`FINDINGS:` output) plus the final report draft, not a fresh read of the diff. It walks the Always items on every diff, plus every trigger group below whose trigger the diff hits, and ticks each box PASS / FAIL / N/A with cited evidence. The gate is FAIL if any applicable box is FAIL.
 
 A trigger group here does not restate another gate's rule — it confirms that gate's mandatory receipt shows up in the review output. "The naming gate found no boolean issues" is not evidence; "grepped &&/||: 3 hits, 3 verdicts below" is. If a gate's headline receipt is missing from the output, this gate fails even when the underlying gate reported PASS — a PASS with no receipt is indistinguishable from a gate that never looked.
 
@@ -58,17 +58,17 @@ N/A: the diff adds or edits no ternary and no `as` cast.
 
 ### Hooks, queries, or mutations added or edited
 
-Owning gates: **react** (fetch ownership, mutation pattern) and **structure** (co-location, unnecessary exports). Required receipts:
+Owning gates: **react** §R13 (fetch ownership, mutation pattern) and **structure** §S8 (co-location, unnecessary exports). Required receipts:
 - For every new hook, its consumers named explicitly by file: `"useFoo has 1 consumer (Foo.tsx, same folder ✓)"` or `"useFoo has 1 consumer (components/Foo.tsx) — should move down to components/"`. A count with no file name ("useFoo has 1 consumer") is not a receipt.
-- `mutateAsync` grep receipt: `grepped mutateAsync: N hits` with a verdict per hit (justified-async caller vs. should switch to `mutate` + callback).
-- Any internal plumbing constant introduced alongside a new data-fetching hook (a query-key fragment, a resource-name string, a path constant) is confirmed unexported unless something outside the file actually imports it — state the grep result, not an assumption. This folds the "no unnecessary export" check into this group rather than treating it as its own trigger.
+- `mutateAsync` grep receipt (react §R13): `grepped mutateAsync: N hits` with a verdict per hit (justified-async caller vs. should switch to `mutate` + callback).
+- Any internal plumbing constant introduced alongside a new data-fetching hook (a query-key fragment, a resource-name string, a path constant) is confirmed unexported unless something outside the file actually imports it — state the grep result, not an assumption (structure §S8). This folds the "no unnecessary export" check into this group rather than treating it as its own trigger.
 - If the diff touches form validation, one receipt line confirming hand-rolled checks were checked against the validation library's own API before being kept (owning gate: **react**, form box).
 
 N/A: no hook, query, or mutation added or edited in the diff.
 
 ### State added or edited
 
-Owning gate: **structure** (placement) and **clarity** (ordering rationale). Required receipts:
+Owning gate: **react** §R15 (placement) and **clarity** §C7 (ordering rationale). Required receipts:
 - Placement stated explicitly: which component/hook owns the new state, and why that is the lowest common ancestor that actually consumes it (not "might need it later").
 - For any two-step or order-dependent mutation (`update` then `remove`, `setX` then `setY` where order matters), confirmation that a rationale comment exists at the call site, with `file:line`.
 

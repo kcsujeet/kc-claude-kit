@@ -22,7 +22,6 @@ The clarity gate agent ticks every box against the diff. A box is FAIL if any ma
 - [ ] §C14 No circular imports introduced (soft). (N/A: no cross-module import change)
 - [ ] §C15 Ternaries: none nested/chained (2+ `?`), long, multi-line once formatted, or with a non-trivial branch (more than a short value/identifier). Applies to value/assignment/returned/arg ternaries too, not just JSX — the branch content is irrelevant, only the shape. Walk every ternary in the diff. **Enumerate by grep, do not eyeball** — see below. (N/A: only when the grep returns 0 hits, stated as `grepped ternaries: 0 hits`)
 - [ ] §C16 Bare numeric literals for dimensions/thresholds/timeouts are named constants with a one-line why, or a design token when the project has a token system; a magic value repeated 2+ times is also a DRY finding. (N/A: no magic literal added)
-- [ ] KISS/YAGNI (standing lens): no needless complexity (a materially simpler equivalent exists — lookup over nested conditionals, early return over nesting, existing util over hand-roll) and no speculative/unused code (unused params/props, single-caller abstraction built for a hypothetical, options nothing passes, dead branches). (N/A)
 
 ## §C1. Dense guard clauses without comment
 
@@ -334,12 +333,14 @@ const next = isOn ? withItem : withoutItem
 
 §C15 says "walk every ternary in the diff" and §C4 says the same for `as` casts. Both are graded on whether you **listed** them, not on whether you noticed them: reading a long diff and forming impressions is how a multi-line ternary survives on a gate reported as PASS.
 
-Find them mechanically **before** reading for meaning, over the diff's **added lines only**:
+Find them mechanically **before** reading for meaning, over the diff's **added lines only** — over the diff you were given (e.g. `gh pr diff <num>` for a PR, `git diff <default-branch>...HEAD` for a branch), e.g.:
 
 ```bash
 gh pr diff <num> | grep -nE '^\+.*\?' | grep -v '^\+.*\w\?:'   # ternaries, minus optional-property syntax
 gh pr diff <num> | grep -nE '^\+.*\bas [A-Z]'                  # type assertions
 ```
+
+Adapt the pattern to the target language's operators before running (`and`/`or` chains, `a if c else b` conditional expressions, `x.(T)` / `cast()` type assertions, etc.); `0 hits` is only a valid receipt after the language-appropriate pattern was run, and the receipt states which pattern was used.
 
 Both greps over-match, and that is fine — the point is that every candidate gets named and dismissed in writing rather than never being looked at. Expect to discard optional properties (`field?: CustomField`), optional chaining, and `??` from the ternary grep; say so per hit.
 

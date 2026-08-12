@@ -66,7 +66,7 @@ In rough order of frequency for this skill's findings:
 The `current` and `destroyed` names don't tell me what they represent in this flow. Could we rename to `newRow` and `previouslyDeletedRow`? Makes the rest of the function easier to follow.
 ```
 
-```
+````
 **suggestion (non-blocking):**
 A guard clause reads more cleanly than the ternary inside the map. Could we switch to:
 
@@ -76,7 +76,7 @@ A guard clause reads more cleanly than the ternary inside the map. Could we swit
   return <TableRow key={field.customId}>...</TableRow>
 })}
 ```
-```
+````
 
 ```
 **nitpick:**

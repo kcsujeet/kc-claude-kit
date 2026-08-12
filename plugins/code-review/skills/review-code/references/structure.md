@@ -13,7 +13,7 @@ The structure gate agent ticks every box below against the diff. A box is FAIL i
 - [ ] §S5 Lookup objects over `switch`/nested `if`: branch-selecting-a-value uses a named map, not a switch or if/else-if chain; differing per-branch computation is handled with a thunk map, not treated as an exemption; a trailing default/else becomes the map's fallback; more than one level of `if` nesting is flattened; the branch key, if derived from multiple booleans, is built from named single-level intermediates, never a chained ternary; a fix for one violation here doesn't introduce another (e.g. replacing the map with an if-early-return helper). (N/A: no branch-selection of one value)
 - [ ] §S6 Helpers placed by consumer count: a helper with exactly one consumer is not pulled into its own subfolder; a helper with two or more consumers is not left stranded in one consumer's local folder. (N/A: no helper added)
 - [ ] §S7 JSDoc on every new exported function, hook, component, and props/type interface, unless the name is fully self-explanatory; no JSDoc that merely restates the name. (N/A: no new exported API, or target repo doesn't use doc comments — confirm by grep before marking N/A)
-- [ ] §S8 New files use named exports (`export const Foo`), inline on the declaration, not `export default` and not a trailing `export { Foo }` block; sibling default-exported files are not an exemption; framework-mandated default exports (route/page/layout files and equivalents) are exempt. (N/A: no new module)
+- [ ] §S8 New files use named exports (`export const Foo`), inline on the declaration, not `export default` and not a trailing `export { Foo }` block; sibling default-exported files are not an exemption; framework-mandated default exports (route/page/layout files and equivalents) are exempt; a new `export` on a constant/helper that nothing outside the file references is itself a finding — grep to confirm nothing imports it. (N/A: no new module)
 - [ ] §S9 Fixed-value discriminators that get serialized/compared at runtime (status, mode, kind, origin, vendor type, etc.) are TypeScript string enums, not string-literal unions; placement matches wherever the target repo already keeps sibling enums. (N/A: no new status/mode/kind field)
 
 ## §S1. Separation of concerns
@@ -62,7 +62,7 @@ New code should follow the target repo's existing layout — grep for where simi
 
 **Audit trigger on restructures.** When a PR moves a folder (reshuffle, rename, etc.), every file inside it inherits the new placement. Re-evaluate each one against this rule even if it didn't move *within* the parent — the parent move IS a placement change. Don't give a file a pass just because "it was already there"; a pre-existing violation propagated through a rename becomes the current PR's violation.
 
-**Cross-feature imports** (one feature importing directly from another feature's internals) are a placement smell in any codebase organized by feature — compose at a shared layer instead.
+**Cross-feature imports** (one feature importing directly from another feature's internals) are a placement smell in any codebase organized by feature — compose at a shared layer instead (boxed in the react gate §R2 for React/TS diffs; for non-React code organized by feature folders, raise it under §S2 with the same compose-at-the-top fix).
 
 ## §S3. Flatten single-file folders; no re-export barrels
 
@@ -269,6 +269,8 @@ New files should use `export const Foo = …` / `export function foo` over `expo
 - Framework route files (page/layout/loading/error/not-found equivalents) that require `export default` by convention.
 - Existing default exports on files not being substantively edited in this PR.
 - Existing default-plus-named mixed files in a legacy area the PR isn't touching.
+
+**Unnecessary exports.** A new `export` on a constant, type, or helper that nothing outside its own file actually imports is a finding independent of named-vs-default: an export advertises an API contract to the rest of the codebase, and a contract nothing has taken up yet is speculative surface area (the YAGNI lens applies here too). Grep the target repo for the identifier before flagging — confirm zero external importers, cite the `0 hits` grep result, then drop the `export` keyword. Internal-only reuse within the same file never needs it.
 
 **One-line counter-example:**
 

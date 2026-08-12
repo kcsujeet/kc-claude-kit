@@ -184,11 +184,13 @@ Now the subject (`member`) is in the name and the prefix (`group`/`org`) reads a
 
 The §N2 box is graded on whether you **listed** the chains, not on whether you noticed them. Reading a long diff and forming impressions is how a three-operand guard slips through while the reviewer still ticks the box: the miss that prompted this rule was a three-clause `if (!a || !b || a.index === b.index) return` buried in a 1,000-line diff, on a gate reported as PASS.
 
-Chains are greppable, so find them mechanically **before** reading for meaning. Over the diff's **added lines only**:
+Chains are greppable, so find them mechanically **before** reading for meaning, over the diff's **added lines only** — over the diff you were given (e.g. `gh pr diff <num>` for a PR, `git diff <default-branch>...HEAD` for a branch), e.g.:
 
 ```bash
 gh pr diff <num> | grep -nE '^\+.*(\&\&|\|\|)'
 ```
+
+Adapt the pattern to the target language's operators before running (`and`/`or` chains, `a if c else b` conditional expressions, `x.(T)` / `cast()` type assertions, etc.); `0 hits` is only a valid receipt after the language-appropriate pattern was run, and the receipt states which pattern was used.
 
 Then produce one line per hit in the gate evidence, with a verdict and the count:
 

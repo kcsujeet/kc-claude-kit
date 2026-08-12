@@ -16,6 +16,8 @@ Install the code-review plugin:
 /plugin install code-review@kc-claude-kit
 ```
 
+The skill triggers automatically on requests like "review this PR" or "review my changes" (skill id `code-review:review-code`).
+
 ## What's inside
 
 | Plugin | Skill | Description |

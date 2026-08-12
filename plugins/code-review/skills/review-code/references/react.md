@@ -1,10 +1,10 @@
 # React gate
 
-Project-structure, component/JSX, data-fetching, and form conventions for React/TS UI code. Covers fourteen independent failure modes across four areas: where code lives (bulletproof-react), how components and markup are structured, how reads/writes are split and owned, and how forms hold state.
+Project-structure, component/JSX, data-fetching, form, and state-placement conventions for React/JSX UI code. Covers fifteen independent failure modes across five areas: where code lives (bulletproof-react), how components and markup are structured, how reads/writes are split and owned, how forms hold state, and where new component state itself lives.
 
 ## Gate checklist
 
-The react gate agent ticks every box against the diff. A box is FAIL if any matching construct in the new code violates the rule; the gate is FAIL if any box is FAIL. Mark a box N/A only when the diff has no matching construct. The whole gate is N/A only when the diff contains no React/TS UI code (state that).
+The react gate agent ticks every box against the diff. A box is FAIL if any matching construct in the new code violates the rule; the gate is FAIL if any box is FAIL. Mark a box N/A only when the diff has no matching construct. The whole gate is N/A only when the diff contains no React/JSX UI code (state that).
 
 - [ ] §R1 Bulletproof-react placement: new feature code sits under `features/<feature>/{api,components,hooks,...}` (only needed subfolders); cross-feature-consumed code sits at the shared app level. (N/A: target repo doesn't use/isn't migrating to a feature-based layout — grep for `src/features/` first — or no files added/moved)
 - [ ] §R2 No cross-feature imports (`features/A` importing from `features/B`'s internals); composition happens at the app/routes level. (N/A: no feature-to-feature import in diff)
@@ -18,8 +18,9 @@ The react gate agent ticks every box against the diff. A box is FAIL if any matc
 - [ ] §R10 No side-effect-only component (`useEffect` + `return null`) — blocker; no skip-via-ternary in map callbacks; no `renderXxx()` inline render-function pattern. (N/A: none of the three constructs in diff)
 - [ ] §R11 Reads and writes live in separate hooks; no raw `fetch`/`axios`/`useMutation`/`useQuery` call inside a component — grep how sibling features do it. (N/A: no data call in diff)
 - [ ] §R12 Fetch ownership re-evaluated for every read hook added/moved: the fetch lives with the actual consumer; a parent/page doesn't duplicate a fetch its child already owns (especially with different params); no full-list fetch added only to derive a boolean. (N/A: no read hook added/moved)
-- [ ] §R13 Query invalidation is a last resort (cache-patch → surgical update → invalidate, in that order); `mutate` + callbacks preferred over `mutateAsync` + `await` when the resolved value only drives a side effect. (N/A: no invalidation or mutation in diff)
+- [ ] §R13 Query invalidation is a last resort (cache-patch → surgical update → invalidate, in that order); `mutate` + callbacks preferred over `mutateAsync` + `await` when the resolved value only drives a side effect; mechanical sweep — grep the diff's added lines for `mutateAsync`, give every hit a verdict, state `grepped mutateAsync: 0 hits` explicitly when none found. (N/A: no invalidation or mutation in diff)
 - [ ] §R14 Form is the single source of truth (no `useState` shadowing a form-held value); hand-rolled validation checks/regex/coercions are confirmed against the validation library's own API before being kept. (N/A: no form or schema in diff)
+- [ ] §R15 New component state lives at the lowest common ancestor of its actual consumers, never lifted because a parent "might" want it; order-dependent multi-step state mutations (`update` then `remove`, `setX` then `setY` where order matters) carry a rationale comment at the call site. (N/A: no state added or edited in diff)
 
 ---
 
@@ -260,6 +261,22 @@ const handleSubmit = () => {
 
 Test: does the resolved value only drive a side effect (snackbar, redirect, cache patch, parent callback)? If yes, it belongs in `onSuccess` — errors flow through `onError` without a `try/catch` per call site, and pending/error state stays in sync automatically.
 
+**Enumerate `mutateAsync` by grep, do not eyeball.** This box is graded on whether the hits were listed, not on whether they were noticed. Find them mechanically over the diff's added lines:
+
+```bash
+gh pr diff <num> | grep -nE '^\+.*mutateAsync'
+```
+
+Emit one line per hit with a verdict:
+
+```
+grepped mutateAsync: 2 hits
+- [FAIL] useSubmitOrder.ts:34 — resolved value only drives a snackbar; switch to `mutate` + `onSuccess`
+- [PASS] useCheckoutFlow.ts:52 — awaited because the caller's own contract returns a promise after settlement
+```
+
+**Silence is not a pass:** a sweep that finds none must print `grepped mutateAsync: 0 hits` explicitly, so "no receipt" is never mistaken for "nothing there."
+
 ---
 
 ## Section 4 — Forms
@@ -297,4 +314,39 @@ check((v) => Number(v) >= 0) // and again in another check
 
 // Better — coerce once, validate with the library's native actions
 pipe(union([string(), number()]), transform((v) => (v === '' ? 0 : Number(v))), minValue(0))
+```
+
+---
+
+## Section 5 — State
+
+### §R15. New state lives at the lowest common ancestor of its consumers
+
+Declare new state where its actual consumers are, not one level higher "in case" a parent ends up needing it too. Lifting state speculatively re-renders everything between the new home and the real consumer, and invites prop drilling (§R5) the moment the speculation doesn't pan out.
+
+```tsx
+// Flag — lifted to the page component though only one child reads/writes it
+const [isPanelOpen, setIsPanelOpen] = useState(false)
+return <Page><SidePanel isOpen={isPanelOpen} onToggle={setIsPanelOpen} /></Page>
+
+// Better — the state stays with its only consumer
+const SidePanel = () => {
+  const [isOpen, setIsOpen] = useState(false)
+  // ...
+}
+```
+
+If a second sibling consumer genuinely appears, lift then — to the nearest common ancestor of the consumers that exist today, not further.
+
+**Order-dependent multi-step state mutations carry a rationale comment.** `update(...)` then `remove(...)`, or `setX(...)` then `setY(...)` where swapping the order changes behavior, needs a one-line comment at the call site saying why the order matters (this is the same rule as clarity's §C7, scoped here to component state specifically).
+
+```tsx
+// Flag — order matters, nothing says so
+update(rowId, changes)
+remove(previousRowId)
+
+// Better
+// remove must run after update: removing first would shift indices update relies on
+update(rowId, changes)
+remove(previousRowId)
 ```
