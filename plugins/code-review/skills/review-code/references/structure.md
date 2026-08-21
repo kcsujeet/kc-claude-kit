@@ -1,5 +1,7 @@
 # Structure gate
 
+> The conventions themselves are stated canonically in the kit's `rules/structure.md`, which loads at authoring time. This file is the review side: the detection criteria and failure modes for grading a diff. Each box stays self-contained so a gate agent needs nothing but this file; when a convention changes, change `rules/structure.md` first and update the affected boxes here to match.
+
 Code-placement and API-shape rules for the diff under review. Covers nine independent failure modes: mixed responsibilities inside one unit, wrong-layer co-location, leftover single-file folders and re-export barrels, dead wrappers, branch-selection that should be a lookup, misplaced helpers, missing JSDoc on exported APIs, default exports on new files, and literal unions standing in for serialized enums.
 
 ## Gate checklist

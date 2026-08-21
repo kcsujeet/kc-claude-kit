@@ -1,5 +1,7 @@
 # Datetime gate
 
+> The conventions themselves are stated canonically in the kit's `rules/datetime.md`, which loads at authoring time. This file is the review side: the detection criteria and failure modes for grading a diff. Each box stays self-contained so a gate agent needs nothing but this file; when a convention changes, change `rules/datetime.md` first and update the affected boxes here to match.
+
 Date/time is where generic correctness rules pay off the most, and where a change that "looks locally correct" most often hides a boundary bug: midnight, a DST transition, a user in another timezone, a week that starts on a different day than the reviewer's. Treat any diff that touches a date, a time, or a timezone as high risk and walk every box below, even when the change is two lines.
 
 ## Gate checklist

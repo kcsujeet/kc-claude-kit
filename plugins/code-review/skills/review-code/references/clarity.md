@@ -1,5 +1,7 @@
 # Clarity gate
 
+> The conventions themselves are stated canonically in the kit's `rules/clarity.md`, which loads at authoring time. This file is the review side: the detection criteria and failure modes for grading a diff. Each box stays self-contained so a gate agent needs nothing but this file; when a convention changes, change `rules/clarity.md` first and update the affected boxes here to match.
+
 Readability rules for the diff under review. None of these are automatically wrong — they are prompts to look harder at new logic. Covers sixteen independent failure modes: guard-clause density, defensive coercion, undeclared field access, redundant casts, tangled side effects, comment hygiene, ordered mutations, magic spreads, inline anonymous types, fallback chains, unhappy-path tangling, thin wrappers, dense sub-expressions, circular imports, ternary shape, and magic numbers.
 
 ## Gate checklist

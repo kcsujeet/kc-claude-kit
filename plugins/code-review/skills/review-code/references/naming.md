@@ -1,5 +1,7 @@
 # Naming gate
 
+> The conventions themselves are stated canonically in the kit's `rules/naming.md`, which loads at authoring time. This file is the review side: the detection criteria and failure modes for grading a diff. Each box stays self-contained so a gate agent needs nothing but this file; when a convention changes, change `rules/naming.md` first and update the affected boxes here to match.
+
 Identifier-naming rules for the diff under review. Covers four independent failure modes: type-shaped names on behavior-bearing values, undecoded inline boolean chains, repeated predicates that should be a shared helper, and names that are dishonest about what the code actually does.
 
 ## Gate checklist
