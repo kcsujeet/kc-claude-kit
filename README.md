@@ -1,6 +1,8 @@
 # kc-claude-kit
 
-Sujeet's personal Claude Code toolkit: reusable plugins for any codebase.
+Sujeet's personal Claude Code toolkit for any codebase: portable coding conventions that load while you write, plus plugins for reviewing a diff, auditing a repo's instruction setup, and verifying a change before calling it done.
+
+Two delivery mechanisms, because they load differently. `rules/` holds conventions and travels by symlink into user scope, since a plugin cannot ship always-on context. Everything else is a plugin you install.
 
 ## Install
 
