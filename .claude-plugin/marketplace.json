@@ -13,6 +13,18 @@
       "source": "./plugins/code-review",
       "description": "Gate-based code review: one subagent per rule file, per-box PASS/FAIL verdicts, zero rationalized skips",
       "version": "1.0.0"
+    },
+    {
+      "name": "claude-md",
+      "source": "./plugins/claude-md",
+      "description": "Audit a repo's Claude Code instruction setup: what stays in CLAUDE.md, what becomes a path-scoped rule, a skill, or a hook",
+      "version": "1.0.0"
+    },
+    {
+      "name": "testing",
+      "source": "./plugins/testing",
+      "description": "Verification workflows: look at the UI before calling it done, with realistic data across states, viewports and themes",
+      "version": "1.0.0"
     }
   ]
 }

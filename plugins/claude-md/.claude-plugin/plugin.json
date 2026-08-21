@@ -1,0 +1,8 @@
+{
+  "name": "claude-md",
+  "description": "Audit a repo's Claude Code instruction setup and propose a restructure: what stays in CLAUDE.md, what becomes a path-scoped rule, a skill, or a hook",
+  "version": "1.0.0",
+  "author": {
+    "name": "Sujeet Kc"
+  }
+}

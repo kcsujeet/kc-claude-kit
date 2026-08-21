@@ -1,0 +1,8 @@
+{
+  "name": "testing",
+  "description": "Verification workflows: look at the UI before calling it done, with realistic data and across the states and viewports that actually break",
+  "version": "1.0.0",
+  "author": {
+    "name": "Sujeet Kc"
+  }
+}

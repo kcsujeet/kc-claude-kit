@@ -10,19 +10,63 @@ Add the marketplace:
 /plugin marketplace add kcsujeet/kc-claude-kit
 ```
 
-Install the code-review plugin:
+Install a plugin:
 
 ```
 /plugin install code-review@kc-claude-kit
+/plugin install claude-md@kc-claude-kit
+/plugin install testing@kc-claude-kit
 ```
 
-The skill triggers automatically on requests like "review this PR" or "review my changes" (skill id `code-review:review-code`).
+All three skills trigger automatically: `code-review:review-code` on "review this PR" or "review my changes", `claude-md:audit` on "audit my CLAUDE.md" or "should this be a skill or a rule", `testing:verify-ui` on "does this look right", and `testing:verify-e2e` on "test this end to end".
+
+## Portable conventions
+
+`rules/` holds the conventions themselves, stated once, in the form Claude reads while **writing** code rather than while reviewing it. Plugins cannot ship rules (a plugin carries `skills/`, `agents/`, `hooks/`, MCP and LSP config, and nothing else), so these travel by symlink into user scope, where they apply to every project on the machine:
+
+```bash
+git clone https://github.com/kcsujeet/kc-claude-kit ~/src/kc-claude-kit
+mkdir -p ~/.claude/rules
+for f in ~/src/kc-claude-kit/rules/*.md; do ln -s "$f" ~/.claude/rules/; done
+```
+
+Each file carries `paths:` frontmatter limiting it to source files, so editing a README or a JSON config does not pull them into context. Run `/context` in a session to confirm which loaded.
+
+| Rule | Scope | Covers |
+|---|---|---|
+| `working-agreement.md` | always | Ask before assuming, report honestly, write corrections down where they belong |
+| `naming.md` | source files | One word per concept, role-not-type names, verb-noun functions, booleans as assertions, named predicates |
+| `clarity.md` | source files | Ternary limits, early returns, comments that earn their place, magic numbers, no defensive coercion |
+| `structure.md` | source files | One responsibility per unit, co-location and promotion, no barrels, named exports, lookup over switch |
+| `datetime.md` | source files | No hand-rolled date math, ISO 8601 with offset, truncation accounting, timezone and clock as settings |
+| `testing.md` | source files | Failing test first, run the loop continuously, never skip a test to reach green, cover the unhappy paths |
+| `type-safety.md` | typed languages | No `any`, no silencing casts, parse external input at the boundary, reuse existing types |
+| `error-handling.md` | source files | No empty catch, typed codes, one envelope, messages that say what to do, structured logs |
+| `performance.md` | source files | Filter and paginate in the data layer, no N+1, index with the query, measure and say what you measured |
+| `dependencies.md` | dependency manifests | Ask first, check maintenance signals, exact versions, nothing that duplicates what is installed |
+
+`working-agreement.md` is the only unscoped one, since it applies to any task rather than any file. The rest carry `paths:` frontmatter, and `dependencies.md` is scoped to manifests so it arrives exactly when something is about to be installed.
+
+For React and TypeScript codebases, [bulletproof-react](https://github.com/alan2207/bulletproof-react/blob/master/docs/project-structure.md) is the canonical source for project structure, and `rules/structure.md` says so explicitly: where the two appear to disagree, that document wins and the rule is what gets corrected. Its guidance on barrel files matches the kit's, with a reason the kit did not have (barrels break tree shaking).
+
+These are the source of truth. The matching `references/*.md` in the code-review plugin hold the review-time detection criteria for the same conventions, so a convention change starts in `rules/` and the gate boxes follow.
 
 ## What's inside
 
 | Plugin | Skill | Description |
 |--------|-------|-------------|
 | `code-review` | `review-code` | Gate-based code review with one subagent per rule file and per-box PASS/FAIL verdicts |
+| `claude-md` | `audit` | Audits a repo's instruction setup and proposes what stays in CLAUDE.md, what becomes a path-scoped rule, a skill, or a hook |
+| `testing` | `verify-ui` | Looks at the actual screen before a UI change is called done: realistic data, every state, narrow viewport, both themes, largest font scale |
+| `testing` | `verify-e2e` | Drives a cross-layer change as a person would, confirms the durable effect at the far end, and walks the unhappy paths on purpose |
+
+## How the CLAUDE.md audit works
+
+A `CLAUDE.md` grows by three lines per correction until it is four hundred lines loaded into every session, and adherence drops as it grows, so the file meant to make Claude reliable does the opposite.
+
+The audit sorts content by **when it needs to load** rather than by topic. It inventories every instruction file, classifies each section (keep, move, delete, split, or enforce), reports the always-loaded line count before and after, and proposes a file plan. Sections only relevant to part of the repo become `.claude/rules/` files with `paths:` frontmatter; multi-step procedures become skills; prose guardrails become hooks, which are the only ones that actually enforce anything; directory trees and architecture tours get deleted, since Claude can read those off the codebase.
+
+It proposes and stops. Nothing is rewritten without explicit approval, because instruction files are usually hand-tuned over months and a bad split degrades every future session quietly.
 
 ## How the review works
 
