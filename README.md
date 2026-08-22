@@ -46,6 +46,8 @@ Each file carries `paths:` frontmatter limiting it to source files, so editing a
 | `error-handling.md` | source files | No empty catch, typed codes, one envelope, messages that say what to do, structured logs |
 | `performance.md` | source files | Filter and paginate in the data layer, no N+1, index with the query, measure and say what you measured |
 | `dependencies.md` | dependency manifests | Ask first, check maintenance signals, exact versions, nothing that duplicates what is installed |
+| `react.md` | components, hooks, api | Components own their container, reads and writes in separate hooks, cache-patch before invalidate, form is the source of truth |
+| `i18n.md` | source and locale files | Source locale only, grep before adding a key, ICU plurals for countable nouns, never concatenate translations |
 
 `working-agreement.md` is the only unscoped one, since it applies to any task rather than any file. The rest carry `paths:` frontmatter, and `dependencies.md` is scoped to manifests so it arrives exactly when something is about to be installed.
 
