@@ -2,7 +2,7 @@
 
 Sujeet's personal Claude Code toolkit for any codebase: portable coding conventions that load while you write, plus plugins for reviewing a diff, auditing a repo's instruction setup, and verifying a change before calling it done.
 
-Two delivery mechanisms, because they load differently. `rules/` holds conventions and travels by symlink into user scope, since a plugin cannot ship always-on context. Everything else is a plugin you install.
+Four plugins. The `conventions` one carries rules, which plugins cannot load on their own, so it ships an `init` skill that copies them into a project and a hook that reminds you when they are missing.
 
 ## Install
 
@@ -15,24 +15,38 @@ Add the marketplace:
 Install a plugin:
 
 ```
+/plugin install conventions@kc-claude-kit
 /plugin install code-review@kc-claude-kit
 /plugin install claude-md@kc-claude-kit
 /plugin install testing@kc-claude-kit
+```
+
+Then, once per project you want the conventions in:
+
+```
+/conventions:init
 ```
 
 All three skills trigger automatically: `code-review:review-code` on "review this PR" or "review my changes", `claude-md:audit` on "audit my CLAUDE.md" or "should this be a skill or a rule", `testing:verify-ui` on "does this look right", and `testing:verify-e2e` on "test this end to end".
 
 ## Portable conventions
 
-`rules/` holds the conventions themselves, stated once, in the form Claude reads while **writing** code rather than while reviewing it. Plugins cannot ship rules (a plugin carries `skills/`, `agents/`, `hooks/`, MCP and LSP config, and nothing else), so these travel by symlink into user scope, where they apply to every project on the machine:
+`plugins/conventions/rules/` holds the conventions themselves, stated once, in the form Claude reads while **writing** code rather than while reviewing it.
+
+Plugins cannot load rules. The spec is explicit: a plugin contributes context "through skills, agents, and hooks", and a `CLAUDE.md` at the plugin root "is not loaded as project context". So the files ship with the plugin and something has to copy them where Claude Code looks:
+
+- **Per project**, run `/conventions:init`. It copies them into `.claude/rules/`, which keeps the `paths:` frontmatter working so each rule loads only when a matching file is touched. Commit the directory and the project carries its own conventions.
+- **Machine-wide**, put them in `~/.claude/rules/` instead, where they apply to every project on that machine:
 
 ```bash
 git clone https://github.com/kcsujeet/kc-claude-kit ~/src/kc-claude-kit
 mkdir -p ~/.claude/rules
-for f in ~/src/kc-claude-kit/rules/*.md; do ln -s "$f" ~/.claude/rules/; done
+for f in ~/src/kc-claude-kit/plugins/conventions/rules/*.md; do ln -s "$f" ~/.claude/rules/; done
 ```
 
-Each file carries `paths:` frontmatter limiting it to source files, so editing a README or a JSON config does not pull them into context. Run `/context` in a session to confirm which loaded.
+A `SessionStart` hook checks whether either is in place and prints one line when neither is, so a fresh clone tells you the conventions are missing instead of quietly running without them. It stays silent otherwise, so the normal case costs no context.
+
+Run `/context` in a new session to confirm what loaded.
 
 | Rule | Scope | Covers |
 |---|---|---|
@@ -59,6 +73,7 @@ These are the source of truth. The matching `references/*.md` in the code-review
 
 | Plugin | Skill | Description |
 |--------|-------|-------------|
+| `conventions` | `init` | Copies the portable convention rules into a project's `.claude/rules/`, with a hook that flags when they are missing |
 | `code-review` | `review-code` | Gate-based code review with one subagent per rule file and per-box PASS/FAIL verdicts |
 | `claude-md` | `audit` | Audits a repo's instruction setup and proposes what stays in CLAUDE.md, what becomes a path-scoped rule, a skill, or a hook |
 | `testing` | `verify-ui` | Looks at the actual screen before a UI change is called done: realistic data, every state, narrow viewport, both themes, largest font scale |
