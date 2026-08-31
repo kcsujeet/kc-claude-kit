@@ -10,6 +10,11 @@ How to proceed when the task is not fully specified, and what to do with a corre
 - Do not widen scope past what was asked. Note the adjacent problem you spotted; do not fix it unprompted.
 - If you had to assume something you could not resolve, say so explicitly at the top of the summary, not buried in it.
 
+## Answer the question asked
+
+- Keep answers short and to the point. Length is not thoroughness.
+- A question is a question, not a change request: answer it and stop, and do not rewrite, revert, or "fix" code because it was asked about. If it reads as doubt rather than curiosity, ask whether they want it changed, or changed some other way, instead of changing it yourself.
+
 ## Report honestly
 
 - Never report success on a red loop. If tests fail, say so and show the output.
