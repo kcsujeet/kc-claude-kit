@@ -13,6 +13,7 @@ Before producing the first draft, paste this checklist in chat with each box exp
 - [ ] Action-first: each draft leads with what to change, not the rationale. Rationale goes in a follow-up sentence only when needed.
 - [ ] One topic per draft: a multi-bullet draft (three sub-points in one comment) means either split into separate threads or pick the single strongest framing.
 - [ ] Courtesy: soft framing throughout (`Could we…`, `Worth…`, `Lean toward…`, `Want to…`). Politeness is non-negotiable; brevity does not excuse curtness. Audit each draft for command-form openers (`Drop`, `Rename`, `Move`, `Add`, `Wire up`, `Replace`, `Use`, `Factor`, etc.) and re-frame as a question or suggestion. Even when the change is mandatory, ask for it; the label (`issue` / `chore` / `suggestion`) already signals the weight.
+- [ ] Code examples: prefer none, and point at existing code that already does the thing. Include a snippet only when the shape is genuinely ambiguous without one, and then write it to the target repo's conventions and read it back as if it had arrived in the diff. A snippet that needs a new one-off helper, or that restructures control flow to fit, means you are designing the fix instead of naming the defect.
 ```
 
 Skipping this checklist (or producing it perfunctorily and then writing long drafts anyway) is the documented failure mode. The discipline only sticks when the checklist precedes the drafts in chat.
@@ -122,12 +123,51 @@ After producing the drafts and before showing them as "ready to post", paste a o
 
 ```
 **Post-draft audit:**
-1. <file:line> | length: <N sentences> | label on own line ✓ | no §X / no jargon ✓ | no em dashes ✓ | soft framing ✓ | action-first ✓ | one topic ✓
-2. <file:line> | length: <N sentences> | label on own line ✓ | no §X / no jargon ✓ | no em dashes ✓ | soft framing ✓ | action-first ✓ | one topic ✓
+1. <file:line> | length: <N sentences> | label on own line ✓ | no §X / no jargon ✓ | no em dashes ✓ | soft framing ✓ | action-first ✓ | one topic ✓ | code earns its place + to repo conventions ✓/n-a
+2. <file:line> | length: <N sentences> | label on own line ✓ | no §X / no jargon ✓ | no em dashes ✓ | soft framing ✓ | action-first ✓ | one topic ✓ | code earns its place + to repo conventions ✓/n-a
 …
 ```
 
-Any FAIL marks (length > 3 without justification, jargon citation, em dashes, command-form opener without `Could we` / `Worth` / `Want to` softener, multi-topic) mean rewrite *before* asking for the post signal, not after the user catches it.
+Any FAIL marks (length > 3 without justification, jargon citation, em dashes, command-form opener without `Could we` / `Worth` / `Want to` softener, multi-topic, a snippet that would not pass this same review) mean rewrite *before* asking for the post signal, not after the user catches it.
+
+## Code examples are proposals, not illustrations
+
+A snippet in a comment is something the author may paste straight in, so it meets
+the same bar as the diff it is critiquing. Two questions, in order: does it earn
+its place at all, and if so does it follow the target repo's conventions?
+
+**Does it earn its place.** Default to no snippet. If the repo already contains
+code that makes the same decision, cite that file and line instead: it is shorter,
+it is known to compile, and it does not invent an approach the author now has to
+argue with. Reach for a snippet only when the shape is genuinely ambiguous in
+prose, and keep it to the smallest fragment that removes the ambiguity.
+
+Two smells that mean you have crossed from naming the defect into designing the
+fix, and should cut the snippet back or drop it:
+
+- It introduces a helper used exactly once, to sidestep something.
+- It reorders or restructures control flow so the example fits.
+
+**Does it follow the conventions.** Open the function you are replacing and keep
+its shape; read the formatter config rather than guessing at indentation, quotes,
+semicolons and line width; then read the snippet back against the repo's
+readability rules exactly as if it had arrived in the diff. Real failures, all
+from a single review:
+
+- A ternary return where the function being replaced used flat early-return
+  guards. The comment argued for readability while lowering it.
+- `const isWallClock = typeof x === 'string' && !hasExplicitOffset(x)`: two
+  clauses behind one name, in a repo whose rule is one named intermediate per
+  clause.
+- Then a one-off `hasOwnInstant` helper introduced to dodge that condition, which
+  traded a convention violation for an unnecessary abstraction.
+- Spaces and semicolons in a repo formatted with tabs and `semicolons: asNeeded`.
+- Calling a module-private helper as if it were exported, without noting that it
+  needs exporting first.
+
+Mirroring neighbouring code is a good default, not a rule that outranks the
+conventions. If the line you are copying sits in a different context, copying its
+shape buys nothing.
 
 ## Posting drafts: wait for an explicit, fresh signal
 
