@@ -1,7 +1,7 @@
 {
   "name": "conventions",
   "description": "Portable coding conventions as path-scoped rules, installed into a project with one command",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "author": {
     "name": "Sujeet Kc"
   }

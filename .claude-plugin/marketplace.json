@@ -12,13 +12,13 @@
       "name": "conventions",
       "source": "./plugins/conventions",
       "description": "Portable coding conventions as path-scoped rules, installed into a project with /conventions:init",
-      "version": "1.0.0"
+      "version": "1.0.1"
     },
     {
       "name": "code-review",
       "source": "./plugins/code-review",
       "description": "Gate-based code review: one subagent per rule file, per-box PASS/FAIL verdicts, zero rationalized skips",
-      "version": "1.0.0"
+      "version": "1.0.1"
     },
     {
       "name": "claude-md",

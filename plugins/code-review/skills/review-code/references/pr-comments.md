@@ -12,6 +12,7 @@ Before producing the first draft, paste this checklist in chat with each box exp
 - [ ] Format: label on its own line; no em dashes; no `§X` / `§<name>` / internal-rule-number citations in any draft; no praise openers (`Good catch`, `Good call`, `Fair`, `Real bug`, `Nice find`); no `(blocking)` decoration.
 - [ ] Action-first: each draft leads with what to change, not the rationale. Rationale goes in a follow-up sentence only when needed.
 - [ ] One topic per draft: a multi-bullet draft (three sub-points in one comment) means either split into separate threads or pick the single strongest framing.
+- [ ] Replies to feedback on OUR OWN PR are one sentence unless a listed exception applies (see "Replying to feedback on your own PR"). No restating the reviewer's point, no explaining why they were right, no precedent for a change they already asked for.
 - [ ] Courtesy: soft framing throughout (`Could we…`, `Worth…`, `Lean toward…`, `Want to…`). Politeness is non-negotiable; brevity does not excuse curtness. Audit each draft for command-form openers (`Drop`, `Rename`, `Move`, `Add`, `Wire up`, `Replace`, `Use`, `Factor`, etc.) and re-frame as a question or suggestion. Even when the change is mandatory, ask for it; the label (`issue` / `chore` / `suggestion`) already signals the weight.
 - [ ] Code examples: prefer none, and point at existing code that already does the thing. Include a snippet only when the shape is genuinely ambiguous without one, and then write it to the target repo's conventions and read it back as if it had arrived in the diff. A snippet that needs a new one-off helper, or that restructures control flow to fit, means you are designing the fix instead of naming the defect.
 ```
@@ -168,6 +169,60 @@ from a single review:
 Mirroring neighbouring code is a good default, not a rule that outranks the
 conventions. If the line you are copying sits in a different context, copying its
 shape buys nothing.
+
+## Length: the budget, and what earns a sentence past it
+
+This applies to every piece of text this skill produces, not just replies. The budgets:
+
+| Surface | Budget |
+|---------|--------|
+| Chat finding | one line |
+| Drafted review comment | one to three sentences, plus a code block only when the shape isn't obvious from prose |
+| Reply accepting feedback on our own PR | one sentence plus the full commit SHA |
+
+A sentence past the budget has to earn its place. **These never earn it, on any surface:** restating the rule or the reviewer's own point back at them; justifying a change the reader already asked for; citing precedent for something nobody disputed; re-describing what a linked commit already shows; explaining the reasoning behind a finding whose fix is already stated. Cut them and let the reader ask.
+
+## Replying to feedback on your own PR
+
+A reply is not a review comment and does not get a Conventional Comments label. It has one job: say whether the code changed, and point at the commit. It is the strictest case of the budget above.
+
+**When accepting, the whole reply is one sentence plus the full commit SHA.**
+
+```
+Fixed in <sha>.
+```
+
+`Done in <sha>.` / `Renamed in <sha>.` / `Removed in <sha>.` all work. The SHA does the explaining; the reviewer clicks it and sees exactly what changed.
+
+**A second sentence is earned by exactly three things, and nothing else:**
+
+1. You are **not** making the change, and owe the reasoning.
+2. What you did **differs** from what was asked, so the reviewer would be surprised by the diff.
+3. You **also changed something adjacent** the reviewer did not raise, so they know to look at it.
+
+**Never earns a sentence:** restating the suggestion back (they wrote it, they know); explaining why the reviewer was right; citing precedent for a change they already asked for; listing what changed when the linked commit shows it; naming the call-site count or file list for a mechanical rename.
+
+Bad, three sentences where one would do:
+```
+Good catch, the name and the value disagreed. Fixed in <sha>: it now reads "X",
+matching `someSiblingKey` for the lowercase word in Title Case. I also fixed
+`otherKey` one line down, which was in the wrong case.
+```
+
+Good, the exception clause kept, everything else cut:
+```
+Fixed in <sha>, now "X". Also fixed `otherKey` below it, which was in the wrong case.
+```
+
+**Audit before showing replies**, sentence count first because that is the mark that drifts:
+
+```
+**Post-draft audit (replies):**
+1. <comment id> | sentences: 1 | full SHA, unbackticked ✓ | stance explicit ✓ | no em dashes ✓ | no restatement ✓ | exception used: none
+2. <comment id> | sentences: 2 | full SHA, unbackticked ✓ | stance explicit ✓ | no em dashes ✓ | no restatement ✓ | exception used: (3) adjacent change
+```
+
+Any reply over one sentence with `exception used: none` is a rewrite before you show it, not after the user asks you to shorten it.
 
 ## Posting drafts: wait for an explicit, fresh signal
 

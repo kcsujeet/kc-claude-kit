@@ -1,7 +1,7 @@
 {
   "name": "code-review",
   "description": "Gate-based code review: one subagent per rule file, per-box PASS/FAIL verdicts, zero rationalized skips",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "author": {
     "name": "Sujeet Kc"
   }
