@@ -11,6 +11,7 @@ The naming gate agent ticks every box against the diff. A box is FAIL if any mat
 - [ ] §N1 Role-not-type names: new variables/functions describe the role, not the type (no `data`/`result`/`value`/`temp`/`item`/`obj` for behavior-bearing values); function names describe the effect, not just the trigger. (N/A: no new identifiers)
 - [ ] §N2 Inline boolean chains — evaluate the OPERANDS, not just the outer name: any `&&`/`||` chain with 2+ non-obvious operands (raw comparisons, enum (in)equalities, negations, `?.` field access) has EACH non-obvious operand extracted to its own named boolean. Assigning the whole chain to a named boolean does NOT satisfy this. A parenthesized sub-expression in a mixed `&&`/`||` chain (e.g. `(a || b) && c`) also gets its own name — parentheses alone don't pass. Enumerate by grep, do not eyeball. (N/A: only when the grep returns 0 hits, stated as `grepped &&/||: 0 hits`)
 - [ ] §N3 Cross-call-site predicate: the same predicate repeated in 2+ places is extracted to a named helper (type guard when narrowing helps). (N/A: no repeated predicate)
+- [ ] §N5 Unambiguous where READ, not where declared: every new identifier (local, destructured value, parameter, closure, returned key, export) is qualified enough to read at its use site without scrolling back to the declaration. A bare generic verb/noun naming the mechanism rather than the subject (`check`, `run`, `wrap`, `guard`, `handle`, `process`, `filter`, `format`, `validate`, and any other single word of that shape) FAILS even though it is accurate, and a collision with an unrelated declaration elsewhere FAILS on its own. Enumerate by grep, do not eyeball. (N/A: only when the diff adds no identifiers, stated as `grepped bare-word declarations: 0 hits`)
 - [ ] §N4 Honest names: each new name reads as a sentence that matches the actual behavior/subject — no surface-word gluing, no subject elision, no context-as-subject, no stale-after-refactor names, no familiar-shaped name hiding a different behavior or constraint. (N/A: no new names)
 
 ## §N1. Names should describe the *role*, not the *type*
@@ -181,6 +182,56 @@ export const orgMemberInvitePath = (orgId: string) => `/portal/organization/${or
 Now the subject (`member`) is in the name and the prefix (`group`/`org`) reads as the calling context.
 
 **How to spot during review:** look at any new exported name and rephrase it as a sentence. If you can't say it without inventing missing words, or the inferred sentence doesn't match the body of the function, flag it. Don't accept "the URL/folder/path already says this" — the name has to stand on its own outside that context.
+
+## §N5. A name has to be unambiguous where it is READ, not where it is declared
+
+Every identifier is read twice: once beside its declaration, where the surrounding lines supply the subject for free, and once at its use site, where they do not. A name that only works in the first position is a review miss waiting to happen, and reviewing it in the first position is what causes the miss.
+
+Applies to every identifier, not just exported ones: locals, destructured values, parameters, closures, returned keys, exports. Distance and collision are what matter, not module boundaries. An export is simply the extreme case, because its use site is guaranteed to be in another file.
+
+**This is a distinct failure mode from §N1 and §N4, and that is exactly why it slips.** The name is not type-shaped, so §N1 passes. The name is not dishonest, so §N4 passes: the thing really does check / wrap / run. What it lacks is a *subject*, and the subject was free at the declaration.
+
+Walk each box independently; failing one is a finding:
+
+- [ ] The identifier is a single generic verb or noun naming the *mechanism* rather than the subject.
+- [ ] It is read far from where it is declared: a different function, a template branch, a nested callback, another file.
+- [ ] Another declaration of the same bare identifier exists elsewhere in the repo for an unrelated purpose.
+- [ ] Sibling identifiers at the use site are built from the same word (`fooWrapped`, `wrappedFoo`, `wrapper`), so this one no longer stands out.
+
+Bad — accurate, and useless where it is used:
+```ts
+const check = <A extends unknown[], R>(action: (...args: A) => R) => /* ... */
+// ...forty lines of unrelated body...
+const handleArchive = check(() => archive(id))
+```
+
+`check(...)` at the bottom says nothing about what is being checked, and a reader has to scroll back to find out which of the codebase's several `check` helpers this is. It reads perfectly well on the line above the declaration, which is where a reviewer looks.
+
+Good — the subject travels with the name:
+```ts
+const checkRetentionPolicy = <A extends unknown[], R>(action: (...args: A) => R) => /* ... */
+
+const handleArchive = checkRetentionPolicy(() => archive(id))
+```
+
+**Enumerate by grep, do not eyeball.** Genericness and collisions are both mechanical. Over the diff's added lines, list every new declaration whose name is a single bare word, then grep it across the repo:
+
+```bash
+<diff command> | grep -nE '^\+.*(const|let|var|function|def|func|return \{) [a-z][a-zA-Z_]*'
+grep -rn "\b<name>\b" <source dirs> | grep -v <vendor dir>
+```
+
+One line per identifier in the gate evidence, with the collision count:
+
+```
+grepped bare-word declarations: 4 hits
+- [PASS] useSomeResource.ts:31 `useSomeResource` — subject in the name
+- [FAIL] useRetentionPolicy.ts:24 `check` — generic verb, no subject; 3 unrelated `check` declarations elsewhere
+- [FAIL] SomePage.tsx:51 `guard` — local, read 9 lines away; collides with an unrelated `guard`
+- [PASS] retentionPolicy.ts:12 `isRetained` — subject in the name
+```
+
+`0 hits` must be printed explicitly, so silence can never be read as a pass.
 
 ## §N2 evidence requirement: enumerate boolean chains by grep, do not eyeball
 
