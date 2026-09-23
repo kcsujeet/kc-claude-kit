@@ -61,7 +61,7 @@ Apply this to every diff, not just the constructs called out elsewhere in this f
 - **YAGNI (§P2)** — is there speculative or unused code? Concretely: unused params/props; an abstraction built for a hypothetical second caller when there is only one; a config option nothing in the diff actually passes; a dead branch. A generality the PR doesn't use is a finding even if it "might be needed later."
 - **KISS (§P3)** — is there a materially simpler equivalent already available? Concretely: a lookup object beating nested conditionals; an early return beating nesting; an existing util or stdlib call beating a hand-roll. Fewer moving parts for the same behavior wins.
 
-Surface each with evidence and let the reader judge — never withhold a finding because the complexity seemed "probably needed."
+Surface each confirmed one with evidence and let the reader judge; never withhold it because the complexity seemed "probably needed." A candidate you cannot back with evidence from the code is dropped, not softened into a "maybe".
 
 ### §P4. Reuse over reinvention
 
@@ -83,12 +83,12 @@ This is the general form of the rule above. The default assumption for any new c
 **Hook-reuse camouflages component-reuse.** A component can *look* compliant because it reuses a shared hook, while still reinventing a shared component that already wraps that same hook. When a component assembles a shared values hook (`useXValues`) + a generic input (a select/autocomplete/picker primitive) + option/filter wiring, that assembled trio is usually already packaged as a shared component (e.g. `<XPicker>` = `useXValues` + the generic input + scoping/filtering). "It uses the shared hook" is NOT enough — grep for a shared component that composes the same hook and prefer it, expressing the delta through its props (an exclude list, a disabled predicate, a query filter) instead of re-hand-assembling.
 
 ```tsx
-// Flag — hand-assembles what <XPicker> already packages, even though useXValues is "reused"
+// Flag: hand-assembles what <XPicker> already packages, even though useXValues is "reused"
 const { options } = useXValues({ type: X, scopeId })
 const available = options.filter((o) => !selectedIds.includes(o.value))
 <GenericAutocomplete multiple name="x_ids" values={available} />
 
-// Prefer — the shared component composes useXValues + the generic input; pass the delta as props
+// Prefer: the shared component composes useXValues + the generic input; pass the delta as props
 <XPicker multiple name="x_ids" excludeIds={selectedIds} />
 ```
 
@@ -130,7 +130,7 @@ Flag numeric coercion/fallback that is either unsafe or redundant:
 const amount = balanceDue ?? 0
 const rate = Number(input) || 0
 
-// Prefer — a single named call the rest of the codebase reads the same way
+// Prefer: a single named call the rest of the codebase reads the same way
 const amount = coerceNumber(balanceDue)
 const rate = coerceNumber(input)
 ```
@@ -142,14 +142,14 @@ Fix: use the project's safe-coercion helper if one already exists (grep for it b
 When the same small conversion/encoding is written inline at 2+ call sites, extract a named helper so the encoding lives in one place. This is easy to miss because each instance is individually a "fine short ternary": no single one trips a ternary-complexity rule, and a boolean-to-value mapping isn't discriminator-selection, so other gates pass each instance in isolation. The smell is the *repetition of the mapping*, especially both directions of the same encoding (encode at write, decode at read) — adding one more case then means editing N sites, and it's easy to get a branch backwards.
 
 ```ts
-// Flag — the same boolean<->Mode encoding inlined at four sites (read + write, two fields)
+// Flag: the same boolean<->Mode encoding inlined at four sites (read + write, two fields)
 fieldA: (saved?.fieldA ?? Mode.ON) === Mode.ON,            // decode
 fieldB: (saved?.fieldB ?? Mode.ON) === Mode.ON,            // decode
 // ...elsewhere...
 fieldA: form.fieldA ? Mode.ON : Mode.OFF,                  // encode
 fieldB: form.fieldB ? Mode.ON : Mode.OFF,                  // encode
 
-// Prefer — the encoding is defined once, each direction a named helper
+// Prefer: the encoding is defined once, each direction a named helper
 const isOn = (value?: Mode) => (value ?? Mode.ON) === Mode.ON
 const toMode = (on: boolean) => (on ? Mode.ON : Mode.OFF)
 ```

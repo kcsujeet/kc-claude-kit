@@ -16,7 +16,7 @@ Before producing the first draft, paste this checklist in chat with each box exp
 **Pre-draft self-prompt:**
 - [ ] Length: each draft will be ≤ 3 sentences (+ code if needed). Long is the exception, not the default; reserve for explaining a subtle tradeoff, pushing back with technical reasoning, or clarifying a non-obvious decision.
 - [ ] Format: label on its own line; no em dashes; no `§X` / `§<name>` / internal-rule-number citations in any draft; no praise openers (`Good catch`, `Good call`, `Fair`, `Real bug`, `Nice find`); no `(blocking)` decoration.
-- [ ] Action-first: each draft leads with what to change, not the rationale. Rationale goes in a follow-up sentence only when needed.
+- [ ] Action-first: each draft leads with what to change, not the rationale. Every `suggestion` then gives a brief reason (one clause or sentence) inside the three-sentence budget; other labels add rationale only when needed.
 - [ ] One topic per draft: a multi-bullet draft (three sub-points in one comment) means either split into separate threads or pick the single strongest framing.
 - [ ] Replies to feedback on OUR OWN PR are one sentence unless a listed exception applies (see "Replying to feedback on your own PR"). No restating the reviewer's point, no explaining why they were right, no precedent for a change they already asked for.
 - [ ] Courtesy: soft framing throughout (`Could we…`, `Worth…`, `Lean toward…`, `Want to…`). Politeness is non-negotiable; brevity does not excuse curtness. Audit each draft for command-form openers (`Drop`, `Rename`, `Move`, `Add`, `Wire up`, `Replace`, `Use`, `Factor`, etc.) and re-frame as a question or suggestion. Even when the change is mandatory, ask for it; the label (`issue` / `chore` / `suggestion`) already signals the weight.
@@ -44,7 +44,7 @@ In rough order of frequency for review findings:
 
 | Label | When |
 |-------|------|
-| **suggestion** | Proposes a specific change. The default for naming, refactor, and structural feedback. |
+| **suggestion** | Proposes a specific change, with a brief reason (one clause or sentence). The default for naming, refactor, and structural feedback. |
 | **nitpick** | Trivial style preference, non-blocking. Use when the existing code works and the change is purely about taste. |
 | **issue** | Real problem in the code that should be addressed before merge. Use sparingly. The label already implies must-fix, so do not add a `(blocking)` decoration. |
 | **question** | Genuine uncertainty about why something was done a particular way. Do not weaponize as a passive-aggressive suggestion. |
@@ -134,13 +134,13 @@ After producing the drafts and before showing them as "ready to post", paste a o
 
 ```
 **Post-draft audit:**
-1. <file:line> | length: <N sentences> | label on own line ✓ | no §X / no jargon / no press-release phrasing ✓ | no em dashes ✓ | soft framing ✓ | action-first ✓ | one topic ✓ | code earns its place + to repo conventions ✓/n-a
-2. <file:line> | length: <N sentences> | label on own line ✓ | no §X / no jargon / no press-release phrasing ✓ | no em dashes ✓ | soft framing ✓ | action-first ✓ | one topic ✓ | code earns its place + to repo conventions ✓/n-a
+1. <file:line> | length: <N sentences> | label on own line ✓ | no §X / no jargon / no press-release phrasing ✓ | no em dashes ✓ | soft framing ✓ | action-first ✓ | suggestion has a reason ✓/n-a | one topic ✓ | code earns its place + to repo conventions ✓/n-a
+2. <file:line> | length: <N sentences> | label on own line ✓ | no §X / no jargon / no press-release phrasing ✓ | no em dashes ✓ | soft framing ✓ | action-first ✓ | suggestion has a reason ✓/n-a | one topic ✓ | code earns its place + to repo conventions ✓/n-a
 Top-level body: none ✓ | or: says <the one thing no inline says> ✓
 …
 ```
 
-Any FAIL marks (length > 3 without justification, jargon citation, press-release phrasing, a top-level body that restates the inlines, em dashes, command-form opener without `Could we` / `Worth` / `Want to` softener, multi-topic, a snippet that would not pass this same review) mean rewrite *before* asking for the post signal, not after the user catches it.
+Any FAIL marks (length > 3 without justification, jargon citation, press-release phrasing, a top-level body that restates the inlines, em dashes, command-form opener without `Could we` / `Worth` / `Want to` softener, a `suggestion` with no reason, multi-topic, a snippet that would not pass this same review) mean rewrite *before* asking for the post signal, not after the user catches it.
 
 ## Top-level review body
 
@@ -204,10 +204,10 @@ This applies to every piece of text this skill produces, not just replies. The b
 | Surface | Budget |
 |---------|--------|
 | Chat finding | one line |
-| Drafted review comment | one to three sentences, plus a code block only when the shape isn't obvious from prose |
+| Drafted review comment | one to three sentences, a `suggestion`'s brief reason included, plus a code block only when the shape isn't obvious from prose |
 | Reply accepting feedback on our own PR | one sentence plus the full commit SHA |
 
-A sentence past the budget has to earn its place. **These never earn it, on any surface:** restating the rule or the reviewer's own point back at them; justifying a change the reader already asked for; citing precedent for something nobody disputed; re-describing what a linked commit already shows; explaining the reasoning behind a finding whose fix is already stated. Cut them and let the reader ask.
+A sentence past the budget has to earn its place. **These never earn it, on any surface:** restating the rule or the reviewer's own point back at them; justifying a change the reader already asked for; citing precedent for something nobody disputed; re-describing what a linked commit already shows; justifying a finding past the one brief reason a `suggestion` carries. Cut them and let the reader ask.
 
 ## Replying to feedback on your own PR
 

@@ -35,7 +35,7 @@ This gate applies to every diff. A box is N/A only under its own stated N/A cond
 
 ## Grading rules
 
-- **Surface everything you find.** Whether a deviation is acceptable or intentional is the user's call, not yours. "Intentional", "defensible", "matches the neighbors" and "low-value" may be added as descriptions; they are never reasons to withhold a finding.
+- **Drop what you cannot confirm, never what you can.** A finding you cannot back with evidence from the code or docs (a possible bug you could not trace, an unsupported judgment call) is dropped rather than softened into a "maybe", while a confirmed checklist violation is always reported unsoftened, and "intentional", "defensible", "matches the neighbors" or "low-value" is never a reason to withhold it.
 - **"Matches the existing pattern" is a yellow flag, not a green light.** New code that extends a violating pattern violates the rule too.
 - **A pre-existing problem is raised at most once, and only when it intersects the change**, marked as pre-existing. A violation the diff copies or moves is the diff's own.
 - **A claim about a library, platform or API cites the documentation fetched or the installed source read in this session.** A behavioral claim from memory is not evidence.
@@ -55,7 +55,7 @@ FINDINGS:
 - <severity 🔴|🟠|🟡> <file>:<line>: <issue>. <fix>
 ```
 
-List every box in the skill's `## Review checklist`, each with its own evidence. An N/A box states which N/A condition holds.
+List every box in the skill's `## Review checklist`, each with its own evidence. An N/A box states which N/A condition holds. Write no em dash (U+2014) anywhere in the block; use a period, comma, colon or parentheses instead.
 
 Failure semantics:
 

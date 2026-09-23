@@ -1,13 +1,13 @@
 ---
 name: review-code
-description: Gate-based code review for a PR, branch, or set of changes in any repo. Gathers the diff and checks its scope, dispatches one gate agent per convention topic (naming, clarity, structure, simplicity, datetime, react, i18n, testing) plus a project-conventions gate that reads the target repo's own .claude/review-conventions.md, then a verification gate that audits their receipts, and aggregates the per-box PASS/FAIL verdicts into one PASSED/FAILED result. Use when the user says "review this PR", "review my code", "review my changes", "review my branch", "is this clean", "is this good to merge", "code review please", or gives a bare PR URL or branch name. Output stays in chat; it never posts to GitHub.
+description: Gate-based code review for a PR, branch, or set of changes in any repo. Gathers the diff and checks its scope, dispatches one gate agent per convention topic (naming, clarity, structure, simplicity, datetime, react, i18n, testing, correctness) plus a project-conventions gate that reads the target repo's own .claude/review-conventions.md, then a verification gate that audits their receipts, and aggregates the per-box PASS/FAIL verdicts into one PASSED/FAILED result. Use when the user says "review this PR", "review my code", "review my changes", "review my branch", "is this clean", "is this good to merge", "code review please", or gives a bare PR URL or branch name. Output stays in chat; it never posts to GitHub.
 ---
 
 # Reviewing code
 
 This skill reviews a diff against a fixed set of quality gates, plus any repo-specific conventions the target project declares for itself. It is the orchestrator: it gathers the diff, checks scope, dispatches the gate agents, and aggregates their verdicts. The rules each gate grades against live in the `conventions` plugin's topic skills; the gates themselves are this plugin's agents.
 
-A regular review catches bugs. The things that slip through review are: convention drift, code placed in the wrong layer, duplicated logic that already exists somewhere else, and code that takes three readings to understand. That is what this skill is for.
+The correctness gate hunts bugs on every diff. The other gates catch what slips through a regular review: convention drift, code placed in the wrong layer, duplicated logic that already exists somewhere else, and code that takes three readings to understand.
 
 ## Hard rules
 
@@ -16,15 +16,16 @@ A regular review catches bugs. The things that slip through review are: conventi
   - **DRY**: is any logic, value, literal, or markup duplicated that should be a single source? A copied block, a re-declared constant, a re-implemented helper.
   - **YAGNI**: is there speculative or unused code? Unused params/props, an abstraction with a single caller built for a hypothetical second one, config options nothing passes, dead branches, a generality the diff doesn't use.
   - **KISS**: is there a materially simpler equivalent? A lookup object beating nested conditionals, an early return beating nesting, an existing util/stdlib call beating a hand-roll, fewer moving parts for the same behavior.
-  These are first-class smells, not stylistic extras. Surface them with evidence and let the user judge (per the surface-everything rule); never withhold one because you decided the complexity was "probably needed".
+  These are first-class smells, not stylistic extras. Surface them with evidence and let the user judge (per the confirmed-findings rule); never withhold a confirmed one because you decided the complexity was "probably needed".
 - **Never post anything to GitHub on your own.** No `gh pr review`, no `gh pr comment`, no `gh api` writes. Output stays in chat. If the user wants comments drafted or posted, they run `/code-review:post-review`. The plugin's hook blocks unapproved GitHub review writes.
 - **Verify conventions against the codebase before flagging.** Do not cite a "convention" from memory. Before saying "this codebase does it like X", grep the repo and confirm there are at least 2-3 existing examples of X. Cite the example file paths in your finding.
 - **Before flagging, confirm it's actually a deviation, not a misread.** Some things look wrong in isolation but are the house style when you grep. Grep to confirm the thing genuinely deviates from how the codebase does it, and cite the evidence. This check is about ACCURACY (don't raise a non-issue based on a misunderstanding); it is NOT a license to suppress. Once something genuinely deviates from a rule, you surface it; see the next two rules.
-- **Surface everything you find. Do NOT make the "is it acceptable / intentional" call yourself; that is the user's (and the PR author's) judgment, not yours.** Your job is detection and reporting. NEVER drop a finding, and never soften it to "this is fine / probably intentional / defensible / low-value / pure conformance so skip it," because you decided it was intended or not worth it. If you found it, you report it, with evidence, and let the human decide whether it's okay. "Intentional" / "defensible" / "matches the neighbors" / "low-value" are descriptions you may add for the human's benefit, never reasons to withhold.
+- **Report what you can confirm; drop what you cannot.** A finding you cannot confirm (a possible bug you could not trace, a judgment call you cannot back with evidence from the code or docs) is dropped, not softened into a "maybe". A confirmed violation of a checklist box is never dropped or softened: whether it is acceptable is the user's (and the PR author's) call, not yours, so "intentional", "defensible", "matches the neighbors" or "low-value" is still never a reason to withhold one. Those words may be added as descriptions for the human's benefit.
 - **Any finding fails its gate. There is no finding that "still passes."** A gate is PASS only when nothing is found in it; the moment one thing is found, that gate is FAIL and the overall verdict is FAILED. Severity labels (🔴/🟠/🟡, issue/suggestion/nitpick) calibrate only the *weight communicated to the author*; they do NOT affect whether the finding is reported or whether the gate passes. A single 🟡 nitpick fails its gate and therefore the review. Report FAILED plainly; never round up to "looks good with minor nits."
-- (Self-review parallel: when reviewing *my own* work, precedent never excuses a violation either; the same surface-everything bar applies before I call work done.)
+- (Self-review parallel: when reviewing *my own* work, precedent never excuses a violation either; the same confirmed-findings bar applies before I call work done.)
 - **When a rule lists examples, examples are illustrations, never an exhaustive boundary.** State the principle first, examples second, explicitly labeled as illustrations. Apply the rule to *every* item in the diff that matches the principle, including items not in the example list. If you find yourself thinking "this item isn't in the listed examples so the rule doesn't apply," you're misreading the rule. This applies BOTH when reading rules (don't narrow to the listed examples) AND when writing rules (don't frame a rule around a specific domain when the principle is general).
-- **Brevity is a hard rule on every surface: chat findings, drafted comments, and replies.** Length is the most consistently violated rule in this skill. Every unit of output has a budget, and a sentence past it must earn its place: **a chat finding is one line**, **a drafted comment is one to three sentences**, **a reply accepting feedback is one sentence plus the commit SHA**. Prose that restates the rule, justifies a change the reader already asked for, re-describes what a linked commit shows, or explains the reasoning behind a finding whose fix is already stated does NOT earn its place; cut it. If the reader needs the why, they will ask. Count before you show: an over-budget unit is a rewrite *before* the user sees it, never after they ask you to shorten it.
+- **Brevity is a hard rule on every surface: chat findings, drafted comments, and replies.** Length is the most consistently violated rule in this skill. Every unit of output has a budget, and a sentence past it must earn its place: **a chat finding is one line**, **a drafted comment is one to three sentences**, **a reply accepting feedback is one sentence plus the commit SHA**. A drafted `suggestion` carries one brief reason inside its budget (see `post-review`). Prose that restates the rule, justifies a change the reader already asked for, re-describes what a linked commit shows, or over-justifies a finding past that one reason does NOT earn its place; cut it. If the reader needs more of the why, they will ask. Count before you show: an over-budget unit is a rewrite *before* the user sees it, never after they ask you to shorten it.
+- **No em dashes (U+2014) in any output.** Not in the chat report, verdict blocks, drafted comments or replies. Use a period, comma, colon or parentheses instead.
 - **A pre-existing problem is flagged at most once, and only when it intersects the change.** Code the diff did not touch is not the author's to fix in this PR. When an untouched line interacts with a changed one (the change calls into it, extends it, or depends on its behavior), raise it once, briefly, marked as pre-existing; otherwise leave it out. A violation the diff copies or moves is not pre-existing: it is the diff's own (see "Matches the existing pattern" below).
 - **Read the actual changed code yourself** with the `Read` tool, after fetching the diff. Gate verdicts are a starting point: the specific issues live in specific lines and you need to see them to call them out usefully.
 - **Cite line numbers, file paths, and head SHA** for every finding. Vague feedback is useless.
@@ -58,11 +59,11 @@ Determine the target repo from the current working directory. Detect the default
 
 ### Step 2: dispatch the gate agents in two phases (mandatory: ALL gates, EVERY round)
 
-Dispatch each gate with the Agent tool, `subagent_type` set to the agent name below. Phase 1 runs in parallel: issue all nine Agent calls in a single message. Phase 2 (verification) runs only after every phase-1 agent has returned, because it audits their returned verdict blocks rather than re-deriving findings.
+Dispatch each gate with the Agent tool, `subagent_type` set to the agent name below. Phase 1 runs in parallel: issue all ten Agent calls in a single message. Phase 2 (verification) runs only after every phase-1 agent has returned, because it audits their returned verdict blocks rather than re-deriving findings.
 
 Each topic gate preloads its `conventions:<topic>` skill, so it already holds that topic's `## Review checklist`, `## Review detail` and `## Sweeps`. You do not paste rules into the prompt.
 
-**Phase 1: dispatch these nine in parallel.**
+**Phase 1: dispatch these ten in parallel.**
 
 | Gate | Agent (`subagent_type`) | Dispatch note |
 |------|-------------------------|---------------|
@@ -74,6 +75,7 @@ Each topic gate preloads its `conventions:<topic>` skill, so it already holds th
 | react | `code-review:react-gate` | agent returns PASS (N/A) if no React/JSX UI code in diff |
 | i18n | `code-review:i18n-gate` | agent returns PASS (N/A) if no locale files in diff |
 | testing | `code-review:testing-gate` | agent returns PASS (N/A) if the diff changes no behavior and touches no test file |
+| correctness | `code-review:correctness-gate` | always |
 | project-conventions | `code-review:project-conventions-gate` | agent returns PASS (N/A) if target repo has no `.claude/review-conventions.md` |
 
 **Phase 2: dispatch only after every phase-1 agent has returned.**
@@ -112,6 +114,7 @@ Each agent must:
    - <severity 🔴|🟠|🟡> <file>:<line>: <issue>. <fix>
    ```
 5. Failure semantics: a box is **FAIL** if ANY matching construct in the diff violates it; the gate STATUS is **FAIL** if ANY box is FAIL. Do not average, do not "mostly pass".
+6. Drop a finding it cannot confirm, never a confirmed one, and write no em dash (U+2014) in the block.
 
 A verdict that does not have this shape, or that has a box with no evidence, is rejected: send it back to the same agent for the per-box `BOXES:` breakdown before aggregating.
 
@@ -119,7 +122,7 @@ A verdict that does not have this shape, or that has a box with no evidence, is 
 
 - Overall verdict is **PASSED** only when every gate returned `PASS` or `PASS (N/A)`, and the `SCOPE:` block has no FAIL box.
 - **A single FAIL box in any one gate means overall FAILED.** State plainly that the review has not passed and the author needs further changes; do not soften a FAILED into "looks mostly good" or "just nits". A nitpick-severity finding still fails its box and therefore the review; severity calibrates the *comment*, not whether the gate passed.
-- **A gate PASSES only when it found nothing. Any finding = that gate FAILED.** Do not let a gate agent (or yourself) return PASS while also listing a finding; that is contradictory and means FAIL. Aggregate by surfacing every finding from every gate; never drop or merge-away a finding because you judged it intentional/acceptable (that call is the user's; see Hard rules). The report lists all findings found, and the verdict is FAILED if the list is non-empty.
+- **A gate PASSES only when it found nothing. Any finding = that gate FAILED.** Do not let a gate agent (or yourself) return PASS while also listing a finding; that is contradictory and means FAIL. Aggregate by surfacing every finding from every gate; never drop or merge-away a confirmed finding because you judged it intentional/acceptable (that call is the user's; see Hard rules). The report lists all findings found, and the verdict is FAILED if the list is non-empty.
 - A built-in box the project-conventions gate lists as overridden (§X3) is reported as overridden, citing the repo rule, and does not fail its gate.
 - Emit the gate-status table first, then the deduped findings, then the explicit `PASSED`/`FAILED` verdict (see Output format).
 - On a re-review, run Steps 1-4 again in full, and fold in the author's replies to your prior comments (Step 1): mark each carried-over item as fixed (verify the whole class), declined-with-reason (surface it, don't re-post over their reply), or still-open. Report the new verdict; do not carry forward a prior round's PASS.
@@ -159,6 +162,7 @@ Report directly in chat. No file output. **Be terse.** The reader is the user, n
 | react | ... |
 | i18n | ... |
 | testing | ... |
+| correctness | ... |
 | project-conventions | ... |
 | verification | ... |
 
@@ -173,9 +177,6 @@ Report directly in chat. No file output. **Be terse.** The reader is the user, n
 
 **Overridden by repo conventions:** (only when the project-conventions gate listed an override)
 - <gate> §<box>: overridden by <repo rule>, `.claude/review-conventions.md:L<n>`.
-
-**Possible bug:** (only if a gate agent spotted one while reading)
-- `<file>:L<n>`: <one-liner>.
 
 **Checklist:** (one line per applicable trigger group, per the verification gate's "How to use this in the output": a cited receipt, or `n/a, diff does not touch X`)
 - Always: <files read at sha, findings cite file:line + sha, nothing posted to GitHub>.
@@ -222,8 +223,7 @@ This skill does not draft or post PR comments. To turn findings into comments, o
 
 ## What this skill is not
 
-- It is not a bug scan. If you spot a real bug while reading, mention it under "**Possible bug:**" but do not let bug-hunting take over; the user has other tools for that.
-- It is not a generic style linter substitute and it is not a security review. Stay focused on the ten gates above plus any repo-declared conventions.
+- It is not a generic style linter substitute and it is not a security review. Stay focused on the eleven gates above plus any repo-declared conventions.
 - It does not post to GitHub on its own.
 
 ## Notes for iteration
@@ -239,6 +239,7 @@ This skill is in active iteration. When the user gives feedback ("you missed X",
    - React/data-fetching/forms/component-structure conventions → `plugins/conventions/skills/react/SKILL.md`
    - Translations / locale keys → `plugins/conventions/skills/i18n/SKILL.md`
    - Test coverage, assertions, test setup, test placement → `plugins/conventions/skills/testing/SKILL.md`
+   - Logic bugs, edge cases, data-shape mismatches, regressions of fixed bugs → `plugins/conventions/skills/correctness/SKILL.md`
    - A new deterministic sweep → a script in that topic's `scripts/`, listed under its `## Sweeps`, with a fixture in `plugins/conventions/tests/sweeps/`
    - Receipts one gate must show for another → `plugins/code-review/agents/verification-gate.md`
    - How a gate agent works (inputs, procedure, verdict shape) → `plugins/code-review/agents/<gate>.md`

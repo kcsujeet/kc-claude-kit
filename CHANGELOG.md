@@ -12,10 +12,11 @@ The restructure described in [`docs/architecture.md`](docs/architecture.md): eac
 
 #### Added
 
-- One skill per topic under `skills/<topic>/SKILL.md` (naming, clarity, structure, simplicity, datetime, react, i18n, testing, type-safety, error-handling, performance, dependencies), invoked as `conventions:<topic>`. Each holds the authoring rules, the review checklist, the per-box review detail, and the topic's sweeps.
+- One skill per topic under `skills/<topic>/SKILL.md` (naming, clarity, structure, simplicity, datetime, react, i18n, testing, correctness, type-safety, error-handling, performance, dependencies), invoked as `conventions:<topic>`. Each holds the authoring rules, the review checklist, the per-box review detail, and the topic's sweeps.
 - Deterministic sweep scripts under `skills/<topic>/scripts/`, each printing one `file:line: text` hit per line, with fixture tests in `tests/`.
 - `scripts/build-rules.sh`, which generates `rules/<topic>.md` from each skill's `## Rules` section and `paths`, and fails on drift with `--check`.
 - Eval suite under `evals/`, run with `claude plugin eval`.
+- `correctness` topic (§B1-§B4): logic errors, edge cases including timezone, data that does not match its declared type at a boundary, and regressions of bugs the repo already fixed. Derived from ilamy-calendar's retired review skill.
 
 #### Changed
 
@@ -27,11 +28,15 @@ The restructure described in [`docs/architecture.md`](docs/architecture.md): eac
 #### Changed
 
 - **Breaking:** posting to GitHub moved out of `review-code` into the user-invoked `/code-review:post-review` skill (`disable-model-invocation: true`). A `PreToolUse` hook blocks any GitHub write whose Bash command does not carry `KC_REVIEW_POST_APPROVED=1`.
-- **Breaking:** gates are plugin agents under `agents/`: `code-review:<topic>-gate` for naming, clarity, structure, simplicity, datetime, react, i18n and testing, each read-only (`Read, Grep, Glob, Bash`, `model: sonnet`) and preloading its `conventions:<topic>` skill, plus `code-review:project-conventions-gate` and `code-review:verification-gate` (phase 2). The `skills/review-code/references/` directory is gone: topic rules moved to the conventions skills, the gate contract into the agents, the repo-author format guide to `docs/review-conventions.md`, and the PR-comment protocol to `post-review`.
+- **Breaking:** gates are plugin agents under `agents/`: `code-review:<topic>-gate` for naming, clarity, structure, simplicity, datetime, react, i18n, testing and correctness, each read-only (`Read, Grep, Glob, Bash`, `model: sonnet`) and preloading its `conventions:<topic>` skill, plus `code-review:project-conventions-gate` and `code-review:verification-gate` (phase 2). The `skills/review-code/references/` directory is gone: topic rules moved to the conventions skills, the gate contract into the agents, the repo-author format guide to `docs/review-conventions.md`, and the PR-comment protocol to `post-review`.
 - **Breaking:** depends on the `conventions` plugin (`^1.1.0`) through `dependencies`, which installs it automatically.
 - `review-code` is now an orchestrator only: it saves the diff to a file, runs the scope checks, dispatches the gates by `subagent_type`, and aggregates. If a gate agent is unavailable it falls back to a `general-purpose` agent that invokes the `conventions:<topic>` skill, and reports the fallback.
 - Gates run the conventions sweep scripts against the saved diff instead of ad hoc greps.
 - A rule in the target repo's `.claude/review-conventions.md` that contradicts a built-in convention now wins for that repo; the built-in box is reported as overridden, citing the repo rule.
+- Bug hunting is a mandatory gate: `code-review:correctness-gate` runs on every review, and the optional "Possible bug" report section is gone.
+- A finding that cannot be confirmed (an untraced possible bug, a judgment call with no evidence from the code or docs) is dropped instead of softened into a "maybe". A confirmed checklist violation is still never dropped or softened.
+- Em dashes are banned in every output surface: the chat report, gate verdict blocks, drafted comments and replies. Output templates and examples in the skills and agents no longer use them.
+- Every drafted `suggestion` comment carries a brief reason inside the one-to-three-sentence budget.
 
 #### Added
 

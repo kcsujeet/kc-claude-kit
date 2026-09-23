@@ -62,14 +62,14 @@ Before evaluating any rule below, the gate agent produces one row per NEW key in
 Required row shape:
 
 ```
-<file>:L<n> — <key> = "<value>" | namespace: <ok / move to shared>, plural: <icu / bare-noun → flag>, dupe: <none / clash with X>, naming: <matches value / mismatch>
+<file>:L<n>: <key> = "<value>" | namespace: <ok / move to shared>, plural: <icu / bare-noun → flag>, dupe: <none / clash with X>, naming: <matches value / mismatch>
 ```
 
 Example:
 
 ```
-feature.json:L12 — sprocket = "sprocket" | namespace: move to shared (generic noun), plural: bare-noun → flag (should be ICU), dupe: none, naming: matches value
-feature.json:L44 — deleteWidgetMessage = "Are you sure you want to delete this widget?" | namespace: ok (feature-specific), plural: n/a (sentence), dupe: none, naming: matches value (short-form Message suffix)
+feature.json:L12: sprocket = "sprocket" | namespace: move to shared (generic noun), plural: bare-noun → flag (should be ICU), dupe: none, naming: matches value
+feature.json:L44: deleteWidgetMessage = "Are you sure you want to delete this widget?" | namespace: ok (feature-specific), plural: n/a (sentence), dupe: none, naming: matches value (short-form Message suffix)
 ```
 
 Do not batch rows from memory. For every new key, walk §I2 through §I7 below and fill in the corresponding cell — a row filled in without actually running the grep and the ICU/naming checks is the exact glaze-over that ships violations. Output the table first, then let the individual boxes' findings expand on any row marked FLAG.
@@ -185,7 +185,7 @@ Do not join two translatable fragments at the call site: `t('edit') + ' ' + t('w
 t('actions.editSomething', { something: t('widget', { count: 1 }) })
 t('actions.addSomething', { something: t('gadgetCount') })
 
-// Bad — flag this
+// Bad: flag this
 `${t('edit')} ${t('widget')}`
 t('edit') + ' ' + t('widget')
 ```

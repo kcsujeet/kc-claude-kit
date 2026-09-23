@@ -372,12 +372,12 @@ The diff is one line, and from then on `Foo` is `Foo` everywhere.
 **§S8.1 — inline `export const`, not a trailing `export { Foo }` block.** Even when the export is already named, prefer attaching `export` to the declaration over declaring `const Foo = …` then re-exporting it at the bottom of the file with `export { Foo }`. Both are named exports; the inline form keeps the export adjacent to the declaration instead of a redundant statement the reader has to scroll to find. A trailing `export { … }` block earns its place only when re-exporting from elsewhere or intentionally grouping several already-declared names together.
 
 ```ts
-// Flag — declaration and export split across the file
+// Flag: declaration and export split across the file
 const Foo = (props: FooProps) => <div />
 // ...
 export { Foo }
 
-// Better — export on the declaration
+// Better: export on the declaration
 export const Foo = (props: FooProps) => <div />
 ```
 

@@ -54,6 +54,7 @@ Each topic is one skill at `plugins/conventions/skills/<topic>/SKILL.md`, with i
 | `react` | components, hooks, api | Components own their container, reads and writes in separate hooks, cache-patch before invalidate, form is the source of truth |
 | `i18n` | source and locale files | Source locale only, grep before adding a key, ICU plurals for countable nouns, never concatenate translations |
 | `testing` | source files | Failing test first, never skip a test to reach green, cover the unhappy paths, exact assertions on observable behavior, gates tested both ways |
+| `correctness` | source files | Empty, null, zero and boundary inputs; operators and conditions checked for off-by-one and inversion; current dependency arrays and closures; no cast hiding a real mismatch; no regression of a fixed bug |
 | `type-safety` | typed languages | No `any`, no silencing casts, parse external input at the boundary, reuse existing types |
 | `error-handling` | source files | No empty catch, typed codes, one envelope, messages that say what to do, structured logs |
 | `performance` | source files | Filter and paginate in the data layer, no N+1, index with the query, measure and say what you measured |
@@ -96,6 +97,7 @@ The gates are dispatched by `subagent_type` (`code-review:naming-gate` and so on
 | react | `code-review:react-gate` | diff has React/JSX UI code | Bulletproof-react structure, keys, data-fetching hooks, forms, render cost |
 | i18n | `code-review:i18n-gate` | diff touches locale files | Per-key audit table, dedup, ICU plurals, no concatenated translations |
 | testing | `code-review:testing-gate` | diff changes behavior or tests | New behavior tested, no class-name assertions, exact assertions, gates tested both ways |
+| correctness | `code-review:correctness-gate` | always | Logic bugs, edge cases (empty, null, zero, boundary, timezone), data matching its declared type at a boundary, no regression of a bug the repo already fixed |
 | project conventions | `code-review:project-conventions-gate` | repo has `.claude/review-conventions.md` | Every rule in the repo's own conventions file; repo rules that override a built-in box are listed |
 | verification | `code-review:verification-gate` | always, second | Files read at head SHA, findings cite `file:line` and SHA, receipts present, nothing posted |
 

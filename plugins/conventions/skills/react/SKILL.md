@@ -95,7 +95,7 @@ Reference: https://github.com/alan2207/bulletproof-react/blob/master/docs/projec
 
 ```
 src/
-├── components/, hooks/, utils/, types/, stores/, lib/, config/   — shared, cross-feature
+├── components/, hooks/, utils/, types/, stores/, lib/, config/   (shared, cross-feature)
 └── features/<feature>/
     ├── api/         - data hooks / API contract for this feature
     ├── components/  - feature-scoped components
@@ -112,10 +112,10 @@ Only the subfolders a feature actually needs — don't scaffold empty ones. Code
 **Applicability guard (this box's N/A condition):** enforce this only when the target repo already follows, or is actively migrating to, a feature-based structure — grep for `src/features/` first. In a legacy flat layout (`src/components/`, `src/hooks/` at the top level, no `features/`), don't demand a bulletproof migration inside an unrelated feature PR; flag only a placement that makes the existing layout *more* inconsistent than it already is (e.g. a new resource split across two different conventions in the same PR).
 
 ```
-// Flag — new feature file placed at the shared app level for no reason
+// Flag: new feature file placed at the shared app level for no reason
 src/hooks/useWidgetPricing.ts       // only WidgetPanel (in features/widgets) consumes it
 
-// Better — feature-scoped
+// Better: feature-scoped
 src/features/widgets/hooks/useWidgetPricing.ts
 ```
 
@@ -127,7 +127,7 @@ src/features/widgets/hooks/useWidgetPricing.ts
 // Flag
 import { useOtherFeatureThing } from '@/features/otherFeature/hooks/useOtherFeatureThing'
 
-// Better — promote the shared piece, or compose one level up
+// Better: promote the shared piece, or compose one level up
 import { useSharedThing } from '@/hooks/useSharedThing'
 ```
 
@@ -169,7 +169,7 @@ return <CreditsCard />   // reads useSomeContext() itself
 When **3+ sibling blocks** are structurally identical and differ only in the data they show, build an array of the varying data and `.map` it.
 
 ```tsx
-// Flag — 3 near-identical blocks, only label/value differ
+// Flag: 3 near-identical blocks, only label/value differ
 <Row><Label>{t('a')}</Label><Value>{a}</Value></Row>
 <Row><Label>{t('b')}</Label><Value>{b}</Value></Row>
 <Row><Label>{t('c')}</Label><Value>{c}</Value></Row>
@@ -205,20 +205,20 @@ Why: the subscription reads as one thing at a glance; the watched value becomes 
 **Owns-container:** a component that renders container-dependent children (grid cells, list rows) should wrap them in its own container itself, not leave the wrapper to the caller.
 
 ```tsx
-// Flag — bare items; layout breaks unless the parent remembers to wrap it
+// Flag: bare items; layout breaks unless the parent remembers to wrap it
 const FieldGroup = () => <><Cell>...</Cell></>
 
-// Better — the component owns its container
+// Better: the component owns its container
 const FieldGroup = () => <Row>{/* Cell items */}</Row>
 ```
 
 **No-parent-assumptions:** a component's root/output must be self-contained and render correctly under any parent. Flag any assumption baked in: positioning that needs a specific ancestor (a prop that only works under a specific ancestor container, e.g. a grid cell prop, `flexGrow`, `alignSelf`; `position: 'absolute'` needing a positioned ancestor); self-applied outer margins presuming sibling rhythm (spacing *between* children is the parent's `gap`/`spacing` to set); presence/placement decisions that are really the parent's call.
 
 ```tsx
-// Flag — root cell-prop only works if some ancestor is the matching container
+// Flag: root cell-prop only works if some ancestor is the matching container
 const Child = () => <GridCell size={12}>...</GridCell>
 
-// Better — child renders self-contained content; parent decides the slot
+// Better: child renders self-contained content; parent decides the slot
 const Child = () => <div>...</div>
 // parent: <GridCell size={12}><Child /></GridCell>
 ```
@@ -292,13 +292,13 @@ Two failure modes:
 - **Over-fetch for a derived flag** — pulling a full list only to compute a boolean (is-it-empty, show/hide a tab, gate a skeleton) is wasteful, and gating a whole page's skeleton on data only one section needs blocks the rest of the page.
 
 ```tsx
-// Flag — parent fetches the whole list just to gate visibility, while a child
+// Flag: parent fetches the whole list just to gate visibility, while a child
 // already fetches (a filtered version of) the same data
 const { data: items, isLoading } = useItems({ enabled })
 if (isLoading) return <Skeleton />
 // ...elsewhere: <ChildList /> independently calls useItems({ filter })
 
-// Prefer — the consumer owns the fetch; let it render its own empty/loading state
+// Prefer: the consumer owns the fetch; let it render its own empty/loading state
 ```
 
 Name the consumers in the review and ask whether the fetch is at the right altitude.
@@ -310,7 +310,7 @@ Name the consumers in the review and ask whether the fetch is at the right altit
 **Prefer `mutate` + callbacks over `mutateAsync` + `await`.** Use `mutate(variables, { onSuccess, onError })` by default. Reach for `mutateAsync` + `await` only when: a subsequent statement in the same control flow genuinely depends on the resolved value and can't move into `onSuccess`; the caller's own contract requires returning a promise that resolves after the mutation completes; or multiple mutations must sequence in a way too tangled for nested `onSuccess`.
 
 ```ts
-// Flag — resolved value only drives a side effect
+// Flag: resolved value only drives a side effect
 const handleSubmit = async () => {
   const result = await someMutation.mutateAsync(variables)
   doSideEffect(result)
@@ -330,8 +330,8 @@ Emit one line per hit with a verdict:
 
 ```
 grepped mutateAsync: 2 hits
-- [FAIL] useSubmitOrder.ts:34 — resolved value only drives a snackbar; switch to `mutate` + `onSuccess`
-- [PASS] useCheckoutFlow.ts:52 — awaited because the caller's own contract returns a promise after settlement
+- [FAIL] useSubmitOrder.ts:34: resolved value only drives a snackbar; switch to `mutate` + `onSuccess`
+- [PASS] useCheckoutFlow.ts:52: awaited because the caller's own contract returns a promise after settlement
 ```
 
 **Silence is not a pass:** a sweep that finds none must print `grepped mutateAsync: 0 hits` explicitly, so "no receipt" is never mistaken for "nothing there."
@@ -348,13 +348,13 @@ grepped mutateAsync: 2 hits
 - **Reactive read** (a dependent field, a preview that must update live): the library's reactive watch equivalent (e.g. `useWatch`).
 
 ```tsx
-// Flag — shadows the form value with parallel state
+// Flag: shadows the form value with parallel state
 const [selected, setSelected] = useState<Foo>()
 const handleChange = (foo?: Foo) => setSelected(foo)
 const handleSubmit = methods.handleSubmit(() => selected && mutate(selected))
 return <FooAutocomplete onChange={handleChange} />
 
-// Better — read straight from the form
+// Better: read straight from the form
 const handleSubmit = methods.handleSubmit((data) => data.foo && mutate(data.foo))
 return <FooAutocomplete />
 ```
@@ -368,10 +368,10 @@ Why: two sources of truth get out of sync (a form reset, `defaultValues`, or a p
 - Any surviving hand-rolled check should be genuinely custom (cross-field, a domain invariant, a conditional requirement) — say so in the finding, so the reader knows it was considered, not missed.
 
 ```ts
-// Flag — manual coercion repeated inside checks
+// Flag: manual coercion repeated inside checks
 check((v) => Number(v) >= 0) // and again in another check
 
-// Better — coerce once, validate with the library's native actions
+// Better: coerce once, validate with the library's native actions
 pipe(union([string(), number()]), transform((v) => (v === '' ? 0 : Number(v))), minValue(0))
 ```
 
@@ -384,11 +384,11 @@ pipe(union([string(), number()]), transform((v) => (v === '' ? 0 : Number(v))), 
 Declare new state where its actual consumers are, not one level higher "in case" a parent ends up needing it too. Lifting state speculatively re-renders everything between the new home and the real consumer, and invites prop drilling (§R5) the moment the speculation doesn't pan out.
 
 ```tsx
-// Flag — lifted to the page component though only one child reads/writes it
+// Flag: lifted to the page component though only one child reads/writes it
 const [isPanelOpen, setIsPanelOpen] = useState(false)
 return <Page><SidePanel isOpen={isPanelOpen} onToggle={setIsPanelOpen} /></Page>
 
-// Better — the state stays with its only consumer
+// Better: the state stays with its only consumer
 const SidePanel = () => {
   const [isOpen, setIsOpen] = useState(false)
   // ...
@@ -400,7 +400,7 @@ If a second sibling consumer genuinely appears, lift then — to the nearest com
 **Order-dependent multi-step state mutations carry a rationale comment.** `update(...)` then `remove(...)`, or `setX(...)` then `setY(...)` where swapping the order changes behavior, needs a one-line comment at the call site saying why the order matters (this is the same rule as clarity's §C7, scoped here to component state specifically).
 
 ```tsx
-// Flag — order matters, nothing says so
+// Flag: order matters, nothing says so
 update(rowId, changes)
 remove(previousRowId)
 

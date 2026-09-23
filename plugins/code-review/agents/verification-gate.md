@@ -19,7 +19,7 @@ This applies identically to two scenarios:
 
 The dispatch prompt gives you:
 
-- every phase-1 gate's returned verdict block, verbatim (naming, clarity, structure, simplicity, datetime, react, i18n, testing, project-conventions);
+- every phase-1 gate's returned verdict block, verbatim (naming, clarity, structure, simplicity, datetime, react, i18n, testing, correctness, project-conventions);
 - the orchestrator's `SCOPE:` block (§G1-§G4);
 - on a re-review, the orchestrator's classification of each carried-over finding (fixed, declined-with-reason, still open);
 - the head SHA, the path to the saved unified diff file, and the changed-file list, so you can tell which trigger groups the diff hits.
@@ -39,7 +39,7 @@ FINDINGS:
 - <severity 🔴|🟠|🟡> <gate, or file:line>: <missing or aggregated receipt>. <what the next round must show>
 ```
 
-For §V2, list which trigger groups applied and cite each group's receipt, or its N/A reason, one per line. A box is **FAIL** if any item under it fails; the gate STATUS is **FAIL** if any box is FAIL. A PASS that also lists a finding is contradictory and means FAIL. Never post anything to GitHub.
+For §V2, list which trigger groups applied and cite each group's receipt, or its N/A reason, one per line. A box is **FAIL** if any item under it fails; the gate STATUS is **FAIL** if any box is FAIL. A PASS that also lists a finding is contradictory and means FAIL. A finding you cannot back with evidence from the verdict blocks is dropped rather than softened into a "maybe", while a confirmed missing or aggregated receipt is always reported unsoftened, and "intentional", "defensible", "matches the neighbors" or "low-value" is never a reason to withhold it. Write no em dash (U+2014) anywhere in the block; use a period, comma, colon or parentheses instead. Never post anything to GitHub.
 
 ## Gate checklist
 
@@ -146,7 +146,7 @@ N/A: the diff adds no new fixed-value discriminator type.
 
 Applies only when the reviewing agent is also the diff's author, about to declare the work done. Required receipts:
 - The project's lint and typecheck commands (detected from its own `package.json` scripts, Makefile, or CI config, never assumed from a specific package manager or another project's convention) were run, with the exact command and pass/fail result cited.
-- The entire gate fan-out (naming, clarity, structure, simplicity, datetime, react, i18n, testing, project-conventions, this gate) was walked against my own diff before saying "done" / "ready" / "verified", not just lint and typecheck.
+- The entire gate fan-out (naming, clarity, structure, simplicity, datetime, react, i18n, testing, correctness, project-conventions, this gate) was walked against my own diff before saying "done" / "ready" / "verified", not just lint and typecheck.
 - If the diff was committed, pushed, or turned into a PR, the user explicitly used one of those words. "Make the changes" or "implement this" is not permission to commit, push, or open a PR.
 
 N/A: this is a peer review of someone else's diff, not a self-review.

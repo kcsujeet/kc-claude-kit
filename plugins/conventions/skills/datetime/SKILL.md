@@ -104,7 +104,7 @@ When sending a date/time to a backend, putting it in a URL/query string, or pers
 
 **Canonical pattern:**
 ```ts
-// Going to the backend / URL / persisted state — use full ISO with offset.
+// Going to the backend / URL / persisted state: use full ISO with offset.
 const startIso = new Date().toISOString()             // '2026-05-27T19:17:20.548Z'
 const endIso = format(end, "yyyy-MM-dd'T'HH:mm:ssXXX") // '2026-05-27T19:17:20+00:00'
 ```

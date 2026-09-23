@@ -266,10 +266,10 @@ One line per identifier in the gate evidence, with the collision count:
 
 ```
 grepped bare-word declarations: 4 hits
-- [PASS] useSomeResource.ts:31 `useSomeResource` — subject in the name
-- [FAIL] useRetentionPolicy.ts:24 `check` — generic verb, no subject; 3 unrelated `check` declarations elsewhere
-- [FAIL] SomePage.tsx:51 `guard` — local, read 9 lines away; collides with an unrelated `guard`
-- [PASS] retentionPolicy.ts:12 `isRetained` — subject in the name
+- [PASS] useSomeResource.ts:31 `useSomeResource`: subject in the name
+- [FAIL] useRetentionPolicy.ts:24 `check`: generic verb, no subject; 3 unrelated `check` declarations elsewhere
+- [FAIL] SomePage.tsx:51 `guard`: local, read 9 lines away; collides with an unrelated `guard`
+- [PASS] retentionPolicy.ts:12 `isRetained`: subject in the name
 ```
 
 `0 hits` must be printed explicitly, so silence can never be read as a pass.
@@ -327,9 +327,9 @@ Then produce one line per hit in the gate evidence, with a verdict and the count
 
 ```
 grepped &&/||: 6 hits
-- [PASS] CheckoutForm.tsx:40 — `canUseCustomFields &&` single named operand
-- [FAIL] SubmissionFields.tsx:77 — 3 unnamed operands (two `!` of optional chains, one raw comparison)
-- [PASS] useSubmissionForm.ts:56 — chain assigned to `sameMembership`, operands readable
+- [PASS] CheckoutForm.tsx:40: `canUseCustomFields &&` single named operand
+- [FAIL] SubmissionFields.tsx:77: 3 unnamed operands (two `!` of optional chains, one raw comparison)
+- [PASS] useSubmissionForm.ts:56: chain assigned to `sameMembership`, operands readable
 ...
 ```
 

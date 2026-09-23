@@ -53,6 +53,7 @@ Convention topics, each a skill at `plugins/conventions/skills/<topic>/SKILL.md`
 | react | yes | `code-review:react-gate` |
 | i18n | yes | `code-review:i18n-gate` |
 | testing | yes | `code-review:testing-gate` |
+| correctness | yes | `code-review:correctness-gate` |
 | type-safety | no (rules only) | |
 | error-handling | no (rules only) | |
 | performance | no (rules only) | |

@@ -409,12 +409,12 @@ Emit one line per hit with a verdict and the count:
 
 ```
 grepped ternaries: 5 hits (1 discarded: `?` inside a regex)
-- [FAIL] someLabel.ts:18 — multi-line, template-literal branch; use an early return
-- [PASS] useSelectionResource.ts:27 — single line, both branches trivial
+- [FAIL] someLabel.ts:18: multi-line, template-literal branch; use an early return
+- [PASS] useSelectionResource.ts:27: single line, both branches trivial
 ...
 grepped as-casts: 3 hits
-- [FAIL] SubmissionFieldRow.tsx:29 — unchecked narrowing of a union
-- [PASS] useSelectionActions.ts:115 — `as ApiQueryParams` matches useMenuCategoryActions.ts:73
+- [FAIL] SubmissionFieldRow.tsx:29: unchecked narrowing of a union
+- [PASS] useSelectionActions.ts:115: `as ApiQueryParams` matches useMenuCategoryActions.ts:73
 ```
 
 **Silence is not a pass:** a gate that found none must print `grepped ternaries: 0 hits` / `grepped as-casts: 0 hits`, so a missing receipt can never be mistaken for a clean sweep.
