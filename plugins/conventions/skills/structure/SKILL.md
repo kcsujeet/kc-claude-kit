@@ -251,7 +251,7 @@ if (!FormComponent) return null
 
 Note: pure styling values (e.g. picking a padding token) are not the right place for this pattern — inline them or use the design system's own scale. The lookup-object pattern is for selecting *behavior*: components, JSX, configs, permissions.
 
-Two levels of `if` nesting is sometimes fine; three or more nearly always wants flattening.
+An `if` directly inside another `if` can stay; a third level (an `if` inside that) gets flattened.
 
 **Checklist — walk it on every `switch` and every `if`/`else-if` chain in the diff. Not passing all boxes means the code failed review:**
 
