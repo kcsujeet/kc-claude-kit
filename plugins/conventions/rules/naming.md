@@ -16,5 +16,6 @@ A name is read far more often than it is written, and a wrong one survives refac
 - A name must be unambiguous **where it is read**, not where it is declared. Beside the declaration the surrounding lines supply the subject for free; at the use site they do not. A bare generic verb or noun that names the mechanism rather than the subject (`check`, `run`, `wrap`, `guard`, `handle`) is wrong even when it is accurate, and so is any name that collides with an unrelated declaration elsewhere. Applies to locals as much as exports; distance and collision are what matter, not module boundaries.
 - A repeated predicate becomes a named helper or type guard. Twice is the threshold.
 - Match the language's own casing: `snake_case` columns and plural tables in SQL, `UpperCamelCase` types with the file named after the type, `kebab-case` plural nouns in routes.
+- A file name identifies the file without its path. Tabs, search results and stack traces show it bare, so `header.tsx` deep in a feature folder is `widget-list-header.tsx`, and no two files share a basename unless the framework requires it.
 
 Detection criteria and per-box review failure modes live in the code-review plugin's `references/naming.md`. This file is the statement of the convention; that file is how a diff gets graded against it.

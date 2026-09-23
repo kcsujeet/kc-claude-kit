@@ -14,6 +14,8 @@ Before producing the first draft, paste this checklist in chat with each box exp
 - [ ] One topic per draft: a multi-bullet draft (three sub-points in one comment) means either split into separate threads or pick the single strongest framing.
 - [ ] Replies to feedback on OUR OWN PR are one sentence unless a listed exception applies (see "Replying to feedback on your own PR"). No restating the reviewer's point, no explaining why they were right, no precedent for a change they already asked for.
 - [ ] Courtesy: soft framing throughout (`Could we…`, `Worth…`, `Lean toward…`, `Want to…`). Politeness is non-negotiable; brevity does not excuse curtness. Audit each draft for command-form openers (`Drop`, `Rename`, `Move`, `Add`, `Wire up`, `Replace`, `Use`, `Factor`, etc.) and re-frame as a question or suggestion. Even when the change is mandatory, ask for it; the label (`issue` / `chore` / `suggestion`) already signals the weight.
+- [ ] Plain words: no press-release or trailer phrasing (`demonstrably`, `a real fix`, `worth shipping on its own`, `well-scoped`, `robust`, `elegant`). Read each draft aloud; if it sounds like an announcement, rewrite it as the plain statement (`fixes the bug`, `this breaks when X`).
+- [ ] Top-level body: none, unless it says something no inline comment says (see "Top-level review body").
 - [ ] Code examples: prefer none, and point at existing code that already does the thing. Include a snippet only when the shape is genuinely ambiguous without one, and then write it to the target repo's conventions and read it back as if it had arrived in the diff. A snippet that needs a new one-off helper, or that restructures control flow to fit, means you are designing the fix instead of naming the defect.
 ```
 
@@ -41,6 +43,8 @@ In rough order of frequency for this skill's findings:
 | **issue** | Real problem in the code that should be addressed before merge. Use sparingly. The label already implies must-fix, so do not add a `(blocking)` decoration. |
 | **question** | Genuine uncertainty about why something was done a particular way. Do not weaponize as a passive-aggressive suggestion. |
 | **chore** | Small task before merge (rename, fix the comment, drop an unused import). |
+| **todo** | A small, necessary change that is not a defect in the code as written (add the missing test case, update the doc comment). |
+| **note** | Information the author should have, with no action expected (a sibling module that already does this, a caveat of the API in use). |
 | **thought** | Exploratory idea worth sharing without expecting action this PR. |
 | **praise** | Use it when something is genuinely well done. Encourages good patterns. |
 
@@ -50,7 +54,7 @@ In rough order of frequency for this skill's findings:
 
 - No em dashes (`—`). Use periods, commas, parentheses, or semicolons.
 - Soft, collaborative language. "Could we...", "Worth a one-line comment...", "Lean toward keeping this because...".
-- Plain words, no jargon. Concrete examples beat abstract principles.
+- Plain words, no jargon. Concrete examples beat abstract principles. No press-release phrasing: "demonstrably", "a real fix", "worth shipping on its own", "well-scoped". Say "fixes the bug" or "this breaks when X".
 - No accusations or assumptions about the author's process. Describe the technical issue directly.
 - **No praise / emphasis openers when accepting feedback.** Drop "Good catch", "Good call", "Fair point", "Real bug", "Nice find". They read as performative agreement. State the action: "Switched both keys to `.filled` (...). Done in <sha>." If the change is non-obvious enough to warrant context, give it after the fact (one line, neutral) without leading with praise.
 - **Default to short replies. Long is fine when the situation calls for it.** When accepting feedback and the fix is straightforward, the ideal reply is one sentence: `Addressed in <sha>.` or `Done in <sha>.` Skip restating the suggestion or itemising what changed when the linked commit makes both obvious. Go long only when the reply needs to (a) explain a subtle tradeoff, (b) push back on the suggestion with technical reasoning, (c) clarify a non-obvious decision that lives in the commit. Brevity is the default; verbosity has to earn its place.
@@ -124,12 +128,29 @@ After producing the drafts and before showing them as "ready to post", paste a o
 
 ```
 **Post-draft audit:**
-1. <file:line> | length: <N sentences> | label on own line ✓ | no §X / no jargon ✓ | no em dashes ✓ | soft framing ✓ | action-first ✓ | one topic ✓ | code earns its place + to repo conventions ✓/n-a
-2. <file:line> | length: <N sentences> | label on own line ✓ | no §X / no jargon ✓ | no em dashes ✓ | soft framing ✓ | action-first ✓ | one topic ✓ | code earns its place + to repo conventions ✓/n-a
+1. <file:line> | length: <N sentences> | label on own line ✓ | no §X / no jargon / no press-release phrasing ✓ | no em dashes ✓ | soft framing ✓ | action-first ✓ | one topic ✓ | code earns its place + to repo conventions ✓/n-a
+2. <file:line> | length: <N sentences> | label on own line ✓ | no §X / no jargon / no press-release phrasing ✓ | no em dashes ✓ | soft framing ✓ | action-first ✓ | one topic ✓ | code earns its place + to repo conventions ✓/n-a
+Top-level body: none ✓ | or: says <the one thing no inline says> ✓
 …
 ```
 
-Any FAIL marks (length > 3 without justification, jargon citation, em dashes, command-form opener without `Could we` / `Worth` / `Want to` softener, multi-topic, a snippet that would not pass this same review) mean rewrite *before* asking for the post signal, not after the user catches it.
+Any FAIL marks (length > 3 without justification, jargon citation, press-release phrasing, a top-level body that restates the inlines, em dashes, command-form opener without `Could we` / `Worth` / `Want to` softener, multi-topic, a snippet that would not pass this same review) mean rewrite *before* asking for the post signal, not after the user catches it.
+
+## Top-level review body
+
+Default to none. Inline comments anchored to lines carry the review; a top-level body earns its place only when it says something no inline comment says. Valid cases:
+
+- **Structural or workflow feedback with no line to anchor to:** "This PR is stacked on #N and can't be reviewed in isolation", or "This does three things; could we split the refactor into its own PR?"
+- **An observation about the PR as a whole** that no single line carries, such as a design concern spanning several files.
+
+Not valid, even though they look summary-shaped:
+
+- A restatement of the inline comments, or a count of them ("Left 4 comments").
+- "See inline." / "Inline comments below."
+- A severity summary ("Two of these need to be addressed before merge"). The labels already say it.
+- Press-release sentences about the PR's quality.
+
+If you cannot point at a sentence that says something no inline says, there is no body, and the posting shape below follows from that.
 
 ## Code examples are proposals, not illustrations
 
@@ -244,7 +265,7 @@ This is the most-violated rule and the most important. Read it twice.
 
 **The protocol:**
 1. Draft.
-2. Show all drafts to the user in chat.
+2. Show all drafts to the user in chat, ending with the head SHA the comments will anchor to and the chosen posting shape: *"These anchor to `<short-sha>` and go up as <individual inline comments / one review with a body>. Say the word when you want them sent."*
 3. Stop. Do not call `gh` to post.
 4. If the user changes anything (rename, drop, rephrase), apply the change, re-show the full updated set, and go back to step 3.
 5. Only when the user gives a fresh standalone post signal *after seeing the latest set*, post via the inline-review API.
@@ -271,18 +292,43 @@ Resolve the target repo from the working directory rather than hardcoding a slug
 gh repo view --json nameWithOwner -q .nameWithOwner
 ```
 
-For a fresh review with multiple inline comments, write a JSON payload and POST it:
+**Check the request shape once per session.** Before the first post in a session, fetch the current GitHub REST docs for the endpoint you are about to use and confirm the fields below still match: [create a review comment](https://docs.github.com/en/rest/pulls/comments#create-a-review-comment-for-a-pull-request) and [create a review](https://docs.github.com/en/rest/pulls/reviews#create-a-review-for-a-pull-request). Cached knowledge of request shapes drifts, and a wrong field fails the post or lands the comment on the wrong line.
+
+**Choose the posting shape from the top-level body, not from severity:**
+
+1. **No top-level body** (the usual case): post each comment individually to `POST /repos/{owner}/{repo}/pulls/{pull_number}/comments`. No review wrapper, no body to invent.
+2. **A body that says something no inline says:** post one review to `POST /repos/{owner}/{repo}/pulls/{pull_number}/reviews`, with that body and the comments inside it. Use `"event": "COMMENT"` unless the user asked to request changes (`"REQUEST_CHANGES"`). The docs mark `body` as "Required when using REQUEST_CHANGES or COMMENT for the event parameter", so a review with no real body is not an option: fall back to shape 1.
+3. **A note with no line to anchor to** (the PR is stacked, or should be split) and no inline comments: `gh pr comment <NUM> --body-file <file>`.
+
+**Shape 1, one request per comment.** `body`, `commit_id`, and `path` are required. `line` is the diff line the comment applies to (the last line of a range); `side` is `RIGHT` for added or unchanged lines and `LEFT` for deletions. A multi-line comment adds `start_line` and `start_side`; a single-line comment omits them.
+
+```bash
+gh api repos/{owner}/{repo}/pulls/<NUM>/comments -X POST --input /tmp/comment-<NUM>-<i>.json
+```
+
+```json
+{
+  "commit_id": "<full 40-char head SHA>",
+  "path": "<file>",
+  "start_line": 9,
+  "start_side": "RIGHT",
+  "line": 12,
+  "side": "RIGHT",
+  "body": "..."
+}
+```
+
+**Shape 2, one review.** Write the payload and POST it:
 
 ```bash
 gh api repos/{owner}/{repo}/pulls/<NUM>/reviews -X POST --input /tmp/review-<NUM>.json
 ```
 
-Payload shape (single-line and multi-line comments both supported):
-
 ```json
 {
   "commit_id": "<full 40-char head SHA>",
   "event": "COMMENT",
+  "body": "<the one thing no inline comment says>",
   "comments": [
     { "path": "<file>", "line": 17, "side": "RIGHT", "body": "..." },
     { "path": "<file>", "start_line": 9, "start_side": "RIGHT", "line": 12, "side": "RIGHT", "body": "..." }

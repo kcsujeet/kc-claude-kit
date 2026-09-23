@@ -1,6 +1,6 @@
 # React gate
 
-Project-structure, component/JSX, data-fetching, form, and state-placement conventions for React/JSX UI code. Covers fifteen independent failure modes across five areas: where code lives (bulletproof-react), how components and markup are structured, how reads/writes are split and owned, how forms hold state, and where new component state itself lives.
+Project-structure, component/JSX, data-fetching, form, and state-placement conventions for React/JSX UI code. Covers nineteen independent failure modes across six areas: where code lives (bulletproof-react), how components and markup are structured, how reads/writes are split and owned, how forms hold state, where new component state itself lives, and what renders cost and how layout holds up at narrow widths.
 
 ## Gate checklist
 
@@ -21,6 +21,10 @@ The react gate agent ticks every box against the diff. A box is FAIL if any matc
 - [ ] §R13 Query invalidation is a last resort (cache-patch → surgical update → invalidate, in that order); `mutate` + callbacks preferred over `mutateAsync` + `await` when the resolved value only drives a side effect; mechanical sweep — grep the diff's added lines for `mutateAsync`, give every hit a verdict, state `grepped mutateAsync: 0 hits` explicitly when none found. (N/A: no invalidation or mutation in diff)
 - [ ] §R14 Form is the single source of truth (no `useState` shadowing a form-held value); hand-rolled validation checks/regex/coercions are confirmed against the validation library's own API before being kept. (N/A: no form or schema in diff)
 - [ ] §R15 New component state lives at the lowest common ancestor of its actual consumers, never lifted because a parent "might" want it; order-dependent multi-step state mutations (`update` then `remove`, `setX` then `setY` where order matters) carry a rationale comment at the call site. (N/A: no state added or edited in diff)
+- [ ] §R16 Every new `useMemo`/`useCallback` earns its place: empty deps with no input from component scope means a module constant (hoist it); a dependency that changes every render (an inline object, array, or function, a fresh instance) means the cache never hits (drop the memo or stabilize the dep); the finding states which. **Enumerate by grep** (see §R16). (N/A: the grep returns 0 hits, stated as `grepped memo hooks: 0 hits`; or the project runs React Compiler, confirmed by grepping its build config)
+- [ ] §R17 No wasted render work: a memo, effect, or loop whose result is unused in the current mode is guarded out; an inline object or callback passed to a memoized child, or into a dependency array, is stabilized; dependency arrays list the underlying data, not a function reference whose identity changes; a value already memoized is not recomputed elsewhere. (N/A: no hook dependency array, memoized child, or mode-dependent computation in diff)
+- [ ] §R18 A JSX block past roughly 30 lines that reads as its own unit is a named component; no wrapper element that only repeats its parent's styling or adds nothing to layout. (N/A: no JSX block over 30 lines and no wrapper element added)
+- [ ] §R19 A change to width, height, min/max sizing, flex/grid layout, or positioning is checked at 375, 600, 768, and 1024 px: the usable width per column or cell after padding is computed or measured at each, and the numbers appear in the finding; removing a minimum-size floor without a responsive fallback FAILS. (N/A: no CSS or layout change in diff)
 
 ---
 
@@ -350,3 +354,71 @@ remove(previousRowId)
 update(rowId, changes)
 remove(previousRowId)
 ```
+
+---
+
+## Section 6: Render cost and layout
+
+### §R16. A memo has to hit
+
+`useMemo` and `useCallback` cost a dependency comparison on every render and buy nothing unless the cache actually hits. Walk every new one:
+
+- **Empty dependencies and no input from component scope.** The value never changes, so it is a module constant in disguise. Hoist it above the component.
+- **A dependency that changes every render.** An inline object, array, or function, or a fresh instance created in render, is a new reference each time, so the memo recomputes every render and adds overhead. Drop the memo, or stabilize the dependency first.
+- **A cheap computation.** A few property reads or a short string concatenation cost less than the comparison. Say what the computation is when flagging it.
+
+```tsx
+// Flag: empty deps, nothing from component scope
+const columns = useMemo(() => [{ key: 'name' }, { key: 'size' }], [])
+
+// Prefer: a module constant
+const COLUMNS = [{ key: 'name' }, { key: 'size' }]
+```
+
+Every "drop this memo" finding states the reason (empty deps, unstable dep, cheap computation), so the author can check it.
+
+**Enumerate by grep, do not eyeball:**
+
+```bash
+gh pr diff <num> | grep -nE '^\+.*\b(useMemo|useCallback)\b'
+```
+
+One line per hit with a verdict, and `grepped memo hooks: 0 hits` printed explicitly when none are found.
+
+**N/A under React Compiler.** When the project runs React Compiler (grep its build config and `package.json` for the compiler plugin), the compiler owns memoization and this box is N/A; say so and cite the config line.
+
+### §R17. No wasted render work
+
+- **Work for a mode that is not active.** A memo, effect, or loop that computes a value only one mode uses, while running in every mode. Guard it with an early return so it does nothing when the result is unused.
+- **Memoization broken by the caller.** An inline object or callback passed to a memoized child (or into a dependency array) is a new reference every render, so the child re-renders anyway. Stabilize it, or drop the child's memo.
+- **Stale or unstable dependencies.** A dependency array that lists a function reference instead of the data the function reads either goes stale or recomputes every render. List the underlying data.
+- **Recomputing a memoized value.** A value computed in a memo, then computed again from the same inputs elsewhere in the component. Read the memoized one.
+- **One call shape repeated inside a memo, varying one argument.** Extract a stable callback and call it, instead of building the same closure several times.
+
+Look first, flag second: read what the computation costs and how often the component renders before calling it waste.
+
+### §R18. Large JSX blocks and redundant wrappers
+
+A JSX block past roughly 30 lines that reads as its own unit (a panel, a row, a form section) is easier to read and test as a named component. Place it per §R9: same file while small, its own file once it grows.
+
+A wrapper element that only repeats its parent's styling, or that adds no layout, semantics, or handler, is markup noise. Drop it and let the parent's box do the work.
+
+```tsx
+// Flag: the inner div repeats the parent's layout
+<div className="flex gap-2">
+  <div className="flex gap-2">{children}</div>
+</div>
+
+// Prefer
+<div className="flex gap-2">{children}</div>
+```
+
+### §R19. Check layout at narrow widths
+
+A change to sizing or layout that looks right on a wide screen can collapse on a narrow one. For any diff touching width, height, min/max sizing, flex or grid layout, or positioning, check it at 375, 600, 768, and 1024 px:
+
+- Compute (or measure in a running app) the usable width per column or cell at each width, after subtracting padding, gaps, and fixed-width siblings.
+- Confirm the content still renders readably at each: text does not overflow, controls stay tappable, nothing is clipped.
+- Put the numbers in the finding ("7 columns at 375 px leave 41 px per cell after padding").
+
+The recurring failure is removing a `min-width`/`min-height` floor without a responsive fallback (a different layout, horizontal scroll, or fewer columns below a breakpoint): the floor was what kept the narrow case readable. When a browser is available, the testing plugin's `verify-ui` skill drives this check against the real screen.

@@ -15,5 +15,7 @@ Code that takes three readings costs more than code that took an extra minute to
 - Keep the unhappy path out of the happy path: validate and return early rather than nesting the real work inside conditionals.
 - A fallback chain of three or more operands is a lookup or a named default, not `a ?? b ?? c ?? d`.
 - Resist the symmetric smell too: a wrapper that adds nothing but a name is over-extraction, not clarity.
+- A named intermediate that makes a line readable stays, even when it costs an extra type-narrowing step or evaluates a trivial branch eagerly.
+- Fixing a ternary must not create a new problem: `flagA && value` is not a stand-in for `value | undefined` (it yields `false`), and an options object spread in conditionally is a hidden ternary.
 
 Detection criteria and per-box review failure modes live in the code-review plugin's `references/clarity.md`. This file is the statement of the convention; that file is how a diff gets graded against it.

@@ -1,6 +1,6 @@
 ---
 name: review-code
-description: Gate-based code review for a PR, branch, or set of changes in any repo. Trigger on "review this PR", "review my code", "review my changes", "review my branch", "is this clean", "is this good to merge", "code review please", a bare PR URL, or a branch name. Fans out one subagent per rule file (naming, clarity, structure, simplicity, datetime, react, i18n, project conventions, verification), aggregates per-box PASS/FAIL verdicts into a single PASSED/FAILED result. Reads the target repo's own .claude/review-conventions.md as an extra gate when present. Output stays in chat only - never posts comments to the PR without explicit approval.
+description: Gate-based code review for a PR, branch, or set of changes in any repo. Trigger on "review this PR", "review my code", "review my changes", "review my branch", "is this clean", "is this good to merge", "code review please", a bare PR URL, or a branch name. Fans out one subagent per rule file (naming, clarity, structure, simplicity, datetime, react, i18n, testing, project conventions, verification), aggregates per-box PASS/FAIL verdicts into a single PASSED/FAILED result. Reads the target repo's own .claude/review-conventions.md as an extra gate when present. Output stays in chat only - never posts comments to the PR without explicit approval.
 ---
 
 # Reviewing code
@@ -25,6 +25,7 @@ A regular review catches bugs. The things that slip through review are: conventi
 - (Self-review parallel: when reviewing *my own* work, precedent never excuses a violation either — the same surface-everything bar applies before I call work done.)
 - **When a rule lists examples, examples are illustrations, never an exhaustive boundary.** State the principle first, examples second, explicitly labeled as illustrations. Apply the rule to *every* item in the diff that matches the principle, including items not in the example list. If you find yourself thinking "this item isn't in the listed examples so the rule doesn't apply," you're misreading the rule. This applies BOTH when reading rules (don't narrow to the listed examples) AND when writing rules (don't frame a rule around a specific domain when the principle is general).
 - **Brevity is a hard rule on every surface: chat findings, drafted comments, and replies.** Length is the most consistently violated rule in this skill. Every unit of output has a budget, and a sentence past it must earn its place: **a chat finding is one line**, **a drafted comment is one to three sentences**, **a reply accepting feedback is one sentence plus the commit SHA**. Prose that restates the rule, justifies a change the reader already asked for, re-describes what a linked commit shows, or explains the reasoning behind a finding whose fix is already stated does NOT earn its place; cut it. If the reader needs the why, they will ask. Count before you show: an over-budget unit is a rewrite *before* the user sees it, never after they ask you to shorten it.
+- **A pre-existing problem is flagged at most once, and only when it intersects the change.** Code the diff did not touch is not the author's to fix in this PR. When an untouched line interacts with a changed one (the change calls into it, extends it, or depends on its behavior), raise it once, briefly, marked as pre-existing; otherwise leave it out. A violation the diff copies or moves is not pre-existing: it is the diff's own (see "Matches the existing pattern" below).
 - **Read the actual changed code yourself** with the `Read` tool, after fetching the diff. Subagent summaries are a starting point — the specific issues live in specific lines and you need to see them to call them out usefully.
 - **Cite line numbers, file paths, and head SHA** for every finding. Vague feedback is useless.
 - **Locale diffs require a per-key audit table — never an aggregate grep, never your memory.** This is enforced by the i18n gate agent: if the diff touches translation/locale files, that agent must produce a per-key audit table (one row per new key, checking namespace placement, pluralization, naming, and duplication — see `references/i18n.md`) as its evidence, and a missing/incomplete table is a gate FAIL. You may NOT write any locale verdict — including "no new keys", "no issues this round", or silently dropping i18n from the checklist — without the table. An aggregate report ("greped N keys, all unique") is an automatic incomplete review: a direct-duplicate grep alone cannot catch a generic noun that belongs in a shared strings file, a singular-only label that should be a plural-aware key, or a key whose name doesn't match its own value. "It matches the neighbors" / "low-value" / "no new keys" are the three rationalizations that have caused this miss — none of them is valid without the table.
@@ -47,11 +48,18 @@ Determine the target repo from the current working directory. Detect the default
   - **No reply / unaddressed** = re-raise, noting it is still open from the prior round.
   Carry the author's responses into Step 4 so the report and any re-drafted comments reflect what was fixed, what was declined-with-reason, and what is genuinely still open. Posting a re-review that ignores the author's replies is a documented trust failure.
 
+**Scope checks (you, before the fan-out).** These are about the target as a whole, so no single gate owns them. Walk each box yourself and record the result as a `SCOPE:` block in the same `BOXES:` shape the gate agents use (Step 3); the verification gate audits it (`references/verification.md` §V7). A scope finding goes into the report like any gate finding and fails the review the same way.
+
+- [ ] §G1 The target is not stacked: the author's other open PRs were listed (`gh pr list --author <author> --state open --json number,headRefName,baseRefName`), and when the diff is large (30+ files) or contains commits that belong to another open branch (compare `gh pr view <num> --json commits`), the review stops and reports the stacking before any line-level finding, suggesting a rebase onto the default branch. A stacked diff cannot be reviewed in isolation. (N/A: local diff, or the author has no other open PR)
+- [ ] §G2 The diff does only what its title and description say. Out-of-scope work (an unrelated refactor, removed public surface, a new abstraction, a bundled feature or option) is one finding asking to split the PR, naming which commits belong in which PR; it is not reviewed silently as if it were in scope. (N/A: never; every target has a stated purpose, even if it is only a branch name)
+- [ ] §G3 Every linked issue was read in full (`gh pr view <num> --json closingIssuesReferences,body`, then `gh issue view <n>`), and each constraint it states ("no public API change", "must work offline") is checked against the diff; a violated constraint is a finding that cites the issue. (N/A: no linked issue)
+- [ ] §G4 A diff too large to read in one pass (roughly 35KB or more) was saved to a file and read in offset/limit chunks, every chunk; no hunk was skimmed. The gate agents get the saved path, not a truncated paste. (N/A: the diff was read whole)
+
 ### Step 2 — fan out gate agents in two phases (mandatory: ALL gates, EVERY round)
 
-Dispatch gate agents (Task tool, `general-purpose` or `Explore`) in **two phases**: the eight rule gates run in parallel first; verification runs second, once all eight have returned, because it audits their returned verdict blocks rather than re-deriving findings. The registry maps each gate to exactly one reference file — each reference is checked by its own agent:
+Dispatch gate agents (Task tool, `general-purpose` or `Explore`) in **two phases**: the nine rule gates run in parallel first; verification runs second, once all nine have returned, because it audits their returned verdict blocks rather than re-deriving findings. The registry maps each gate to exactly one reference file — each reference is checked by its own agent:
 
-**Phase 1 — dispatch these eight in parallel:**
+**Phase 1 — dispatch these nine in parallel:**
 
 | Gate | Reference file | Dispatch note |
 |------|----------------|----------------|
@@ -62,13 +70,14 @@ Dispatch gate agents (Task tool, `general-purpose` or `Explore`) in **two phases
 | datetime | `references/datetime.md` | agent returns PASS (N/A) if no date/time logic in diff |
 | react | `references/react.md` | agent returns PASS (N/A) if no React/JSX UI code in diff |
 | i18n | `references/i18n.md` | agent returns PASS (N/A) if no locale files in diff |
+| testing | `references/testing.md` | agent returns PASS (N/A) if the diff changes no behavior and touches no test file |
 | project-conventions | `references/project-conventions.md` | agent returns PASS (N/A) if target repo has no `.claude/review-conventions.md` |
 
 **Phase 2 — dispatch only after every Phase 1 agent has returned:**
 
 | Gate | Reference file | Dispatch note |
 |------|----------------|----------------|
-| verification | `references/verification.md` | always; its prompt additionally includes every Phase 1 gate's returned `GATE:`/`STATUS:`/`BOXES:`/`FINDINGS:` block |
+| verification | `references/verification.md` | always; its prompt additionally includes every Phase 1 gate's returned `GATE:`/`STATUS:`/`BOXES:`/`FINDINGS:` block, your `SCOPE:` block, and on a re-review your classification of each carried-over finding (Step 1) |
 
 Every gate is dispatched even when it looks inapplicable. A gate whose rules don't apply returns `PASS (N/A)` **with the reason** — you do NOT skip dispatching it. "No hooks changed, so react is N/A" is a verdict the gate agent must produce after reading the diff, never an assumption you make on its behalf.
 
@@ -76,7 +85,7 @@ The `project-conventions` gate is how this skill stays repo-agnostic while still
 
 ### Step 3 — the gate-agent contract (include this in every agent's prompt)
 
-Give each agent: the gate name, its single owned reference file path, the head SHA, the changed-file list, and the diff (or the commands to fetch them). The verification agent additionally receives every other gate's returned verdict block as input, since it audits those receipts rather than re-deriving findings. Require the agent to:
+Give each agent: the gate name, its single owned reference file path, the head SHA, the changed-file list, and the diff (or the commands to fetch them). The verification agent additionally receives every other gate's returned verdict block, plus your `SCOPE:` block and (on a re-review) your carried-over-finding classification, as input, since it audits those receipts rather than re-deriving findings. Require the agent to:
 
 1. Read the ENTIRE owned reference file, including its `## Gate checklist` block.
 2. **Sweep the greppable constructs FIRST, before reading the diff for meaning.** Some boxes cover constructs a grep can enumerate exactly, and those boxes are graded on whether the hits were **listed**, not on whether they were noticed. Run the grep over the diff's added lines, then give every hit a `file:line` verdict in the evidence, with the hit count. `0 hits` must be stated explicitly; a box with no receipt is FAIL by default, because silence is indistinguishable from never having looked.
@@ -134,6 +143,7 @@ Report directly in chat. No file output. **Be terse.** The reader is the user, n
 | datetime | ... |
 | react | ... |
 | i18n | ... |
+| testing | ... |
 | project-conventions | ... |
 | verification | ... |
 
@@ -151,6 +161,7 @@ Report directly in chat. No file output. **Be terse.** The reader is the user, n
 
 **Checklist:** (one line per applicable trigger group, per `references/verification.md`'s "How to use this in the output" — a cited receipt, or `n/a, diff does not touch X`)
 - Always: <files read at sha, findings cite file:line + sha, nothing posted to GitHub>.
+- Scope: <§G1-§G4 results, e.g. "not stacked (author has no other open PR); title matches; no linked issue; diff read whole">.
 - <trigger group>: <receipt, or "n/a, diff does not touch X">.
 
 **Overall:** <one short sentence; if FAILED, name what must change for the next round to pass>.
@@ -195,7 +206,7 @@ The three rules to internalize before reading the reference:
 ## What this skill is not
 
 - It is not a bug scan. If you spot a real bug while reading, mention it under "**Possible bug:**" but do not let bug-hunting take over — the user has other tools for that.
-- It is not a generic style linter substitute and it is not a security review. Stay focused on the nine gates above plus any repo-declared conventions.
+- It is not a generic style linter substitute and it is not a security review. Stay focused on the ten gates above plus any repo-declared conventions.
 - It does not post to GitHub on its own.
 
 ## Notes for iteration
@@ -210,6 +221,8 @@ This skill is in active iteration. When the user gives feedback ("you missed X",
    - Dates, times, timezones, locale-dependent formatting → `references/datetime.md`
    - React/data-fetching/forms/component-structure conventions → `references/react.md`
    - Translations / locale keys → `references/i18n.md`
+   - Test coverage, assertions, test setup, test placement → `references/testing.md`
+   - PR scope, stacking, linked issues, reading large diffs → the scope checks in this `SKILL.md` (Step 1)
    - PR comment format, label, tone, posting protocol → `references/pr-comments.md`
    - Workflow change, output format change, hard rule → this `SKILL.md`
    - Feedback that is specific to one target repo, not a general rule → suggest the user add it to that repo's own `.claude/review-conventions.md` instead of any file in this skill.

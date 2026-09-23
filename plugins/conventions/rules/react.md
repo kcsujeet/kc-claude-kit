@@ -19,6 +19,8 @@ Placement is covered by `structure.md`, which defers to bulletproof-react. This 
 - No `renderSomething()` inline render functions, and no skipping items by returning null from a ternary inside a map. Filter first.
 - Assign a hook result to a variable, then derive on the next line. Never inline a selector or subscription inside a transforming expression.
 - Do not reach for `useMemo` or `useCallback` by default when the project runs React Compiler. Write the plain value or function.
+- Without React Compiler, a `useMemo` or `useCallback` has to hit: empty dependencies mean a module constant, and a dependency that changes every render (an inline object, array or function) means the memo never does. Pass stable references to memoized children.
+- A block of markup past about thirty lines that reads as its own unit is a named component, and a wrapper element that only repeats its parent's styling is deleted.
 
 ## Data access
 

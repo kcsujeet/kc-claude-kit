@@ -12,6 +12,7 @@ Date code that looks locally correct is where boundary bugs hide: midnight, a DS
 - Account for every truncation. Know whether the truncated value is being serialized, used as a round-trip key, or compared, and keep both sides of a comparison in the same form and locality.
 - `new Date()` in a render or a memo is either frozen or never memoized. Key off a day-granularity timestamp instead.
 - Timezone, week start, and 12-versus-24-hour are **inputs** from user or org settings. They are never constants, and a customer's explicit setting always wins over anything inferred.
+- A locale formatter (`Intl.DateTimeFormat`, `toLocaleString`) gets the configured time zone explicitly. Without one it formats in the machine's zone, which is right only by accident.
 - Locale drives both text and ordering. Formatting is separate from language: a date can be German-ordered while the page is read in French, and the org's setting decides.
 - Earliest and latest come from the date library's `max`/`min`, not a hand-rolled reduce.
 

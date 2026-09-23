@@ -15,6 +15,7 @@ Where code lives is part of its contract. A path promises something about what i
 - Delete dead wrappers in every shape: async-await passthrough, destructure-and-reconstruct, single-use alias, identity transform, a Promise wrapped around a Promise.
 - A lookup object beats a `switch` or an `if` chain that maps a key to a value. Use thunks when the branches need per-branch work.
 - Exported APIs carry a short doc comment saying what they are for, not restating the signature.
+- Do not widen a package's public exports so a sibling package can reach an internal. Move the shared piece to a shared layer both consume.
 - A discriminator the backend serializes is a string enum, not a literal union: if the backend can return it, it needs a name in the code.
 
 ## React and TypeScript codebases
