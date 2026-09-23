@@ -1,48 +1,60 @@
 # kc-claude-kit
 
-Sujeet's personal Claude Code toolkit for any codebase: portable coding conventions that load while you write, plus plugins for reviewing a diff, auditing a repo's instruction setup, and verifying a change before calling it done.
-
-Four plugins:
+Sujeet's personal Claude Code toolkit for any codebase: portable coding conventions that load while you write, a gate-based code review built on them, and plugins for auditing a repo's instruction setup and verifying a change before calling it done.
 
 | Plugin | What it does |
 |---|---|
-| `conventions` | The conventions themselves, one skill per topic. Each topic skill holds the authoring rules, the review checklist, and the deterministic sweeps that check them. `/conventions:init` installs the rules into a project. |
-| `code-review` | Gate-based review of a PR, branch or diff. One read-only gate agent per convention topic returns per-box PASS/FAIL verdicts, and a verification gate audits their receipts. Posting to GitHub is a separate, user-invoked skill behind a hook. |
+| `conventions` | The conventions themselves, one skill per topic, each with its authoring rules, its review checklist and the scripts that check them. `/conventions:init` installs the rules into a project. |
+| `code-review` | Reviews a PR, branch or diff with one read-only gate agent per convention topic, and returns a single PASSED or FAILED verdict. Posting to GitHub is a separate skill that only you can run, behind a hook. |
 | `claude-md` | Audits a repo's instruction setup and proposes what stays in CLAUDE.md, what becomes a path-scoped rule, a skill, or a hook. |
 | `testing` | Verification workflows: look at the UI before calling it done, and drive a cross-layer change end to end. |
 
-The layout and the reasoning behind it, with the docs each decision rests on, are in [`docs/architecture.md`](docs/architecture.md).
+## Contents
+
+- [Install](#install)
+- [Writing code: the conventions](#writing-code-the-conventions)
+- [Reviewing code](#reviewing-code)
+- [Posting review comments to GitHub](#posting-review-comments-to-github)
+- [Adding your repo's own rules](#adding-your-repos-own-rules)
+- [Using the skills in Gemini CLI or Antigravity](#using-the-skills-in-gemini-cli-or-antigravity)
+- [Script reference](#script-reference)
+- [Developing](#developing)
 
 ## Install
 
-Add the marketplace:
+Add the marketplace, then install the plugins you want:
 
 ```
 /plugin marketplace add kcsujeet/kc-claude-kit
-```
-
-Install the plugins you want:
-
-```
 /plugin install conventions@kc-claude-kit
 /plugin install code-review@kc-claude-kit
 /plugin install claude-md@kc-claude-kit
 /plugin install testing@kc-claude-kit
 ```
 
-`code-review` declares `conventions` in its `dependencies`, so installing `code-review` installs `conventions` too ([plugin dependencies](https://code.claude.com/docs/en/plugin-dependencies)). The gate agents load their checklists from the conventions skills, so the review cannot run without them.
+`code-review` declares `conventions` in its `dependencies`, so installing `code-review` installs `conventions` too ([plugin dependencies](https://code.claude.com/docs/en/plugin-dependencies)). The review cannot run without it: its gates load their checklists from the conventions skills.
 
-Then, once per project you want the conventions in:
+Then, once in each project you want the conventions in:
 
 ```
 /conventions:init
 ```
 
-The model-invoked skills trigger on their own: `code-review:review-code` on "review this PR" or "review my changes", `claude-md:audit` on "audit my CLAUDE.md" or "should this be a skill or a rule", `testing:verify-ui` on "does this look right", `testing:verify-e2e` on "test this end to end", and each `conventions:<topic>` skill when its topic comes up. `/code-review:post-review` is the exception: it only runs when you type it.
+Most skills trigger on their own:
 
-## Conventions
+| Say | Skill |
+|---|---|
+| "review this PR", "review my changes" | `code-review:review-code` |
+| "audit my CLAUDE.md", "should this be a skill or a rule" | `claude-md:audit` |
+| "does this look right" | `testing:verify-ui` |
+| "test this end to end" | `testing:verify-e2e` |
+| (the topic comes up) | `conventions:<topic>` |
 
-Each topic is one skill at `plugins/conventions/skills/<topic>/SKILL.md`, with its sections in a fixed order: `## Rules` (how to write it), `## Review checklist` (the boxes a gate ticks), `## Review detail` (examples and evidence per box), and `## Sweeps` (the bundled scripts). One file per convention means the rule you write against and the box a reviewer ticks cannot drift apart, which they used to. Two topics also bundle lookups, which take a name or a key instead of a diff: `naming/scripts/name-collisions.sh <name>` lists a name's whole-word hits in the tracked files, and `i18n/scripts/locale-duplicates.sh <locale-dir> <value> <leaf-key>` runs the two duplicate greps a new locale key needs.
+The exception is `/code-review:post-review`, which only runs when you type it.
+
+## Writing code: the conventions
+
+Each convention topic is one skill. It holds the rules to write against and the checklist a reviewer ticks, in the same file, so the two cannot drift apart.
 
 | Topic | Scope | Covers |
 |---|---|---|
@@ -60,73 +72,87 @@ Each topic is one skill at `plugins/conventions/skills/<topic>/SKILL.md`, with i
 | `performance` | source files | Filter and paginate in the data layer, no N+1, index with the query, measure and say what you measured |
 | `dependencies` | dependency manifests | Ask first, check maintenance signals, exact versions, nothing that duplicates what is installed |
 
-Plus `working-agreement.md`, the one hand-written, always-loaded rule: ask before assuming, report honestly, write corrections down where they belong.
+Plus `working-agreement.md`, the one hand-written rule, loaded in every session: ask before assuming, report honestly, write corrections down where they belong.
 
 For React and TypeScript codebases, [bulletproof-react](https://github.com/alan2207/bulletproof-react/blob/master/docs/project-structure.md) is the canonical source for project structure, and the `structure` topic says so explicitly: where the two appear to disagree, that document wins and the rule is what gets corrected.
 
-### Why `/conventions:init` still exists
+### Getting the rules loaded
 
-Skills accept `paths:`, which looks like it should make the rule copies unnecessary. It does not: measured on Claude Code 2.1.280, a `paths:`-scoped plugin skill is not loaded when you read a matching file, only when the model decides to invoke it. Rules are what load on file read ([memory](https://code.claude.com/docs/en/memory)), and plugins cannot ship rules. So the plugin keeps a `rules/` directory, and `init` copies it where Claude Code looks:
+Rules are what Claude Code loads when you open a matching file ([memory](https://code.claude.com/docs/en/memory)), and a plugin cannot ship rules. So the conventions reach your session as rule files you install:
 
-- **Per project**, `/conventions:init` copies the rules into `.claude/rules/`, which keeps the `paths:` frontmatter working so each rule loads only when a matching file is touched. Commit the directory and the project carries its own conventions.
-- **Machine-wide**, put them in `~/.claude/rules/` instead, where they apply to every project on that machine:
+- **Per project:** `/conventions:init` copies the rules into `.claude/rules/`, where each loads only when a matching file is touched. Commit the directory and the project carries its own conventions.
+- **Machine-wide:** link them into `~/.claude/rules/`, where they apply to every project on that machine:
 
-```bash
-git clone https://github.com/kcsujeet/kc-claude-kit ~/src/kc-claude-kit
-mkdir -p ~/.claude/rules
-for f in ~/src/kc-claude-kit/plugins/conventions/rules/*.md; do ln -s "$f" ~/.claude/rules/; done
-```
+  ```bash
+  git clone https://github.com/kcsujeet/kc-claude-kit ~/src/kc-claude-kit
+  mkdir -p ~/.claude/rules
+  for f in ~/src/kc-claude-kit/plugins/conventions/rules/*.md; do ln -s "$f" ~/.claude/rules/; done
+  ```
 
-`/conventions:init` runs `plugins/conventions/scripts/install-rules.sh`, which copies the rules and stamps the plugin version; `--dry-run` lists what an update would replace. `rules/` is generated from the topic skills by `plugins/conventions/scripts/build-rules.sh`, so there is still one source, and CI fails if the two drift. `init` writes a version stamp next to the copies, and a `SessionStart` hook prints one line when the rules are missing or older than the installed plugin. It stays silent otherwise, so the normal case costs no context.
+`init` writes a version stamp next to the copies. When the rules are missing or older than the installed plugin, a `SessionStart` hook says so in one line, and it stays silent otherwise. After a plugin update, run `/conventions:init` again. Run `/context` in a new session to confirm what loaded.
 
-Run `/context` in a new session to confirm what loaded.
+Why not let the skills load themselves? Skills accept `paths:`, but measured on Claude Code 2.1.280, a `paths:`-scoped plugin skill is not loaded when you read a matching file, only when the model decides to invoke it. The rule files are generated from the skills, so there is still one source.
 
-## How the review works
+## Reviewing code
 
-Before the fan-out, `code-review:review-code` runs the scope checks itself: is the PR stacked on another, does it do more than its title says, what constraints does the linked issue set, and was a large diff read in full. Then it dispatches one gate agent per applicable topic, in parallel. Each gate is a read-only plugin agent (`Read, Grep, Glob, Bash`) that preloads its conventions skill, runs that topic's sweep scripts over the diff, walks every checklist box, and returns a per-box verdict with evidence. Any finding fails its gate. The verification gate runs second and audits the other gates' receipts. The orchestrator aggregates everything into a single PASSED/FAILED verdict and leads with a gate-status table.
+Ask for a review of a PR, a branch or your working changes. `code-review:review-code` then:
 
-The deterministic steps around the gates are scripts in `plugins/code-review/scripts/`, each tested against a stub `gh`:
+1. **Gathers the change:** saves the diff, the head SHA and the changed files.
+2. **Checks its scope:** is the PR stacked on another, does it do more than its title says, what constraints does the linked issue set, was a large diff read in full.
+3. **Dispatches every gate in parallel.** Each gate is a read-only agent (`Read, Grep, Glob, Bash`, plus `Skill` to recover a topic skill that did not preload) that preloads its conventions skill, runs that topic's scripts over the diff, walks every checklist box, and returns a per-box verdict with evidence. A gate whose topic the diff does not touch still runs and returns `PASS (N/A)` with its reason, so the report always shows every gate.
+4. **Verifies the receipts:** the verification gate runs last and checks that every other gate produced the evidence its checklist demands.
+5. **Reports one verdict:** PASSED only when every gate passed.
 
-| Script | Does |
-|---|---|
-| `gather-review.sh (<pr> \| --branch [<base>])` | Saves the diff and changed-file list for a PR or a local branch (base: `origin/HEAD`, then `main`, then `master`) and prints `meta.env` with `HEAD_SHA`, `BASE`, `TITLE`, `DIFF_FILE` and `CHANGED_FILES`; prints the fetch command when the local checkout is not the PR head |
-| `scope-facts.sh <pr>` | Prints the facts the scope checks need: author, base, commit and file counts, the author's other open PRs, and each linked issue, with the PR description and issue bodies saved to files |
-| `review-threads.sh <pr> [--mine <login>]` | Prints every review comment thread, root then replies, and with `--mine` marks the threads you started and whether the author replied after you (requires `jq`) |
-| `build-comment-payloads.sh <drafts.json> <diff> <sha> --pr <n>` | Used by `post-review`: checks each drafted comment's path and line against the diff's hunks, writes one payload per comment, and prints the approval-token commands for the user to approve; never posts (requires `jq`) |
+Two rules keep findings honest:
 
-The gates are dispatched by `subagent_type` (`code-review:naming-gate` and so on). If a gate agent is unavailable, for example because the `conventions` dependency failed to load, the orchestrator runs that gate as a `general-purpose` agent told to invoke the `conventions:<topic>` skill and follow the same contract, and says so in the report.
+- **Findings cite real lines.** Every line number comes from the citation map (`added-lines.sh`), which lists each added line with its line number in the source file at the head SHA, so a finding never points at a position inside the diff file.
+- **Only confirmed findings count.** A confirmed finding fails its gate, and "intentional" or "low-value" is never a reason to hold it back. A finding the gate cannot confirm from the code or the docs is dropped, not softened into a maybe.
 
-| Topic | Gate agent | Dispatch | Checks, in short |
+### The gates
+
+| Topic | Gate agent | Applies when | Checks, in short |
 |---|---|---|---|
-| naming | `code-review:naming-gate` | always | Role names, honest names, extracted boolean chains, names unambiguous where read, verb-led functions, file names |
-| clarity | `code-review:clarity-gate` | always | Ternaries, guard clauses, comments, magic numbers, casts and `any` that lie, defensive coercion |
-| structure | `code-review:structure-gate` | always | One responsibility, co-location, no barrels, dead wrappers, lookups over `switch`, breaking changes named |
-| simplicity | `code-review:simplicity-gate` | always | DRY, YAGNI, KISS; reuse of what already exists, searched by shape as well as by name |
+| naming | `code-review:naming-gate` | every diff | Role names, honest names, extracted boolean chains, names unambiguous where read, verb-led functions, file names |
+| clarity | `code-review:clarity-gate` | every diff | Ternaries, guard clauses, comments, magic numbers, casts and `any` that lie, defensive coercion |
+| structure | `code-review:structure-gate` | every diff | One responsibility, co-location, no barrels, dead wrappers, lookups over `switch`, breaking changes named |
+| simplicity | `code-review:simplicity-gate` | every diff | DRY, YAGNI, KISS; reuse of what already exists, searched by shape as well as by name |
+| correctness | `code-review:correctness-gate` | every diff | Logic bugs, edge cases (empty, null, zero, boundary, timezone), data matching its declared type at a boundary, no regression of a bug the repo already fixed |
 | datetime | `code-review:datetime-gate` | diff touches date/time logic | No hand-rolled date math, ISO 8601 with offset, truncation, timezone as an input |
 | react | `code-review:react-gate` | diff has React/JSX UI code | Bulletproof-react structure, keys, data-fetching hooks, forms, render cost |
 | i18n | `code-review:i18n-gate` | diff touches locale files | Per-key audit table, dedup, ICU plurals, no concatenated translations |
 | testing | `code-review:testing-gate` | diff changes behavior or tests | New behavior tested, no class-name assertions, exact assertions, gates tested both ways |
-| correctness | `code-review:correctness-gate` | always | Logic bugs, edge cases (empty, null, zero, boundary, timezone), data matching its declared type at a boundary, no regression of a bug the repo already fixed |
 | project conventions | `code-review:project-conventions-gate` | repo has `.claude/review-conventions.md` | Every rule in the repo's own conventions file; repo rules that override a built-in box are listed |
-| verification | `code-review:verification-gate` | always, second | Files read at head SHA, findings cite `file:line` and SHA, receipts present, nothing posted |
+| verification | `code-review:verification-gate` | every diff; runs after the others | Files read at head SHA, findings cite `file:line` and SHA, receipts present, nothing posted |
 
-`type-safety`, `error-handling`, `performance` and `dependencies` are rules-only topics: they guide writing and have no gate.
+`type-safety`, `error-handling`, `performance` and `dependencies` guide writing only and have no gate.
 
-### Posting to GitHub
+If a gate agent is unavailable, for example because the `conventions` dependency failed to load, the review runs that gate as a `general-purpose` agent told to invoke the `conventions:<topic>` skill and follow the same contract, and says so in the report. And if a gate agent starts but its preloaded skill did not load (Claude Code skips a missing preloaded skill silently), the gate invokes the skill itself, and fails with `topic skill unavailable` if that fails too. No gate ever grades a topic from memory.
 
-The review never posts. Its output stays in chat.
+### What the report looks like
 
-To turn findings into PR comments, run `/code-review:post-review`. It is user-invoked only (`disable-model-invocation: true`), drafts the comments in Conventional Comments format, shows you the draft, and waits for a fresh, explicit post signal. The actual `gh` write only goes through when the same Bash command carries the approval token `KC_REVIEW_POST_APPROVED=1`, typed after your signal. A `PreToolUse` hook in the plugin (`scripts/guard-github-post.sh`) blocks any GitHub review write without it, because an instruction is context and only a hook enforces anything. It covers `gh pr comment`, `gh pr review`, `gh issue comment`, and `gh api` writes to a PR's or issue's comments or reviews; reads, `gh pr create` and `gh pr merge` pass untouched.
+- The gate-status table comes first, listing every gate as PASS, FAIL or N/A, then the findings, then an explicit PASSED or FAILED verdict. One confirmed finding in any gate fails the review.
+- Each finding is one line, citing the file, line and head SHA, then the issue and the fix.
+- No em dashes anywhere in the output: not in the report, the gate verdicts, drafted comments or replies.
 
-### Per-repo extension
+## Posting review comments to GitHub
 
-If the target repository has a `.claude/review-conventions.md`, it becomes an extra gate (`code-review:project-conventions-gate`). Use it for project-specific rules: data-layer patterns, UI-library rules, domain helpers, whatever the built-in topics do not know about. Write each rule as a checklist of failure modes with one canonical example path, so a gate can walk it box by box. [`docs/review-conventions.md`](docs/review-conventions.md) has the format guide and a worked example.
+The review never posts; its output stays in chat. To turn findings into PR comments, run `/code-review:post-review` yourself (it sets `disable-model-invocation: true`, so the model cannot start it). It:
+
+1. Drafts the comments in Conventional Comments format, giving every `suggestion` a brief reason.
+2. Runs the drafts through `build-comment-payloads.sh`, which rejects any comment whose file or line is not in the diff.
+3. Shows you the drafts and the exact post commands, and waits for a fresh, explicit post signal.
+
+A post only goes through when the same Bash command carries the approval token `KC_REVIEW_POST_APPROVED=1`, typed after your signal. A `PreToolUse` hook in the plugin (`scripts/guard-github-post.sh`) blocks every GitHub review write without it, because an instruction is only context and a hook is what enforces. It covers `gh pr comment`, `gh pr review`, `gh issue comment`, and `gh api` writes to a PR's or issue's comments or reviews. Reads, `gh pr create` and `gh pr merge` pass untouched.
+
+## Adding your repo's own rules
+
+If the repository under review has a `.claude/review-conventions.md`, it becomes an extra gate (`code-review:project-conventions-gate`). Use it for project-specific rules: data-layer patterns, UI-library rules, domain helpers, whatever the built-in topics do not know about. Write each rule as a checklist of failure modes with one canonical example path, so the gate can walk it box by box. [`docs/review-conventions.md`](docs/review-conventions.md) has the format guide and a worked example.
 
 On conflict, the repo's rule wins over a built-in convention: the review reports the built-in box as overridden, citing the repo rule, instead of failing it. The repo knows its own context; the kit only knows what is portable.
 
 ## Using the skills in Gemini CLI or Antigravity
 
-The skills follow the Agent Skills standard, so other agents can read them. `scripts/export-agent-skills.sh` copies every skill into another tool's skills directory, renamed to `kc-<plugin>-<skill>` (for example `kc-conventions-naming`) because those tools share one flat namespace where bare names like `naming` collide. It rewrites `${CLAUDE_PLUGIN_ROOT}` script paths to the exported location and bundles the shared sweep library, so the sweeps still run.
+The skills follow the Agent Skills standard, so other agents can read them. `scripts/export-agent-skills.sh` copies every skill into another tool's skills directory, renamed to `kc-<plugin>-<skill>` (for example `kc-conventions-naming`) because those tools share one flat namespace where bare names like `naming` collide. It rewrites `${CLAUDE_PLUGIN_ROOT}` script paths to the exported location and bundles the scripts the skills call, so they still run.
 
 As a Gemini CLI extension:
 
@@ -142,9 +168,42 @@ scripts/export-agent-skills.sh /path/to/repo/.agents/skills
 scripts/export-agent-skills.sh ~/.gemini/config/skills
 ```
 
-What does not carry over: gate agents and hooks are Claude Code features, so another tool runs the gates inline from the skills. `post-review` is never exported, since its safety depends on the Claude Code hook, and neither is `conventions:init`, which installs into `.claude/rules/`. The rewritten paths are absolute, so re-run the export rather than moving its output. The script header lists the remaining limits.
+What does not carry over:
+
+- Gate agents and hooks are Claude Code features, so another tool runs the gates inline from the skills.
+- `post-review` is never exported, since its safety depends on the Claude Code hook.
+- `conventions:init` is never exported, since it installs into `.claude/rules/`.
+
+The rewritten paths are absolute, so re-run the export instead of moving its output. The script header lists the remaining limits.
+
+## Script reference
+
+The deterministic steps are scripts, each with fixture tests, so the model runs them instead of retyping commands.
+
+**Review steps** (`plugins/code-review/scripts/`, tested against a stub `gh`):
+
+| Script | Does |
+|---|---|
+| `gather-review.sh (<pr> \| --branch [<base>])` | Saves the diff and changed-file list for a PR or a local branch (base: `origin/HEAD`, then `main`, then `master`) and prints `meta.env` with `HEAD_SHA`, `BASE`, `TITLE`, `DIFF_FILE` and `CHANGED_FILES`; prints the fetch command when the local checkout is not the PR head |
+| `scope-facts.sh <pr>` | Prints the facts the scope checks need: author, base, commit and file counts, the author's other open PRs, and each linked issue, with the PR description and issue bodies saved to files |
+| `review-threads.sh <pr> [--mine <login>]` | Prints every review comment thread, root then replies, and with `--mine` marks the threads you started and whether the author replied after you (requires `jq`) |
+| `build-comment-payloads.sh <drafts.json> <diff> <sha> --pr <n>` | Used by `post-review`: checks each drafted comment's path and line against the diff's hunks, writes one payload per comment, and prints the approval-token commands for you to approve; never posts (requires `jq`) |
+| `guard-github-post.sh` | The `PreToolUse` hook that blocks GitHub review writes without the approval token |
+
+**Convention checks** (`plugins/conventions/`):
+
+| Script | Does |
+|---|---|
+| `skills/<topic>/scripts/*.sh <diff>` | The sweeps: each prints the added lines that match one check (ternaries, `as` casts, `&&`/`||` chains, nested `if`s, class-name assertions, and so on) as `path:line: text` |
+| `scripts/added-lines.sh <diff>` | The citation map: every added line with its line number in the source file |
+| `skills/naming/scripts/name-collisions.sh <name>` | A name's whole-word hits in the tracked files |
+| `skills/i18n/scripts/locale-duplicates.sh <locale-dir> <value> <leaf-key>` | The two duplicate greps a new locale key needs |
+| `scripts/install-rules.sh [--dry-run]` | What `/conventions:init` runs: copies the rules and stamps the plugin version; `--dry-run` lists what an update would replace |
+| `scripts/build-rules.sh [--check]` | Regenerates `rules/` from the topic skills; `--check` fails when they drift |
 
 ## Developing
+
+The layout and the reasoning behind it, with the docs each decision rests on, are in [`docs/architecture.md`](docs/architecture.md). A topic skill lives at `plugins/conventions/skills/<topic>/SKILL.md`, with its sections in a fixed order: `## Rules`, `## Review checklist`, `## Review detail`, `## Sweeps`. Edit the skill, never `rules/`, which is generated.
 
 Load the working copies instead of the installed plugins. Load both, since `code-review` depends on `conventions` and a local copy satisfies the dependency:
 

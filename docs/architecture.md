@@ -88,7 +88,7 @@ What changed is that the rules are generated from the skills, so there is one so
 
 ### Gates are plugin agents
 
-Plugins ship subagents from `agents/`, named `plugin:agent` ([plugins](https://code.claude.com/docs/en/plugins)). The documented practices are single responsibility, restricted tools, and a model matched to the task ([subagents](https://code.claude.com/docs/en/sub-agents)). Each gate is read-only (`Read, Grep, Glob, Bash`) and owns one topic.
+Plugins ship subagents from `agents/`, named `plugin:agent` ([plugins](https://code.claude.com/docs/en/plugins)). The documented practices are single responsibility, restricted tools, and a model matched to the task ([subagents](https://code.claude.com/docs/en/sub-agents)). Each gate is read-only (`Read, Grep, Glob, Bash`, plus `Skill` so it can load its topic skill itself if the preload was skipped) and owns one topic.
 
 ### Deterministic checks are scripts
 
