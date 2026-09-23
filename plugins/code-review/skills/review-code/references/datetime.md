@@ -14,6 +14,7 @@ The datetime gate agent ticks every box against the diff. A box is FAIL if any m
 - [ ] §D4 Every truncated date/time derived from an instant is accounted for: the diff makes clear whether it is a **serialized value** (§D3 applies), a **round-trip key** (parse must match the format's locality), or a **comparison** (both sides same form and locality) — truncation is the trigger, not serialization. (N/A: no instant truncated to a date or time)
 - [ ] §D5 A `new Date()` (or equivalent "now") evaluated in render or inside a memo is either genuinely per-render or has a stable, granularity-appropriate primitive in its dependency list — it is not frozen for the life of the mount, and the dependency is not a full ISO string or object identity that changes every render. (N/A: no "now" captured in render or memo)
 - [ ] §D6 Timezone, week-start, and 12/24-hour formatting are treated as inputs from user/app settings, never hardcoded or inferred from locale/browser alone; server-rendered artifacts use stored settings, not browser context; the earliest/latest of several dates uses the date library's `max`/`min`, not `new Date(Math.max(...))`. (N/A: no timezone/week-start/hour-format/min-max logic)
+- [ ] §D7 No locale formatter (`Intl.DateTimeFormat`, `Date.prototype.toLocaleString`/`toLocaleDateString`/`toLocaleTimeString`, or a library call that delegates to them) runs without an explicit time zone when the app has a configured one; without it the output follows the machine's zone. (N/A: no locale date formatting in diff, or the app has no configured time zone)
 
 ## §D1. Never hand-roll date/time math
 
@@ -129,3 +130,17 @@ Three different clocks exist in any system with a browser, a configurable user/o
 - **12-hour vs. 24-hour formatting** comes from a stored user/app setting, never from the display locale alone. A page in one language can still be set to the other hour format — locale controls wording (am/pm marker, month names), not the hour convention.
 - **Server-rendered artifacts** — emails, PDFs, background jobs — have no browser context at all. Anything relying on "the viewer's timezone" or "the viewer's locale" is simply wrong there; only stored settings (the user's or org's configured timezone/format) are available to that code path.
 - **Earliest/latest of several dates** should use the date library's `max`/`min`, not `new Date(Math.max(...dates.map(d => d.getTime())))`. The hand-rolled version is not wrong, but it is unnecessary reinvention of a one-line library call and is worth flagging alongside §D1.
+
+## §D7. A locale formatter gets the configured time zone
+
+`Intl.DateTimeFormat` and the `toLocale*String` methods format in the runtime's own time zone unless they are given one. In an app with a configured user or org time zone (§D6), a formatter called without it renders the right instant at the wrong wall-clock time for every viewer whose machine is in a different zone, and on a server it renders in the server's zone. The value looks correct in local testing, because the developer's machine and the configured zone usually match.
+
+```ts
+// Flag: formats in the machine's zone
+new Intl.DateTimeFormat(locale, { hour: 'numeric', minute: '2-digit' }).format(startsAt)
+
+// Prefer: the configured zone, read the way the rest of the app reads it
+new Intl.DateTimeFormat(locale, { hour: 'numeric', minute: '2-digit', timeZone: settings.timeZone }).format(startsAt)
+```
+
+The `timeZone` option is documented on MDN's [`Intl.DateTimeFormat` constructor page](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Intl/DateTimeFormat/DateTimeFormat). When the project's date library wraps formatting with its own time-zone support, use that wrapper instead of a bare `Intl` call.

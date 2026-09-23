@@ -2,7 +2,7 @@
 
 > The conventions themselves are stated canonically in the kit's `rules/structure.md`, which loads at authoring time. This file is the review side: the detection criteria and failure modes for grading a diff. Each box stays self-contained so a gate agent needs nothing but this file; when a convention changes, change `rules/structure.md` first and update the affected boxes here to match.
 
-Code-placement and API-shape rules for the diff under review. Covers nine independent failure modes: mixed responsibilities inside one unit, wrong-layer co-location, leftover single-file folders and re-export barrels, dead wrappers, branch-selection that should be a lookup, misplaced helpers, missing JSDoc on exported APIs, default exports on new files, and literal unions standing in for serialized enums.
+Code-placement and API-shape rules for the diff under review. Covers twelve independent failure modes: mixed responsibilities inside one unit, wrong-layer co-location, leftover single-file folders and re-export barrels, dead wrappers, branch-selection that should be a lookup, misplaced helpers, missing JSDoc on exported APIs, default exports on new files, literal unions standing in for serialized enums, unflagged breaking changes to a public API, modules sitting in a folder that promises a different kind of module, and public exports widened only to share an internal.
 
 ## Gate checklist
 
@@ -12,11 +12,14 @@ The structure gate agent ticks every box below against the diff. A box is FAIL i
 - [ ] §S2 Co-location/promotion: single-consumer code stays next to its consumer; multi-consumer code sits at the consumers' nearest common ancestor judged by scope/coupling, not raw count; view-local helpers are promoted only when a real external consumer appears (YAGNI-gated), not on speculation; inherently-shared-layer code is placed in its shared layer from day one regardless of current consumer count. (N/A: no files moved/added)
 - [ ] §S3 Single-file folders are flattened; no `export { default } from './X'` re-export barrels. (N/A: no folders/barrels touched)
 - [ ] §S4 No dead wrappers: single-item array wrap-then-spread, no-op async passthroughs, argument destructure-and-reconstruct passthroughs, single-use const aliases, verbatim object-spread, a producer value the consumer independently re-derives, promise-wrapping-a-promise, manual await-then-callback when the callee already accepts a callback. (N/A: none added)
-- [ ] §S5 Lookup objects over `switch`/nested `if`: branch-selecting-a-value uses a named map, not a switch or if/else-if chain; differing per-branch computation is handled with a thunk map, not treated as an exemption; a trailing default/else becomes the map's fallback; more than one level of `if` nesting is flattened; the branch key, if derived from multiple booleans, is built from named single-level intermediates, never a chained ternary; a fix for one violation here doesn't introduce another (e.g. replacing the map with an if-early-return helper). (N/A: no branch-selection of one value)
+- [ ] §S5 Lookup objects over `switch`/nested `if`: branch-selecting-a-value uses a named map, not a switch or if/else-if chain; differing per-branch computation is handled with a thunk map, not treated as an exemption; a trailing default/else becomes the map's fallback; more than one level of `if` nesting is flattened; the branch key, if derived from multiple booleans, is built from named single-level intermediates, never a chained ternary; a fix for one violation here doesn't introduce another (e.g. replacing the map with an if-early-return helper); map entries are plain values unless a value closes over a per-call argument or must be lazy, and the map is typed so its fallback is justified; every `switch`, `else if`, and value IIFE in the added lines, and every nested `if` the indentation scan reports, is enumerated with a verdict. (N/A: only when the greps and the scan return 0 hits, stated as `grepped switch/else-if/IIFE: 0 hits` and `nested-if scan: 0 hits`)
 - [ ] §S6 Helpers placed by consumer count: a helper with exactly one consumer is not pulled into its own subfolder; a helper with two or more consumers is not left stranded in one consumer's local folder. (N/A: no helper added)
 - [ ] §S7 JSDoc on every new exported function, hook, component, and props/type interface, unless the name is fully self-explanatory; no JSDoc that merely restates the name. (N/A: no new exported API, or target repo doesn't use doc comments — confirm by grep before marking N/A)
 - [ ] §S8 New files use named exports (`export const Foo`), inline on the declaration, not `export default` and not a trailing `export { Foo }` block; sibling default-exported files are not an exemption; framework-mandated default exports (route/page/layout files and equivalents) are exempt; a new `export` on a constant/helper that nothing outside the file references is itself a finding — grep to confirm nothing imports it. (N/A: no new module)
 - [ ] §S9 Fixed-value discriminators that get serialized/compared at runtime (status, mode, kind, origin, vendor type, etc.) are TypeScript string enums, not string-literal unions; placement matches wherever the target repo already keeps sibling enums. (N/A: no new status/mode/kind field)
+- [ ] §S10 Breaking changes are named: a removed or renamed export, a changed prop or parameter shape on a shared component or exported function, and a field removed from (or made required on) an exported type are each identified as breaking, every importer is grepped and cited, and the finding stands even when the PR description says the change is not breaking. (N/A: no exported symbol, shared component signature, or exported type changed)
+- [ ] §S11 No context, hook, or pure helper in a components folder: the misplaced-modules sweep ran over every changed AND untracked file, and each hit (a `createContext(` module, a hook file, a non-component module under a components folder) has a verdict naming its type-correct destination. (N/A: only when the sweep returns 0 hits, stated as `misplaced-modules sweep: 0 hits`)
+- [ ] §S12 No package's public exports are widened only so a sibling package can reuse an internal: when a new export on a package's public entry point exists for another package in the same repo to import an implementation detail, the shared piece moves to a shared package or layer instead. (N/A: no new public-entry export consumed by another package in the repo)
 
 ## §S1. Separation of concerns
 
@@ -163,6 +166,7 @@ This rule is **absolute** and applies to functions, variables, arrays, objects, 
 - The wrapper adds a non-trivial default — `(opts = computedDefaults) => fn(opts)`. (`= {}` purely to allow destructuring is not a default.)
 - The wrapper narrows a type the wrapped function cannot.
 - The wrapper introduces a docstring or named identity at a re-export boundary that consumers depend on.
+- A named intermediate that describes a computed value for readability (a named branch or clause); see clarity §C18. Only an alias that renames one existing identifier with nothing added is dead.
 
 **How to spot one fast during review:** if the wrapper body is structurally identical to the call you'd write inline at the call site, the wrapper is dead. Apply the test: "what does this wrapper do that the wrapped thing does not?" If the answer is "nothing," delete.
 
@@ -198,6 +202,42 @@ Two levels of `if` nesting is sometimes fine; three or more nearly always wants 
 - [ ] A `default` / trailing `else` that returns a value → keep it as the map's fallback (`map[key] ?? fallback`), not a branch.
 - [ ] More than one level of `if` nesting → flatten (guard clause, extracted function, or lookup).
 - [ ] The branch genuinely does **divergent work** (side effects, early returns, several statements that aren't "produce one value") → branching is fine; say so in the finding so the reader knows it was considered, not missed.
+
+**Map entries are plain values by default.** Strings, numbers, config objects, and JSX elements (an element is a cheap descriptor, not a render) go straight into the map. Wrap an entry in `() =>` only when the value closes over a per-call argument, or must be lazy because building it is expensive or has side effects; an unneeded thunk is itself a dead wrapper (§S4). Type the map as `Partial<Record<Key, Value>>` when not every key has an entry, so the `?? fallback` at the lookup is justified by the type rather than defensive.
+
+```ts
+// Flag: thunks around values that need no argument and are cheap
+const titleByView: Record<View, () => string> = { [View.LIST]: () => 'Widgets', [View.GRID]: () => 'Gallery' }
+
+// Prefer: plain values, with the fallback typed in
+const titleByView: Partial<Record<View, string>> = { [View.LIST]: 'Widgets', [View.GRID]: 'Gallery' }
+const title = titleByView[view] ?? DEFAULT_TITLE
+```
+
+**Enumerate chains and nesting by grep, do not eyeball.** Over the diff's added lines, list every `switch`, every `else if`, and every IIFE assigned to a value (an IIFE that picks one value from a discriminant is a `switch` in disguise):
+
+```bash
+gh pr diff <num> | grep -nE '^\+.*(\bswitch *\(|\belse +if *\(|= *\((async *)?\(\) *=>)'
+```
+
+Nesting is not visible in added lines alone, so scan the changed files themselves with an indentation-aware pass: it reports an `if` opened while an `if` or `else` block at a lower indent is still open, and treats `else if` at the same indent as a sibling, not nesting.
+
+```bash
+git diff --name-only <base>...HEAD > /tmp/changed-files.txt
+while IFS= read -r f; do [ -f "$f" ] || continue; awk -v F="$f" '
+  function indentOf(line) { match(line, /^[ \t]*/); return RLENGTH }
+  /^[ \t]*$/ { next }
+  {
+    ind = indentOf($0)
+    isIf = $0 ~ /^[ \t]*(\}[ \t]*)?(else[ \t]+)?if[ \t]*\(/
+    isElse = !isIf && $0 ~ /^[ \t]*(\}[ \t]*)?else([^A-Za-z0-9_]|$)/
+    for (d in open) if (open[d] && d + 0 >= ind) open[d] = 0
+    if (isIf) for (d in open) if (open[d] && d + 0 < ind) { print F ":" NR ": if nested inside a block opened at indent " d; break }
+    if (isIf || isElse) open[ind] = 1
+  }' "$f"; done < /tmp/changed-files.txt
+```
+
+The scan is indentation-based, so it is a candidate generator: open each hit, confirm it is a real nesting in a changed region, and give it a verdict against the nesting rule above. It also under-matches (a nested `if` on the same line as its parent, code not indented by the formatter), so still read each changed function's control flow. Adapt both to the target language (`elif`, `case`/`when`, `match`) and state which patterns were run. Print `grepped switch/else-if/IIFE: N hits` and `nested-if scan: N hits`, with `0 hits` stated explicitly.
 
 **Deriving the lookup key from multiple booleans:** the lookup map is correct even when the key has to come from 2+ booleans, but the *key derivation itself* must not be a chained ternary. Break the chain into named single-level intermediates so each `?:` reads as one decision.
 
@@ -346,3 +386,38 @@ Reasons:
 **What NOT to flag:**
 - One-off literal unions where the value space is genuinely local UI state (variant strings like `'minimal' | 'full'`, a UI-library prop union, drawer sizes). Apply the backend-value test above.
 - Pre-existing literal unions the PR doesn't substantively edit. Adding a member to an existing union is acceptable; introducing a brand-new union for a serialized value is not.
+
+## §S10. Breaking changes are named, whatever the description says
+
+A change to a public or shared API can break a caller the diff never shows. Walk every changed export, shared component signature, and exported type, and treat these as breaking:
+
+- An export removed or renamed.
+- A prop or parameter removed, renamed, retyped, or reordered on a shared component or exported function.
+- A field removed from an exported type, or an optional field made required. Consumers who construct the type as a literal stop compiling, even though the library itself always passes the value.
+
+For each, grep the target repo for importers and cite the count and paths. When the package is published, the importers you can grep are not all of them; say so in the finding. The finding stands even when the PR description says "no breaking changes" or "internal only": the description is a claim, and the signature is the evidence. The usual remedy is the non-breaking shape (keep the field optional with a default, keep the old export as a deprecated alias) unless the break is intended, in which case the finding asks for it to be stated and versioned.
+
+## §S11. Misplaced-modules sweep
+
+§S1 says the directory is part of the contract. This box enforces it mechanically for the most common miss: a context, hook, or pure helper created inside a components folder because that is where the author was working. Run it over every changed file AND every untracked file, since a newly created misplaced file is the usual case and is not in `git diff` until it is added:
+
+```bash
+{ git diff --name-only <base>...HEAD; git ls-files --others --exclude-standard; } | sort -u > /tmp/changed-files.txt
+while IFS= read -r f; do [ -f "$f" ] || continue; case "$f" in
+  */components/*)
+    grep -q 'createContext(' "$f" && echo "$f: createContext() under components/, belongs with contexts or stores"
+    case "$(basename "$f")" in
+      index.ts|index.js|*.test.*|*.spec.*|*.stories.*) ;;
+      use-*|use[A-Z]*) echo "$f: hook under components/, belongs with hooks" ;;
+      *.ts|*.js) echo "$f: non-component module under components/, likely a util, type, or context" ;;
+    esac ;;
+esac; done < /tmp/changed-files.txt
+```
+
+Adapt the folder names and extensions to the target repo's layout (grep where its contexts, hooks, and utils already live) before running. Every hit is a candidate: open the file, confirm what it exports, and name the destination the repo already uses for that kind of module. Print `misplaced-modules sweep: N hits`, with `0 hits` stated explicitly.
+
+## §S12. Do not widen a public API to share an internal
+
+In a repo with several packages, the tempting fix for "package B needs a helper that lives inside package A" is to export it from A's public entry point. That turns an implementation detail into a public contract A now has to keep, and couples B to A's internals. When a new export on a package's public entry exists for a sibling package to import (grep the sibling's imports to confirm), the shared piece belongs in a shared package or layer that both consume.
+
+This is distinct from §S8's unnecessary exports: there, nothing imports the new export; here, something does, and the question is whether it should be importing it from there. Do not flag an export that is part of the package's intended public API for its real consumers; flag the one that exists only to let a sibling reach inside.

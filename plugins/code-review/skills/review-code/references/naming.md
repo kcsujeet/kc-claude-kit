@@ -2,7 +2,7 @@
 
 > The conventions themselves are stated canonically in the kit's `rules/naming.md`, which loads at authoring time. This file is the review side: the detection criteria and failure modes for grading a diff. Each box stays self-contained so a gate agent needs nothing but this file; when a convention changes, change `rules/naming.md` first and update the affected boxes here to match.
 
-Identifier-naming rules for the diff under review. Covers four independent failure modes: type-shaped names on behavior-bearing values, undecoded inline boolean chains, repeated predicates that should be a shared helper, and names that are dishonest about what the code actually does.
+Identifier-naming rules for the diff under review. Covers seven independent failure modes: type-shaped names on behavior-bearing values, undecoded inline boolean chains, repeated predicates that should be a shared helper, names that are dishonest about what the code actually does, names that only read well beside their declaration, noun-phrase names on functions, and file names that need their path to mean anything.
 
 ## Gate checklist
 
@@ -11,8 +11,10 @@ The naming gate agent ticks every box against the diff. A box is FAIL if any mat
 - [ ] §N1 Role-not-type names: new variables/functions describe the role, not the type (no `data`/`result`/`value`/`temp`/`item`/`obj` for behavior-bearing values); function names describe the effect, not just the trigger. (N/A: no new identifiers)
 - [ ] §N2 Inline boolean chains — evaluate the OPERANDS, not just the outer name: any `&&`/`||` chain with 2+ non-obvious operands (raw comparisons, enum (in)equalities, negations, `?.` field access) has EACH non-obvious operand extracted to its own named boolean. Assigning the whole chain to a named boolean does NOT satisfy this. A parenthesized sub-expression in a mixed `&&`/`||` chain (e.g. `(a || b) && c`) also gets its own name — parentheses alone don't pass. Enumerate by grep, do not eyeball. (N/A: only when the grep returns 0 hits, stated as `grepped &&/||: 0 hits`)
 - [ ] §N3 Cross-call-site predicate: the same predicate repeated in 2+ places is extracted to a named helper (type guard when narrowing helps). (N/A: no repeated predicate)
-- [ ] §N5 Unambiguous where READ, not where declared: every new identifier (local, destructured value, parameter, closure, returned key, export) is qualified enough to read at its use site without scrolling back to the declaration. A bare generic verb/noun naming the mechanism rather than the subject (`check`, `run`, `wrap`, `guard`, `handle`, `process`, `filter`, `format`, `validate`, and any other single word of that shape) FAILS even though it is accurate, and a collision with an unrelated declaration elsewhere FAILS on its own. Enumerate by grep, do not eyeball. (N/A: only when the diff adds no identifiers, stated as `grepped bare-word declarations: 0 hits`)
 - [ ] §N4 Honest names: each new name reads as a sentence that matches the actual behavior/subject — no surface-word gluing, no subject elision, no context-as-subject, no stale-after-refactor names, no familiar-shaped name hiding a different behavior or constraint. (N/A: no new names)
+- [ ] §N5 Unambiguous where READ, not where declared: every new identifier (local, destructured value, parameter, closure, returned key, export) is qualified enough to read at its use site without scrolling back to the declaration. A bare generic verb/noun naming the mechanism rather than the subject (`check`, `run`, `wrap`, `guard`, `handle`, `process`, `filter`, `format`, `validate`, and any other single word of that shape) FAILS even though it is accurate, and a collision with an unrelated declaration elsewhere FAILS on its own. Enumerate by grep, do not eyeball. (N/A: only when the diff adds no identifiers, stated as `grepped bare-word declarations: 0 hits`)
+- [ ] §N6 Verb-led functions: every new function (declaration, arrow-function const, or object method) starts with a verb that says what calling it does: predicates `is`/`has`/`can`/`should`, value getters `get`/`to`, mutators and handlers `set`/`toggle`/`handle`. A noun-phrase name (`sameOwner`, `itemLabel`, `widgetKey`) reads like a value, not a callable, and FAILS. PascalCase components and `use*` hooks are exempt. Enumerate by grep, do not eyeball. (N/A: only when the grep returns 0 hits, stated as `grepped unverbed functions: 0 hits`)
+- [ ] §N7 Unique file names: every new file name identifies the file without its path, since tabs, search results, and stack traces show it bare. A basename that already exists elsewhere in the repo FAILS, and so does a generic one (`header.tsx`, `helpers.ts`) deep in a folder whose path carries the only meaning. Framework-mandated names (`index`, `page`, `layout`, `route` and equivalents) are exempt, and a test file is judged by its unit's name. (N/A: no new files in diff)
 
 ## §N1. Names should describe the *role*, not the *type*
 
@@ -233,6 +235,55 @@ grepped bare-word declarations: 4 hits
 
 `0 hits` must be printed explicitly, so silence can never be read as a pass.
 
+## §N6. Functions start with a verb
+
+A function name is read at call sites, where a noun phrase looks like a value: `if (sameOwner(a, b))` reads as indexing into something, and `const label = itemLabel(item)` hides that work happens. Lead with the verb that says what the call does.
+
+| Shape | Prefix | Illustration |
+|---|---|---|
+| Boolean predicate | `is`, `has`, `can`, `should` | `sameOwner` → `isSameOwner` |
+| Returns a value | `get`, `to`, or a precise verb (`parse`, `format`, `build`) | `itemLabel` → `getItemLabel`, `widgetKey` → `getWidgetKey` |
+| Mutates or handles | `set`, `toggle`, `handle`, `update` | `selection` → `toggleSelection` |
+
+**Not flagged:** a function already led by a clear action verb (`detectMode`, `resolveOwner`, `renderRow`); React components (PascalCase); hooks (`use*`). A bare verb with no subject (`check`, `run`) passes this box but fails §N5; walk both.
+
+**Enumerate by grep, do not eyeball.** Over the diff's added lines, list function declarations whose name does not start with a known verb:
+
+```bash
+<diff command> | grep -nE '^\+.*(const [a-z][A-Za-z0-9]* = (async )?(\(|[a-z][A-Za-z0-9]* =>)|function [a-z][A-Za-z0-9]* *\()' \
+  | grep -vE '(const|function) (is|has|can|should|get|set|to|use|handle|on|toggle|create|build|make|render|parse|format|resolve|compute|find|filter|map|sort|merge|apply|run|load|save|read|write|add|remove|update|delete|fetch|validate|normalize|ensure|init|detect|select|wrap|with|extract|convert|check|compare|register|reset|clear|open|close|show|hide|emit|dispatch|subscribe)[A-Z]'
+```
+
+Extend the verb allowlist with the target repo's own established verbs before running, and adapt the declaration pattern to the target language. The grep over-matches: an IIFE assigned to a value (`const total = (() => { ... })()`) is a value, not a callable, and is dismissed in writing. Object methods (`label() {`, `label: () =>`) are not matched by the pattern; read them in the diff. One line per hit with a verdict, and the count:
+
+```
+grepped unverbed functions: 3 hits
+- [FAIL] widget-utils.ts:12 `sameOwner`: predicate without `is`; `isSameOwner`
+- [FAIL] widget-utils.ts:20 `itemLabel`: value getter without `get`; `getItemLabel`
+- [PASS] widget-panel.tsx:8 `total`: IIFE assigned to a value, not a function
+```
+
+`0 hits` must be printed explicitly.
+
+## §N7. A file name identifies the file without its path
+
+A file's name is what shows in an editor tab, a search result, a stack trace, and a diff header, usually with the path cut off. A name that only means something with its folders attached is a lookup every time someone meets it, and a name shared with another file sends them to the wrong one.
+
+**Flag:**
+- A new file whose basename already exists elsewhere in the repo.
+- A generic basename (`header.tsx`, `helpers.ts`, `types.ts`, `utils.ts`) deep in a feature folder, where only the path says what it is for. The fix carries the subject into the name: `widget-list-header.tsx`.
+
+**Not flagged:** framework-mandated names the tooling looks up by name (`index`, `page`, `layout`, `route`, and equivalents); a test file, which carries its unit's name plus the test suffix and is judged by that unit's name.
+
+**Check mechanically.** For each file the diff adds (including untracked files on a local branch), count basename matches across the repo:
+
+```bash
+{ git diff --name-only --diff-filter=A <base>...HEAD; git ls-files --others --exclude-standard; } | sort -u \
+  | while IFS= read -r f; do b=$(basename "$f"); n=$({ git ls-files; git ls-files --others --exclude-standard; } | awk -F/ -v b="$b" '$NF == b' | wc -l); echo "$f: $n"; done
+```
+
+A count above 1 is a collision. A count of 1 still gets the generic-name read. One line per new file in the evidence, stated as `checked new file names: N files, M collisions`.
+
 ## §N2 evidence requirement: enumerate boolean chains by grep, do not eyeball
 
 The §N2 box is graded on whether you **listed** the chains, not on whether you noticed them. Reading a long diff and forming impressions is how a three-operand guard slips through while the reviewer still ticks the box: the miss that prompted this rule was a three-clause `if (!a || !b || a.index === b.index) return` buried in a 1,000-line diff, on a gate reported as PASS.
@@ -244,6 +295,8 @@ gh pr diff <num> | grep -nE '^\+.*(\&\&|\|\|)'
 ```
 
 Adapt the pattern to the target language's operators before running (`and`/`or` chains, `a if c else b` conditional expressions, `x.(T)` / `cast()` type assertions, etc.); `0 hits` is only a valid receipt after the language-appropriate pattern was run, and the receipt states which pattern was used.
+
+A condition split one clause per line yields one hit per line, and each line on its own looks like a single operand. Before giving a verdict, reassemble the whole condition from its first line to its last and count the clauses, not the lines: a four-clause `Boolean(...)` wrapped one clause per line is four operands, the same as if it were on one line. Give the verdict once, on the condition's first line, and mark the continuation hits as part of it.
 
 Then produce one line per hit in the gate evidence, with a verdict and the count:
 

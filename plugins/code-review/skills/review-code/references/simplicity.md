@@ -1,6 +1,6 @@
 # Simplicity gate
 
-Covers the standing DRY/YAGNI/KISS lens applied to every diff, reuse-over-reinvention (including the "assume it already exists" search), and two numeric-hygiene rules: safe coercion and repeated-conversion extraction.
+Covers the standing DRY/YAGNI/KISS lens applied to every diff, reuse-over-reinvention (including the "assume it already exists" search), two numeric-hygiene rules (safe coercion and repeated-conversion extraction), the delete-or-collapse test on every new construct, type signatures wider than their sink needs, unverified "this mirrors X" claims, refactor leftovers, and shared-component props added for one caller.
 
 ## Gate checklist
 
@@ -9,8 +9,13 @@ The simplicity gate agent ticks every box against the diff. A box is FAIL if any
 - [ ] §P1 DRY: no logic, value, literal, or markup duplicated that should be a single source (a copied block, a re-declared constant, a re-implemented helper). (N/A: nothing duplicated in the diff)
 - [ ] §P2 YAGNI: no speculative or unused code — no unused params/props, no abstraction with a single caller built for a hypothetical second one, no config option nothing passes, no dead branch. (N/A: no new abstraction, param, prop, or config option in the diff)
 - [ ] §P3 KISS: no materially simpler equivalent left on the table — a lookup object beats nested conditionals, an early return beats nesting, an existing util/stdlib call beats a hand-roll. (N/A: nothing in the diff has a simpler available equivalent)
-- [ ] §P4 Assume-it-exists: any new hand-rolled capability was checked against a prop/slot on the component already in use, a shared hook/util, a component variant, and data already in state/store, in that order, before being written; a component that only reuses a shared *hook* is still checked against a shared *component* that composes that same hook. (N/A: nothing hand-rolled in the diff)
+- [ ] §P4 Assume-it-exists: any new hand-rolled capability was checked against a prop/slot on the component already in use, a shared hook/util, a component variant, and data already in state/store, in that order, before being written; a component that only reuses a shared *hook* is still checked against a shared *component* that composes that same hook; a new type was grepped by its field set and a new component by its core props and markup, not only by name. (N/A: nothing hand-rolled in the diff)
 - [ ] §P5 Numeric hygiene: coercions are NaN-safe and don't silently swallow a legitimate `0` (no bare `value ?? 0` on a nullable/optional numeric, no `Number(x) || 0`, no NaN-risky `Number(x)` on a possibly-empty/non-numeric value; no wrapping of an already-guaranteed `number`); a non-trivial conversion/encoding repeated at 2+ call sites is extracted to a named helper rather than re-inlined per site. (N/A: no numeric coercion and no repeated conversion in the diff)
+- [ ] §P6 Delete-or-collapse: every new construct (variable, branch, guard, helper, prop, param, option, type, default, wrapper) passes "what breaks if I delete or collapse this?"; one that collapses to a simpler form with identical behavior FAILS, and the finding gives the concrete simpler form. "It works", "it's defensive", and "it's more explicit" are not justifications. A named intermediate kept for readability is exempt (clarity §C18). (N/A: no new construct in the diff)
+- [ ] §P7 Types as narrow as their sink: every new or changed return/param type carries no member its consumers treat identically to another (a `=> T | undefined`, `| null`, or `| ''` whose sink handles the empty value exactly like the default narrows to `=> T`); the sink's behavior was opened or run before the finding claims it. (N/A: no new or changed signature)
+- [ ] §P8 Mirror claims are diffed: wherever the PR or the review says a new member mirrors, follows, or matches an existing sibling, the two signatures are set side by side in the evidence; an unjustified difference between siblings is a finding. (N/A: no new member beside an existing sibling, and no such claim)
+- [ ] §P9 No refactor leftovers: no markup or block left duplicated by an incomplete refactor, no import nothing uses, no prop or param threaded through and never read, no commented-out code. (N/A: none in the diff)
+- [ ] §P10 A prop or option added to a shared component or shared helper for a single caller's case is questioned: could the caller own it, or compose the shared piece instead? (N/A: no shared component or helper signature changed)
 
 ## §P1–P3. The DRY / YAGNI / KISS standing lens
 
@@ -68,6 +73,12 @@ Concrete instance (the recurring one): a sibling element hand-rendering a field'
 
 When flagging: grep for the existing thing (the component's prop types, the hook, the store) and cite it, then flag the hand-rolled version. Don't flag if a genuine search confirms nothing fits.
 
+**Search by shape, not only by name.** A duplicate usually has a different name, so a name grep alone misses it:
+
+- For a new **type**, grep for its field set (two or three of its distinctive field names together), not its name. A second interface with the same fields is the duplicate.
+- For a new **component**, grep for its core props and its distinctive markup (the primitive it renders, the prop combination it takes). A near-copy of an existing component rarely shares its name.
+- For a new **helper**, grep for the calls it makes and the keywords of what it computes.
+
 ## §P5. Numeric hygiene
 
 ### Safe numeric coercion
@@ -108,3 +119,65 @@ const toMode = (on: boolean) => (on ? Mode.ON : Mode.OFF)
 ```
 
 Calibrate by cost: a trivial 2-site repeat is a `nitpick`; a both-directions encoding or 3+ sites is a `suggestion`. This is distinct from the repeated-*JSX*-block rule (react gate §R6, which maps an array); this rule is about a repeated *expression/conversion* becoming a named helper.
+
+## §P6. The delete-or-collapse test
+
+For every new construct in the diff, ask **"what breaks if I delete or collapse this?"** If the answer is "nothing, the behavior is identical", it is a finding, and the simplest form that produces the same observable behavior is the correct one. Apply it on your own to every changed line; missing an obvious collapse that the user then has to point out is a review defect, the same as missing a bug.
+
+Concretely (illustrations, not an exhaustive list):
+
+- **A `let` plus `if`-assignment that one expression replaces.**
+  ```ts
+  // Flag
+  let itemLabel: string | undefined
+  if (count !== undefined) {
+    itemLabel = String(count)
+  }
+
+  // Prefer: optional chaining yields undefined for undefined
+  const itemLabel = count?.toString()
+  ```
+- **A guard or branch for a state the types already rule out.** If `widget` is typed non-optional, `if (!widget) return` guards nothing.
+- **Null handling that `?.`, `??`, or a parameter default already covers.**
+- **A prop, param, or option that every caller passes with the same value**, or that the callee could read from a context it already consumes.
+- **A default, wrapper, or type alias** that restates what it wraps (overlaps structure §S4; report it once, under the closer fit).
+
+Give the concrete simpler form in the finding, not "simplify this", and scan the rest of the diff for the same shape. A named intermediate that exists for readability is not a collapse candidate (clarity §C18).
+
+## §P7. A type is as narrow as its sink needs
+
+The delete-or-collapse test applies to type signatures too. A return or parameter type can carry surface that no consumer uses, exactly like an unused branch.
+
+```ts
+// Flag: every consumer passes the result to a class-merging helper, which drops '' and undefined alike
+getItemClassName?: (item: Item) => string | undefined
+
+// Prefer
+getItemClassName?: (item: Item) => string
+```
+
+Before flagging, open (or run) the sink and confirm it treats the empty value exactly like the default: a class-merging helper dropping `''`, a renderer skipping `null`, a serializer omitting `undefined`. If the sink distinguishes them, the wider type is doing work and stays.
+
+## §P8. "This mirrors X" is diffed, not asserted
+
+When the PR, or your own notes, describe a new member as following, mirroring, or matching an existing sibling, put the two signatures side by side in the evidence and compare them literally. Siblings that disagree in shape are a finding unless the difference is justified:
+
+```ts
+isItemDisabled?: (item: Item) => boolean            // existing sibling: definite return
+getItemClassName?: (item: Item) => string | undefined // new: optional return, for no stated reason
+```
+
+"This mirrors X" without the comparison is the same shortcut as asserting a library's behavior from memory.
+
+## §P9. Refactor leftovers
+
+An incomplete refactor leaves debris the diff no longer needs:
+
+- Markup or a block duplicated because the new version was added and the old one never removed.
+- An import nothing in the file uses any more. If the target repo's linter reports unused imports, its output is the receipt; cite it.
+- A prop or parameter still threaded through a component or function that no longer reads it.
+- Commented-out code. Version control keeps the old version; the comment only adds noise.
+
+## §P10. A shared prop added for one caller
+
+A prop or option added to a shared component or helper so that one caller can get a special case makes every other caller carry it. Ask whether the caller could own the behavior (wrap or compose the shared piece), or whether the case is general enough that several callers would plausibly use it today. A shared component with many props, several of which only one caller passes, is the accumulated form of this finding.

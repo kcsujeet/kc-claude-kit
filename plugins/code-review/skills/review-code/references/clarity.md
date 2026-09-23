@@ -2,7 +2,7 @@
 
 > The conventions themselves are stated canonically in the kit's `rules/clarity.md`, which loads at authoring time. This file is the review side: the detection criteria and failure modes for grading a diff. Each box stays self-contained so a gate agent needs nothing but this file; when a convention changes, change `rules/clarity.md` first and update the affected boxes here to match.
 
-Readability rules for the diff under review. None of these are automatically wrong — they are prompts to look harder at new logic. Covers sixteen independent failure modes: guard-clause density, defensive coercion, undeclared field access, redundant casts, tangled side effects, comment hygiene, ordered mutations, magic spreads, inline anonymous types, fallback chains, unhappy-path tangling, thin wrappers, dense sub-expressions, circular imports, ternary shape, and magic numbers.
+Readability rules for the diff under review. None of these are automatically wrong — they are prompts to look harder at new logic. Covers eighteen independent failure modes: guard-clause density, defensive coercion, undeclared field access, redundant casts, tangled side effects, comment hygiene, ordered mutations, magic spreads, inline anonymous types, fallback chains, unhappy-path tangling, thin wrappers, dense sub-expressions, circular imports, ternary shape, magic numbers, type escape hatches (lying casts, `any`, non-null assertions), and review suggestions that strip readable intermediates.
 
 ## Gate checklist
 
@@ -13,7 +13,7 @@ The clarity gate agent ticks every box against the diff. A box is FAIL if any ma
 - [ ] §C3 Every new `record.someField` access is declared on the record's type/interface; optional-chained access to an undeclared field is a FAIL. (N/A: no new field access)
 - [ ] §C4 No redundant `as T` assertion on a value the compiler already infers as `T`. **Enumerate by grep, do not eyeball** — see below. (N/A: only when the grep returns 0 hits, stated as `grepped as-casts: 0 hits`)
 - [ ] §C5 No side effects inside render/computation closures (map/filter/reduce callbacks, memoized selectors, inline JSX expressions); side effects live in named handlers called from outside the closure. (N/A: no closure with a side effect in diff)
-- [ ] §C6 Comments earn their place AND are sparse: none paraphrase the next line or restate a name; the diff does not comment most blocks by default (over-commenting density is itself a FAIL); non-obvious constraints are commented. (N/A: no comments added)
+- [ ] §C6 Comments earn their place AND are sparse: none paraphrase the next line or restate a name; none narrate the task, ticket, or review round instead of the code; the diff does not comment most blocks by default (over-commenting density is itself a FAIL); non-obvious constraints are commented. (N/A: no comments added)
 - [ ] §C7 Two-step / order-dependent state mutations have an ordering rationale comment. (N/A: no ordered mutation pair in diff)
 - [ ] §C8 No magic spread + override + default mixed in one literal (extract a named value). (N/A: no such literal in diff)
 - [ ] §C9 No inline anonymous structural type in a variable declaration (name it at module scope). (N/A: no inline structural type in diff)
@@ -22,8 +22,10 @@ The clarity gate agent ticks every box against the diff. A box is FAIL if any ma
 - [ ] §C12 No thin-wrapper helper whose name only restates a one-line body (over-extraction). (N/A: no new single-purpose helper in diff)
 - [ ] §C13 An expression (template literal, call argument, JSX prop, or return) that inlines 2+ non-trivial sub-expressions (each a `??`/optional-chain fallback, call, ternary, or cast) extracts them to named locals first. (N/A: no such multi-part expression in diff)
 - [ ] §C14 No circular imports introduced (soft). (N/A: no cross-module import change)
-- [ ] §C15 Ternaries: none nested/chained (2+ `?`), long, multi-line once formatted, or with a non-trivial branch (more than a short value/identifier). Applies to value/assignment/returned/arg ternaries too, not just JSX — the branch content is irrelevant, only the shape. Walk every ternary in the diff. **Enumerate by grep, do not eyeball** — see below. (N/A: only when the grep returns 0 hits, stated as `grepped ternaries: 0 hits`)
+- [ ] §C15 Ternaries: none nested/chained (2+ `?`), long, multi-line once formatted, or with a non-trivial branch (more than a short value/identifier). Applies to value/assignment/returned/arg ternaries too, not just JSX — the branch content is irrelevant, only the shape. Walk every ternary in the diff. A proposed fix respects the remedy limits in §C15 (no `flagA && value` for a value-or-absent prop, no conditionally spread options object). **Enumerate by grep, do not eyeball** — see below. (N/A: only when the grep returns 0 hits, stated as `grepped ternaries: 0 hits`)
 - [ ] §C16 Bare numeric literals for dimensions/thresholds/timeouts are named constants with a one-line why, or a design token when the project has a token system; a magic value repeated 2+ times is also a DRY finding. (N/A: no magic literal added)
+- [ ] §C17 No type escape hatches: no `as` cast (including `as unknown as T`) that asserts a type the value does not actually have in order to silence a mismatch; no `any`, explicit or through an untyped boundary; no non-null assertion (`value!`). **Enumerate by grep, do not eyeball**; see §C17. (N/A: only when all three greps return 0 hits, stated as `grepped as-casts: 0 hits`, `grepped any: 0 hits`, `grepped non-null assertions: 0 hits`)
+- [ ] §C18 No finding this gate proposes suggests removing a named intermediate that makes an expression readable on the grounds that it looks redundant, costs a type-narrowing step, or eagerly evaluates a trivial branch the ternary will not take. Sibling gates that propose inlining (simplicity §P6, structure §S4) apply the same test. (N/A: no finding proposes removing a named intermediate)
 
 ## §C1. Dense guard clauses without comment
 
@@ -85,6 +87,7 @@ Default is self-documenting code: descriptive names, small functions, and named 
 - Describe the happy path without naming the constraint that forced this code shape.
 - Run on for many lines — a comment longer than ~2 sentences usually means the function itself wants splitting or renaming.
 - Appear at high density — a comment on nearly every line/block/attribute — even when each is individually harmless.
+- Narrate the task, ticket, or review round rather than the code: `// added for the new checkout flow`, `// changed per review`, `// previously used X`. That history belongs in the commit message, and the comment goes stale the moment it lands.
 - Are grammatically awkward — those often mark spots where the author was working out the logic while typing, and the underlying code usually needs the most attention.
 
 **Do NOT flag comments that:**
@@ -327,6 +330,12 @@ const withoutItem = items.filter((entry) => entry !== item)
 const next = isOn ? withItem : withoutItem
 ```
 
+**Remedy limits.** A fix for a ternary must not trade it for a different defect:
+
+- A value-or-absent prop is never rewritten as `flagA && value`. That yields `false`, not `undefined`, which a prop typed `T | undefined` rejects and a renderer may print. Assign a named const with an `if`, or keep a one-line ternary with `undefined` as the other branch. (Inside a class-merging helper, `flagA && 'some-class'` is fine, because the helper drops `false`.)
+- Never propose a conditionally built partial object spread into a call (`widgetFn({ ...base, ...(flagA ? { optA, optB } : {}) })`). It moves the ternary out of sight instead of removing it; branch at the call site or name the options object instead.
+- For trivial branches (string formatting, key building, a cheap lookup), computing both named branches eagerly is the accepted cost of a one-line choice and is not an efficiency finding (§C18).
+
 **Acceptable single-ternary patterns** (do NOT flag):
 - One condition selecting between two values inline: `<Title>{flagA ? 'Confirm' : 'Send Request'}</Title>`.
 - A ternary whose branches are single primitive values (a number, a class name, a short string) or a single short identifier, on one line.
@@ -338,18 +347,20 @@ const next = isOn ? withItem : withoutItem
 Find them mechanically **before** reading for meaning, over the diff's **added lines only** — over the diff you were given (e.g. `gh pr diff <num>` for a PR, `git diff <default-branch>...HEAD` for a branch), e.g.:
 
 ```bash
-gh pr diff <num> | grep -nE '^\+.*\?' | grep -v '^\+.*\w\?:'   # ternaries, minus optional-property syntax
-gh pr diff <num> | grep -nE '^\+.*\bas [A-Z]'                  # type assertions
+gh pr diff <num> | grep -nE '^\+.*[^?]\?([^.?:]|$)'   # ternaries: a `?` that is not `?.`, `??`, or an optional `?:`
+gh pr diff <num> | grep -nE '^\+.*\bas [A-Za-z]'       # type assertions, including `as string`, `as const`, `as unknown as T`
 ```
+
+The ternary pattern matches the `?` itself rather than dropping lines, so a line that holds both an optional property and a real ternary is still a hit, and a `?` left at the end of a line by the formatter is caught too.
 
 Adapt the pattern to the target language's operators before running (`and`/`or` chains, `a if c else b` conditional expressions, `x.(T)` / `cast()` type assertions, etc.); `0 hits` is only a valid receipt after the language-appropriate pattern was run, and the receipt states which pattern was used.
 
-Both greps over-match, and that is fine — the point is that every candidate gets named and dismissed in writing rather than never being looked at. Expect to discard optional properties (`field?: CustomField`), optional chaining, and `??` from the ternary grep; say so per hit.
+Both greps over-match, and that is fine — the point is that every candidate gets named and dismissed in writing rather than never being looked at. Expect to discard a `?` inside a string or a regex from the ternary grep, and import/export aliases (`import { x as y }`) and the word "as" in comments or strings from the cast grep; say so per hit. `as const` is a hit too: it is usually fine, and the verdict says so.
 
 Emit one line per hit with a verdict and the count:
 
 ```
-grepped ternaries: 10 hits (6 discarded: optional-property syntax / `??`)
+grepped ternaries: 5 hits (1 discarded: `?` inside a regex)
 - [FAIL] someLabel.ts:18 — multi-line, template-literal branch; use an early return
 - [PASS] useSelectionResource.ts:27 — single line, both branches trivial
 ...
@@ -380,3 +391,30 @@ setTimeout(() => pollStatus(), RETRY_DELAY_MS)
 ```
 
 The same intent expressed as different magic numbers (one call site waits `3000`, another waits `2500` for what's meant to be the same delay) is the tell that a shared constant is missing. A magic value repeated 2+ times is also a DRY finding independent of the naming issue.
+
+## §C17. Type escape hatches: lying casts, `any`, non-null assertions
+
+§C4 catches a cast that is merely redundant. This box catches the worse case: a cast, an `any`, or a `!` that tells the compiler something untrue so an error goes away. The error was the type system reporting a real mismatch; the escape hatch hides it until runtime.
+
+- **A lying cast.** `const widget = response as Widget` where `response` is a different or wider shape, or the double cast `value as unknown as Widget` that exists only because the single cast was rejected. Fix the type upstream, or parse and narrow the value (a type guard, a schema parse at the boundary). A cast is legitimate only where the compiler genuinely cannot know the type and the code has checked it (a DOM query result, a parsed payload already validated).
+- **`any`.** An explicit `: any`, `as any`, or `<any>`, or an untyped parameter or import that widens to `any` and carries a wrong shape through. Use `unknown` and narrow it, or name the real type.
+- **Non-null assertion.** `widget!.label` or `items.at(0)!` asserts presence without checking it. Use a guard with an early return, optional chaining with a default, or narrow the type so the value cannot be absent.
+
+**Enumerate by grep, do not eyeball.** The cast hits come from the §C4 grep above (one sweep, two verdicts: redundant under §C4, lying under §C17). Add, over the diff's added lines:
+
+```bash
+gh pr diff <num> | grep -nE '^\+.*(: *any\b|<any>|\bas any\b|\bany\[\])'   # any
+gh pr diff <num> | grep -nE '^\+.*[A-Za-z0-9_)\]]!([.)\[;,]|$)'             # non-null assertions (not `!=`)
+```
+
+Adapt both to the target language's escape hatches (force unwrap, force cast, `# type: ignore`, and so on), and state which patterns were run. One line per hit with a verdict, and `grepped any: 0 hits` / `grepped non-null assertions: 0 hits` printed explicitly when true.
+
+## §C18. Do not suggest removing a readable intermediate
+
+A named intermediate that splits an expression into readable parts (a named branch, a named clause, a named sub-expression) is the fix for §C13 and §C15, not a defect. A review, from any gate, must not suggest inlining it because it:
+
+- looks redundant next to the expression it names;
+- costs an extra narrowing step for the type checker (the value has to be re-checked after being named);
+- eagerly evaluates a branch the ternary will not take, when the branch is trivial (formatting, key building, a cheap lookup).
+
+This does not protect a pure alias that renames one identifier to another with nothing added (`const handleClose = onClose`): that is a dead wrapper (structure §S4). The line is whether the name describes a computed value or only repeats an existing one. The clarity gate grades its own proposed fixes against this box; simplicity §P6 and structure §S4 point here so their inline suggestions pass the same test.
