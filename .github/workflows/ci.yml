@@ -115,17 +115,23 @@ jobs:
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
       # CI form from https://code.claude.com/docs/en/plugin-evals.
-      # code-review cases build their fixture repos with scaffold scripts,
-      # and the review runs git through Bash and dispatches gate agents.
+      # code-review cases load conventions too (plugins: ["../..",
+      # "../../../conventions"]), and the runner only loads plugins inside its
+      # containment root: the target plugin when the target is a plugin, else
+      # the directory the eval runs against. So code-review runs from the repo
+      # root with --eval-dir. Its cases also build fixture repos with scaffold
+      # scripts, run git through Bash and dispatch gate agents.
       # --allow-tools takes a list, so it stays last among these flags.
       - name: Run eval suite
         if: steps.key.outputs.present == 'true'
         run: |
+          target=("plugins/$PLUGIN")
           extra_flags=()
           if [ "$PLUGIN" = code-review ]; then
+            target=(. --eval-dir plugins/code-review/evals --ablation with-without)
             extra_flags+=(--scaffold --allow-tools Bash Agent)
           fi
-          claude plugin eval "plugins/$PLUGIN" \
+          claude plugin eval "${target[@]}" \
             --trust-plugin \
             --json results.json \
             --threshold 0.8 \

@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Fixed
+
+- The code-review eval suite could not load: its cases list `../../../conventions`, which sits outside the eval runner's containment root when the target is `plugins/code-review`. CI and the README now run it from the repo root with `--eval-dir plugins/code-review/evals`. Measured: all 3 code-review cases pass.
+- The README and the code-review 2.0.0 release notes now say that upgrading from 1.x needs `claude plugin install conventions@kc-claude-kit`, since `claude plugin update` does not install the new dependency.
+
+## conventions 1.1.0, code-review 2.0.0 - 2026-09-23
+
 The restructure described in [`docs/architecture.md`](docs/architecture.md): each convention is stated once, as a skill used both when writing and when reviewing.
 
 ### conventions 1.1.0
