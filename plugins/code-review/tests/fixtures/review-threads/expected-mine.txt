@@ -1,0 +1,34 @@
+4 thread(s), 8 comment(s)
+
+thread 101 src/widget.ts:12 (4 comments)
+started-by-you: yes
+author-replied-after-your-last: no
+  101 @reviewer src/widget.ts:12
+      Could we rename `check` to `checkRetentionPolicy`?
+  105 @alice src/widget.ts:12 (reply to 101)
+      Renamed in 1111111111111111111111111111111111111111.
+  107 @reviewer src/widget.ts:12 (reply to 101)
+      The same applies to `run` below.
+  108 @carol src/widget.ts:12 (reply to 105)
+      +1
+
+thread 250 src/list.ts:4 (1 comment)
+started-by-you: no
+author-replied-after-your-last: n/a
+  250 @carol src/list.ts:4
+      Is this sorted?
+
+thread 300 src/header.tsx:7 (outdated) (2 comments)
+started-by-you: yes
+author-replied-after-your-last: yes
+  300 @reviewer src/header.tsx:7 (outdated)
+      Worth a guard here.
+      Second line.
+  301 @alice src/header.tsx:7 (outdated) (reply to 300)
+      Added.
+
+thread 400 README.md (1 comment)
+started-by-you: yes
+author-replied-after-your-last: no
+  400 @reviewer README.md
+      File-level note.

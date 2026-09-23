@@ -22,7 +22,8 @@ kc-claude-kit/
     │   ├── rules/                       # GENERATED from skills/<topic>/SKILL.md; never edit by hand
     │   │   └── working-agreement.md     # the one hand-written rule (no topic skill, always loaded)
     │   ├── scripts/build-rules.sh       # regenerates rules/, --check fails on drift
-    │   ├── tests/                       # sweep fixtures and runner
+    │   ├── scripts/install-rules.sh     # what init runs: copies rules/ and writes the version stamp
+    │   ├── tests/                       # sweep and lookup fixtures, their runners, install-rules test
     │   ├── hooks/                       # SessionStart: missing or stale rules
     │   └── evals/
     ├── code-review/
@@ -33,6 +34,7 @@ kc-claude-kit/
     │   ├── agents/<topic>-gate.md       # one gate agent per topic, plus project-conventions-gate.md and verification-gate.md
     │   ├── hooks/hooks.json             # blocks unapproved GitHub posts
     │   ├── scripts/guard-github-post.sh
+    │   ├── scripts/*.sh                 # gather-review, scope-facts, review-threads, build-comment-payloads
     │   ├── tests/
     │   └── evals/
     ├── claude-md/                       # unchanged
@@ -66,7 +68,7 @@ A topic skill's body has these sections, in this order:
 1. `## Rules`: the authoring conventions. `scripts/build-rules.sh` copies this section, with the skill's `paths`, into `rules/<topic>.md`.
 2. `## Review checklist`: the `- [ ] §<id> ... (N/A: ...)` boxes a gate agent ticks. Absent for rules-only topics.
 3. `## Review detail`: the per-box sections, examples and evidence requirements.
-4. `## Sweeps`: the bundled scripts, each run as `bash "${CLAUDE_PLUGIN_ROOT}/skills/<topic>/scripts/<name>.sh" <diff-file>`, printing one `file:line: text` hit per line and nothing else.
+4. `## Sweeps`: the bundled scripts, each run as `bash "${CLAUDE_PLUGIN_ROOT}/skills/<topic>/scripts/<name>.sh" <diff-file>`, printing one `file:line: text` hit per line and nothing else. A lookup, which takes a name or a key instead of a diff (`naming/scripts/name-collisions.sh`, `i18n/scripts/locale-duplicates.sh`), is listed there too and says so.
 
 Posting approval token: a GitHub write passes the code-review guard only when the same Bash command contains `KC_REVIEW_POST_APPROVED=1`, typed after the user's explicit post signal.
 
@@ -91,6 +93,8 @@ Plugins ship subagents from `agents/`, named `plugin:agent` ([plugins](https://c
 ### Deterministic checks are scripts
 
 "Prefer scripts for deterministic operations", and for a script that is executed "only the script's output consumes tokens" ([skill best practices](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/best-practices)). Sweeps are scripts with fixture tests, so a broken regex fails CI instead of passing a review. The same goes for line numbers: `conventions/scripts/added-lines.sh` prints every added line with its source line number, and gates cite from it. Measured before it existed, gates read positions out of the saved diff file and cited lines that did not exist in the source.
+
+Orchestration steps are scripts too, tested against a stub `gh`: `init` runs `conventions/scripts/install-rules.sh`, `review-code` gathers its diff, scope facts and reply threads with `code-review/scripts/`, and `post-review` validates comment anchors and builds payloads with `build-comment-payloads.sh`.
 
 ### Posting is user-invoked and enforced
 

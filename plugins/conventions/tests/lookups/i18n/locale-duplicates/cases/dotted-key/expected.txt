@@ -1,0 +1,2 @@
+value: locales/en/shared.json:4:   "a.b": "Dotted",
+key: locales/en/shared.json:4:   "a.b": "Dotted",

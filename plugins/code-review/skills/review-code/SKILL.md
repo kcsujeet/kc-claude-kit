@@ -39,22 +39,25 @@ The review is NOT a single inline pass. It is a fan-out of independent **gate ag
 
 ### Step 1: gather context (you, the orchestrator)
 
-Determine the target repo from the current working directory. Detect the default branch instead of hardcoding one, e.g. `git rev-parse --abbrev-ref origin/HEAD | sed 's|origin/||'`.
+Run the bundled scripts from the target repo's working directory; each prints what it gathered, so read its output rather than re-deriving it.
 
-- Diff + head SHA + changed files: for a PR, `gh pr diff <num>` and `gh pr view <num> --json headRefOid,title,files`. For a branch: `git diff $(git rev-parse --abbrev-ref origin/HEAD | sed 's|origin/||')...HEAD` and `git rev-parse HEAD`. When there is no `origin/HEAD` (a local-only repo), fall back to `main`, then `master`.
-- **Save the unified diff to a file** the gate agents can read, named by the head SHA, e.g. `gh pr diff <num> > "${TMPDIR:-/tmp}/review-<sha>.diff"` or `git diff <default-branch>...HEAD > "${TMPDIR:-/tmp}/review-<sha>.diff"`. Every gate gets this path; the sweep scripts run against it.
-- If the working tree is not on the head commit, fetch it (`git fetch origin pull/<num>/head:pr-<num>`) so the gate agents can read files at the exact head SHA via `git show <sha>:<path>`.
-- **On a re-review, also fetch the reply threads on your previous comments and read what the author said.** `gh api 'repos/<owner>/<repo>/pulls/<num>/comments?per_page=100'` and group by `in_reply_to_id` to see each thread. For every carried-over finding, classify the author's reply before re-raising it:
+- **Diff, head SHA, changed files:** `bash "${CLAUDE_PLUGIN_ROOT}/scripts/gather-review.sh" <num>` for a PR, or `bash "${CLAUDE_PLUGIN_ROOT}/scripts/gather-review.sh" --branch [<base>]` for a local branch (base: `origin/HEAD`, then `main`, then `master`). It saves `review.diff` and `changed-files.txt` under `${TMPDIR:-/tmp}/kc-review-<sha>/` and prints `meta.env`: `HEAD_SHA`, `BASE`, `TITLE`, `DIFF_FILE`, `CHANGED_FILES`, and `PR` in PR mode. Every gate gets `DIFF_FILE` and `HEAD_SHA` from it; the sweep scripts run against `DIFF_FILE`.
+- **Head checkout:** when `meta.env` has a `FETCH=` line, the working tree is not on the head commit. Run that command so the gate agents can read files at the exact head SHA via `git show <sha>:<path>`.
+- **Scope facts (PRs):** `bash "${CLAUDE_PLUGIN_ROOT}/scripts/scope-facts.sh" <num>` prints the author, base, commit and file counts, the author's other open PRs, and each linked issue, saving the PR description (`pr-body.md`) and each issue body (`issue-<n>.md`) beside the diff. The §G1-§G3 boxes below are judged from it.
+- **On a re-review, also read the reply threads on your previous comments:** `bash "${CLAUDE_PLUGIN_ROOT}/scripts/review-threads.sh" <num> --mine <your-login>` (login: `gh api user --jq .login`) prints every thread, root then replies, and marks the threads you started and whether the author replied after your last comment. For every carried-over finding, classify the author's reply before re-raising it:
   - **A commit SHA** = "fixed in `<sha>`". Verify it against head, and verify the WHOLE class, not just the examples you named. A common pattern: the author fixes the exact items you listed but leaves the rest of the same class; the finding is still open, but re-frame it as "the named ones are done; the same applies to the rest", not as if nothing changed.
   - **Reasoned push-back** (e.g. "this matches the existing pattern, keeping it") = do NOT silently re-post a fresh duplicate comment on a thread they already answered; that reads as ignoring them. Surface their reasoning to the user, and either drop the finding or reply in the existing thread with the counter-point; let the user decide.
   - **No reply / unaddressed** = re-raise, noting it is still open from the prior round.
+
   Carry the author's responses into Step 4 so the report and any re-drafted comments reflect what was fixed, what was declined-with-reason, and what is genuinely still open. Posting a re-review that ignores the author's replies is a documented trust failure.
+
+If a script fails, relay its message; fall back to the equivalent `gh`/`git` command by hand only when the script itself is unavailable, and say so in the report.
 
 **Scope checks (you, before the fan-out).** These are about the target as a whole, so no single gate owns them. Walk each box yourself and record the result as a `SCOPE:` block in the same `BOXES:` shape the gate agents return (Step 3); the verification gate audits it (its §V7). A scope finding goes into the report like any gate finding and fails the review the same way.
 
-- [ ] §G1 The target is not stacked: the author's other open PRs were listed (`gh pr list --author <author> --state open --json number,headRefName,baseRefName`), and when the diff is large (30+ files) or contains commits that belong to another open branch (compare `gh pr view <num> --json commits`), the review stops and reports the stacking before any line-level finding, suggesting a rebase onto the default branch. A stacked diff cannot be reviewed in isolation. (N/A: local diff, or the author has no other open PR)
+- [ ] §G1 The target is not stacked: the author's other open PRs were listed (`scope-facts.sh`), and when the diff is large (30+ files) or the PR's base or commits belong to another open branch (compare its head, base and commit count with the listed PRs), the review stops and reports the stacking before any line-level finding, suggesting a rebase onto the default branch. A stacked diff cannot be reviewed in isolation. (N/A: local diff, or the author has no other open PR)
 - [ ] §G2 The diff does only what its title and description say. Out-of-scope work (an unrelated refactor, removed public surface, a new abstraction, a bundled feature or option) is one finding asking to split the PR, naming which commits belong in which PR; it is not reviewed silently as if it were in scope. (N/A: never; every target has a stated purpose, even if it is only a branch name)
-- [ ] §G3 Every linked issue was read in full (`gh pr view <num> --json closingIssuesReferences,body`, then `gh issue view <n>`), and each constraint it states ("no public API change", "must work offline") is checked against the diff; a violated constraint is a finding that cites the issue. (N/A: no linked issue)
+- [ ] §G3 Every linked issue was read in full (the `issue-<n>.md` files `scope-facts.sh` saved, and its `pr-body.md`), and each constraint it states ("no public API change", "must work offline") is checked against the diff; a violated constraint is a finding that cites the issue. (N/A: no linked issue)
 - [ ] §G4 A diff too large to read in one pass (roughly 35KB or more) was read from the saved file in offset/limit chunks, every chunk; no hunk was skimmed. The gate agents get the saved path, not a truncated paste. (N/A: the diff was read whole)
 
 ### Step 2: dispatch the gate agents in two phases (mandatory: ALL gates, EVERY round)
@@ -94,9 +97,9 @@ The `project-conventions` gate is how this skill stays repo-agnostic while still
 
 The agents carry this contract in their own definitions; the dispatch prompt supplies the inputs. Give each phase-1 agent:
 
-- the head SHA;
-- the path to the saved unified diff file (Step 1);
-- the changed-file list;
+- the head SHA (`HEAD_SHA` from `meta.env`);
+- the path to the saved unified diff file (`DIFF_FILE` from `meta.env`);
+- the changed-file list (`CHANGED_FILES` from `meta.env`);
 - the target repo root.
 
 Each agent must:

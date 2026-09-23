@@ -271,10 +271,11 @@ This is the most-violated rule and the most important. Read it twice.
 
 **The protocol:**
 1. Draft.
-2. Show all drafts to the user in chat, ending with the head SHA the comments will anchor to and the chosen posting shape: *"These anchor to `<short-sha>` and go up as <individual inline comments / one review with a body>. Say the word when you want them sent."*
-3. Stop. Do not call `gh` to post.
-4. If the user changes anything (rename, drop, rephrase), apply the change, re-show the full updated set, and go back to step 3.
-5. Only when the user gives a fresh standalone post signal *after seeing the latest set*, post via the inline-review API, with the approval token on every write command (see "The approval token" below).
+2. Write the inline drafts to `drafts.json` and build their payloads (see "Build the payloads" below). A draft the script rejects is fixed before anyone sees it.
+3. Show all drafts to the user in chat, ending with the head SHA the comments will anchor to, the chosen posting shape, and the commands the script printed: *"These anchor to `<short-sha>` and go up as <individual inline comments / one review with a body>, with the commands below. Say the word when you want them sent."*
+4. Stop. Do not call `gh` to post.
+5. If the user changes anything (rename, drop, rephrase), apply the change, rebuild the payloads, re-show the full updated set with the new commands, and go back to step 4.
+6. Only when the user gives a fresh standalone post signal *after seeing the latest set*, run exactly the commands they saw, each carrying the approval token (see "The approval token" below).
 
 If you are about to post and the most recent message from the user combined a request with a post instruction (e.g. "show me the six and post"), default to step 2 and ask: *"Holding for your post signal - say the word when you want them sent."* Better to ask twice than to post against intent. Trust is hard to rebuild.
 
@@ -309,13 +310,25 @@ gh repo view --json nameWithOwner -q .nameWithOwner
 
 **Check the request shape once per session.** Before the first post in a session, fetch the current GitHub REST docs for the endpoint you are about to use and confirm the fields below still match: [create a review comment](https://docs.github.com/en/rest/pulls/comments#create-a-review-comment-for-a-pull-request) and [create a review](https://docs.github.com/en/rest/pulls/reviews#create-a-review-for-a-pull-request). Cached knowledge of request shapes drifts, and a wrong field fails the post or lands the comment on the wrong line.
 
+### Build the payloads
+
+Before any post, every inline draft goes through the payload builder. Write the drafts as a JSON array of `{path, line, body}` objects (with `start_line`, and `side`/`start_side` only when a draft needs them) and run:
+
+```bash
+bash "${CLAUDE_PLUGIN_ROOT}/scripts/build-comment-payloads.sh" drafts.json "$DIFF_FILE" "$HEAD_SHA" --pr <NUM>
+```
+
+`DIFF_FILE` and `HEAD_SHA` come from the `meta.env` that `review-code` wrote with `gather-review.sh`; run that script again if the head has moved. The builder checks that each path is in the diff, that each `line` and `start_line` is a line a hunk covers on the comment's side, and that no body is empty. It lists every failing draft and writes nothing when any fails. When all pass it writes one payload per draft and prints one command per payload, already prefixed with the approval token. It never posts.
+
+Those printed commands are what the user approves. Show them with the drafts, and after the post signal run them unchanged. The token in them is still governed by "The approval token" above: printing it is not permission to run it.
+
 **Choose the posting shape from the top-level body, not from severity:**
 
 1. **No top-level body** (the usual case): post each comment individually to `POST /repos/{owner}/{repo}/pulls/{pull_number}/comments`. No review wrapper, no body to invent.
 2. **A body that says something no inline says:** post one review to `POST /repos/{owner}/{repo}/pulls/{pull_number}/reviews`, with that body and the comments inside it. Use `"event": "COMMENT"` unless the user asked to request changes (`"REQUEST_CHANGES"`). The docs mark `body` as "Required when using REQUEST_CHANGES or COMMENT for the event parameter", so a review with no real body is not an option: fall back to shape 1.
 3. **A note with no line to anchor to** (the PR is stacked, or should be split) and no inline comments: `KC_REVIEW_POST_APPROVED=1 gh pr comment <NUM> --body-file <file>`.
 
-**Shape 1, one request per comment.** `body`, `commit_id`, and `path` are required. `line` is the diff line the comment applies to (the last line of a range); `side` is `RIGHT` for added or unchanged lines and `LEFT` for deletions. A multi-line comment adds `start_line` and `start_side`; a single-line comment omits them.
+**Shape 1, one request per comment.** This is the builder's output: one payload file and one printed command per draft. `body`, `commit_id`, and `path` are required. `line` is the diff line the comment applies to (the last line of a range); `side` is `RIGHT` for added or unchanged lines and `LEFT` for deletions. A multi-line comment adds `start_line` and `start_side`; a single-line comment omits them.
 
 ```bash
 KC_REVIEW_POST_APPROVED=1 gh api repos/{owner}/{repo}/pulls/<NUM>/comments -X POST --input /tmp/comment-<NUM>-<i>.json
@@ -333,7 +346,7 @@ KC_REVIEW_POST_APPROVED=1 gh api repos/{owner}/{repo}/pulls/<NUM>/comments -X PO
 }
 ```
 
-**Shape 2, one review.** Write the payload and POST it:
+**Shape 2, one review.** Run the builder over the inline drafts first, so every anchor is validated, then copy each payload's `path`, `line`, `side`, `body` and any start fields into `comments`. Write the review payload and POST it:
 
 ```bash
 KC_REVIEW_POST_APPROVED=1 gh api repos/{owner}/{repo}/pulls/<NUM>/reviews -X POST --input /tmp/review-<NUM>.json

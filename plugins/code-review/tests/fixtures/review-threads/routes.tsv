@@ -1,0 +1,3 @@
+api --paginate repos/{owner}/{repo}/pulls/12/comments?per_page=100	comments.json
+pr view 12 --json author	pr-view.json
+api --paginate repos/{owner}/{repo}/pulls/13/comments?per_page=100	empty.json

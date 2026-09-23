@@ -1,0 +1,12 @@
+wrote {out}/comment-1.json (src/widgets/list.ts:3)
+wrote {out}/comment-2.json (src/widgets/list.ts:2-4)
+wrote {out}/comment-3.json (src/widgets/list.ts:2)
+wrote {out}/comment-4.json (src/widgets/header.tsx:1)
+wrote {out}/comment-5.json (src/widgets/list.ts:5)
+
+Commands for the user to approve (not run):
+KC_REVIEW_POST_APPROVED=1 gh api repos/{owner}/{repo}/pulls/12/comments -X POST --input {out}/comment-1.json
+KC_REVIEW_POST_APPROVED=1 gh api repos/{owner}/{repo}/pulls/12/comments -X POST --input {out}/comment-2.json
+KC_REVIEW_POST_APPROVED=1 gh api repos/{owner}/{repo}/pulls/12/comments -X POST --input {out}/comment-3.json
+KC_REVIEW_POST_APPROVED=1 gh api repos/{owner}/{repo}/pulls/12/comments -X POST --input {out}/comment-4.json
+KC_REVIEW_POST_APPROVED=1 gh api repos/{owner}/{repo}/pulls/12/comments -X POST --input {out}/comment-5.json

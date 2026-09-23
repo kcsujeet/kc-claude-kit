@@ -1,0 +1,9 @@
+{
+  "commit_id": "1111111111111111111111111111111111111111",
+  "path": "src/widgets/list.ts",
+  "line": 4,
+  "side": "RIGHT",
+  "body": "**question:**\nAre these three exported on purpose?",
+  "start_line": 2,
+  "start_side": "RIGHT"
+}

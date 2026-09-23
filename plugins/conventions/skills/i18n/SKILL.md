@@ -84,15 +84,13 @@ If the project's locale files are all hand-maintained (no generation pipeline), 
 
 **Mandatory dual grep, for every key in a touched file — not just the newly added lines.** When a diff edits a locale file, every key in that file is in scope, including keys that predate the PR. A pre-existing duplicate is still a finding: removing it is the same size of change as anything else in the file the PR is already touching, so "out of scope, pre-existing" is not a valid excuse.
 
-For each new (or touched) key, run both:
+For each new (or touched) key, run both greps with one call, passing the source-locale directory, the English value, and the unscoped leaf key name (just the leaf, not the dotted path):
 
 ```bash
-# 1. The English value, across the whole source-locale tree.
-grep -rn "Widget" locales/en/
-
-# 2. The unscoped leaf key name (just the leaf, not the dotted path).
-grep -rn "\"widget\":" locales/en/
+bash "${CLAUDE_PLUGIN_ROOT}/skills/i18n/scripts/locale-duplicates.sh" locales/en "Widget" widget
 ```
+
+It prints every hit of the value across the whole source-locale tree labelled `value:`, then every `"widget":` leaf-key hit labelled `key:`, each as `path:line: text`. Both greps are the evidence: cite the hits (or `0 hits`) for each key in the audit table.
 
 Any hit outside the file being edited is a duplicate or near-duplicate. This is a real blind spot twice over:
 
@@ -198,7 +196,13 @@ t('edit') + ' ' + t('widget')
 
 ## Sweeps
 
-Save the diff under review to a file and run the script over it; `-` reads the diff from stdin. No other sweep is bundled for this topic.
+Save the diff under review to a file and run `added-lines.sh` over it; `-` reads the diff from stdin. The topic bundles no diff sweep of its own, only the §I3 lookup.
+
+- `locale-duplicates.sh` (§I3, a lookup rather than a diff sweep): takes a locale directory, a value and a leaf key, and runs the two §I3 greps. Run it once per new or touched key.
+
+  ```bash
+  bash "${CLAUDE_PLUGIN_ROOT}/skills/i18n/scripts/locale-duplicates.sh" <locale-dir> <value> <leaf-key>
+  ```
 
 - `added-lines.sh` (citation map): every added line as `path:line: text`, with the source line number at the head SHA. Cite every finding's line from this output or from a sweep hit, never from a position in the diff file.
 

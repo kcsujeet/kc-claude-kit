@@ -16,6 +16,8 @@ The restructure described in [`docs/architecture.md`](docs/architecture.md): eac
 - Deterministic sweep scripts under `skills/<topic>/scripts/`, each printing one `file:line: text` hit per line, with fixture tests in `tests/`.
 - `scripts/build-rules.sh`, which generates `rules/<topic>.md` from each skill's `## Rules` section and `paths`, and fails on drift with `--check`.
 - Eval suite under `evals/`, run with `claude plugin eval`.
+- `scripts/install-rules.sh`, which `/conventions:init` now runs: it finds the rules relative to itself, copies them, writes the version stamp, and reports each rule as new, unchanged or replaced (`--dry-run` to preview). Tests in `tests/install-rules.test.sh`.
+- Lookups that take a name or key instead of a diff: `skills/naming/scripts/name-collisions.sh` (§N5) and `skills/i18n/scripts/locale-duplicates.sh` (§I3), replacing the inline greps in those sections. Fixtures run by `tests/run-lookups.sh`.
 - `correctness` topic (§B1-§B4): logic errors, edge cases including timezone, data that does not match its declared type at a boundary, and regressions of bugs the repo already fixed. Derived from ilamy-calendar's retired review skill.
 
 #### Changed
@@ -41,6 +43,9 @@ The restructure described in [`docs/architecture.md`](docs/architecture.md): eac
 #### Added
 
 - `hooks/hooks.json` and `scripts/guard-github-post.sh`: a `PreToolUse` guard on Bash that denies `gh pr comment`, `gh pr review`, `gh issue comment` and `gh api` writes to PR or issue comments and reviews unless the command carries `KC_REVIEW_POST_APPROVED=1`, with tests in `tests/guard-github-post.test.sh`.
+- Orchestration scripts under `scripts/`, which `review-code` Step 1 now runs in place of inline `gh`/`git` commands: `gather-review.sh` (diff, changed files and `meta.env` for a PR or a branch), `scope-facts.sh` (the §G1-§G3 facts), and `review-threads.sh` (reply threads on a re-review). Gates receive `DIFF_FILE` and `HEAD_SHA` from `meta.env`.
+- `scripts/build-comment-payloads.sh`: `post-review` passes every draft through it before a post. It validates each draft's path and line against the diff's hunks, writes the payloads, and prints the approval-token commands the user approves. It never posts.
+- Tests for all four under `tests/`, run against a stub `gh` in `tests/lib/`.
 - Eval suite under `evals/` (seeded violations, a clean diff, an unrelated request), with scaffold scripts that build fixture repos. Run with `--scaffold --allow-tools Bash Agent`.
 - `docs/review-conventions.md`: how to write a repo's `.claude/review-conventions.md`.
 

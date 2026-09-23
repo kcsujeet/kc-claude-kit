@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+# Test stub for gh. Never touches the network: it looks its arguments up in a
+# routes file and prints the named fixture.
+#
+#   KC_GH_ROUTES  routes file, one `<args><TAB><fixture path>` per line, where
+#                 <args> is the gh argument list joined by single spaces with
+#                 any `--jq <expr>` / `-q <expr>` removed, and the fixture path
+#                 is relative to the routes file's directory.
+#   KC_GH_LOG     optional: each call's joined arguments are appended here.
+#
+# With --jq, the fixture is piped through `jq -r <expr>`: gh prints --jq
+# string results unquoted, as the example in
+# https://cli.github.com/manual/gh_help_formatting shows.
+# An unrouted call prints the arguments to stderr and exits 1, so a script
+# that changes its gh invocation fails its test instead of passing silently.
+set -euo pipefail
+
+routes_file=${KC_GH_ROUTES:?KC_GH_ROUTES is not set}
+jq_expression=""
+gh_args=()
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --jq | -q)
+      jq_expression=$2
+      shift 2
+      continue
+      ;;
+  esac
+  gh_args+=("$1")
+  shift
+done
+route_key="${gh_args[*]}"
+if [ -n "${KC_GH_LOG:-}" ]; then printf '%s\n' "$route_key" >> "$KC_GH_LOG"; fi
+
+fixture=$(awk -F '\t' -v key="$route_key" '$1 == key { print $2; exit }' "$routes_file")
+if [ -z "$fixture" ]; then
+  echo "gh stub: no fixture for: gh $route_key" >&2
+  exit 1
+fi
+fixture_path="$(dirname "$routes_file")/$fixture"
+if [ -n "$jq_expression" ]; then
+  jq -r "$jq_expression" "$fixture_path"
+else
+  cat "$fixture_path"
+fi

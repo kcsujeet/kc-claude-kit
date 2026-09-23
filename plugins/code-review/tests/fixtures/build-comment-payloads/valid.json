@@ -1,0 +1,7 @@
+[
+  { "path": "src/widgets/list.ts", "line": 3, "body": "**suggestion:**\nCould we name this `widgetTotal`?" },
+  { "path": "src/widgets/list.ts", "start_line": 2, "line": 4, "body": "**question:**\nAre these three exported on purpose?" },
+  { "path": "src/widgets/list.ts", "line": 2, "side": "LEFT", "body": "**note:**\n`list` had two importers." },
+  { "path": "src/widgets/header.tsx", "line": 1, "body": "**nitpick:**\nWorth a doc comment." },
+  { "path": "src/widgets/list.ts", "line": 5, "body": "**thought:**\nThe default export could go." }
+]

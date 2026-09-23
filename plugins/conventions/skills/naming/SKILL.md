@@ -256,11 +256,13 @@ const checkRetentionPolicy = <A extends unknown[], R>(action: (...args: A) => R)
 const handleArchive = checkRetentionPolicy(() => archive(id))
 ```
 
-**Enumerate by grep, do not eyeball.** Genericness and collisions are both mechanical. Run the `bare-word-declarations.sh` sweep (see Sweeps) to list every new declaration over the diff's added lines, pick out each one whose name is a single bare word, then grep that name across the repo:
+**Enumerate by grep, do not eyeball.** Genericness and collisions are both mechanical. Run the `bare-word-declarations.sh` sweep (see Sweeps) to list every new declaration over the diff's added lines, pick out each one whose name is a single bare word, then list that name's whole-word hits across the repo's tracked files:
 
 ```bash
-grep -rn "\b<name>\b" <source dirs> | grep -v <vendor dir>
+bash "${CLAUDE_PLUGIN_ROOT}/skills/naming/scripts/name-collisions.sh" <name> [<repo-root>]
 ```
+
+It prints `path:line: text` per hit; every hit other than the declaration itself is a candidate collision the verdict must address.
 
 One line per identifier in the gate evidence, with the collision count:
 
@@ -357,6 +359,12 @@ Save the diff under review to a file (`gh pr diff <num> > /tmp/review.diff`, or 
 
   ```bash
   bash "${CLAUDE_PLUGIN_ROOT}/skills/naming/scripts/bare-word-declarations.sh" <diff-file>
+  ```
+
+- `name-collisions.sh` (§N5, a lookup rather than a diff sweep): takes one name, not a diff, and prints every whole-word hit in the repo's tracked files as `path:line: text`. Run it once per bare-word hit from the sweep above; the collision count in the receipt comes from it.
+
+  ```bash
+  bash "${CLAUDE_PLUGIN_ROOT}/skills/naming/scripts/name-collisions.sh" <name> [<repo-root>]
   ```
 
 - `unverbed-functions.sh` (§N6): added function declarations whose name does not start with a known verb. Receipt: `grepped unverbed functions: N hits`.

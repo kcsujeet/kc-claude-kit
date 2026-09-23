@@ -178,7 +178,7 @@ When the author replies that a flagged change was deliberate (in the description
 
 ## §V7. The scope checks were walked
 
-The orchestrator walks §G1-§G4 in the review-code skill's Step 1 itself, because they concern the target as a whole rather than one topic. This box confirms the `SCOPE:` block exists and has per-box evidence: the `gh pr list` output for stacking, the title set against the diff's areas, the linked issue quoted (or "no linked issue"), the diff size and how it was read. A scope check reported as "scope fine" with no per-box line fails, the same as an aggregated receipt under §V3.
+The orchestrator walks §G1-§G4 in the review-code skill's Step 1 itself, because they concern the target as a whole rather than one topic. This box confirms the `SCOPE:` block exists and has per-box evidence: the author's other open PRs from `scope-facts.sh` for stacking, the title set against the diff's areas, the linked issue quoted (or "no linked issue"), the diff size and how it was read. A scope check reported as "scope fine" with no per-box line fails, the same as an aggregated receipt under §V3.
 
 ---
 

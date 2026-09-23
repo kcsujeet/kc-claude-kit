@@ -1,0 +1,11 @@
+{
+  "body": "",
+  "number": 13,
+  "author": { "login": "bob" },
+  "baseRefName": "main",
+  "headRefName": "fix/typo",
+  "headRefOid": "3333333333333333333333333333333333333333",
+  "changedFiles": 1,
+  "commits": [ { "oid": "dddd" } ],
+  "closingIssuesReferences": []
+}

@@ -1,0 +1,18 @@
+{
+  "body": "Adds the widget list header.\n\nCloses #7, closes #9.",
+  "number": 12,
+  "author": { "login": "alice", "name": "Alice", "is_bot": false },
+  "baseRefName": "feature/widgets-base",
+  "headRefName": "feature/widget-header",
+  "headRefOid": "2222222222222222222222222222222222222222",
+  "changedFiles": 34,
+  "commits": [
+    { "oid": "aaaa", "messageHeadline": "Add widget base" },
+    { "oid": "bbbb", "messageHeadline": "Add widget header" },
+    { "oid": "cccc", "messageHeadline": "Fix header spacing" }
+  ],
+  "closingIssuesReferences": [
+    { "id": "I_1", "number": 7, "url": "https://github.com/acme/widgets/issues/7", "repository": { "name": "widgets", "owner": { "login": "acme" } } },
+    { "id": "I_2", "number": 9, "url": "https://github.com/acme/widgets/issues/9", "repository": { "name": "widgets", "owner": { "login": "acme" } } }
+  ]
+}

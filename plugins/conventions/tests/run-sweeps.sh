@@ -65,6 +65,8 @@ done
 
 # The sweeps share one usage contract; check it once per script. The empty-diff
 # run happens inside an empty git work tree, which the repo-aware sweeps default to.
+# Lookups (scripts whose usage line takes no `<diff-file|->`) are checked for the
+# exit-2 half only; run-lookups.sh covers their output.
 empty_repo="$work_dir/empty-repo"
 mkdir -p "$empty_repo"
 git -C "$empty_repo" init -q
@@ -78,6 +80,7 @@ for sweep_script in "$plugin_dir"/skills/*/scripts/*.sh; do
     echo "FAIL $script_label: expected exit 2 with no arguments, got $usage_status"
     failures=$((failures + 1))
   fi
+  grep -qF '<diff-file|->' "$sweep_script" || continue
   stdin_output=$(cd "$empty_repo" && printf '' | bash "$sweep_script" - 2>&1) || {
     echo "FAIL $script_label: non-zero exit on an empty diff from stdin: $stdin_output"
     failures=$((failures + 1))

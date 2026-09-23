@@ -42,7 +42,7 @@ The model-invoked skills trigger on their own: `code-review:review-code` on "rev
 
 ## Conventions
 
-Each topic is one skill at `plugins/conventions/skills/<topic>/SKILL.md`, with its sections in a fixed order: `## Rules` (how to write it), `## Review checklist` (the boxes a gate ticks), `## Review detail` (examples and evidence per box), and `## Sweeps` (the bundled scripts). One file per convention means the rule you write against and the box a reviewer ticks cannot drift apart, which they used to.
+Each topic is one skill at `plugins/conventions/skills/<topic>/SKILL.md`, with its sections in a fixed order: `## Rules` (how to write it), `## Review checklist` (the boxes a gate ticks), `## Review detail` (examples and evidence per box), and `## Sweeps` (the bundled scripts). One file per convention means the rule you write against and the box a reviewer ticks cannot drift apart, which they used to. Two topics also bundle lookups, which take a name or a key instead of a diff: `naming/scripts/name-collisions.sh <name>` lists a name's whole-word hits in the tracked files, and `i18n/scripts/locale-duplicates.sh <locale-dir> <value> <leaf-key>` runs the two duplicate greps a new locale key needs.
 
 | Topic | Scope | Covers |
 |---|---|---|
@@ -77,13 +77,22 @@ mkdir -p ~/.claude/rules
 for f in ~/src/kc-claude-kit/plugins/conventions/rules/*.md; do ln -s "$f" ~/.claude/rules/; done
 ```
 
-`rules/` is generated from the topic skills by `plugins/conventions/scripts/build-rules.sh`, so there is still one source, and CI fails if the two drift. `init` writes a version stamp next to the copies, and a `SessionStart` hook prints one line when the rules are missing or older than the installed plugin. It stays silent otherwise, so the normal case costs no context.
+`/conventions:init` runs `plugins/conventions/scripts/install-rules.sh`, which copies the rules and stamps the plugin version; `--dry-run` lists what an update would replace. `rules/` is generated from the topic skills by `plugins/conventions/scripts/build-rules.sh`, so there is still one source, and CI fails if the two drift. `init` writes a version stamp next to the copies, and a `SessionStart` hook prints one line when the rules are missing or older than the installed plugin. It stays silent otherwise, so the normal case costs no context.
 
 Run `/context` in a new session to confirm what loaded.
 
 ## How the review works
 
 Before the fan-out, `code-review:review-code` runs the scope checks itself: is the PR stacked on another, does it do more than its title says, what constraints does the linked issue set, and was a large diff read in full. Then it dispatches one gate agent per applicable topic, in parallel. Each gate is a read-only plugin agent (`Read, Grep, Glob, Bash`) that preloads its conventions skill, runs that topic's sweep scripts over the diff, walks every checklist box, and returns a per-box verdict with evidence. Any finding fails its gate. The verification gate runs second and audits the other gates' receipts. The orchestrator aggregates everything into a single PASSED/FAILED verdict and leads with a gate-status table.
+
+The deterministic steps around the gates are scripts in `plugins/code-review/scripts/`, each tested against a stub `gh`:
+
+| Script | Does |
+|---|---|
+| `gather-review.sh (<pr> \| --branch [<base>])` | Saves the diff and changed-file list for a PR or a local branch (base: `origin/HEAD`, then `main`, then `master`) and prints `meta.env` with `HEAD_SHA`, `BASE`, `TITLE`, `DIFF_FILE` and `CHANGED_FILES`; prints the fetch command when the local checkout is not the PR head |
+| `scope-facts.sh <pr>` | Prints the facts the scope checks need: author, base, commit and file counts, the author's other open PRs, and each linked issue, with the PR description and issue bodies saved to files |
+| `review-threads.sh <pr> [--mine <login>]` | Prints every review comment thread, root then replies, and with `--mine` marks the threads you started and whether the author replied after you (requires `jq`) |
+| `build-comment-payloads.sh <drafts.json> <diff> <sha> --pr <n>` | Used by `post-review`: checks each drafted comment's path and line against the diff's hunks, writes one payload per comment, and prints the approval-token commands for the user to approve; never posts (requires `jq`) |
 
 The gates are dispatched by `subagent_type` (`code-review:naming-gate` and so on). If a gate agent is unavailable, for example because the `conventions` dependency failed to load, the orchestrator runs that gate as a `general-purpose` agent told to invoke the `conventions:<topic>` skill and follow the same contract, and says so in the report.
 
@@ -149,6 +158,7 @@ Run what CI runs:
 bash plugins/conventions/scripts/build-rules.sh          # regenerate rules/ after editing a topic skill
 bash plugins/conventions/scripts/build-rules.sh --check  # fail if rules/ drifted from the skills
 bash plugins/conventions/tests/run-sweeps.sh             # sweep fixtures
+bash plugins/conventions/tests/run-lookups.sh            # lookup fixtures
 for t in plugins/*/tests/*.sh; do bash "$t"; done        # every plugin's test runners
 git ls-files '*.sh' | xargs shellcheck
 claude plugin validate . --strict
