@@ -42,7 +42,7 @@ mine_login=""
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --mine)
-      [ "$#" -ge 2 ] && [ -n "$2" ] || usage
+      if [ "$#" -lt 2 ] || [ -z "$2" ]; then usage; fi
       mine_login=$2
       shift
       ;;

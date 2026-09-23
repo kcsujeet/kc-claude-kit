@@ -55,7 +55,7 @@ while [ "$#" -gt 0 ]; do
       shift
       ;;
     --out-dir)
-      [ "$#" -ge 2 ] && [ -n "$2" ] || usage
+      if [ "$#" -lt 2 ] || [ -z "$2" ]; then usage; fi
       out_dir=$2
       shift
       ;;
