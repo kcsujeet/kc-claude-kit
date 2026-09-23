@@ -2,6 +2,7 @@
 paths:
   - "**/*.{ts,tsx,js,jsx,mjs,cjs,rb,py,swift,go,java,kt,php,cs,rs}"
 ---
+<!-- Generated from skills/error-handling/SKILL.md by scripts/build-rules.sh. Edit the skill, not this file. -->
 
 # Error handling
 

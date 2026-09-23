@@ -1,0 +1,18 @@
+diff --git a/src/some-label.ts b/src/some-label.ts
+new file mode 100644
+index 0000000..1111111
+--- /dev/null
++++ b/src/some-label.ts
+@@ -0,0 +1,12 @@
++const label = isOn ? 'On' : 'Off'
++const name = user?.profile?.name
++const fallback = name ?? defaultName
++type Props = { title?: string; onClose?: () => void }
++const next = isOn
++  ? [...items, item]
++  : items.filter((entry) => entry !== item)
++const size = compact ?
++const mixed = (opts?: Options) => opts ? 1 : 2
++const first = list?.[0]
++count ??= 0
++const re = /colou?r/

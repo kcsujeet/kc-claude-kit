@@ -1,0 +1,2 @@
+src/pick.ts:3:     if (b) {
+src/pick.ts:12:     if (a && b) return 4

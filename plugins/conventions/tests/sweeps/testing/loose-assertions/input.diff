@@ -1,0 +1,22 @@
+diff --git a/src/layout.spec.ts b/src/layout.spec.ts
+new file mode 100644
+index 0000000..1111111
+--- /dev/null
++++ b/src/layout.spec.ts
+@@ -0,0 +1,9 @@
++expect(result.length).toBeGreaterThan(0)
++expect(widget.label).toBeTruthy()
++expect(value).toBeDefined()
++expect(value).not.toBeNull()
++expect(result).toHaveLength(3)
++expect(widget.label).toBe('Widget A')
++expect(width).toBeCloseTo(41.5, 1)
++expect(value).toBeNull()
++expect(count).toBeLessThanOrEqual(10)
+diff --git a/src/layout.ts b/src/layout.ts
+new file mode 100644
+index 0000000..1111111
+--- /dev/null
++++ b/src/layout.ts
+@@ -0,0 +1,1 @@
++const isVisible = Boolean(el) // toBeTruthy would be wrong here

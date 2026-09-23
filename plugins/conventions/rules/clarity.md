@@ -2,6 +2,7 @@
 paths:
   - "**/*.{ts,tsx,js,jsx,mjs,cjs,rb,py,swift,go,java,kt,php,cs,rs}"
 ---
+<!-- Generated from skills/clarity/SKILL.md by scripts/build-rules.sh. Edit the skill, not this file. -->
 
 # Clarity
 
@@ -18,4 +19,4 @@ Code that takes three readings costs more than code that took an extra minute to
 - A named intermediate that makes a line readable stays, even when it costs an extra type-narrowing step or evaluates a trivial branch eagerly.
 - Fixing a ternary must not create a new problem: `flagA && value` is not a stand-in for `value | undefined` (it yields `false`), and an options object spread in conditionally is a hidden ternary.
 
-Detection criteria and per-box review failure modes live in the code-review plugin's `references/clarity.md`. This file is the statement of the convention; that file is how a diff gets graded against it.
+Detection criteria and per-box review failure modes live in the `## Review checklist` of the `clarity` skill (`conventions:clarity`), with the detail under its `## Review detail`. These rules are the statement of the convention; that checklist is how a diff gets graded against it.

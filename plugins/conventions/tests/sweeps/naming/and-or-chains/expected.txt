@@ -1,0 +1,4 @@
+src/widget-form.tsx:11: const canSubmit = form.featureEnabled && form.count > 0 && form.status !== Status.LOCKED
+src/widget-form.tsx:41:   if (!a ||
+src/widget-form.tsx:42:     !b ||
+src/widget-list.tsx:2:   <div>{editMode && <Editor />}</div>

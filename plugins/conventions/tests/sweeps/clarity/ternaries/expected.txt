@@ -1,0 +1,5 @@
+src/some-label.ts:1: const label = isOn ? 'On' : 'Off'
+src/some-label.ts:6:   ? [...items, item]
+src/some-label.ts:8: const size = compact ?
+src/some-label.ts:9: const mixed = (opts?: Options) => opts ? 1 : 2
+src/some-label.ts:12: const re = /colou?r/

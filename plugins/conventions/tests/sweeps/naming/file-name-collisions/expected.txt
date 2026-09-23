@@ -1,0 +1,2 @@
+src/features/gadgets/helpers.ts:1: helpers.ts shared with 1 other file(s): src/helpers.ts
+src/features/widgets/components/header.tsx:1: header.tsx shared with 1 other file(s): src/layout/header.tsx

@@ -1,0 +1,5 @@
+src/widget.ts:13: const addedA = 3
+src/widget.ts:14: const addedB = 4
+src/widget.ts:16: ++const leadingPlusText = 6
+src/other.ts:1: export const first = 1
+src/other.ts:2: export const second = 2

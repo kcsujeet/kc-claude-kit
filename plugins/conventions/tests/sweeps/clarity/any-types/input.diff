@@ -1,0 +1,15 @@
+diff --git a/src/parse-payload.ts b/src/parse-payload.ts
+new file mode 100644
+index 0000000..1111111
+--- /dev/null
++++ b/src/parse-payload.ts
+@@ -0,0 +1,9 @@
++const payload: any = JSON.parse(raw)
++const list = value as any
++const items: any[] = []
++const box = new Box<any>()
++const parsed: unknown = JSON.parse(raw)
++const company: Company = load()
++const anything: string = "x"
++const many = 3
++function f(x:any) {}

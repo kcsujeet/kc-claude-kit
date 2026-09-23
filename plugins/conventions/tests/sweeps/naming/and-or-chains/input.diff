@@ -1,0 +1,27 @@
+diff --git a/src/widget-form.tsx b/src/widget-form.tsx
+index 1111111..2222222 100644
+--- a/src/widget-form.tsx
++++ b/src/widget-form.tsx
+@@ -10,3 +10,5 @@
+ const form = useWidgetForm()
+-const canSubmit = form.valid
++const canSubmit = form.featureEnabled && form.count > 0 && form.status !== Status.LOCKED
++const label = name ?? fallbackName
++const next = current?.child
+ return canSubmit
+@@ -40,2 +40,6 @@
+ if (ready) {
++  if (!a ||
++    !b ||
++    a.index === b.index) return
++  const mask = flags | EXTRA_FLAG
+ }
+diff --git a/src/widget-list.tsx b/src/widget-list.tsx
+new file mode 100644
+index 0000000..1111111
+--- /dev/null
++++ b/src/widget-list.tsx
+@@ -0,0 +1,3 @@
++export const WidgetList = ({ editMode }: Props) => (
++  <div>{editMode && <Editor />}</div>
++)

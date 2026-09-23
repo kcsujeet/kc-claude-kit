@@ -1,0 +1,5 @@
+src/layout.spec.ts:1: expect(result.length).toBeGreaterThan(0)
+src/layout.spec.ts:2: expect(widget.label).toBeTruthy()
+src/layout.spec.ts:3: expect(value).toBeDefined()
+src/layout.spec.ts:4: expect(value).not.toBeNull()
+src/layout.spec.ts:9: expect(count).toBeLessThanOrEqual(10)

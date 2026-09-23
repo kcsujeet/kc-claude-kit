@@ -1,8 +1,11 @@
 {
   "name": "code-review",
-  "description": "Gate-based code review: one subagent per rule file, per-box PASS/FAIL verdicts, zero rationalized skips",
-  "version": "1.1.0",
+  "description": "Gate-based code review: one gate agent per convention topic, per-box PASS/FAIL verdicts, zero rationalized skips",
+  "version": "2.0.0",
   "author": {
     "name": "Sujeet Kc"
-  }
+  },
+  "dependencies": [
+    { "name": "conventions", "version": "^1.1.0" }
+  ]
 }

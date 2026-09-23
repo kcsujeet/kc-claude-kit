@@ -2,6 +2,7 @@
 paths:
   - "**/*.{ts,tsx,js,jsx,mjs,cjs,rb,py,swift,go,java,kt,php,cs,rs}"
 ---
+<!-- Generated from skills/testing/SKILL.md by scripts/build-rules.sh. Edit the skill, not this file. -->
 
 # Testing discipline
 
@@ -19,4 +20,4 @@ The loop is not a formality at the end. A change is not done until it is green.
 - Cover the unhappy paths deliberately: the empty collection, the expired token, the duplicate submit, the interrupted write. The happy path is the one that already works.
 - When a bug is fixed, the regression test comes with it in the same change, and it must fail without the fix.
 
-Detection criteria and per-box review failure modes live in the code-review plugin's `references/testing.md`. This file is the statement of the convention; that file is how a diff gets graded against it.
+Detection criteria and per-box review failure modes live in the `## Review checklist` of the `testing` skill (`conventions:testing`), with the detail under its `## Review detail`. These rules are the statement of the convention; that checklist is how a diff gets graded against it.

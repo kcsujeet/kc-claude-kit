@@ -1,0 +1,2 @@
+src/use-submit-order.ts:1: const result = await someMutation.mutateAsync(variables)
+src/use-submit-order.ts:3: const { mutateAsync: submitOrder } = useSubmitOrder()

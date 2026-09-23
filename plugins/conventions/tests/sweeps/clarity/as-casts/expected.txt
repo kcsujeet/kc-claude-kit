@@ -1,0 +1,5 @@
+src/submission-field-row.tsx:1: const value = (maybeThing() ?? fallbackThing()) as Thing
+src/submission-field-row.tsx:2: const id = raw as string
+src/submission-field-row.tsx:3: const modes = ['a', 'b'] as const
+src/submission-field-row.tsx:4: const widget = response as unknown as Widget
+src/submission-field-row.tsx:5: import { format as formatDate } from 'date-fns'

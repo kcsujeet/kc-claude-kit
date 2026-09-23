@@ -2,6 +2,7 @@
 paths:
   - "**/*.{ts,tsx,js,jsx,mjs,cjs,rb,py,swift,go,java,kt,php,cs,rs}"
 ---
+<!-- Generated from skills/structure/SKILL.md by scripts/build-rules.sh. Edit the skill, not this file. -->
 
 # Structure
 
@@ -32,4 +33,4 @@ Where anything above appears to disagree with it, that document wins and this fi
 
 Apply this to a repo that already uses a feature-based layout or is migrating to one. In a legacy flat layout, do not demand a migration as a side effect of unrelated work; just avoid making the existing structure more inconsistent than it already is.
 
-Detection criteria and per-box review failure modes live in the code-review plugin's `references/structure.md` and `references/react.md`. This file is the statement of the convention; those files are how a diff gets graded against it.
+Detection criteria and per-box review failure modes live in the `## Review checklist` of the `structure` skill (`conventions:structure`) and of the `react` skill, with the detail under each one's `## Review detail`. These rules are the statement of the convention; those checklists are how a diff gets graded against it.

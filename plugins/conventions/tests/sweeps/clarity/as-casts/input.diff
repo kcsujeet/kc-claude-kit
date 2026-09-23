@@ -1,0 +1,15 @@
+diff --git a/src/submission-field-row.tsx b/src/submission-field-row.tsx
+new file mode 100644
+index 0000000..1111111
+--- /dev/null
++++ b/src/submission-field-row.tsx
+@@ -0,0 +1,9 @@
++const value = (maybeThing() ?? fallbackThing()) as Thing
++const id = raw as string
++const modes = ['a', 'b'] as const
++const widget = response as unknown as Widget
++import { format as formatDate } from 'date-fns'
++const hasItems = items.length > 0
++class Canvas {}
++const alias = basis
++// this was fine

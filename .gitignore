@@ -1,3 +1,7 @@
 .DS_Store
 .superpowers/
-docs/
+# docs/ holds scratch planning notes; only the architecture contract is tracked.
+docs/*
+!docs/architecture.md
+# written by each `claude plugin eval` run
+plugins/*/evals/results/
