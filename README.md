@@ -34,6 +34,12 @@ Add the marketplace, then install the plugins you want:
 
 `code-review` declares `conventions` in its `dependencies`, so installing `code-review` installs `conventions` too ([plugin dependencies](https://code.claude.com/docs/en/plugin-dependencies)). The review cannot run without it: its gates load their checklists from the conventions skills.
 
+Upgrading `code-review` from 1.x: `claude plugin update` does not install the new `conventions` dependency, and `code-review` stays disabled with a dependency error until you install it:
+
+```
+claude plugin install conventions@kc-claude-kit
+```
+
 Then, once in each project you want the conventions in:
 
 ```
@@ -228,8 +234,10 @@ Evals run each case with and without the plugin and cost model calls, so CI only
 
 ```bash
 claude plugin eval plugins/conventions
-claude plugin eval plugins/code-review --scaffold --allow-tools Bash Agent   # its cases build fixture repos and run git
+claude plugin eval . --eval-dir plugins/code-review/evals --scaffold --allow-tools Bash Agent
 ```
+
+code-review runs from the repo root because its cases also load `conventions`, and the eval runner only loads plugins inside its containment root: the target plugin when the target is a plugin, otherwise the directory the eval runs against. Its cases build fixture repos, run git and dispatch gate agents, hence `--scaffold` and `--allow-tools`.
 
 Results land in `plugins/<name>/evals/results/`, which is ignored.
 
