@@ -10,6 +10,7 @@ paths:
   - "**/*.podspec"
   - "**/Package.swift"
 ---
+<!-- Generated from skills/dependencies/SKILL.md by scripts/build-rules.sh. Edit the skill, not this file. -->
 
 # Dependencies
 

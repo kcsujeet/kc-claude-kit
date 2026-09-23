@@ -2,6 +2,7 @@
 paths:
   - "**/*.{ts,tsx,swift,kt,rs,go,cs,java}"
 ---
+<!-- Generated from skills/type-safety/SKILL.md by scripts/build-rules.sh. Edit the skill, not this file. -->
 
 # Type safety
 

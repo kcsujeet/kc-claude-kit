@@ -1,0 +1,3 @@
+src/components/format-price.ts:1: non-component module under components/, likely a util, type, or context
+src/components/use-widget.ts:1: hook under components/, belongs with hooks
+src/components/widget-context.tsx:2: export const WidgetContext = createContext(null)

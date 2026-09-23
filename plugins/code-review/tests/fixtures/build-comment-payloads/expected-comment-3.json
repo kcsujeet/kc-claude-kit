@@ -1,0 +1,7 @@
+{
+  "commit_id": "1111111111111111111111111111111111111111",
+  "path": "src/widgets/list.ts",
+  "line": 2,
+  "side": "LEFT",
+  "body": "**note:**\n`list` had two importers."
+}

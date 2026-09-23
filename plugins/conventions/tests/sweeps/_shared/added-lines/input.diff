@@ -1,0 +1,18 @@
+diff --git a/src/widget.ts b/src/widget.ts
+index 1111111..2222222 100644
+--- a/src/widget.ts
++++ b/src/widget.ts
+@@ -10,4 +12,5 @@ export const widgetLabel = (status: Status) => {
+ const kept = 1
+-const removed = 2
++const addedA = 3
++const addedB = 4
+ const alsoKept = 5
++++const leadingPlusText = 6
+diff --git a/src/other.ts b/src/other.ts
+new file mode 100644
+--- /dev/null
++++ b/src/other.ts
+@@ -0,0 +1,2 @@
++export const first = 1
++export const second = 2

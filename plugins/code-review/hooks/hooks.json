@@ -1,0 +1,17 @@
+{
+  "description": "Blocks GitHub review writes (PR and issue comments, reviews) that lack the KC_REVIEW_POST_APPROVED=1 approval token",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/guard-github-post.sh\"",
+            "shell": "bash"
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,8 @@
+pr view 12 --json number,author,baseRefName,headRefName,headRefOid,commits,changedFiles,closingIssuesReferences,body	pr-view.json
+pr list --author alice --state open --limit 100 --json number,headRefName,baseRefName	pr-list.json
+issue view https://github.com/acme/widgets/issues/7 --json number,title,body	issue-7.json
+issue view https://github.com/acme/widgets/issues/9 --json number,title,body	issue-9.json
+pr view 13 --json number,author,baseRefName,headRefName,headRefOid,commits,changedFiles,closingIssuesReferences,body	pr-view-lonely.json
+pr list --author bob --state open --limit 100 --json number,headRefName,baseRefName	pr-list-lonely.json
+pr view 10 --json commits	pr-commits-10.json
+pr view 11 --json commits	pr-commits-11.json

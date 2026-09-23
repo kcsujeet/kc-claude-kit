@@ -1,0 +1,17 @@
+[
+  {
+    "number": 12,
+    "headRefName": "feature/widget-header",
+    "baseRefName": "feature/widgets-base"
+  },
+  {
+    "number": 10,
+    "headRefName": "feature/widgets-base",
+    "baseRefName": "main"
+  },
+  {
+    "number": 11,
+    "headRefName": "chore/deps",
+    "baseRefName": "main"
+  }
+]

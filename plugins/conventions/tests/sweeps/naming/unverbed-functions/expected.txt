@@ -1,0 +1,7 @@
+src/widget-utils.ts:1: export const sameOwner = (a: Widget, b: Widget) => a.ownerId === b.ownerId
+src/widget-utils.ts:2: export const itemLabel = (item: Item) => item.name
+src/widget-utils.ts:5: const widgetKey = async (widget) => widget.id
+src/widget-utils.ts:6: const total = (() => { return 3 })()
+src/widget-utils.ts:7: function selection(ids: string[]) {}
+src/widget-utils.ts:11: const check = () => true
+src/widget-utils.ts:13: const doubled = value => value * 2

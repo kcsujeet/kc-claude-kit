@@ -1,0 +1,3 @@
+src/widget-table.tsx:1: const columns = useMemo(() => [{ key: 'name' }], [])
+src/widget-table.tsx:2: const onSelect = useCallback((id) => select(id), [select])
+src/widget-table.tsx:3: import { useMemo, useState } from 'react'

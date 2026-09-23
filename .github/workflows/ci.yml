@@ -1,0 +1,144 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      plugin:
+        description: Plugin whose eval suite to run (costs model calls)
+        required: true
+        type: choice
+        options:
+          - code-review
+          - conventions
+
+permissions:
+  contents: read
+
+# `shell: bash` runs steps with -eo pipefail, so a failed curl fails the install.
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  validate:
+    name: Validate manifests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      # Native installer, https://code.claude.com/docs/en/setup
+      - name: Install Claude Code
+        run: |
+          curl -fsSL https://claude.ai/install.sh | bash
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Validate marketplace
+        run: claude plugin validate . --strict
+
+      - name: Validate each plugin
+        run: |
+          for dir in plugins/*/; do
+            echo "::group::${dir}"
+            claude plugin validate "${dir%/}" --strict
+            echo "::endgroup::"
+          done
+
+  rules-in-sync:
+    name: Generated rules match their skills
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Check rules/ against skills/
+        run: bash plugins/conventions/scripts/build-rules.sh --check
+
+  scripts:
+    name: Shell scripts and their tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      # shellcheck ships on the ubuntu-24.04 runner image (actions/runner-images).
+      - name: shellcheck
+        run: git ls-files -z '*.sh' | xargs -0 --no-run-if-empty shellcheck
+
+      - name: Convention sweep fixtures
+        run: bash plugins/conventions/tests/run-sweeps.sh
+
+      # Every top-level *.sh in a plugin's tests/ is a runner; helpers and
+      # fixtures live in subdirectories. Plugins with no tests are skipped.
+      - name: Plugin test runners
+        run: |
+          shopt -s nullglob
+          for runner in plugins/*/tests/*.sh; do
+            if [ "$runner" = plugins/conventions/tests/run-sweeps.sh ]; then
+              continue
+            fi
+            echo "::group::${runner}"
+            bash "$runner"
+            echo "::endgroup::"
+          done
+
+  evals:
+    name: Plugin evals
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    env:
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      PLUGIN: ${{ inputs.plugin }}
+    steps:
+      # The secrets context is not available in a job-level `if`, so the
+      # check runs as a step and gates the rest.
+      - name: Check for ANTHROPIC_API_KEY
+        id: key
+        run: |
+          if [ -n "$ANTHROPIC_API_KEY" ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::ANTHROPIC_API_KEY secret is not set; skipping evals."
+            echo "present=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v7
+        if: steps.key.outputs.present == 'true'
+
+      # bubblewrap and socat back the OS sandbox that Bash-granting cases need
+      # on Linux (https://code.claude.com/docs/en/plugin-evals).
+      - name: Install Claude Code and sandbox prerequisites
+        if: steps.key.outputs.present == 'true'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y bubblewrap socat
+          curl -fsSL https://claude.ai/install.sh | bash
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      # CI form from https://code.claude.com/docs/en/plugin-evals.
+      # code-review cases build their fixture repos with scaffold scripts,
+      # and the review runs git through Bash and dispatches gate agents.
+      # --allow-tools takes a list, so it stays last among these flags.
+      - name: Run eval suite
+        if: steps.key.outputs.present == 'true'
+        run: |
+          extra_flags=()
+          if [ "$PLUGIN" = code-review ]; then
+            extra_flags+=(--scaffold --allow-tools Bash Agent)
+          fi
+          claude plugin eval "plugins/$PLUGIN" \
+            --trust-plugin \
+            --json results.json \
+            --threshold 0.8 \
+            --model claude-sonnet-5 \
+            --judge-model claude-haiku-4-5 \
+            --no-publish \
+            --max-cost-usd 10 \
+            "${extra_flags[@]}"
+
+      - name: Upload results
+        if: always() && steps.key.outputs.present == 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          name: eval-results-${{ inputs.plugin }}
+          path: results.json
+          if-no-files-found: warn

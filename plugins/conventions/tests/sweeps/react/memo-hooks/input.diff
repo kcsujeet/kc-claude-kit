@@ -1,0 +1,12 @@
+diff --git a/src/widget-table.tsx b/src/widget-table.tsx
+new file mode 100644
+index 0000000..1111111
+--- /dev/null
++++ b/src/widget-table.tsx
+@@ -0,0 +1,6 @@
++const columns = useMemo(() => [{ key: 'name' }], [])
++const onSelect = useCallback((id) => select(id), [select])
++import { useMemo, useState } from 'react'
++const memoized = useMemoizedValue(value)
++const cb = useCallbackRef(fn)
++const [open, setOpen] = useState(false)

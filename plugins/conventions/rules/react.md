@@ -4,10 +4,11 @@ paths:
   - "**/hooks/**/*.{ts,js}"
   - "**/api/**/*.{ts,js}"
 ---
+<!-- Generated from skills/react/SKILL.md by scripts/build-rules.sh. Edit the skill, not this file. -->
 
 # React
 
-Placement is covered by `structure.md`, which defers to bulletproof-react. This file is everything else: how components, data access, forms and state are built.
+Placement is covered by the `structure` skill, which defers to bulletproof-react. This file is everything else: how components, data access, forms and state are built.
 
 ## Components and markup
 
@@ -37,4 +38,4 @@ Placement is covered by `structure.md`, which defers to bulletproof-react. This 
 - Two state updates whose order matters carry a one-line comment at the call site saying why.
 - A child that needs two or more props derived from one hook the parent called should call the hook itself.
 
-Detection criteria and per-box review failure modes live in the code-review plugin's `references/react.md`. This file is the statement of the convention; that file is how a diff gets graded against it.
+Detection criteria and per-box review failure modes live in the `## Review checklist` of the `react` skill (`conventions:react`), with the detail under its `## Review detail`. These rules are the statement of the convention; that checklist is how a diff gets graded against it.

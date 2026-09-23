@@ -1,0 +1,2 @@
+pr view 12 --json headRefOid,baseRefName,title,files,url	pr-view.json
+pr diff 12 --color never	pr.diff

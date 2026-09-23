@@ -1,0 +1,7 @@
+build-comment-payloads.sh: 6 draft(s) failed validation; nothing written:
+  draft 2 (src/widgets/list.ts:10): line 10 is not on the RIGHT side of any hunk in src/widgets/list.ts
+  draft 3 (src/other.ts:1): path src/other.ts is not in the diff
+  draft 4 (src/widgets/list.ts:3): body is empty
+  draft 6 (src/widgets/list.ts:3): start_line must come before line
+  draft 7 (src/widgets/list.ts:4): line 4 is not on the LEFT side of any hunk in src/widgets/list.ts
+  draft 8 (src/widgets/list.ts:3): side must be RIGHT or LEFT, got MIDDLE

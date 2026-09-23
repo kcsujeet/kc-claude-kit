@@ -1,0 +1,10 @@
+{
+  "headRefOid": "1111111111111111111111111111111111111111",
+  "baseRefName": "main",
+  "title": "Add widget list's header\nwith a stray newline",
+  "url": "https://github.com/acme/widgets/pull/12",
+  "files": [
+    { "path": "src/widgets/list.ts", "additions": 3, "deletions": 1 },
+    { "path": "src/widgets/header.tsx", "additions": 5, "deletions": 0 }
+  ]
+}

@@ -1,0 +1,10 @@
+[
+  { "path": "src/widgets/list.ts", "line": 3, "body": "Fine on its own." },
+  { "path": "src/widgets/list.ts", "line": 10, "body": "Outside every hunk." },
+  { "path": "src/other.ts", "line": 1, "body": "Not in the diff." },
+  { "path": "src/widgets/list.ts", "line": 3, "body": "   " },
+  { "path": "src/widgets/list.ts", "start_line": 4, "line": 23, "body": "Across two hunks." },
+  { "path": "src/widgets/list.ts", "start_line": 3, "line": 3, "body": "Empty range." },
+  { "path": "src/widgets/list.ts", "line": 4, "side": "LEFT", "body": "Added line on the old side." },
+  { "path": "src/widgets/list.ts", "line": 3, "side": "MIDDLE", "body": "Bad side." }
+]

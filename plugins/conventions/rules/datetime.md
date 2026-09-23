@@ -2,6 +2,7 @@
 paths:
   - "**/*.{ts,tsx,js,jsx,mjs,cjs,rb,py,swift,go,java,kt,php,cs,rs}"
 ---
+<!-- Generated from skills/datetime/SKILL.md by scripts/build-rules.sh. Edit the skill, not this file. -->
 
 # Dates and times
 
@@ -16,4 +17,4 @@ Date code that looks locally correct is where boundary bugs hide: midnight, a DS
 - Locale drives both text and ordering. Formatting is separate from language: a date can be German-ordered while the page is read in French, and the org's setting decides.
 - Earliest and latest come from the date library's `max`/`min`, not a hand-rolled reduce.
 
-Detection criteria and per-box review failure modes live in the code-review plugin's `references/datetime.md`. This file is the statement of the convention; that file is how a diff gets graded against it.
+Detection criteria and per-box review failure modes live in the `## Review checklist` of the `datetime` skill (`conventions:datetime`), with the detail under its `## Review detail`. These rules are the statement of the convention; that checklist is how a diff gets graded against it.

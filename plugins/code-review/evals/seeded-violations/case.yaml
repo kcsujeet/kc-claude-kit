@@ -1,0 +1,6 @@
+schema_version: "1.1"
+name: seeded-violations
+description: A feature branch with a nested ternary, an `as any` cast and a noun-named predicate comes back FAILED, names the ternary or the cast, and dispatches the plugin's gate agents.
+tags: [review, positive]
+context:
+  scaffold_script: setup.sh

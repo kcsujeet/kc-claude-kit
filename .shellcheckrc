@@ -1,0 +1,4 @@
+# Sweep scripts source the shared plugins/conventions/scripts/lib/ through
+# `# shellcheck source=` directives written relative to the script itself.
+external-sources=true
+source-path=SCRIPTDIR

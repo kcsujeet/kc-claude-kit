@@ -1,0 +1,6 @@
+value: locales/en/feature.json:3:     "widget" : "Widget",
+value: locales/en/feature.json:4:     "widgetHeader": "Widget header"
+value: locales/en/shared.json:2:   "widget": "Widget",
+value: locales/en/shared.json:3:   "widgets": "Widgets",
+key: locales/en/feature.json:3:     "widget" : "Widget",
+key: locales/en/shared.json:2:   "widget": "Widget",

@@ -1,0 +1,19 @@
+diff --git a/src/widget-utils.ts b/src/widget-utils.ts
+new file mode 100644
+index 0000000..1111111
+--- /dev/null
++++ b/src/widget-utils.ts
+@@ -0,0 +1,13 @@
++export const sameOwner = (a: Widget, b: Widget) => a.ownerId === b.ownerId
++export const itemLabel = (item: Item) => item.name
++export const isSameOwner = (a: Widget, b: Widget) => a.ownerId === b.ownerId
++export const getItemLabel = (item: Item) => item.name
++const widgetKey = async (widget) => widget.id
++const total = (() => { return 3 })()
++function selection(ids: string[]) {}
++function toggleSelection(ids: string[]) {}
++const useWidgets = () => []
++const WidgetCard = () => null
++const check = () => true
++const count = items.length
++const doubled = value => value * 2

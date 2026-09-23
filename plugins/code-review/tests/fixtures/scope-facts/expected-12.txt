@@ -1,0 +1,17 @@
+## PR
+number: 12
+author: alice
+base: feature/widgets-base
+head: feature/widget-header
+head sha: 2222222222222222222222222222222222222222
+commits: 3
+files: 34
+description: {out}/pr-body.md
+
+## Author's other open PRs
+#10 head=feature/widgets-base base=main commits=1
+#11 head=chore/deps base=main commits=2
+
+## Linked issues
+#7 Widget list needs a header (body: {out}/issue-7.md)
+#9 Header must work offline (body: {out}/issue-9.md)

@@ -1,0 +1,4 @@
+src/widget-list.test.tsx:1: expect(screen.getByText('Widget A')).toHaveClass('bg-primary')
+src/widget-list.test.tsx:3: render(<WidgetList className="custom" />)
+src/widget-list.test.tsx:4: expect(el.classList.contains('active')).toBe(true)
+src/__tests__/widget-row.tsx:1: expect(row).toHaveClass('selected')

@@ -1,0 +1,5 @@
+src/use-retention-policy.ts:1: const check = <A extends unknown[], R>(action: (...args: A) => R) => action
+src/use-retention-policy.ts:2: let guard = false
+src/use-retention-policy.ts:3: export const checkRetentionPolicy = () => true
+src/use-retention-policy.ts:4: function run() {}
+src/use-retention-policy.ts:7: return { value }

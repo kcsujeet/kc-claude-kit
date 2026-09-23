@@ -1,0 +1,5 @@
+src/provider-form.tsx:1: switch (providerKind) {
+src/provider-form.tsx:2: } else if (flagB) {
+src/provider-form.tsx:3: }else if(flagC) {
+src/provider-form.tsx:4: const title = (() => {
+src/provider-form.tsx:5: const load = (async () => {

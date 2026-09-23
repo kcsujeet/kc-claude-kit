@@ -1,0 +1,4 @@
+src/widget-label.ts:1: const label = widget!.label
+src/widget-label.ts:2: const first = items.at(0)!
+src/widget-label.ts:3: const item = rows[0]!;
+src/widget-label.ts:4: call(value!, other)

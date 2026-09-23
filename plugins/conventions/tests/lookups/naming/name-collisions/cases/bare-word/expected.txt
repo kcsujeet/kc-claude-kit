@@ -1,0 +1,4 @@
+README.md:1: Run check before merge.
+src/auth/guard.ts:1: function check(token: string) {
+src/retention.ts:1: export const check = (policy: Policy) => policy.days > 0
+src/retention.ts:2: export const checkRetention = () => check(defaultPolicy)

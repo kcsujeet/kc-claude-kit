@@ -2,7 +2,16 @@
 
 Sujeet's personal Claude Code toolkit for any codebase: portable coding conventions that load while you write, plus plugins for reviewing a diff, auditing a repo's instruction setup, and verifying a change before calling it done.
 
-Four plugins. The `conventions` one carries rules, which plugins cannot load on their own, so it ships an `init` skill that copies them into a project and a hook that reminds you when they are missing.
+Four plugins:
+
+| Plugin | What it does |
+|---|---|
+| `conventions` | The conventions themselves, one skill per topic. Each topic skill holds the authoring rules, the review checklist, and the deterministic sweeps that check them. `/conventions:init` installs the rules into a project. |
+| `code-review` | Gate-based review of a PR, branch or diff. One read-only gate agent per convention topic returns per-box PASS/FAIL verdicts, and a verification gate audits their receipts. Posting to GitHub is a separate, user-invoked skill behind a hook. |
+| `claude-md` | Audits a repo's instruction setup and proposes what stays in CLAUDE.md, what becomes a path-scoped rule, a skill, or a hook. |
+| `testing` | Verification workflows: look at the UI before calling it done, and drive a cross-layer change end to end. |
+
+The layout and the reasoning behind it, with the docs each decision rests on, are in [`docs/architecture.md`](docs/architecture.md).
 
 ## Install
 
@@ -12,7 +21,7 @@ Add the marketplace:
 /plugin marketplace add kcsujeet/kc-claude-kit
 ```
 
-Install a plugin:
+Install the plugins you want:
 
 ```
 /plugin install conventions@kc-claude-kit
@@ -21,21 +30,45 @@ Install a plugin:
 /plugin install testing@kc-claude-kit
 ```
 
+`code-review` declares `conventions` in its `dependencies`, so installing `code-review` installs `conventions` too ([plugin dependencies](https://code.claude.com/docs/en/plugin-dependencies)). The gate agents load their checklists from the conventions skills, so the review cannot run without them.
+
 Then, once per project you want the conventions in:
 
 ```
 /conventions:init
 ```
 
-All three skills trigger automatically: `code-review:review-code` on "review this PR" or "review my changes", `claude-md:audit` on "audit my CLAUDE.md" or "should this be a skill or a rule", `testing:verify-ui` on "does this look right", and `testing:verify-e2e` on "test this end to end".
+The model-invoked skills trigger on their own: `code-review:review-code` on "review this PR" or "review my changes", `claude-md:audit` on "audit my CLAUDE.md" or "should this be a skill or a rule", `testing:verify-ui` on "does this look right", `testing:verify-e2e` on "test this end to end", and each `conventions:<topic>` skill when its topic comes up. `/code-review:post-review` is the exception: it only runs when you type it.
 
-## Portable conventions
+## Conventions
 
-`plugins/conventions/rules/` holds the conventions themselves, stated once, in the form Claude reads while **writing** code rather than while reviewing it.
+Each topic is one skill at `plugins/conventions/skills/<topic>/SKILL.md`, with its sections in a fixed order: `## Rules` (how to write it), `## Review checklist` (the boxes a gate ticks), `## Review detail` (examples and evidence per box), and `## Sweeps` (the bundled scripts). One file per convention means the rule you write against and the box a reviewer ticks cannot drift apart, which they used to. Two topics also bundle lookups, which take a name or a key instead of a diff: `naming/scripts/name-collisions.sh <name>` lists a name's whole-word hits in the tracked files, and `i18n/scripts/locale-duplicates.sh <locale-dir> <value> <leaf-key>` runs the two duplicate greps a new locale key needs.
 
-Plugins cannot load rules. The spec is explicit: a plugin contributes context "through skills, agents, and hooks", and a `CLAUDE.md` at the plugin root "is not loaded as project context". So the files ship with the plugin and something has to copy them where Claude Code looks:
+| Topic | Scope | Covers |
+|---|---|---|
+| `naming` | source files | One word per concept, role-not-type names, verb-noun functions, booleans as assertions, unambiguous where read not where declared, named predicates, file names that stand without their path |
+| `clarity` | source files | Ternary limits, early returns, comments that earn their place, magic numbers, no defensive coercion |
+| `structure` | source files | One responsibility per unit, co-location and promotion, no barrels, named exports, lookup over switch |
+| `simplicity` | source files | DRY, YAGNI and KISS; look for what already exists before hand-rolling it |
+| `datetime` | source files | No hand-rolled date math, ISO 8601 with offset, truncation accounting, timezone and clock as settings |
+| `react` | components, hooks, api | Components own their container, reads and writes in separate hooks, cache-patch before invalidate, form is the source of truth |
+| `i18n` | source and locale files | Source locale only, grep before adding a key, ICU plurals for countable nouns, never concatenate translations |
+| `testing` | source files | Failing test first, never skip a test to reach green, cover the unhappy paths, exact assertions on observable behavior, gates tested both ways |
+| `correctness` | source files | Empty, null, zero and boundary inputs; operators and conditions checked for off-by-one and inversion; current dependency arrays and closures; no cast hiding a real mismatch; no regression of a fixed bug |
+| `type-safety` | typed languages | No `any`, no silencing casts, parse external input at the boundary, reuse existing types |
+| `error-handling` | source files | No empty catch, typed codes, one envelope, messages that say what to do, structured logs |
+| `performance` | source files | Filter and paginate in the data layer, no N+1, index with the query, measure and say what you measured |
+| `dependencies` | dependency manifests | Ask first, check maintenance signals, exact versions, nothing that duplicates what is installed |
 
-- **Per project**, run `/conventions:init`. It copies them into `.claude/rules/`, which keeps the `paths:` frontmatter working so each rule loads only when a matching file is touched. Commit the directory and the project carries its own conventions.
+Plus `working-agreement.md`, the one hand-written, always-loaded rule: ask before assuming, report honestly, write corrections down where they belong.
+
+For React and TypeScript codebases, [bulletproof-react](https://github.com/alan2207/bulletproof-react/blob/master/docs/project-structure.md) is the canonical source for project structure, and the `structure` topic says so explicitly: where the two appear to disagree, that document wins and the rule is what gets corrected.
+
+### Why `/conventions:init` still exists
+
+Skills accept `paths:`, which looks like it should make the rule copies unnecessary. It does not: measured on Claude Code 2.1.280, a `paths:`-scoped plugin skill is not loaded when you read a matching file, only when the model decides to invoke it. Rules are what load on file read ([memory](https://code.claude.com/docs/en/memory)), and plugins cannot ship rules. So the plugin keeps a `rules/` directory, and `init` copies it where Claude Code looks:
+
+- **Per project**, `/conventions:init` copies the rules into `.claude/rules/`, which keeps the `paths:` frontmatter working so each rule loads only when a matching file is touched. Commit the directory and the project carries its own conventions.
 - **Machine-wide**, put them in `~/.claude/rules/` instead, where they apply to every project on that machine:
 
 ```bash
@@ -44,68 +77,110 @@ mkdir -p ~/.claude/rules
 for f in ~/src/kc-claude-kit/plugins/conventions/rules/*.md; do ln -s "$f" ~/.claude/rules/; done
 ```
 
-A `SessionStart` hook checks whether either is in place and prints one line when neither is, so a fresh clone tells you the conventions are missing instead of quietly running without them. It stays silent otherwise, so the normal case costs no context.
+`/conventions:init` runs `plugins/conventions/scripts/install-rules.sh`, which copies the rules and stamps the plugin version; `--dry-run` lists what an update would replace. `rules/` is generated from the topic skills by `plugins/conventions/scripts/build-rules.sh`, so there is still one source, and CI fails if the two drift. `init` writes a version stamp next to the copies, and a `SessionStart` hook prints one line when the rules are missing or older than the installed plugin. It stays silent otherwise, so the normal case costs no context.
 
 Run `/context` in a new session to confirm what loaded.
 
-| Rule | Scope | Covers |
-|---|---|---|
-| `working-agreement.md` | always | Ask before assuming, report honestly, write corrections down where they belong |
-| `naming.md` | source files | One word per concept, role-not-type names, verb-noun functions, booleans as assertions, unambiguous where read not where declared, named predicates, file names that stand without their path |
-| `clarity.md` | source files | Ternary limits, early returns, comments that earn their place, magic numbers, no defensive coercion |
-| `structure.md` | source files | One responsibility per unit, co-location and promotion, no barrels, named exports, lookup over switch |
-| `datetime.md` | source files | No hand-rolled date math, ISO 8601 with offset, truncation accounting, timezone and clock as settings |
-| `testing.md` | source files | Failing test first, run the loop continuously, never skip a test to reach green, cover the unhappy paths, exact assertions on observable behavior, gates tested both ways |
-| `type-safety.md` | typed languages | No `any`, no silencing casts, parse external input at the boundary, reuse existing types |
-| `error-handling.md` | source files | No empty catch, typed codes, one envelope, messages that say what to do, structured logs |
-| `performance.md` | source files | Filter and paginate in the data layer, no N+1, index with the query, measure and say what you measured |
-| `dependencies.md` | dependency manifests | Ask first, check maintenance signals, exact versions, nothing that duplicates what is installed |
-| `react.md` | components, hooks, api | Components own their container, reads and writes in separate hooks, cache-patch before invalidate, form is the source of truth |
-| `i18n.md` | source and locale files | Source locale only, grep before adding a key, ICU plurals for countable nouns, never concatenate translations |
-
-`working-agreement.md` is the only unscoped one, since it applies to any task rather than any file. The rest carry `paths:` frontmatter, and `dependencies.md` is scoped to manifests so it arrives exactly when something is about to be installed.
-
-For React and TypeScript codebases, [bulletproof-react](https://github.com/alan2207/bulletproof-react/blob/master/docs/project-structure.md) is the canonical source for project structure, and `rules/structure.md` says so explicitly: where the two appear to disagree, that document wins and the rule is what gets corrected. Its guidance on barrel files matches the kit's, with a reason the kit did not have (barrels break tree shaking).
-
-These are the source of truth. The matching `references/*.md` in the code-review plugin hold the review-time detection criteria for the same conventions, so a convention change starts in `rules/` and the gate boxes follow.
-
-## What's inside
-
-| Plugin | Skill | Description |
-|--------|-------|-------------|
-| `conventions` | `init` | Copies the portable convention rules into a project's `.claude/rules/`, with a hook that flags when they are missing |
-| `code-review` | `review-code` | Gate-based code review with one subagent per rule file and per-box PASS/FAIL verdicts |
-| `claude-md` | `audit` | Audits a repo's instruction setup and proposes what stays in CLAUDE.md, what becomes a path-scoped rule, a skill, or a hook |
-| `testing` | `verify-ui` | Looks at the actual screen before a UI change is called done: realistic data, every state, narrow viewport, both themes, largest font scale |
-| `testing` | `verify-e2e` | Drives a cross-layer change as a person would, confirms the durable effect at the far end, and walks the unhappy paths on purpose |
-
-## How the CLAUDE.md audit works
-
-A `CLAUDE.md` grows by three lines per correction until it is four hundred lines loaded into every session, and adherence drops as it grows, so the file meant to make Claude reliable does the opposite.
-
-The audit sorts content by **when it needs to load** rather than by topic. It inventories every instruction file, classifies each section (keep, move, delete, split, or enforce), reports the always-loaded line count before and after, and proposes a file plan. Sections only relevant to part of the repo become `.claude/rules/` files with `paths:` frontmatter; multi-step procedures become skills; prose guardrails become hooks, which are the only ones that actually enforce anything; directory trees and architecture tours get deleted, since Claude can read those off the codebase.
-
-It proposes and stops. Nothing is rewritten without explicit approval, because instruction files are usually hand-tuned over months and a bad split degrades every future session quietly.
-
 ## How the review works
 
-Before the fan-out, the orchestrator runs the scope checks itself: is the PR stacked on another, does it do more than its title says, what constraints does the linked issue set, and was a large diff read in full. Then the code-review plugin dispatches one subagent per gate, in parallel. Each agent owns exactly one reference file, reads its gate checklist, and returns a structured per-box verdict with evidence. Any finding fails its gate. The orchestrator aggregates all gate results into a single PASSED/FAILED verdict and leads the report with a gate-status table showing which gates passed or failed.
+Before the fan-out, `code-review:review-code` runs the scope checks itself: is the PR stacked on another, does it do more than its title says, what constraints does the linked issue set, and was a large diff read in full. Then it dispatches one gate agent per applicable topic, in parallel. Each gate is a read-only plugin agent (`Read, Grep, Glob, Bash`) that preloads its conventions skill, runs that topic's sweep scripts over the diff, walks every checklist box, and returns a per-box verdict with evidence. Any finding fails its gate. The verification gate runs second and audits the other gates' receipts. The orchestrator aggregates everything into a single PASSED/FAILED verdict and leads with a gate-status table.
 
-## Per-repo extension
+The deterministic steps around the gates are scripts in `plugins/code-review/scripts/`, each tested against a stub `gh`:
 
-If the target repository has a `.claude/review-conventions.md` file, it becomes an extra gate. This file lets you encode project-specific code review rules without modifying the plugin. For documentation on the expected format and examples, see `plugins/code-review/skills/review-code/references/project-conventions.md`.
+| Script | Does |
+|---|---|
+| `gather-review.sh (<pr> \| --branch [<base>])` | Saves the diff and changed-file list for a PR or a local branch (base: `origin/HEAD`, then `main`, then `master`) and prints `meta.env` with `HEAD_SHA`, `BASE`, `TITLE`, `DIFF_FILE` and `CHANGED_FILES`; prints the fetch command when the local checkout is not the PR head |
+| `scope-facts.sh <pr>` | Prints the facts the scope checks need: author, base, commit and file counts, the author's other open PRs, and each linked issue, with the PR description and issue bodies saved to files |
+| `review-threads.sh <pr> [--mine <login>]` | Prints every review comment thread, root then replies, and with `--mine` marks the threads you started and whether the author replied after you (requires `jq`) |
+| `build-comment-payloads.sh <drafts.json> <diff> <sha> --pr <n>` | Used by `post-review`: checks each drafted comment's path and line against the diff's hunks, writes one payload per comment, and prints the approval-token commands for the user to approve; never posts (requires `jq`) |
 
-## Gate registry
+The gates are dispatched by `subagent_type` (`code-review:naming-gate` and so on). If a gate agent is unavailable, for example because the `conventions` dependency failed to load, the orchestrator runs that gate as a `general-purpose` agent told to invoke the `conventions:<topic>` skill and follow the same contract, and says so in the report.
 
-| Gate | Dispatch | Contents |
-|---|---|---|
-| **naming** | always | Role-not-type names (`data`/`result`/`temp` in business logic); honest names (read as a sentence: subject elision, context-as-subject, stale-after-refactor, familiar-shaped names hiding different behavior); boolean-chain extraction (operands too, not just the outer name); repeated predicate → named helper/type guard; unambiguous where READ not where declared (a bare generic verb/noun, or a collision with an unrelated declaration, fails even when accurate); functions lead with a verb (noun-phrase helpers fail); new file names unique and meaningful without their path; mechanical `&&`/`\|\|`, bare-word-declaration, and unverbed-function grep sweeps with per-hit verdicts (a condition split one clause per line is reassembled before judging). |
-| **clarity** | always | Ternary checklist (nested/long/multi-line/non-trivial-branch; value ternaries too); dense guard clauses; defensive coercion on typed values; redundant `as T`; comment rules (earn their place, density is itself a finding); two-step mutations without ordering rationale; magic spreads; inline anonymous structural types; 3+-operand fallback chains; unhappy-path tangled into happy path; thin-wrapper over-extraction (the symmetric smell); dense inlined sub-expressions; magic numbers → named constant or token; type escape hatches (a cast that lies to silence an error, `any`, non-null `!`); ternary remedies that must not introduce a new defect; review suggestions must not strip readable intermediates; ternary/cast/`any`/non-null grep sweeps. |
-| **structure** | always | Separation of concerns (one observable responsibility; directory path is part of the contract; `hooks/` promises hooks, `utils/` promises pure functions); co-location and nearest-common-ancestor promotion (YAGNI-gated for view-local helpers, role-driven for shared-layer code); flatten single-file folders; no re-export barrels; dead wrappers (all shapes: single-item array wrap-then-spread, async-await passthrough, destructure-and-reconstruct, one-use alias, identity transform, producer/consumer double-derivation, Promise-around-Promise); lookup objects over `switch`/nested `if` (thunk maps for per-branch interpolation; chained-ternary key derivation banned); named exports for new files (inline `export const`, not trailing blocks); JSDoc on exported APIs; string enums over literal unions for backend-serialized discriminators (would-the-backend-return-this test); plain-value map entries by default, thunks only when needed; `switch`/`else if`/value-IIFE grep and an indentation-aware nested-`if` scan; breaking changes named (removed/renamed exports, changed props, a field made required) with importers grepped; misplaced-modules sweep over changed and untracked files; no public exports widened to share an internal. |
-| **simplicity** | always | DRY/YAGNI/KISS as a standing lens with any-finding-fails weight; assume-it-exists (check props/slots → shared hooks/utils → component variants → existing data before hand-rolling; hook-reuse doesn't excuse component-reinvention); NaN-risky coercion (`Number(x) \|\| 0` swallows legit 0; use the project's safe-coercion helper if one exists); non-trivial conversion repeated at 2+ sites → one named helper (esp. both directions of one encoding); the delete-or-collapse test on every new construct; types as narrow as their sink; "mirrors X" claims backed by the two signatures side by side; refactor leftovers; shared props added for one caller; reuse searched by shape (a type's field set, a component's props and markup), not only by name. |
-| **datetime** | conditional: diff touches date/time logic | No hand-rolled date math (`split(':')`, `getTime()` arithmetic, `+86_400_000` breaks on DST, manual `padStart`); use the project's date library; serialize instants as full ISO 8601 with offset (date-only is fine for genuinely date-only fields); truncation accounting (serialized value / round-trip key / comparison; `format`+`parseISO` is local↔local, `new Date(str)` reads UTC and shifts a day west of UTC); `new Date()` in render/memo (frozen vs never-memoized; use day-granularity timestamp keys); timezone, week-start, and 12/24-hour are **inputs** from user/app settings, never constants; earliest/latest via the date lib's `max`/`min`; `Intl` and `toLocale*String` formatting always given the configured time zone. |
-| **react** | conditional: diff has React/TS code | **Bulletproof-react project structure** ([reference](https://github.com/alan2207/bulletproof-react/blob/master/docs/project-structure.md)): feature-based layout (`features/<feature>/{api,components,hooks,stores,types,utils}`; only the subfolders a feature needs), shared code at app level (`components/`, `hooks/`, `utils/`, `types/`, `stores/`), **no cross-feature imports** (compose at the app level), unidirectional flow (shared → features → app). Plus: React keys (no index for reorderable items, no mixed filtered/unfiltered indices); prop drilling when a child could read the same hook/context; repeated sibling JSX (3+ structurally identical blocks → map an array with stable keys); hook-call purity (assign the hook result, derive on the next line); a component owns its own container and never assumes its parent's context (no root `size`/`flexGrow`/self-margins that only work under one ancestor); conditional element assembly → named local component with early returns; no side-effect-only components (`useEffect` + `return null`; use a hook or HOC); no skip-via-ternary in map callbacks; no `renderXxx()` inline render functions; data-fetching principles (reads and writes in separate hooks, no raw fetch/mutation calls in components, cache-patch before invalidate, `mutate`+callbacks over `mutateAsync`+`await` when the value only drives side effects, fetch lives with its consumer; no over-fetch for a derived boolean); forms: the form is the single source of truth (no shadowing `useState`), check the validation library's API before hand-rolling a check; render cost: a memo has to hit (N/A under React Compiler), no wasted render work, large JSX blocks become components, no redundant wrapper elements; layout changes checked at 375/600/768/1024 px. |
-| **i18n** | conditional: diff touches locale/translation files | Per-key audit table mandatory (one row per new key), never an aggregate grep; dedup (value grep + unscoped leaf-key grep across the whole locale tree, plus semantic-equivalent reasoning, since re-phrasings evade value greps); ICU plurals for every countable noun (even singular-only labels; no baked-plural keys; no separate `x`/`xs` pairs); never concatenate translations (word order varies by language); verb+noun values decompose into an action template + noun key; label + runtime data value is interpolation, not concatenation (don't invent `fooWithBar` composite keys); key name matches value; generic nouns belong in the common/shared namespace, not feature files; if the project machine-generates non-source locales, edits to them are flagged as lost-on-deploy. |
-| **testing** | conditional: diff changes behavior or touches tests | New behavior has a test (a bug fix's test fails without the fix); no class-name assertions standing in for behavior; gates tested both ways; repeated setup becomes a local helper; tests sit beside their unit; exact assertions when the value is known; class-assertion and loose-assertion grep sweeps with per-hit verdicts. |
-| **project-conventions** | conditional: target repo has `.claude/review-conventions.md` | The agent reads the repo's own conventions file and walks the diff against every rule in it, same per-box contract. This is the extension point for company- or project-specific rules: a repo encodes its own data-layer patterns, UI-library rules, domain-math helpers, etc. there. The reference file documents the expected format (checklist of failure modes, one canonical example path per rule) so repos write gate-consumable conventions. |
-| **verification** | always | Receipts checklist: read every non-trivial changed file at head SHA; every finding cites `file:line` + short SHA; nothing posted to GitHub; per-trigger receipt lines (grep counts, per-key table when i18n applies); self-review variant (when the reviewer authored the diff: lint/types green is not gate-clean; explicit commit/push authorization check); external-behavior claims cite fetched docs; renamed or moved is not fixed on a re-review; a defended finding needs evidence; the orchestrator's scope checks (stacking, title vs scope, linked-issue constraints, chunked reading of large diffs) walked per box. |
+| Topic | Gate agent | Dispatch | Checks, in short |
+|---|---|---|---|
+| naming | `code-review:naming-gate` | always | Role names, honest names, extracted boolean chains, names unambiguous where read, verb-led functions, file names |
+| clarity | `code-review:clarity-gate` | always | Ternaries, guard clauses, comments, magic numbers, casts and `any` that lie, defensive coercion |
+| structure | `code-review:structure-gate` | always | One responsibility, co-location, no barrels, dead wrappers, lookups over `switch`, breaking changes named |
+| simplicity | `code-review:simplicity-gate` | always | DRY, YAGNI, KISS; reuse of what already exists, searched by shape as well as by name |
+| datetime | `code-review:datetime-gate` | diff touches date/time logic | No hand-rolled date math, ISO 8601 with offset, truncation, timezone as an input |
+| react | `code-review:react-gate` | diff has React/JSX UI code | Bulletproof-react structure, keys, data-fetching hooks, forms, render cost |
+| i18n | `code-review:i18n-gate` | diff touches locale files | Per-key audit table, dedup, ICU plurals, no concatenated translations |
+| testing | `code-review:testing-gate` | diff changes behavior or tests | New behavior tested, no class-name assertions, exact assertions, gates tested both ways |
+| correctness | `code-review:correctness-gate` | always | Logic bugs, edge cases (empty, null, zero, boundary, timezone), data matching its declared type at a boundary, no regression of a bug the repo already fixed |
+| project conventions | `code-review:project-conventions-gate` | repo has `.claude/review-conventions.md` | Every rule in the repo's own conventions file; repo rules that override a built-in box are listed |
+| verification | `code-review:verification-gate` | always, second | Files read at head SHA, findings cite `file:line` and SHA, receipts present, nothing posted |
+
+`type-safety`, `error-handling`, `performance` and `dependencies` are rules-only topics: they guide writing and have no gate.
+
+### Posting to GitHub
+
+The review never posts. Its output stays in chat.
+
+To turn findings into PR comments, run `/code-review:post-review`. It is user-invoked only (`disable-model-invocation: true`), drafts the comments in Conventional Comments format, shows you the draft, and waits for a fresh, explicit post signal. The actual `gh` write only goes through when the same Bash command carries the approval token `KC_REVIEW_POST_APPROVED=1`, typed after your signal. A `PreToolUse` hook in the plugin (`scripts/guard-github-post.sh`) blocks any GitHub review write without it, because an instruction is context and only a hook enforces anything. It covers `gh pr comment`, `gh pr review`, `gh issue comment`, and `gh api` writes to a PR's or issue's comments or reviews; reads, `gh pr create` and `gh pr merge` pass untouched.
+
+### Per-repo extension
+
+If the target repository has a `.claude/review-conventions.md`, it becomes an extra gate (`code-review:project-conventions-gate`). Use it for project-specific rules: data-layer patterns, UI-library rules, domain helpers, whatever the built-in topics do not know about. Write each rule as a checklist of failure modes with one canonical example path, so a gate can walk it box by box. [`docs/review-conventions.md`](docs/review-conventions.md) has the format guide and a worked example.
+
+On conflict, the repo's rule wins over a built-in convention: the review reports the built-in box as overridden, citing the repo rule, instead of failing it. The repo knows its own context; the kit only knows what is portable.
+
+## Using the skills in Gemini CLI or Antigravity
+
+The skills follow the Agent Skills standard, so other agents can read them. `scripts/export-agent-skills.sh` copies every skill into another tool's skills directory, renamed to `kc-<plugin>-<skill>` (for example `kc-conventions-naming`) because those tools share one flat namespace where bare names like `naming` collide. It rewrites `${CLAUDE_PLUGIN_ROOT}` script paths to the exported location and bundles the shared sweep library, so the sweeps still run.
+
+As a Gemini CLI extension:
+
+```bash
+scripts/export-agent-skills.sh --gemini-extension ~/src/kc-claude-kit-gemini/kc-claude-kit
+gemini extensions link ~/src/kc-claude-kit-gemini/kc-claude-kit
+```
+
+Into an Antigravity workspace or its global skills directory ([Antigravity skills](https://antigravity.google/docs/skills)):
+
+```bash
+scripts/export-agent-skills.sh /path/to/repo/.agents/skills
+scripts/export-agent-skills.sh ~/.gemini/config/skills
+```
+
+What does not carry over: gate agents and hooks are Claude Code features, so another tool runs the gates inline from the skills. `post-review` is never exported, since its safety depends on the Claude Code hook, and neither is `conventions:init`, which installs into `.claude/rules/`. The rewritten paths are absolute, so re-run the export rather than moving its output. The script header lists the remaining limits.
+
+## Developing
+
+Load the working copies instead of the installed plugins. Load both, since `code-review` depends on `conventions` and a local copy satisfies the dependency:
+
+```bash
+claude --plugin-dir ./plugins/conventions --plugin-dir ./plugins/code-review
+```
+
+Run what CI runs:
+
+```bash
+bash plugins/conventions/scripts/build-rules.sh          # regenerate rules/ after editing a topic skill
+bash plugins/conventions/scripts/build-rules.sh --check  # fail if rules/ drifted from the skills
+bash plugins/conventions/tests/run-sweeps.sh             # sweep fixtures
+bash plugins/conventions/tests/run-lookups.sh            # lookup fixtures
+for t in plugins/*/tests/*.sh; do bash "$t"; done        # every plugin's test runners
+git ls-files '*.sh' | xargs shellcheck
+claude plugin validate . --strict
+for p in plugins/*/; do claude plugin validate "$p" --strict; done
+```
+
+Evals run each case with and without the plugin and cost model calls, so CI only runs them on demand (the `evals` job, `workflow_dispatch`). Locally:
+
+```bash
+claude plugin eval plugins/conventions
+claude plugin eval plugins/code-review --scaffold --allow-tools Bash Agent   # its cases build fixture repos and run git
+```
+
+Results land in `plugins/<name>/evals/results/`, which is ignored.
+
+### Releasing
+
+`version` lives in each plugin's `plugin.json` only; the marketplace entries carry none, since a marketplace version is silently masked by `plugin.json` ([marketplaces](https://code.claude.com/docs/en/plugin-marketplaces)). To release a plugin, bump its `plugin.json` version, add a `CHANGELOG.md` entry, commit, then tag from the plugin directory:
+
+```bash
+cd plugins/conventions
+claude plugin tag --push
+```
+
+That creates and pushes `conventions--v<version>`. Dependency resolution reads these tags, so a `code-review` release that raises its `conventions` range needs the matching `conventions` tag pushed first.

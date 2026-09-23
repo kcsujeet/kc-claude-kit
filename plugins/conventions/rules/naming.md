@@ -2,6 +2,7 @@
 paths:
   - "**/*.{ts,tsx,js,jsx,mjs,cjs,rb,py,swift,go,java,kt,php,cs,rs}"
 ---
+<!-- Generated from skills/naming/SKILL.md by scripts/build-rules.sh. Edit the skill, not this file. -->
 
 # Naming
 
@@ -18,4 +19,4 @@ A name is read far more often than it is written, and a wrong one survives refac
 - Match the language's own casing: `snake_case` columns and plural tables in SQL, `UpperCamelCase` types with the file named after the type, `kebab-case` plural nouns in routes.
 - A file name identifies the file without its path. Tabs, search results and stack traces show it bare, so `header.tsx` deep in a feature folder is `widget-list-header.tsx`, and no two files share a basename unless the framework requires it.
 
-Detection criteria and per-box review failure modes live in the code-review plugin's `references/naming.md`. This file is the statement of the convention; that file is how a diff gets graded against it.
+Detection criteria and per-box review failure modes live in the `## Review checklist` of the `naming` skill (`conventions:naming`), with the detail under its `## Review detail`. These rules are the statement of the convention; that checklist is how a diff gets graded against it.
