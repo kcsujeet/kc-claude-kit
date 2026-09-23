@@ -99,7 +99,7 @@ Ask for a review of a PR, a branch or your working changes. `code-review:review-
 
 1. **Gathers the change:** saves the diff, the head SHA and the changed files.
 2. **Checks its scope:** is the PR stacked on another, does it do more than its title says, what constraints does the linked issue set, was a large diff read in full.
-3. **Dispatches every gate in parallel.** Each gate is a read-only agent (`Read, Grep, Glob, Bash`) that preloads its conventions skill, runs that topic's scripts over the diff, walks every checklist box, and returns a per-box verdict with evidence. A gate whose topic the diff does not touch still runs and returns `PASS (N/A)` with its reason, so the report always shows every gate.
+3. **Dispatches every gate in parallel.** Each gate is a read-only agent (`Read, Grep, Glob, Bash`, plus `Skill` to recover a topic skill that did not preload) that preloads its conventions skill, runs that topic's scripts over the diff, walks every checklist box, and returns a per-box verdict with evidence. A gate whose topic the diff does not touch still runs and returns `PASS (N/A)` with its reason, so the report always shows every gate.
 4. **Verifies the receipts:** the verification gate runs last and checks that every other gate produced the evidence its checklist demands.
 5. **Reports one verdict:** PASSED only when every gate passed.
 
@@ -126,7 +126,7 @@ Two rules keep findings honest:
 
 `type-safety`, `error-handling`, `performance` and `dependencies` guide writing only and have no gate.
 
-If a gate agent is unavailable, for example because the `conventions` dependency failed to load, the review runs that gate as a `general-purpose` agent told to invoke the `conventions:<topic>` skill and follow the same contract, and says so in the report.
+If a gate agent is unavailable, for example because the `conventions` dependency failed to load, the review runs that gate as a `general-purpose` agent told to invoke the `conventions:<topic>` skill and follow the same contract, and says so in the report. And if a gate agent starts but its preloaded skill did not load (Claude Code skips a missing preloaded skill silently), the gate invokes the skill itself, and fails with `topic skill unavailable` if that fails too. No gate ever grades a topic from memory.
 
 ### What the report looks like
 
