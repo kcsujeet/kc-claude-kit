@@ -17,6 +17,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
+- `image-preview` 1.0.0: thumbnails of pasted images above the prompt. Ghostty and kitty get the real picture through the `Image` element; other terminals, Apple Terminal among them, get half-block `Raster` cells decoded from a `sips`-resampled BMP. A copied Finder image file (which pastes as its icon) previews the real file, and on send Claude gets a note naming it. The band beneath (another plugin's row) is kept. macOS only. Tests run by `claude plugin test`.
 - `usage-band` 1.0.0: a row of pills above the prompt showing the model, the context window's fill, the 5-hour and 7-day rate limits with time until each resets, input, output and cache-read tokens summed over every model request (subagents included), and the session's cost. Built on Claude Code's function hooks (`ui.render` on `AbovePrompt`, `session.measure`, `turn.step`), with tests run by `claude plugin test`.
 
 ### Fixed
