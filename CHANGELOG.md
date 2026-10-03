@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+
+- `usage-band` 1.0.0: a row of pills above the prompt showing the model, the context window's fill, the 5-hour and 7-day rate limits with time until each resets, input, output and cache-read tokens summed over every model request (subagents included), and the session's cost. Built on Claude Code's function hooks (`ui.render` on `AbovePrompt`, `session.measure`, `turn.step`), with tests run by `claude plugin test`.
+
 ### Fixed
 
 - The code-review eval suite could not load: its cases list `../../../conventions`, which sits outside the eval runner's containment root when the target is `plugins/code-review`. CI and the README now run it from the repo root with `--eval-dir plugins/code-review/evals`. Measured: all 3 code-review cases pass.
