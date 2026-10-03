@@ -1,7 +1,7 @@
 {
   "name": "usage-band",
   "description": "A row of pills above the prompt: model, context fill, 5h and 7d rate limits with reset times, input/output/cache tokens, and session cost",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "author": {
     "name": "Sujeet Kc"
   },
