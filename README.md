@@ -70,8 +70,7 @@ It is built on Claude Code's function hooks, an early-access API, so a Claude Co
 
 `image-preview` has no skill either: paste an image and a thumbnail labelled with its tag number appears above the prompt. The row clears when you send the prompt or delete the tags, and whatever else draws in that band (`usage-band`'s pills, say) stays below it.
 
-<!-- TODO: add the screenshot at plugins/image-preview/screenshot.png -->
-![image-preview: a thumbnail of a pasted image above the prompt](plugins/image-preview/screenshot.png)
+<img width="1038" height="486" alt="collage-pen-20261003-175242" src="https://github.com/user-attachments/assets/db9d3a9a-0060-481b-aae5-fc5214ceb053" />
 
 How the thumbnail is drawn depends on the terminal:
 
