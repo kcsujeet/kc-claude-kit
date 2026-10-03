@@ -32,6 +32,11 @@
       "name": "usage-band",
       "source": "./plugins/usage-band",
       "description": "A row of pills above the prompt: model, context fill, rate limits with reset times, token totals and session cost"
+    },
+    {
+      "name": "image-preview",
+      "source": "./plugins/image-preview",
+      "description": "Thumbnails of the images you paste, above the prompt, in any terminal; reads the real file behind a copied Finder icon"
     }
   ]
 }

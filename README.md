@@ -9,6 +9,7 @@ Sujeet's personal Claude Code toolkit for any codebase: portable coding conventi
 | `instructions` | Audits a repo's instruction setup and proposes what stays in CLAUDE.md, what becomes a path-scoped rule, a skill, or a hook. |
 | `testing` | Verification workflows: look at the UI before calling it done, and drive a cross-layer change end to end. |
 | `usage-band` | A row of pills above the prompt: the model, how full the context window is, the 5-hour and 7-day rate limits with their reset times, input, output and cache-read tokens, and the session's cost. |
+| `image-preview` | Thumbnails of the images you paste, above the prompt, instead of bare `[Image #1]` tags: the real picture in Ghostty and kitty, colored cells in other terminals. |
 
 ## Contents
 
@@ -32,6 +33,7 @@ Add the marketplace, then install the plugins you want:
 /plugin install instructions@kc-claude-kit
 /plugin install testing@kc-claude-kit
 /plugin install usage-band@kc-claude-kit
+/plugin install image-preview@kc-claude-kit
 ```
 
 `code-review` declares `conventions` in its `dependencies`, so installing `code-review` installs `conventions` too ([plugin dependencies](https://code.claude.com/docs/en/plugin-dependencies)). The review cannot run without it: its gates load their checklists from the conventions skills.
@@ -65,6 +67,32 @@ The exception is `/code-review:post-review`, which only runs when you type it.
 <img width="1071" height="385" alt="collage-pen-20261003-160636" src="https://github.com/user-attachments/assets/2fbbfb31-4dc5-4d7b-bdaa-96364cf63509" />
 
 It is built on Claude Code's function hooks, an early-access API, so a Claude Code update can change what it can draw. The rate-limit pills appear only on a subscription, after the first response reports the limits; the token pills count from when the session loaded the plugin.
+
+`image-preview` has no skill either: paste an image and a thumbnail labelled with its tag number appears above the prompt. The row clears when you send the prompt or delete the tags, and whatever else draws in that band (`usage-band`'s pills, say) stays below it.
+
+<!-- TODO: add the screenshot at plugins/image-preview/screenshot.png -->
+![image-preview: a thumbnail of a pasted image above the prompt](plugins/image-preview/screenshot.png)
+
+How the thumbnail is drawn depends on the terminal:
+
+| Terminal | What you see |
+|---|---|
+| Ghostty (`TERM=xterm-ghostty`) or kitty (`TERM=xterm-kitty`, or `KITTY_WINDOW_ID` set) | The real picture, drawn by the terminal over the kitty graphics protocol. |
+| Apple Terminal, and any other terminal without the kitty graphics protocol | Colored half-block cells (`▀`), two pixels per cell, at most 32 columns by 4 rows. You can tell what the image is, but it is blurry, and fine text in a screenshot is not readable. |
+
+Apple Terminal cannot show the actual image: it does not speak the kitty graphics protocol, and given an `Image` element there, Claude Code draws only its text fallback. So the cells are the best a terminal like it can do. The cells are also what you get in these cases:
+
+- **Any terminal the plugin does not detect as Ghostty or kitty**, even one that draws images some other way, such as iTerm2's inline images or sixel. Claude Code's `Image` element speaks the kitty protocol only.
+- **Ghostty or kitty with `TERM` changed**, over SSH or inside tmux, which set their own `TERM`. The plugin goes by the variables those terminals set.
+
+And no thumbnails at all:
+
+- **Linux.** Decoding an image relies on macOS's `sips`, because a function hook's environment has no way to decompress a PNG or JPEG.
+- **The Claude desktop app.** The plugin draws on the terminal surface only.
+
+Copying an image file in Finder (⌘C on the file) puts the file's icon on the clipboard, not the picture, so ctrl+v pastes the file type's generic icon (a grey "JPG" page, say). `image-preview` checks the clipboard when a new tag appears; if it holds a copied image file, the thumbnail shows the real file, and on send Claude gets a note naming that file so it reads the real image. The icon is still attached to the prompt: a plugin cannot remove an attachment.
+
+It is built on Claude Code's function hooks, like `usage-band`. It reads the prompt every 300ms to spot new tags, and finds each image in Claude Code's paste cache, `<tmp>/<project>/<session>/images/<n>.<ext>`. Neither is a documented contract, so a Claude Code update can move them.
 
 ## Writing code: the conventions
 
