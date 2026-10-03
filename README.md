@@ -62,8 +62,7 @@ The exception is `/code-review:post-review`, which only runs when you type it.
 
 `usage-band` has no skill: once installed, it draws its pills above the prompt in every session.
 
-<!-- TODO: add the screenshot at plugins/usage-band/screenshot.png -->
-![usage-band: the row of pills above the prompt](plugins/usage-band/screenshot.png)
+<img width="1015" height="324" alt="Screenshot 2026-10-03 at 8 56 05 AM" src="https://github.com/user-attachments/assets/28e915ac-9e34-46a5-aeb5-7f495af492d1" />
 
 It is built on Claude Code's function hooks, an early-access API, so a Claude Code update can change what it can draw. The rate-limit pills appear only on a subscription, after the first response reports the limits; the token pills count from when the session loaded the plugin.
 
