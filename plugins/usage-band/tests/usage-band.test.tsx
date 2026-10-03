@@ -37,12 +37,16 @@ describe('format', () => {
   })
 })
 
+// Core's own drawing; in this band core draws nothing.
+const EMPTY_BAND = { type: 'engine', ref: 0 } as const
+
 const NOW = Date.parse('2026-10-03T10:00:00.000Z')
 const iso = (ms: number) => new Date(ms).toISOString()
 
 for (const surface of ['terminal', 'desktop'] as const) {
   test(`band draws model, context, limits, tokens and cost on ${surface}`, async ($, on) => {
     mock.clock(on, { now: NOW })
+    on('ui.render', () => EMPTY_BAND as never)
     on('session.measure', ($, e) => ({ changed: [...e.changed] }))
     on('session.model', () => ({ value: 'claude-opus-5-5' }))
     on('turn.step', async function* ($, e) {
@@ -94,3 +98,27 @@ for (const surface of ['terminal', 'desktop'] as const) {
     }
   })
 }
+
+// What the plugins beneath draw in the shared band: image-preview's thumbnails, say.
+const THUMBNAILS = { type: 'Text', props: {}, children: ['[Image #1]'] } as const
+const BAND_PROPS = {
+  hasSurvey: false,
+  isWorking: false,
+  maxRows: 20,
+  bodyColumns: 200,
+  scroll: { offset: 0, bodyRows: 20 },
+  view: {},
+}
+
+test('keeps what the plugins beneath drew, stacked above the pills', async ($, on) => {
+  mock.clock(on, { now: NOW })
+  on('ui.render', () => THUMBNAILS as never)
+
+  const ui = await $.ui.mount({ plugin: 'usage-band', surface: 'terminal', component: 'AbovePrompt', props: BAND_PROPS })
+  const drawn = await ui.drawn()
+
+  expect(drawn).toMatchObject({ type: 'Box', props: { flexDirection: 'column' } })
+  const column = drawn.type === 'Box' ? drawn : undefined
+  expect(column?.children?.[0]).toEqual(THUMBNAILS)
+  expect(JSON.stringify(column?.children?.[1])).toContain('↑ ')
+})

@@ -181,9 +181,16 @@ export const register: Register = (on) => {
       pills.push(valuePill('cost', '$', formatCost(usage.costUsd), '#f1e6cf', '#a8862e'))
     }
 
+    // The band is shared: whatever the plugins beneath drew (image-preview's thumbnails) stays,
+    // stacked above the pills, so the pills never hide it and an empty band adds no rows.
+    const above = await next(e)
+
     return (
-      <Box flexDirection="row" flexWrap="wrap" width={bandWidth} paddingX={1} paddingTop={1}>
-        {pills}
+      <Box flexDirection="column">
+        {above}
+        <Box flexDirection="row" flexWrap="wrap" width={bandWidth} paddingX={1} paddingTop={1}>
+          {pills}
+        </Box>
       </Box>
     )
   })
