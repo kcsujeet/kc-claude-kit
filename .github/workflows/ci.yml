@@ -46,6 +46,10 @@ jobs:
             echo "::endgroup::"
           done
 
+      # Function-hook plugins carry *.test.ts(x) files run by `claude plugin test`.
+      - name: Function-hook plugin tests
+        run: claude plugin test plugins/usage-band
+
   rules-in-sync:
     name: Generated rules match their skills
     runs-on: ubuntu-latest

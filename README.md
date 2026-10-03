@@ -8,6 +8,7 @@ Sujeet's personal Claude Code toolkit for any codebase: portable coding conventi
 | `code-review` | Reviews a PR, branch or diff with one read-only gate agent per convention topic, and returns a single PASSED or FAILED verdict. Posting to GitHub is a separate skill that only you can run, behind a hook. |
 | `claude-md` | Audits a repo's instruction setup and proposes what stays in CLAUDE.md, what becomes a path-scoped rule, a skill, or a hook. |
 | `testing` | Verification workflows: look at the UI before calling it done, and drive a cross-layer change end to end. |
+| `usage-band` | A row of pills above the prompt: the model, how full the context window is, the 5-hour and 7-day rate limits with their reset times, input, output and cache-read tokens, and the session's cost. |
 
 ## Contents
 
@@ -30,6 +31,7 @@ Add the marketplace, then install the plugins you want:
 /plugin install code-review@kc-claude-kit
 /plugin install claude-md@kc-claude-kit
 /plugin install testing@kc-claude-kit
+/plugin install usage-band@kc-claude-kit
 ```
 
 `code-review` declares `conventions` in its `dependencies`, so installing `code-review` installs `conventions` too ([plugin dependencies](https://code.claude.com/docs/en/plugin-dependencies)). The review cannot run without it: its gates load their checklists from the conventions skills.
@@ -57,6 +59,8 @@ Most skills trigger on their own:
 | (the topic comes up) | `conventions:<topic>` |
 
 The exception is `/code-review:post-review`, which only runs when you type it.
+
+`usage-band` has no skill: once installed, it draws its pills above the prompt in every session. It is built on Claude Code's function hooks, an early-access API, so a Claude Code update can change what it can draw. The rate-limit pills appear only on a subscription, after the first response reports the limits; the token pills count from when the session loaded the plugin.
 
 ## Writing code: the conventions
 
