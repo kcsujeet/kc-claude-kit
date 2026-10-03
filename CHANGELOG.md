@@ -6,6 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Changed
+
+- `claude-md` is renamed `instructions` (2.0.0), and its skill `claude-md:audit` is now `instructions:audit`. Claude Code now reserves plugin names that start with `claude-`, so `claude plugin validate --strict` rejected the old name and failed CI. Already installed? Swap it:
+
+  ```
+  claude plugin uninstall claude-md@kc-claude-kit
+  claude plugin install instructions@kc-claude-kit
+  ```
+
 ### Added
 
 - `usage-band` 1.0.0: a row of pills above the prompt showing the model, the context window's fill, the 5-hour and 7-day rate limits with time until each resets, input, output and cache-read tokens summed over every model request (subagents included), and the session's cost. Built on Claude Code's function hooks (`ui.render` on `AbovePrompt`, `session.measure`, `turn.step`), with tests run by `claude plugin test`.

@@ -37,7 +37,7 @@ kc-claude-kit/
     │   ├── scripts/*.sh                 # gather-review, scope-facts, review-threads, build-comment-payloads
     │   ├── tests/
     │   └── evals/
-    ├── claude-md/                       # unchanged
+    ├── instructions/                    # was claude-md; renamed, the claude- prefix is reserved
     └── testing/                         # unchanged
 ```
 

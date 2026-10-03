@@ -6,7 +6,7 @@ Sujeet's personal Claude Code toolkit for any codebase: portable coding conventi
 |---|---|
 | `conventions` | The conventions themselves, one skill per topic, each with its authoring rules, its review checklist and the scripts that check them. `/conventions:init` installs the rules into a project. |
 | `code-review` | Reviews a PR, branch or diff with one read-only gate agent per convention topic, and returns a single PASSED or FAILED verdict. Posting to GitHub is a separate skill that only you can run, behind a hook. |
-| `claude-md` | Audits a repo's instruction setup and proposes what stays in CLAUDE.md, what becomes a path-scoped rule, a skill, or a hook. |
+| `instructions` | Audits a repo's instruction setup and proposes what stays in CLAUDE.md, what becomes a path-scoped rule, a skill, or a hook. |
 | `testing` | Verification workflows: look at the UI before calling it done, and drive a cross-layer change end to end. |
 | `usage-band` | A row of pills above the prompt: the model, how full the context window is, the 5-hour and 7-day rate limits with their reset times, input, output and cache-read tokens, and the session's cost. |
 
@@ -29,7 +29,7 @@ Add the marketplace, then install the plugins you want:
 /plugin marketplace add kcsujeet/kc-claude-kit
 /plugin install conventions@kc-claude-kit
 /plugin install code-review@kc-claude-kit
-/plugin install claude-md@kc-claude-kit
+/plugin install instructions@kc-claude-kit
 /plugin install testing@kc-claude-kit
 /plugin install usage-band@kc-claude-kit
 ```
@@ -53,7 +53,7 @@ Most skills trigger on their own:
 | Say | Skill |
 |---|---|
 | "review this PR", "review my changes" | `code-review:review-code` |
-| "audit my CLAUDE.md", "should this be a skill or a rule" | `claude-md:audit` |
+| "audit my CLAUDE.md", "should this be a skill or a rule" | `instructions:audit` |
 | "does this look right" | `testing:verify-ui` |
 | "test this end to end" | `testing:verify-e2e` |
 | (the topic comes up) | `conventions:<topic>` |

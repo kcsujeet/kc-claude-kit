@@ -19,8 +19,8 @@
       "description": "Gate-based code review: one gate agent per convention topic, per-box PASS/FAIL verdicts, zero rationalized skips"
     },
     {
-      "name": "claude-md",
-      "source": "./plugins/claude-md",
+      "name": "instructions",
+      "source": "./plugins/instructions",
       "description": "Audit a repo's Claude Code instruction setup: what stays in CLAUDE.md, what becomes a path-scoped rule, a skill, or a hook"
     },
     {
