@@ -31,7 +31,7 @@
     {
       "name": "usage-band",
       "source": "./plugins/usage-band",
-      "description": "A row of pills above the prompt: model, context fill, rate limits with reset times, token totals and session cost"
+      "description": "A row of pills above the prompt: model, git branch, context fill, rate limits with reset times, token totals and session cost"
     },
     {
       "name": "image-preview",

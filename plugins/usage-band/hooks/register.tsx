@@ -2,7 +2,7 @@ import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register, SessionMeasureInput, SessionRateLimit } from 'claude-code'
 
 import type { Limit, Tokens, Usage } from '../types'
-import { formatCost, formatModel, formatRemaining, formatTokens } from './format'
+import { INK, formatCost, formatModel, formatRemaining, formatTokens, usageColor } from './format'
 
 const usageAtom = atom({ plugin: 'usage-band', key: 'usage' } as const, {
   context: null,
@@ -17,9 +17,11 @@ const tokensAtom = atom({ plugin: 'usage-band', key: 'tokens' } as const, {
 } as Tokens)
 const nowAtom = atom({ plugin: 'usage-band', key: 'now' } as const, 0)
 const modelAtom = atom({ plugin: 'usage-band', key: 'model' } as const, null as string | null)
+const branchAtom = atom({ plugin: 'usage-band', key: 'branch' } as const, null as string | null)
 
 const PILL_PADDING_X = 2
-const INK = '#2b2b2b'
+// A blank row between pill rows once a narrow terminal wraps them.
+const PILL_ROW_GAP = 1
 const MUTED = '#5f6b66'
 
 type Segment = { text: string; color: string; isBold?: boolean }
@@ -54,6 +56,17 @@ async function refreshModel($: EngineInterface): Promise<void> {
   }
 }
 
+// Empty outside a repository and on a detached HEAD, both shown as no pill.
+async function refreshBranch($: EngineInterface): Promise<void> {
+  try {
+    const { exitCode, stdout } = await $.process.run(['git', 'branch', '--show-current'])
+    const branch = exitCode === 0 ? stdout.trim() : ''
+    await update($, branchAtom, () => (branch === '' ? null : branch))
+  } catch {
+    return
+  }
+}
+
 export const register: Register = (on) => {
   on('session.start', async ($, e, next) => {
     const result = await next(e)
@@ -62,6 +75,7 @@ export const register: Register = (on) => {
     const startedNow = await $.clock.now()
     await update($, nowAtom, () => startedNow)
     await refreshModel($)
+    await refreshBranch($)
     $.clock.every(30_000, async () => {
       const tickNow = await $.clock.now()
       await update($, nowAtom, () => tickNow)
@@ -92,10 +106,19 @@ export const register: Register = (on) => {
     return result
   })
 
-  // A /model switch shows as soon as the next prompt goes out.
+  // A /model switch shows as soon as the next prompt goes out; a branch switched
+  // outside the session, by then too.
   on('prompt.submit', async ($, e, next) => {
     const result = await next(e)
     await refreshModel($)
+    await refreshBranch($)
+    return result
+  })
+
+  // A checkout the model runs shows as soon as the command returns.
+  on('tool.call', { tool: 'Bash' }, async ($, e, next) => {
+    const result = await next(e)
+    await refreshBranch($)
     return result
   })
 
@@ -107,6 +130,7 @@ export const register: Register = (on) => {
     await read($, nowAtom) // subscribes the band to the 30s tick
     const now = await $.clock.now()
     const model = await read($, modelAtom)
+    const branch = await read($, branchAtom)
     const { Box, Text } = $.ui.resolve(e)
     // Held to the band's own width so the row wraps instead of pushing the
     // transcript and the band's [-] past the terminal's edge.
@@ -130,7 +154,7 @@ export const register: Register = (on) => {
       const segments: Segment[] = [
         { text: `${icon} `, color: accent },
         { text: `${label} `, color: MUTED },
-        { text: `${Math.round(limit.percentUsed)}%`, color: INK, isBold: true },
+        { text: `${Math.round(limit.percentUsed)}%`, color: usageColor(limit.percentUsed), isBold: true },
       ]
       if (hasReset) {
         segments.push({ text: `  ↻ ${formatRemaining(resetsAtMs, now)}`, color: MUTED })
@@ -152,6 +176,9 @@ export const register: Register = (on) => {
     if (model !== null) {
       pills.push(valuePill('model', '✦', formatModel(model), '#ececec', '#d97757'))
     }
+    if (branch !== null) {
+      pills.push(valuePill('branch', '⎇', branch, '#e6e1d8', '#7a5c3a'))
+    }
     if (usage.context !== null && usage.context.percent !== null) {
       const { percent, tokens: contextTokens, window } = usage.context
       const fill = contextTokens === null ? '' : `  ${formatTokens(contextTokens)}/${formatTokens(window)}`
@@ -161,7 +188,7 @@ export const register: Register = (on) => {
           [
             { text: '◧ ', color: '#3b8ea5' },
             { text: 'ctx ', color: MUTED },
-            { text: `${percent}%`, color: INK, isBold: true },
+            { text: `${percent}%`, color: usageColor(percent), isBold: true },
             { text: fill, color: MUTED },
           ],
           '#d5e9ef',
@@ -188,7 +215,7 @@ export const register: Register = (on) => {
     return (
       <Box flexDirection="column">
         {above}
-        <Box flexDirection="row" flexWrap="wrap" width={bandWidth} paddingX={1} paddingTop={1}>
+        <Box flexDirection="row" flexWrap="wrap" rowGap={PILL_ROW_GAP} width={bandWidth} paddingX={1} paddingTop={1}>
           {pills}
         </Box>
       </Box>

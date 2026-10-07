@@ -8,7 +8,7 @@ Sujeet's personal Claude Code toolkit for any codebase: portable coding conventi
 | `code-review` | Reviews a PR, branch or diff with one read-only gate agent per convention topic, and returns a single PASSED or FAILED verdict. Posting to GitHub is a separate skill that only you can run, behind a hook. |
 | `instructions` | Audits a repo's instruction setup and proposes what stays in CLAUDE.md, what becomes a path-scoped rule, a skill, or a hook. |
 | `testing` | Verification workflows: look at the UI before calling it done, and drive a cross-layer change end to end. |
-| `usage-band` | A row of pills above the prompt: the model, how full the context window is, the 5-hour and 7-day rate limits with their reset times, input, output and cache-read tokens, and the session's cost. |
+| `usage-band` | A row of pills above the prompt: the model, the current git branch, how full the context window is, the 5-hour and 7-day rate limits with their reset times, input, output and cache-read tokens, and the session's cost. The context, 5-hour and 7-day percentages turn amber from 70% and red from 90%. |
 | `image-preview` | Thumbnails of the images you paste, above the prompt, instead of bare `[Image #1]` tags: the real picture in Ghostty and kitty, colored cells in other terminals. |
 
 ## Contents

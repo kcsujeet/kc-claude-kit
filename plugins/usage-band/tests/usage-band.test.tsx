@@ -1,6 +1,6 @@
 import { describe, expect, mock, test } from 'claude-code/testing'
 
-import { formatCost, formatModel, formatRemaining, formatTokens } from '../hooks/format'
+import { formatCost, formatModel, formatRemaining, formatTokens, usageColor } from '../hooks/format'
 
 const HOUR = 3_600_000
 
@@ -35,7 +35,19 @@ describe('format', () => {
       formatRemaining(12 * 60_000, now),
     ]).toEqual(['2h 40m', '1d 7h', '12m'])
   })
+
+  test('usage color: ink below 70%, amber from 70%, red from 90%', async () => {
+    expect([usageColor(69), usageColor(70), usageColor(89), usageColor(90), usageColor(100)]).toEqual([
+      '#2b2b2b',
+      '#7a4a00',
+      '#7a4a00',
+      '#a3141c',
+      '#a3141c',
+    ])
+  })
 })
+
+const BRANCH_RESULT = { exitCode: 0, stdout: 'feat/usage-band\n', stderr: '', isStdoutTruncated: false, isStderrTruncated: false }
 
 // Core's own drawing; in this band core draws nothing.
 const EMPTY_BAND = { type: 'engine', ref: 0 } as const
@@ -49,6 +61,7 @@ for (const surface of ['terminal', 'desktop'] as const) {
     on('ui.render', () => EMPTY_BAND as never)
     on('session.measure', ($, e) => ({ changed: [...e.changed] }))
     on('session.model', () => ({ value: 'claude-opus-5-5' }))
+    on('process.run', () => ({ value: BRANCH_RESULT }))
     on('turn.step', async function* ($, e) {
       return {
         turnId: e.turnId,
@@ -93,7 +106,7 @@ for (const surface of ['terminal', 'desktop'] as const) {
       },
     })
     const drawn = JSON.stringify(await ui.drawn())
-    for (const shown of ['Opus 5.5', '16%', '162.4k/1.0M', '20%', '58%', '2h 40m', '1d 7h', '15.6k', '3.0k', '954.2k', '$4.32']) {
+    for (const shown of ['Opus 5.5', 'feat/usage-band', '16%', '162.4k/1.0M', '20%', '58%', '2h 40m', '1d 7h', '15.6k', '3.0k', '954.2k', '$4.32']) {
       expect(drawn).toContain(shown)
     }
   })
@@ -121,4 +134,27 @@ test('keeps what the plugins beneath drew, stacked above the pills', async ($, o
   const column = drawn.type === 'Box' ? drawn : undefined
   expect(column?.children?.[0]).toEqual(THUMBNAILS)
   expect(JSON.stringify(column?.children?.[1])).toContain('↑ ')
+  expect(column?.children?.[1]).toMatchObject({ type: 'Box', props: { flexWrap: 'wrap', rowGap: 1 } })
+})
+
+test('colors a percentage amber from 70% and red from 90%', async ($, on) => {
+  mock.clock(on, { now: NOW })
+  on('ui.render', () => EMPTY_BAND as never)
+  on('session.measure', ($, e) => ({ changed: [...e.changed] }))
+
+  await $.session.measure({
+    context: { window: 200_000, tokens: 150_000, percent: 75 },
+    rateLimits: [
+      { kind: 'five_hour', percentUsed: 92 },
+      { kind: 'seven_day', percentUsed: 10 },
+    ],
+    changed: ['rateLimits'],
+  })
+
+  const ui = await $.ui.mount({ plugin: 'usage-band', surface: 'terminal', component: 'AbovePrompt', props: BAND_PROPS })
+  const drawn = JSON.stringify(await ui.drawn())
+
+  expect(drawn).toContain('{"color":"#7a4a00","bold":true},"children":["75%"]')
+  expect(drawn).toContain('{"color":"#a3141c","bold":true},"children":["92%"]')
+  expect(drawn).toContain('{"color":"#2b2b2b","bold":true},"children":["10%"]')
 })
