@@ -36,3 +36,18 @@ export function formatModel(modelId: string): string {
   const contextSuffix = longContext === undefined ? '' : ' 1M'
   return `${familyName} ${major}.${minor}${contextSuffix}`
 }
+
+export const INK = '#2b2b2b'
+// Dark amber and red rather than bright yellow and red, so the bold figure keeps
+// at least 5.6:1 contrast on every pastel pill (WCAG AA asks 4.5:1).
+const WARNING = '#7a4a00'
+const CRITICAL = '#a3141c'
+const WARNING_PERCENT = 70
+const CRITICAL_PERCENT = 90
+
+/** The color of a usage figure: ink below 70%, amber from 70%, red from 90%. */
+export function usageColor(percent: number): string {
+  if (percent >= CRITICAL_PERCENT) return CRITICAL
+  if (percent >= WARNING_PERCENT) return WARNING
+  return INK
+}

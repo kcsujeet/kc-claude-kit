@@ -10,6 +10,6 @@ export type Tokens = { input: number; output: number; cacheRead: number }
 
 declare module 'claude-code' {
   interface PluginState {
-    'usage-band': { usage: Usage; tokens: Tokens; now: number; model: string | null }
+    'usage-band': { usage: Usage; tokens: Tokens; now: number; model: string | null; branch: string | null }
   }
 }

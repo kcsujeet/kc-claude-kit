@@ -1,7 +1,7 @@
 {
   "name": "usage-band",
-  "description": "A row of pills above the prompt: model, context fill, 5h and 7d rate limits with reset times, input/output/cache tokens, and session cost",
-  "version": "1.0.1",
+  "description": "A row of pills above the prompt: model, git branch, context fill, 5h and 7d rate limits with reset times, input/output/cache tokens, and session cost, with usage figures turning amber from 70% and red from 90%",
+  "version": "1.1.0",
   "author": {
     "name": "Sujeet Kc"
   },
