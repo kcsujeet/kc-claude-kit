@@ -62,6 +62,7 @@ for (const surface of ['terminal', 'desktop'] as const) {
     on('session.measure', ($, e) => ({ changed: [...e.changed] }))
     on('session.model', () => ({ value: 'claude-opus-5-5' }))
     on('process.run', () => ({ value: BRANCH_RESULT }))
+    on('prompt.submit', ($, e) => ({ text: e.text }))
     on('turn.step', async function* ($, e) {
       return {
         turnId: e.turnId,
@@ -88,6 +89,8 @@ for (const surface of ['terminal', 'desktop'] as const) {
       cost: { usd: 4.32 },
       changed: ['rateLimits', 'cost'],
     })
+    // A prompt is one of the moments the band reads the branch.
+    await $.prompt.submit({ text: 'hi', wait: false, origin: { kind: 'composer' } })
     for await (const _ of $.turn.step({ turnId: 't1', index: 0, model: 'claude-opus-5-5', messageCount: 1 })) {
       // drain the stream
     }
