@@ -16,16 +16,30 @@ Before producing the first draft, paste this checklist in chat with each box exp
 **Pre-draft self-prompt:**
 - [ ] Length: each draft will be ≤ 3 sentences (+ code if needed). Long is the exception, not the default; reserve for explaining a subtle tradeoff, pushing back with technical reasoning, or clarifying a non-obvious decision.
 - [ ] Format: label on its own line; no em dashes; no `§X` / `§<name>` / internal-rule-number citations in any draft; no praise openers (`Good catch`, `Good call`, `Fair`, `Real bug`, `Nice find`); no `(blocking)` decoration.
-- [ ] Action-first: each draft leads with what to change, not the rationale. Every `suggestion` then gives a brief reason (one clause or sentence) inside the three-sentence budget; other labels add rationale only when needed.
+- [ ] Clear ask: by the end of the second sentence the reader knows what would change. Opening with the problem is fine (it is how people talk); a paragraph of rationale before the ask is not. Every `suggestion` gives a brief reason (one clause or sentence) inside the three-sentence budget; other labels add rationale only when needed.
 - [ ] One topic per draft: a multi-bullet draft (three sub-points in one comment) means either split into separate threads or pick the single strongest framing.
-- [ ] Replies to feedback on OUR OWN PR are one sentence unless a listed exception applies (see "Replying to feedback on your own PR"). No restating the reviewer's point, no explaining why they were right, no precedent for a change they already asked for.
-- [ ] Courtesy: soft framing throughout (`Could we…`, `Worth…`, `Lean toward…`, `Want to…`). Politeness is non-negotiable; brevity does not excuse curtness. Audit each draft for command-form openers (`Drop`, `Rename`, `Move`, `Add`, `Wire up`, `Replace`, `Use`, `Factor`, etc.) and re-frame as a question or suggestion. Even when the change is mandatory, ask for it; the label (`issue` / `chore` / `suggestion`) already signals the weight.
+- [ ] Replies to feedback on OUR OWN PR are one sentence unless a listed exception applies (see "Replying to feedback on your own PR"). A reply that declines explains gently and leaves the door open; it never opens with the decision ("I'd rather", "Keeping it"). No restating the reviewer's point, no explaining why they were right, no precedent for a change they already asked for.
+- [ ] Courtesy, in the user's own voice: plainly say what is hard or wrong, then what would help, the way a person would say it out loud. There is no stock opener: not "Could we", not "Worth", not "Would be better", not any phrase used as a formula. Read the drafts side by side; if two open or are built the same way, rewrite one. Ask a question only when it is a real question. No bare command as the opener (`Drop`, `Rename`, `Move`, `Use`, etc.). Politeness is non-negotiable; brevity does not excuse curtness, and the label (`issue` / `chore` / `suggestion`) already signals the weight.
 - [ ] Plain words: no press-release or trailer phrasing (`demonstrably`, `a real fix`, `worth shipping on its own`, `well-scoped`, `robust`, `elegant`). Read each draft aloud; if it sounds like an announcement, rewrite it as the plain statement (`fixes the bug`, `this breaks when X`).
+- [ ] Simple words, checked not felt: reread each draft as its author would. No hard or technical words, no sentence over about 25 words, and the author never has to open the code to follow it (see "Tone rules").
+- [ ] Proof fits the reader: proof (steps, error text, repro, example) only when asked for, when the reader will use it, or to back up a review point; otherwise just the result. No greeting or emoji opener, no bold list labels, messages people read in quotes rather than backticks, no closing line that repeats the point (see "Tone rules").
+- [ ] Worth a comment: small nits are left out of the draft set (see "Pick what to post"). Naming and "name this condition" comments stay.
+- [ ] Closed spec: the drafts use only the labels in the Labels table, the `**<label>**:` / body layout, plain fenced code blocks, and the posting shapes in "Posting via the GitHub API". No field, format, or decoration this file does not list (see "The spec is closed").
+- [ ] Label picked from the Labels table, not from the user's reaction. How strongly the user phrased their feedback is not an input to the label.
 - [ ] Top-level body: none, unless it says something no inline comment says (see "Top-level review body").
-- [ ] Code examples: prefer none, and point at existing code that already does the thing. Include a snippet only when the shape is genuinely ambiguous without one, and then write it to the target repo's conventions and read it back as if it had arrived in the diff. A snippet that needs a new one-off helper, or that restructures control flow to fit, means you are designing the fix instead of naming the defect.
+- [ ] Code examples: prefer none, and point at existing code that already does the thing. Include a snippet only when the shape is genuinely ambiguous without one, and then write it to the target repo's conventions and read it back as if it had arrived in the diff. Every new name in it is defined, or explained as new or existing (see "Tone rules"). A snippet that needs a new one-off helper, or that restructures control flow to fit, means you are designing the fix instead of naming the defect.
 ```
 
 Skipping this checklist (or producing it perfunctorily and then writing long drafts anyway) is the documented failure mode. The discipline only sticks when the checklist precedes the drafts in chat.
+
+## Pick what to post
+
+Too many comments crowd a PR, and the ones that matter get lost. The chat report still lists every finding, but the draft set leaves out small nits:
+
+- **Leave out:** a code comment that restates the code or is stale, a redundant cast, a spelling or wording tweak in a comment, anything the author would fix in seconds without being told.
+- **Keep:** naming, "give this condition a name", hard-to-read logic, duplicated code, wrong placement, translation keys, bugs.
+
+When in doubt, ask the user rather than drafting it. Say in chat which findings were left out, in one line.
 
 ## Format
 
@@ -54,16 +68,64 @@ In rough order of frequency for review findings:
 | **thought** | Exploratory idea worth sharing without expecting action this PR. |
 | **praise** | Use it when something is genuinely well done. Encourages good patterns. |
 
+**Pick the label from this table, not from the user's reaction.** "This is horrible to read" is feedback about the code, not an instruction to escalate. Structural, naming and readability feedback stays `suggestion` however strongly the user phrases it; `issue` is for a defect. If the user wants an escalation they will ask for one, and then it is their decision rather than your inference.
+
 **Decorations** (optional, in parens after the label): `(non-blocking)`, `(if-minor)`. Do not use `(blocking)` - escalation should come from the label choice (`**issue:**` for must-fix, `**suggestion:**` for proposals, etc.), not from a decoration tacked on.
 
 ## Tone rules
 
 - No em dashes (`—`). Use periods, commas, parentheses, or semicolons.
-- Soft, collaborative language. "Could we...", "Worth a one-line comment...", "Lean toward keeping this because...".
+- Polite and plain, in the user's voice: name what is hard, then what would help, in whatever words fit that comment. No phrase is the house opener. "Could we", "Worth" and "Would be better" are each fine once in a while, but a set where the drafts share an opener or a sentence shape reads like a template, and the user notices.
+- **Write so a ten-year-old could follow it.** Short sentences, everyday words, straight to the point, still polite. Say what is hard and what would help; skip the theory. Words like "drift", "passthrough", "predicate", "derive", "co-locate", "invariant" and "semantics" get swapped for plain ones ("stay the same", "only hands it on", "condition", "work out"). Real comments in this voice:
+  - "I find this whole section very hard to read. This can be simplified in my opinion."
+  - "Would be better to create meaningful named variables for these conditions and reuse the variables."
+- **"Simple words" is a check you run, not a box you tick from memory.** It slips most when a draft explains a design, because it gets written the way the code was just read. Before ticking it, reread the draft as the author and walk three failure modes:
+  - **Hard words:** a technical or abstract word where an everyday one works. "Where the items come from" beats "the data source", "the cache" or "normalization".
+  - **Long sentences:** any sentence over about 25 words, or one that stacks two reasons with "since … so …". Split it.
+  - **Needs the code:** a sentence the author could only follow by opening the files. Say what it does or what the user sees instead.
+
+  Code names are not the problem. Naming the piece you mean helps the reader, so keep them; it's the hard words and stacked sentences around them that lose people. A real reply, first as drafted and then as approved (names changed):
+
+  Bad:
+  ```
+  The table and the add buttons are already shared (`ItemsTable`, `AddItemButton`, `AddManyItemsButton`), so what's left per screen is only where the rows come from and how they're shown. The invoice reads them from the invoice's cache with the invoice's formatters and labels, while the order loads them with its own query and the account's formatters, which is why `ItemForm` takes them as a slot.
+  ```
+
+  Good:
+  ```
+  Most of it is already shared: `ItemsTable`, `AddItemButton` and `AddManyItemsButton` are used on both screens. The only part that's different is where the items come from, so each screen hands its own list to the form.
+  ```
+- **Give proof when it helps the reader, not by default.** This applies to review comments, replies, and any comment written for the user (issue trackers, chat). Proof (how you tested, the exact error, a repro, an example) belongs in a comment in three cases:
+  1. The reader asked for it.
+  2. The reader will understand it and use it. QA gets the steps you tried; a lead who only needs the outcome gets the result.
+  3. You are making a point in a review. A bug comes with a short repro; a suggestion comes with an example of the change. Back the point up rather than just stating it.
+
+  Outside those three, say the result and stop. Each of these is checked on its own:
+  - **Proof nobody needed:** test steps, exact error text, or the list of cases tried, in a status reply to someone who only needs the outcome.
+  - **Greeting or emoji opener:** no "Hey", no 👋. Start with the mention, then the point.
+  - **Bold labels in lists:** plain list items, no `**Label:**` heads.
+  - **Code formatting on words people read:** an error message or a UI label goes in quotes ("id cannot be changed"); backticks are for code names and values.
+  - **A closing line that repeats:** drop a last sentence that restates the point or cites someone else's decision ("The PM said matching is fine, so no change here").
+
+  A real status reply to a lead, first as drafted and then as the user sent it:
+
+  Bad:
+  ```
+  2. Removing an item from the invoice only: no change, it matches the old editor. I tried each permission on its own. With "Edit non-price fields" on it works; with only the price permission, or none, it's blocked in both editors. The rule is in the backend, so nothing changes there.
+  ```
+
+  Good:
+  ```
+  2. Removing an item from the invoice only: no change, it matches the old editor.
+  ```
+
+  The same test steps stayed in the reply to QA, because QA checks them.
+- **A code example must make sense on its own.** Any new name it uses (a helper, a map, a hook) is either defined in the example or explained in one plain sentence: what it is, and whether it already exists or would be new (and where it could live). A reader who hits `inlineLinkTo(...)` with no definition can't tell if they missed an existing util or are meant to write one.
 - Plain words, no jargon. Concrete examples beat abstract principles. No press-release phrasing: "demonstrably", "a real fix", "worth shipping on its own", "well-scoped". Say "fixes the bug" or "this breaks when X".
 - No accusations or assumptions about the author's process. Describe the technical issue directly.
 - **No praise / emphasis openers when accepting feedback.** Drop "Good catch", "Good call", "Fair point", "Real bug", "Nice find". They read as performative agreement. State the action: "Switched both keys to `.filled` (...). Done in <sha>." If the change is non-obvious enough to warrant context, give it after the fact (one line, neutral) without leading with praise.
 - **Default to short replies. Long is fine when the situation calls for it.** When accepting feedback and the fix is straightforward, the ideal reply is one sentence: `Addressed in <sha>.` or `Done in <sha>.` Skip restating the suggestion or itemising what changed when the linked commit makes both obvious. Go long only when the reply needs to (a) explain a subtle tradeoff, (b) push back on the suggestion with technical reasoning, (c) clarify a non-obvious decision that lives in the commit. Brevity is the default; verbosity has to earn its place.
+- **Very polite and down to earth, always.** Write the way you'd talk to a teammate you like: warm, humble, plain. No phrasing that sounds like a ruling ("Declining", "Rejecting", "Not doing this", "I'd rather", "Keeping it as is"), even when the code stays the same. A friendly close ("if that's okay", "happy to change it if you'd prefer", a 🙂) is welcome where it fits.
 - **Politeness throughout, regardless of length.** Soft framing applies equally to one-line replies and multi-paragraph ones. "Addressed in <sha>" is polite; "Yep, fixed" is curt. Don't sacrifice tone for terseness.
 - No attribution footers ("Generated with Claude Code", thumbs reactions, etc.).
 - **Translation/locale findings must show a concrete before/after example, not just describe the rule.** A comment that says "this should be an ICU plural in the shared strings file" leaves the author guessing at the exact shape. Include the corrected key (with the full ICU plural value) and the updated call site, in fenced blocks. Mirror an existing key the codebase already has so the shape is unambiguous. See the worked example below.
@@ -75,12 +137,12 @@ In rough order of frequency for review findings:
 
 ```
 **suggestion:**
-The `current` and `destroyed` names don't tell me what they represent in this flow. Could we rename to `newRow` and `previouslyDeletedRow`? Makes the rest of the function easier to follow.
+It's hard to tell what `current` and `destroyed` are. Maybe `newRow` and `previouslyDeletedRow`? The rest of the function would be easier to follow.
 ```
 
 ````
 **suggestion (non-blocking):**
-A guard clause reads more cleanly than the ternary inside the map. Could we switch to:
+The ternary inside the map is hard to read. An early return is simpler here:
 
 ```tsx
 {rows.fields.map((field, index) => {
@@ -92,24 +154,24 @@ A guard clause reads more cleanly than the ternary inside the map. Could we swit
 
 ```
 **nitpick:**
-Worth a one-line comment noting that `update` has to run before `remove`, otherwise the destroyed-row index would shift.
+A one-line comment saying `update` has to run before `remove` would help, since the other order moves the deleted row's index.
 ```
 
 ```
 **chore:**
-"Initialize new row with the existing data" reads as if we copy data into the new row, but the code merges new-row data into the deleted slot. Could we tighten to: "There's a unique constraint on (parent_id, style_id); revive the soft-deleted row instead of inserting a duplicate."
+"Initialize new row with the existing data" reads as if we copy data into the new row, but the code puts the new row's data into the deleted one. Maybe: "There's a unique constraint on (parent_id, style_id); revive the soft-deleted row instead of inserting a duplicate."
 ```
 
 ```
 **question:**
-Is the `String() === String()` here defending against a case where one side comes in as a string from a form input? If yes, worth a comment naming that.
+Is the `String() === String()` here because one side can come in as a string from the form? If yes, a short comment saying so would help.
 ```
 
 Translation finding: always include the concrete key shape and call site (countable nouns are ICU plurals, even singular-only labels):
 
 ```
 **suggestion:**
-`widget` is a generic countable noun, so it belongs in the shared strings file as an ICU plural (same shape as the existing `gadget` entry) rather than a flat string in a feature file. Could we move it and read it with a count?
+`widget` is a common word, so it belongs in the shared strings file as a plural, like the `gadget` entry there.
 ```
 ```jsonc
 // shared.json
@@ -134,13 +196,13 @@ After producing the drafts and before showing them as "ready to post", paste a o
 
 ```
 **Post-draft audit:**
-1. <file:line> | length: <N sentences> | label on own line ✓ | no §X / no jargon / no press-release phrasing ✓ | no em dashes ✓ | soft framing ✓ | action-first ✓ | suggestion has a reason ✓/n-a | one topic ✓ | code earns its place + to repo conventions ✓/n-a
-2. <file:line> | length: <N sentences> | label on own line ✓ | no §X / no jargon / no press-release phrasing ✓ | no em dashes ✓ | soft framing ✓ | action-first ✓ | suggestion has a reason ✓/n-a | one topic ✓ | code earns its place + to repo conventions ✓/n-a
+1. <file:line> | length: <N sentences> | label on own line ✓ | no §X / no jargon / no press-release phrasing ✓ | no em dashes ✓ | polite, own voice ✓ | clear ask ✓ | suggestion has a reason ✓/n-a | one topic ✓ | simple words ✓ | worth posting ✓ | code earns its place, stands alone, to repo conventions ✓/n-a
+2. <file:line> | length: <N sentences> | label on own line ✓ | no §X / no jargon / no press-release phrasing ✓ | no em dashes ✓ | polite, own voice ✓ | clear ask ✓ | suggestion has a reason ✓/n-a | one topic ✓ | simple words ✓ | worth posting ✓ | code earns its place, stands alone, to repo conventions ✓/n-a
 Top-level body: none ✓ | or: says <the one thing no inline says> ✓
 …
 ```
 
-Any FAIL marks (length > 3 without justification, jargon citation, press-release phrasing, a top-level body that restates the inlines, em dashes, command-form opener without `Could we` / `Worth` / `Want to` softener, a `suggestion` with no reason, multi-topic, a snippet that would not pass this same review) mean rewrite *before* asking for the post signal, not after the user catches it.
+Any FAIL marks (length > 3 without justification, jargon citation, press-release phrasing, a top-level body that restates the inlines, em dashes, a bare command as the opener, two drafts that open or are built the same way (any stock phrase repeated), a `suggestion` with no reason, multi-topic, hard words or a sentence over about 25 words, a small nit that should have been left out, a snippet with an unexplained new name or one that would not pass this same review) mean rewrite *before* asking for the post signal, not after the user catches it.
 
 ## Top-level review body
 
@@ -227,6 +289,18 @@ Fixed in <sha>.
 2. What you did **differs** from what was asked, so the reviewer would be surprised by the diff.
 3. You **also changed something adjacent** the reviewer did not raise, so they know to look at it.
 
+**Declining stays warm.** When you are not making the change (exception 1), explain gently first, then say you'd like to keep it, and leave the door open. Don't lead with the decision.
+
+Bad, reads as a ruling:
+```
+I'd rather keep it, since the old version crashes when the record is missing.
+```
+
+Good, explains first and asks:
+```
+They look the same, but the old version still runs the second check when the record is missing, so it crashes. The spec covers that case, so I'll keep this one if that's okay 🙂
+```
+
 **Never earns a sentence:** restating the suggestion back (they wrote it, they know); explaining why the reviewer was right; citing precedent for a change they already asked for; listing what changed when the linked commit shows it; naming the call-site count or file list for a mechanical rename.
 
 Bad, three sentences where one would do:
@@ -250,6 +324,20 @@ Fixed in <sha>, now "X". Also fixed `otherKey` below it, which was in the wrong 
 ```
 
 Any reply over one sentence with `exception used: none` is a rewrite before you show it, not after the user asks you to shorten it.
+
+## The spec is closed
+
+What this file describes is the whole available surface. If a shape is not described here, it is not available, however reasonable it looks in the moment. Inventing one is not a creative improvement; it is an unreviewed change to a format the author and the user both rely on.
+
+Three real deviations, all invented mid-session, all caught by the user rather than by the post-draft audit (which checks tone and length, and so cannot see a fabricated surface):
+
+| Invented | What this file actually specifies |
+|----------|-----------------------------------|
+| A review-level summary `body` that restates the inline comments | "Top-level review body": none, unless it says something no inline says. |
+| A provider-specific `suggestion` fence so the author can apply a change in one click | Every code example here uses a plain fenced block. |
+| Raising a label after the user reacted strongly to the code | The Labels table decides; see the note under "Labels". |
+
+**A finding with no inline home does not justify a new surface.** When a finding belongs to a file outside the diff, it cannot be an inline comment. Fold it into the nearest inline comment that shares its topic, or leave it in chat for the user. Do not invent a container to hold it. (A note about the PR as a whole, such as "this should be split", is different: "Top-level review body" covers it.)
 
 ## Posting drafts: wait for an explicit, fresh signal
 
