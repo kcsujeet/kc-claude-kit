@@ -10,7 +10,6 @@ kc-claude-kit/
 ├── .github/workflows/ci.yml             # validate, rules sync, script tests; evals on demand
 ├── scripts/export-agent-skills.sh       # copy every skill into another tool's skills directory
 ├── docs/architecture.md                 # this file
-├── docs/review-conventions.md           # how a repo writes its .claude/review-conventions.md
 ├── CHANGELOG.md
 └── plugins/
     ├── conventions/

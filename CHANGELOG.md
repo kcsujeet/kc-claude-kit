@@ -31,6 +31,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Fixed
 
+- Removed links to `docs/review-conventions.md` from the README, `review-code`, `project-conventions-gate` and `docs/architecture.md`. The file was never committed; the README's own paragraph describes the `.claude/review-conventions.md` format.
 - The code-review eval suite could not load: its cases list `../../../conventions`, which sits outside the eval runner's containment root when the target is `plugins/code-review`. CI and the README now run it from the repo root with `--eval-dir plugins/code-review/evals`. Measured: all 3 code-review cases pass.
 - The README and the code-review 2.0.0 release notes now say that upgrading from 1.x needs `claude plugin install conventions@kc-claude-kit`, since `claude plugin update` does not install the new dependency.
 

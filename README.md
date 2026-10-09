@@ -187,7 +187,7 @@ A post only goes through when the same Bash command carries the approval token `
 
 ## Adding your repo's own rules
 
-If the repository under review has a `.claude/review-conventions.md`, it becomes an extra gate (`code-review:project-conventions-gate`). Use it for project-specific rules: data-layer patterns, UI-library rules, domain helpers, whatever the built-in topics do not know about. Write each rule as a checklist of failure modes with one canonical example path, so the gate can walk it box by box. [`docs/review-conventions.md`](docs/review-conventions.md) has the format guide and a worked example.
+If the repository under review has a `.claude/review-conventions.md`, it becomes an extra gate (`code-review:project-conventions-gate`). Use it for project-specific rules: data-layer patterns, UI-library rules, domain helpers, whatever the built-in topics do not know about. Write each rule as a checklist of failure modes with one canonical example path, so the gate can walk it box by box.
 
 On conflict, the repo's rule wins over a built-in convention: the review reports the built-in box as overridden, citing the repo rule, instead of failing it. The repo knows its own context; the kit only knows what is portable.
 
