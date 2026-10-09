@@ -22,6 +22,7 @@ Placement is covered by the `structure` skill, which defers to bulletproof-react
 - Do not reach for `useMemo` or `useCallback` by default when the project runs React Compiler. Write the plain value or function.
 - Without React Compiler, a `useMemo` or `useCallback` has to hit: empty dependencies mean a module constant, and a dependency that changes every render (an inline object, array or function) means the memo never does. Pass stable references to memoized children.
 - A block of markup past about thirty lines that reads as its own unit is a named component, and a wrapper element that only repeats its parent's styling is deleted.
+- On React 19 and later, `ref` is a plain prop. Do not add `forwardRef`, and never declare `ref` in the props of a component that is also wrapped in `forwardRef`.
 
 ## Data access
 
@@ -29,10 +30,17 @@ Placement is covered by the `structure` skill, which defers to bulletproof-react
 - The fetch lives with the actual consumer. A page does not duplicate a fetch its child already owns, especially with different params, and nothing fetches a whole list to derive one boolean.
 - After a write, patch the cache first, then update surgically, and invalidate only as a last resort.
 - Prefer `mutate` with callbacks over `mutateAsync` with `await` when the resolved value only drives a side effect.
+- A request's method matches its effect: a read uses GET unless its input cannot fit in a query string.
+- A cache patch or invalidation targets the narrowest key that shows the change.
+- A write hook touches only its own resource. Another resource's writes live in that resource's hook, and the caller composes the two.
+- A read hook wires up every option it accepts. Accepting an option and ignoring it is dead surface.
 
 ## Forms and state
 
 - The form is the single source of truth. No `useState` shadowing a value the form already holds.
+- A form-state hook returns form plumbing only (the methods, submit and discard, saving state). One field's fetching, watching and lookup state live in that field's component.
+- Each form watch lives in the smallest component that renders from it; a child reads shared form values itself rather than taking them as props.
+- A form that edits a record seeds the related record its inputs render from, not just the id.
 - Check the validation library's own API before hand-rolling a check, a regex, or a coercion. Most of them already exist there.
 - New state lives at the lowest common ancestor of its actual consumers, never lifted because a parent might want it later.
 - Two state updates whose order matters carry a one-line comment at the call site saying why.

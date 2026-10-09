@@ -18,6 +18,7 @@ kc-claude-kit/
     │   ├── skills/
     │   │   ├── <topic>/SKILL.md         # one topic = one file: Rules + Review checklist + Review detail
     │   │   ├── <topic>/scripts/*.sh     # that topic's deterministic sweeps
+    │   │   ├── <topic>/references/*.md  # Review detail moved out to keep SKILL.md under 500 lines
     │   │   └── init/SKILL.md            # copies the generated rules into a project
     │   ├── rules/                       # GENERATED from skills/<topic>/SKILL.md; never edit by hand
     │   │   └── working-agreement.md     # the one hand-written rule (no topic skill, always loaded)
@@ -67,7 +68,7 @@ A topic skill's body has these sections, in this order:
 
 1. `## Rules`: the authoring conventions. `scripts/build-rules.sh` copies this section, with the skill's `paths`, into `rules/<topic>.md`.
 2. `## Review checklist`: the `- [ ] §<id> ... (N/A: ...)` boxes a gate agent ticks. Absent for rules-only topics.
-3. `## Review detail`: the per-box sections, examples and evidence requirements.
+3. `## Review detail`: the per-box sections, examples and evidence requirements. When the skill nears 500 lines, a cluster of these sections moves to `references/<cluster>.md`, linked by its `${CLAUDE_PLUGIN_ROOT}` path; gates read it from there.
 4. `## Sweeps`: the bundled scripts, each run as `bash "${CLAUDE_PLUGIN_ROOT}/skills/<topic>/scripts/<name>.sh" <diff-file>`, printing one `file:line: text` hit per line and nothing else. A lookup, which takes a name or a key instead of a diff (`naming/scripts/name-collisions.sh`, `i18n/scripts/locale-duplicates.sh`), is listed there too and says so.
 
 Posting approval token: a GitHub write passes the code-review guard only when the same Bash command contains `KC_REVIEW_POST_APPROVED=1`, typed after the user's explicit post signal.

@@ -47,7 +47,7 @@ For §V2, list which trigger groups applied and cite each group's receipt, or it
 - [ ] §V2 Per-trigger receipt lines present for every trigger group the diff hits (list which groups applied, and cite each group's receipt). Each group has its own N/A condition, walked independently:
   - locale files touched → i18n per-key audit table present (N/A: no locale files in diff)
   - boolean logic added/edited → `grepped &&/||: N hits` with per-hit verdicts (N/A: no boolean chain added/edited)
-  - ternaries, casts, `any`, or non-null assertions added/edited → `grepped ternaries: N hits` / `grepped as-casts: N hits` / `grepped any: N hits` / `grepped non-null assertions: N hits` (N/A: none of the four added/edited)
+  - ternaries, casts, `any`, non-null assertions, or conditional spreads added/edited → `grepped ternaries: N hits` (each hit labelled single-line or MULTI-LINE) / `grepped as-casts: N hits` / `grepped any: N hits` / `grepped non-null assertions: N hits` / `grepped conditional spreads: N hits` (N/A: none of the five added/edited)
   - hooks/queries/mutations added/edited → named consumers per new hook, `mutateAsync` grep receipt (N/A: no hook/query/mutation added/edited)
   - state added/edited → lowest-common-ancestor placement stated, rationale comment confirmed for order-dependent mutations (N/A: no state added/edited)
   - dead wrappers kept anywhere in the diff → what each earns its place stated (N/A: no wrapper-shaped code in diff)
@@ -55,12 +55,13 @@ For §V2, list which trigger groups applied and cite each group's receipt, or it
   - test files touched or behavior changed → `grepped class assertions: N hits` / `grepped loose assertions: N hits` with per-hit verdicts, and the gated conditions named with the test covering each side (N/A: no test file touched and no behavior change)
   - exported APIs added → doc-comment box walked (N/A: no new exported API)
   - fixed-value discriminator added → enum boxes walked, call sites checked (N/A: no new discriminator type)
-  - self-review only → lint/typecheck receipt, full fan-out walked, commit/push/PR permission confirmed (N/A: this is a peer review of someone else's diff, not a self-review)
-- [ ] §V3 No aggregate receipts where enumeration is required: per-key table has one row per key (not a summary count), per-hit grep verdicts list every hit individually (not "N hits, all fine"), named-consumer citations name the actual file per hook (not "hooks have consumers"). (N/A: no trigger group in this diff requires enumerated evidence)
+  - self-review only → lint/typecheck receipt, fan-out run only on request or once before a PR, UI looked at rendered, commit/push/PR permission confirmed (N/A: this is a peer review of someone else's diff, not a self-review)
+- [ ] §V3 No aggregate or truncated receipts where enumeration is required: per-key table has one row per key (not a summary count), per-hit grep verdicts list every hit individually (not "N hits, all fine"), every sweep's hit count equals its verdict count (no `head`, "first N" or sampling), named-consumer citations name the actual file per hook (not "hooks have consumers"). (N/A: no trigger group in this diff requires enumerated evidence)
 - [ ] §V4 Every finding whose claim rests on the behavior of a library, platform, or external API cites the documentation fetched (or the installed source read) this session; a behavioral claim from memory FAILS. (N/A: no finding depends on external behavior)
 - [ ] §V5 On a re-review, a prior finding is marked fixed only when the construct is gone; a construct that was renamed, moved to another file, or re-wrapped is still open and is re-raised citing the prior comment. (N/A: first round, or no prior finding)
 - [ ] §V6 A finding the author defended as intentional is not marked resolved on the claim alone; when it concerns observable behavior or layout, the review cites a run, a visual check, or a concrete numeric walkthrough showing the intended result actually works. (N/A: no finding was defended)
 - [ ] §V7 The orchestrator's `SCOPE:` block is present and walks §G1-§G4 from the review-code skill's Step 1 one box at a time, each with evidence (the command run or the issue quoted) or its N/A reason; a missing block or a box with no evidence FAILS. (N/A: never; every review has a scope)
+- [ ] §V8 Fixes and rewrites were re-checked: on a re-review, code verified as fixed this round was walked against every gate's checklist like any new line (`<n> fixes re-checked`), and every rewrite a gate proposed in a finding passes every gate's checklist itself, not only the rule that surfaced it (`<n> rewrites checked`). (N/A: first round with no proposed rewrite)
 
 ---
 
@@ -88,11 +89,11 @@ Owning gate: **naming**. Required receipt: `grepped &&/||: N hits` stated explic
 
 N/A: the diff adds or edits no `&&`/`||` chain.
 
-### Ternaries, casts, `any`, or non-null assertions added or edited
+### Ternaries, casts, `any`, non-null assertions, or conditional spreads added or edited
 
-Owning gate: **clarity** (§C4, §C15, §C17). Required receipts: `grepped ternaries: N hits`, `grepped as-casts: N hits`, `grepped any: N hits`, and `grepped non-null assertions: N hits`, each stated explicitly with `0 hits` when true, each hit given its own verdict (kept as a simple ternary / flagged as nested-long-multiline / cast is redundant / cast asserts a type the value does not have / cast is genuinely narrowing an unknown). Separate grep lines are required: a combined "grepped ternaries and casts: N hits" collapses independent sweeps into one and loses which construct each hit belongs to.
+Owning gate: **clarity** (§C4, §C15, §C17, §C19). Required receipts: `grepped ternaries: N hits`, `grepped as-casts: N hits`, `grepped any: N hits`, `grepped non-null assertions: N hits`, and `grepped conditional spreads: N hits`, each stated explicitly with `0 hits` when true, each hit given its own verdict (kept as a simple ternary / flagged as nested-long-multiline / cast is redundant / cast asserts a type the value does not have / cast is genuinely narrowing an unknown / spread flagged or dismissed). Every ternary hit is labelled single-line or MULTI-LINE; an unlabelled ternary verdict fails this box. Separate grep lines are required: a combined "grepped ternaries and casts: N hits" collapses independent sweeps into one and loses which construct each hit belongs to.
 
-N/A: the diff adds or edits no ternary, no `as` cast, no `any`, and no non-null assertion.
+N/A: the diff adds or edits no ternary, no `as` cast, no `any`, no non-null assertion, and no conditional spread.
 
 ### Hooks, queries, or mutations added or edited
 
@@ -146,7 +147,8 @@ N/A: the diff adds no new fixed-value discriminator type.
 
 Applies only when the reviewing agent is also the diff's author, about to declare the work done. Required receipts:
 - The project's lint and typecheck commands (detected from its own `package.json` scripts, Makefile, or CI config, never assumed from a specific package manager or another project's convention) were run, with the exact command and pass/fail result cited.
-- The entire gate fan-out (naming, clarity, structure, simplicity, datetime, react, i18n, testing, correctness, project-conventions, this gate) was walked against my own diff before saying "done" / "ready" / "verified", not just lint and typecheck.
+- The gate fan-out ran only when it should: when the user asked for a review, or once before opening a PR for a big change, never after each fix. When it ran, every gate (naming, clarity, structure, simplicity, datetime, react, i18n, testing, correctness, project-conventions, this gate) was walked against my own diff, not just lint and typecheck.
+- UI changes were looked at rendered in a browser (the dev server, or the testing plugin's `verify-ui`), because a DOM emulator lays nothing out: label and value hierarchy, wrapping, truncation, overflow, and sticky or scroll behavior. A screen that replaces an existing one is compared side by side with it. When it could not be rendered, the report says so. (N/A for this item: the diff changes no UI.)
 - If the diff was committed, pushed, or turned into a PR, the user explicitly used one of those words. "Make the changes" or "implement this" is not permission to commit, push, or open a PR.
 
 N/A: this is a peer review of someone else's diff, not a self-review.
@@ -157,6 +159,7 @@ Several of the groups above have a built-in trap: an aggregate summary reads as 
 
 - **Per-key i18n table**: one row per new key is mandatory evidence. `"checked 7 keys, all unique"` is not the table; it hides a generic noun in the wrong file or a missing ICU plural that only shows up when each key is walked individually.
 - **Per-hit grep verdicts** (`&&`/`||`, ternaries, `as`-casts): `"grepped 3 &&/|| chains, all fine"` is not three verdicts; it hides the one non-obvious operand that needed its own name.
+- **Truncated sweeps**: a hit list piped through `head`, cut to the "first N", or abandoned at the first find. A sweep's hit count must equal its verdict count; the unread hits are where the misses are.
 - **Per-consumer hook citations**: `"all new hooks have consumers"` is not a citation; it hides the one hook whose sole consumer sits two folders away and should have been co-located instead.
 - **Per-chain / per-export / per-call-site walks** (switch/if-else-if, exported APIs, enum call sites): a single pass/fail line covering "all chains" or "all exports" collapses distinct constructs that can fail independently.
 
@@ -180,6 +183,10 @@ When the author replies that a flagged change was deliberate (in the description
 
 The orchestrator walks §G1-§G4 in the review-code skill's Step 1 itself, because they concern the target as a whole rather than one topic. This box confirms the `SCOPE:` block exists and has per-box evidence: the author's other open PRs from `scope-facts.sh` for stacking, the title set against the diff's areas, the linked issue quoted (or "no linked issue"), the diff size and how it was read. A scope check reported as "scope fine" with no per-box line fails, the same as an aggregated receipt under §V3.
 
+## §V8. Fixes and rewrites are re-checked
+
+Code you verify as a fix is new code. On a re-review, a replacement that resolves the original finding while adding a multi-line ternary, a dead wrapper or a misplaced export is a finding of its own, and quoting it approvingly without walking it is a documented miss. Likewise, a rewrite a gate proposes must pass every gate's checklist, not only the box that surfaced the problem. Receipt: `<n> fixes re-checked` and `<n> rewrites checked`, each with the gates walked.
+
 ---
 
 ## How to use this in the output
@@ -196,7 +203,7 @@ Example (generic file names):
   - shared.json:L14: `total` = "Total" | namespace: ok (shared), plural: n/a (label), dupe: none, naming: matches value
   - widgets.json:L9: `widgetCount` = "Widgets" | namespace: FLAG generic noun → shared.json, plural: FLAG baked-plural → ICU, dupe: none, naming: matches value
 - Boolean logic: grepped &&/||: 2 hits: widget-form.tsx:L41 extracted to `canSubmitWidget`, widget-list.tsx:L18 flagged (raw `status === 'A' || status === 'B'` left inline).
-- Ternaries/casts: grepped ternaries: 0 hits. grepped as-casts: 1 hit: widget-actions.ts:L22 redundant `as Widget`, flagged.
+- Ternaries/casts/spreads: grepped ternaries: 1 hit: widget-list.tsx:L12 single-line, both branches short, kept. grepped as-casts: 1 hit: widget-actions.ts:L22 redundant `as Widget`, flagged. grepped conditional spreads: 0 hits.
 - Hooks/queries/mutations: n/a, diff does not touch data-fetching hooks.
 - State: n/a, diff does not add or edit component state.
 - Dead wrappers: widget-actions.ts:L30 `const submitWidget = (data) => mutate(data)` kept, earns its place, narrows `unknown` payload to `WidgetInput`.
@@ -204,7 +211,8 @@ Example (generic file names):
 - Tests: grepped class assertions: 0 hits. grepped loose assertions: 1 hit, widget-list.test.tsx:L30 `toBeGreaterThan(0)` on a known count of 3, flagged. Gate `isFilterOpen`: widget-list.test.tsx:L41 (met), :L55 (not met).
 - Exported APIs: n/a, diff adds no new export.
 - Fixed-value discriminator: n/a, diff adds no new discriminator type.
-- Self-review: lint (`npm run lint`) pass, typecheck (`npm run typecheck`) pass; full gate fan-out walked before this report; no commit/push/PR performed, none requested.
+- Self-review: lint (`npm run lint`) pass, typecheck (`npm run typecheck`) pass; fan-out run because the user asked for a review; widget list checked rendered at 375 and 1024 px, no wrapping or overflow; no commit/push/PR performed, none requested.
+- Fixes and rewrites: 2 fixes re-checked (all gates); 1 rewrite checked (all gates).
 ```
 
 A skipped group means it was not verified; that is a gate FAIL, not a shorter report. An aggregated group where enumeration is required is the same failure as a missing one: it looks complete and isn't.

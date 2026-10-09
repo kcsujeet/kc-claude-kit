@@ -1,6 +1,6 @@
 ---
 name: structure
-description: "Code placement and module-shape conventions for TypeScript, JavaScript and other source files: one responsibility per unit, co-location and promotion, flattened single-file folders, no barrels, no dead wrappers, lookup objects over switch and nested if, named exports, JSDoc on exports, string enums for serialized discriminators, breaking changes, misplaced modules, and public exports. Use when writing or reviewing code that adds, moves or exports a file, function, hook or type, or that branches on a discriminator."
+description: "Code placement and module-shape conventions for TypeScript, JavaScript and other source files: one responsibility per unit, co-location and promotion, flattened single-file folders, no barrels, no dead wrappers, lookup objects over switch and nested if, named exports, JSDoc on exports, string enums for serialized discriminators, breaking changes, misplaced modules, public exports, what a module exports, one component per file, and routes-only `app/` folders. Use when writing or reviewing code that adds, moves or exports a file, function, hook or type, or that branches on a discriminator."
 user-invocable: false
 paths:
   - "**/*.{ts,tsx,js,jsx,mjs,cjs,rb,py,swift,go,java,kt,php,cs,rs}"
@@ -19,12 +19,12 @@ paths:
   - §S4. No dead wrappers
   - §S5. Lookup objects over switch/nested if
   - §S6. Code placement, general
-  - §S7. JSDoc on exported APIs
-  - §S8. Named exports for new modules
+  - §S7, §S8, §S10, §S12, §S13. Exports and public API (in `references/exports.md`)
   - §S9. Fixed-value discriminators: string enums, not literal unions
-  - §S10. Breaking changes are named, whatever the description says
   - §S11. Misplaced-modules sweep
-  - §S12. Do not widen a public API to share an internal
+  - §S14. New code acts on its home's subject
+  - §S15. One exported component per file
+  - §S16. `app/` holds routes only
 - Sweeps
 
 ## Rules
@@ -36,7 +36,10 @@ Where code lives is part of its contract. A path promises something about what i
 - Flatten a folder that holds one file. `Foo/Foo.tsx` with no siblings is just `Foo.tsx`.
 - No barrel re-export files. Import the module path directly, which also keeps tree shaking working. A barrel for a single component is fine.
 - Named exports on new files, declared inline (`export const foo = ...`), not collected in a trailing export block.
-- Delete dead wrappers in every shape: async-await passthrough, destructure-and-reconstruct, single-use alias, identity transform, a Promise wrapped around a Promise.
+- Delete dead wrappers in every shape: async-await passthrough, destructure-and-reconstruct, single-use alias, identity transform, a Promise wrapped around a Promise, a hook returning another hook's values unchanged, a wrapper whose only addition is an `onSuccess` every caller could pass itself.
+- A module exports the thing it is named for plus its own surface (its props, argument and return types). An unrelated export, such as a domain enum in a hook file, moves to where its consumers are; a type only this module uses stays.
+- New code acts on its home's subject. A method added to the order module creates, reads or changes orders; one that only prices a cart belongs with the cart.
+- One exported component per file. Its hooks and helpers move to their own files, and a subcomponent with one consumer stays private in that consumer's file.
 - A lookup object beats a `switch` or an `if` chain that maps a key to a value. Use thunks when the branches need per-branch work.
 - Exported APIs carry a short doc comment saying what they are for, not restating the signature.
 - Do not widen a package's public exports so a sibling package can reach an internal. Move the shared piece to a shared layer both consume.
@@ -52,6 +55,7 @@ Where anything above appears to disagree with it, that document wins and this fi
 - Shared code lives at the app level: `components/`, `hooks/`, `utils/`, `types/`, `stores/`, `lib/`, `config/`.
 - No cross-feature imports. Two features that need the same thing compose at the app level, or the shared thing moves up.
 - Dependencies flow one way: shared can be used anywhere, features import only from shared, the app imports from both.
+- `app/` is the routing layer: route files, their tests and route-level actions, plus the app's own entry, provider and router. Components, hooks and utils go to the shared folders or a feature, never beside a route.
 - Its guidance on barrel files matches the rule above: barrels were once recommended per feature and no longer are, because they break tree shaking. Import files directly.
 
 Apply this to a repo that already uses a feature-based layout or is migrating to one. In a legacy flat layout, do not demand a migration as a side effect of unrelated work; just avoid making the existing structure more inconsistent than it already is.
@@ -65,7 +69,7 @@ The structure gate agent ticks every box below against the diff. A box is FAIL i
 - [ ] §S1 Separation of concerns: each unit (function, hook, component, module) has one observable responsibility; no data-reading unit also bundles a selector, formatter, or mutation; no util silently performs a side effect. (N/A: no multi-responsibility unit added)
 - [ ] §S2 Co-location/promotion: single-consumer code stays next to its consumer; multi-consumer code sits at the consumers' nearest common ancestor judged by scope/coupling, not raw count; view-local helpers are promoted only when a real external consumer appears (YAGNI-gated), not on speculation; inherently-shared-layer code is placed in its shared layer from day one regardless of current consumer count. (N/A: no files moved/added)
 - [ ] §S3 Single-file folders are flattened; no `export { default } from './X'` re-export barrels. (N/A: no folders/barrels touched)
-- [ ] §S4 No dead wrappers: single-item array wrap-then-spread, no-op async passthroughs, argument destructure-and-reconstruct passthroughs, single-use const aliases, verbatim object-spread, a producer value the consumer independently re-derives, promise-wrapping-a-promise, manual await-then-callback when the callee already accepts a callback. (N/A: none added)
+- [ ] §S4 No dead wrappers: single-item array wrap-then-spread, no-op async passthroughs, argument destructure-and-reconstruct passthroughs, single-use const aliases, verbatim object-spread, a producer value the consumer independently re-derives, promise-wrapping-a-promise, manual await-then-callback when the callee already accepts a callback, a hook or function returning an inner call's values unchanged (**enumerate**: for every changed hook, list the keys it returns and the keys it takes from inner hook calls; a key in both lists, untouched, is a passthrough), a wrapper whose only addition is an `onSuccess` or similar callback every caller could pass itself. (N/A: none added)
 - [ ] §S5 Lookup objects over `switch`/nested `if`: branch-selecting-a-value uses a named map, not a switch or if/else-if chain; differing per-branch computation is handled with a thunk map, not treated as an exemption; a trailing default/else becomes the map's fallback; more than one level of `if` nesting is flattened; the branch key, if derived from multiple booleans, is built from named single-level intermediates, never a chained ternary; a fix for one violation here doesn't introduce another (e.g. replacing the map with an if-early-return helper); map entries are plain values unless a value closes over a per-call argument or must be lazy, and the map is typed so its fallback is justified; every `switch`, `else if`, and value IIFE in the added lines (`switch-else-if-iife.sh`), and every nested `if` the indentation scan reports (`nested-ifs.sh`), is enumerated with a verdict. (N/A: only when both sweeps return 0 hits, stated as `grepped switch/else-if/IIFE: 0 hits` and `nested-if scan: 0 hits`)
 - [ ] §S6 Helpers placed by consumer count: a helper with exactly one consumer is not pulled into its own subfolder; a helper with two or more consumers is not left stranded in one consumer's local folder. (N/A: no helper added)
 - [ ] §S7 JSDoc on every new exported function, hook, component, and props/type interface, unless the name is fully self-explanatory; no JSDoc that merely restates the name. (N/A: no new exported API, or target repo doesn't use doc comments — confirm by grep before marking N/A)
@@ -74,10 +78,14 @@ The structure gate agent ticks every box below against the diff. A box is FAIL i
 - [ ] §S10 Breaking changes are named: a removed or renamed export, a changed prop or parameter shape on a shared component or exported function, and a field removed from (or made required on) an exported type are each identified as breaking, every importer is grepped and cited, and the finding stands even when the PR description says the change is not breaking. (N/A: no exported symbol, shared component signature, or exported type changed)
 - [ ] §S11 No context, hook, or pure helper in a components folder: the misplaced-modules sweep (`misplaced-modules.sh`) ran over every changed AND untracked file, and each hit (a `createContext(` module, a hook file, a non-component module under a components folder) has a verdict naming its type-correct destination. (N/A: only when the sweep returns 0 hits, stated as `misplaced-modules sweep: 0 hits`)
 - [ ] §S12 No package's public exports are widened only so a sibling package can reuse an internal: when a new export on a package's public entry point exists for another package in the same repo to import an implementation detail, the shared piece moves to a shared package or layer instead. (N/A: no new public-entry export consumed by another package in the repo)
+- [ ] §S13 A module exports what it is named for: for every changed module (hooks, components, utils, constants, types, api modules), every export gets a verdict of `own-surface` (the named thing plus its props, argument and return types, or a one-off local constant) or `misplaced` (a domain enum or wire value in a hook file, a pure helper in a types file, a domain type in a utils file). Only `misplaced` is a finding, and it names the destination by §S2. A locally used type or constant flagged only for living in the file is itself a FAIL, so each verdict states the scope test's answer. **Enumerate**: list every export per changed module. (N/A: no export added or changed)
+- [ ] §S14 New code belongs where it is put: for every new member (a method on a module, a hook, a type, a constant, a file), the name of its home and the members already there were read, and the new code acts on that same subject. Code that only borrows the home's inputs or helpers without acting on its subject FAILS, and the finding names where it belongs. Matching a backend route that is itself misplaced is not a pass; flag both. (N/A: no new member added)
+- [ ] §S15 One exported component per file: no new or changed component file exports more than one component (**enumerate**: count the exported components in every changed component file, one verdict per file with its count). Its other exports (hooks, helpers, shared style constants) move out to their own files, placed by §S2 and §S11, a subcomponent with one consumer stays private in that consumer's file, and no new file only wraps one value or element. (N/A: no changed file exports a component)
+- [ ] §S16 `app/` holds routes only: every new file under the routing layer (`app/`, or the repo's equivalent) is a route file the framework reads by name, a test for one, a route-level action, or the app's own entry, provider or router; a component, hook, util or constant there FAILS, even beside existing ones, since precedent is not an exemption. **Enumerate**: list every new file under it with a verdict. (N/A: no new file under the routing layer)
 
 ## Review detail
 
-Code-placement and API-shape rules for the diff under review. Covers twelve independent failure modes: mixed responsibilities inside one unit, wrong-layer co-location, leftover single-file folders and re-export barrels, dead wrappers, branch-selection that should be a lookup, misplaced helpers, missing JSDoc on exported APIs, default exports on new files, literal unions standing in for serialized enums, unflagged breaking changes to a public API, modules sitting in a folder that promises a different kind of module, and public exports widened only to share an internal.
+Code-placement and API-shape rules for the diff under review. Covers sixteen independent failure modes: mixed responsibilities inside one unit, wrong-layer co-location, leftover single-file folders and re-export barrels, dead wrappers, branch-selection that should be a lookup, misplaced helpers, missing JSDoc on exported APIs, default exports on new files, literal unions standing in for serialized enums, unflagged breaking changes to a public API, modules sitting in a folder that promises a different kind of module, public exports widened only to share an internal, exports unrelated to their module, new code placed in a home whose subject it does not act on, files exporting several components, and non-route files in the routing layer.
 
 ### §S1. Separation of concerns
 
@@ -135,7 +143,7 @@ New code should follow the target repo's existing layout — grep for where simi
 
 ### §S4. No dead wrappers
 
-If a wrapper adds no semantic value over the thing it wraps, drop it and use the wrapped value directly. Wrappers earn their place by adding a transformation, a type narrowing, a side effect, a default, or documentation that the wrapped thing cannot provide on its own. If you cannot name what the wrapper adds, it is dead.
+If a wrapper adds no semantic value over the thing it wraps, drop it and use the wrapped value directly. Wrappers earn their place by adding a transformation, a type narrowing, a side effect, a default, or documentation that the wrapped thing cannot provide on its own. A side effect every caller could attach itself (an `onSuccess` callback) does not count. If you cannot name what the wrapper adds, it is dead.
 
 This rule is **absolute** and applies to functions, variables, arrays, objects, hooks, components — anything. Distinct shapes of the same mistake recur across a single PR; catch all of them independently, don't stop at the first.
 
@@ -216,6 +224,28 @@ This rule is **absolute** and applies to functions, variables, arrays, objects, 
   return runAsync(input, { onSuccess })
   ```
   (Library-flavored example: a mutation hook that already accepts an `onSuccess` option in its call signature — awaiting the async variant and manually invoking the callback afterward is the same dead wrapper.)
+
+- **A hook or function that returns an inner call's values unchanged:**
+  ```ts
+  // Bad: three keys come straight from useWidgetQuery and are returned untouched
+  const { widget, isLoading, refetch } = useWidgetQuery(widgetId)
+  return { widget, isLoading, refetch, total: getWidgetTotal(widget) }
+
+  // Good: the consumer calls useWidgetQuery itself, or the hook spreads it
+  const widgetQuery = useWidgetQuery(widgetId)
+  return { ...widgetQuery, total: getWidgetTotal(widgetQuery.widget) }
+  ```
+  Re-listing the keys by hand is what lets the surface drift: a key stops being read and nothing says so. The same goes for a value read from a context or settings hook and returned unchanged; the consumer can call that hook too. Enumerate it: per changed hook, the keys returned against the keys taken from inner calls.
+
+- **A wrapper whose only addition is a callback every caller could pass:**
+  ```ts
+  // Bad: each method is `updateWidgetMutation.mutate(widget, { onSuccess: refreshList })`
+  const { updateWidget } = useWidgetListActions()
+
+  // Good: the call site passes the callback
+  updateWidgetMutation.mutate(widget, { onSuccess: refreshList })
+  ```
+  The callback is a side effect, but attaching one is something every caller can already do, so a wrapper that exists only for it is dead.
 
 **Legitimate wrappers (do NOT flag):**
 
@@ -308,80 +338,9 @@ Match the conventions already established in the directory the PR is touching:
 - Side-effect calls (state updates, removals, setters) defined inside render JSX or inline map/filter callbacks usually want to live in a handler defined above the return, or inside the relevant hook.
 - Helpers used in only one consumer live next to it; helpers used across consumers belong in a shared location matching the target repo's existing shared-code layout.
 
-### §S7. JSDoc on exported APIs
+### §S7, §S8, §S10, §S12, §S13. Exports and public API
 
-Exported APIs carry doc comments so a consumer reading at the call site can hover and see what the thing does, what its parameters mean, and what it returns, without opening the source. Internal helpers used in only one file generally don't need it. Before flagging density on this box, grep the target repo to confirm it actually uses doc comments as a convention — don't impose the rule on a repo that doesn't.
-
-**Where doc comments are expected:**
-- Exported utility functions in shared helper locations.
-- Exported custom hooks, whether shared or feature-scoped.
-- Exported components, especially shared ones used across features.
-- Exported types and props interfaces, particularly when the type name doesn't fully describe the shape.
-
-**Standard tags:** parameter descriptions with type, return description, a component/type marker where the language convention supports one. Keep descriptions concise — one or two lines beats a paragraph.
-
-**What to flag:**
-- A new exported function, hook, or component with no doc comment at all.
-- A new exported props/type interface where the field names aren't self-explanatory and there's no per-field description.
-- A doc comment that just restates the function name (`/** Get the user. */` above `getUser()`) — the restates-the-name flag applies everywhere, regardless of what kind of unit it's on. Either deepen it or drop it.
-
-**What NOT to flag:**
-- Internal helpers (not exported, used in one file).
-- Trivially-named exports where the name fully describes the behavior (`isProduction`, `EMPTY_ARRAY`).
-- Existing files that already lack doc comments, if the PR isn't adding new exports there — retroactive additions are out of scope for a feature PR.
-
-### §S8. Named exports for new modules
-
-New files should use `export const Foo = …` / `export function foo` over `export default`. Existing `export default` declarations are fine — don't churn old code just for style. Framework-mandated default exports (route/page/layout files and any similar convention where the framework specifically reads `default`) are exempt; flag those as the only allowed defaults.
-
-**Why named over default:**
-
-1. **Refactor safety.** Renaming a named export forces every import site to update (a type error at each call site). Default imports invent a local name at every call site, so renaming the source doesn't propagate — different files end up with different local names pointing at the same value.
-2. **Find-references in IDEs.** "Find all usages" works cleanly on a named export across the whole repo; on a default export, the search has to match arbitrary local names callers invented, which it can't.
-3. **Auto-import.** Editors surface named exports cleanly with their canonical name; default exports either don't auto-suggest or suggest whatever name the editor inferred from the filename, which decays as files get renamed.
-4. **Explicit API surface.** `export { Foo, fooHelper }` reads as a deliberate public contract. A default plus a stray named export muddles which is "the" thing in the file.
-5. **Tree-shaking.** Named exports compose better with bundler dead-code elimination, which matters most for shared packages consumed by multiple apps.
-
-**What to flag:**
-- A new component / hook / util that exports `default` instead of a named const.
-- A new app-level hook using `export default` because its siblings in the same folder are all default-export. Sibling defaults are exactly the "looks like conformance" trap this rule overrides — "the existing hooks here are default" is not a valid reason to keep the new one default. Flag it at the same weight as a new component.
-- A default export in a file that already has named exports of related helpers (mixed signal — make all named).
-
-**What NOT to flag:**
-- Framework route files (page/layout/loading/error/not-found equivalents) that require `export default` by convention.
-- Existing default exports on files not being substantively edited in this PR.
-- Existing default-plus-named mixed files in a legacy area the PR isn't touching.
-
-**Unnecessary exports.** A new `export` on a constant, type, or helper that nothing outside its own file actually imports is a finding independent of named-vs-default: an export advertises an API contract to the rest of the codebase, and a contract nothing has taken up yet is speculative surface area (the YAGNI lens applies here too). Grep the target repo for the identifier before flagging — confirm zero external importers, cite the `0 hits` grep result, then drop the `export` keyword. Internal-only reuse within the same file never needs it.
-
-**One-line counter-example:**
-
-Bad — new component file:
-```ts
-const Foo = (props: FooProps) => <div />
-export default Foo
-```
-
-Good:
-```ts
-export const Foo = (props: FooProps) => <div />
-```
-
-The diff is one line, and from then on `Foo` is `Foo` everywhere.
-
-**§S8.1 — inline `export const`, not a trailing `export { Foo }` block.** Even when the export is already named, prefer attaching `export` to the declaration over declaring `const Foo = …` then re-exporting it at the bottom of the file with `export { Foo }`. Both are named exports; the inline form keeps the export adjacent to the declaration instead of a redundant statement the reader has to scroll to find. A trailing `export { … }` block earns its place only when re-exporting from elsewhere or intentionally grouping several already-declared names together.
-
-```ts
-// Flag: declaration and export split across the file
-const Foo = (props: FooProps) => <div />
-// ...
-export { Foo }
-
-// Better: export on the declaration
-export const Foo = (props: FooProps) => <div />
-```
-
-This is a nitpick-severity consistency item, not an §S8 failure (the export is already named). Flag it when a new file uses the trailing form, especially when several new sibling files all do.
+The detail for these five boxes (doc comments on exports, named and unnecessary exports, breaking changes, public exports widened for a sibling package, and what a module exports) is in `${CLAUDE_PLUGIN_ROOT}/skills/structure/references/exports.md`. Read it in full before grading any of them.
 
 ### §S9. Fixed-value discriminators: string enums, not literal unions
 
@@ -427,27 +386,38 @@ Reasons:
 - One-off literal unions where the value space is genuinely local UI state (variant strings like `'minimal' | 'full'`, a UI-library prop union, drawer sizes). Apply the backend-value test above.
 - Pre-existing literal unions the PR doesn't substantively edit. Adding a member to an existing union is acceptable; introducing a brand-new union for a serialized value is not.
 
-### §S10. Breaking changes are named, whatever the description says
-
-A change to a public or shared API can break a caller the diff never shows. Walk every changed export, shared component signature, and exported type, and treat these as breaking:
-
-- An export removed or renamed.
-- A prop or parameter removed, renamed, retyped, or reordered on a shared component or exported function.
-- A field removed from an exported type, or an optional field made required. Consumers who construct the type as a literal stop compiling, even though the library itself always passes the value.
-
-For each, grep the target repo for importers and cite the count and paths. When the package is published, the importers you can grep are not all of them; say so in the finding. The finding stands even when the PR description says "no breaking changes" or "internal only": the description is a claim, and the signature is the evidence. The usual remedy is the non-breaking shape (keep the field optional with a default, keep the old export as a deprecated alias) unless the break is intended, in which case the finding asks for it to be stated and versioned.
-
 ### §S11. Misplaced-modules sweep
 
 §S1 says the directory is part of the contract. This box enforces it mechanically for the most common miss: a context, hook, or pure helper created inside a components folder because that is where the author was working. Run it over every changed file AND every untracked file, since a newly created misplaced file is the usual case and is not in `git diff` until it is added: the `misplaced-modules.sh` sweep (see Sweeps) does both when run from the repo root. It reports a `createContext(` call under a components folder (belongs with contexts or stores), a hook file there (belongs with hooks), and a non-component `.ts`/`.js` module there (likely a util, type, or context).
 
 If the target repo's layout uses other folder names or extensions (grep where its contexts, hooks, and utils already live), adapt the checks and run them by hand as well. Every hit is a candidate: open the file, confirm what it exports, and name the destination the repo already uses for that kind of module. Print `misplaced-modules sweep: N hits`, with `0 hits` stated explicitly.
 
-### §S12. Do not widen a public API to share an internal
+### §S14. New code acts on its home's subject
 
-In a repo with several packages, the tempting fix for "package B needs a helper that lives inside package A" is to export it from A's public entry point. That turns an implementation detail into a public contract A now has to keep, and couples B to A's internals. When a new export on a package's public entry exists for a sibling package to import (grep the sibling's imports to confirm), the shared piece belongs in a shared package or layer that both consume.
+A home (a module, a resource, a folder, a file) is named for one subject, and its members act on it. Before accepting a new member, read the home's name and the members already there, and confirm the new code acts on that same thing. Code that only borrows the home's inputs or helpers belongs elsewhere: a `previewTotals` method added to the order module that creates no order and only prices a cart belongs with the cart. Following the backend's route is not a pass: if the route is misplaced too, flag both.
 
-This is distinct from §S8's unnecessary exports: there, nothing imports the new export; here, something does, and the question is whether it should be importing it from there. Do not flag an export that is part of the package's intended public API for its real consumers; flag the one that exists only to let a sibling reach inside.
+### §S15. One exported component per file
+
+A component file that exports several components (or exports cells, hooks and style constants so another component can reuse them) is the usual result of a refactor, not of a new file. Split it by kind, the way the repo already places each kind:
+
+- each exported component gets its own file, named after it; the files can share a folder named after the parent component (`widget-table/widget-table.tsx`, `widget-table/widget-table-head.tsx`), imported by path with no barrel (§S3);
+- hooks and helpers move out of the component file into their own files, placed by §S2 and §S11;
+- a subcomponent with a single consumer stays private in that consumer's file;
+- no thin file: a component that only wraps one value or element is inlined where it is used.
+
+### §S16. `app/` holds routes only
+
+In a bulletproof-react layout, `app/` is the routing layer: route files the framework reads by name (`page`, `layout`, `route` and equivalents), their tests, route-level actions, and the app's entry, provider and router. Routes compose pieces from the shared folders and `features/`. A component or hook placed beside a page is not reachable by URL, so nothing breaks, but the route folder quietly becomes a feature folder nothing else can reuse from:
+
+```
+app/widgets/
+  page.tsx                 // fine: the route
+  page.test.tsx            // fine: the route's test
+  widget-cards.tsx         // FAIL: a component; belongs in features/widgets/components/
+  use-widget-summary.ts    // FAIL: a hook; belongs in features/widgets/hooks/
+```
+
+A new file added beside legacy helpers that already sit there still fails: moving the old ones is out of scope, but the new one starts outside `app/`.
 
 ## Sweeps
 

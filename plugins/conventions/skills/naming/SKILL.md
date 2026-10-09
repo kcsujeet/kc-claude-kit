@@ -1,6 +1,6 @@
 ---
 name: naming
-description: "Naming conventions for identifiers and file names in TypeScript, JavaScript, Ruby, Python, Swift, Go, Java, Kotlin, PHP, C# and Rust source files: role-not-type names, verb-led function names, named boolean operands, honest names, names unambiguous at the use site, and file names unique without their path. Use when writing or reviewing code that adds or renames a variable, function, boolean, parameter, export or file, or when choosing a name."
+description: "Naming conventions for identifiers and file names in TypeScript, JavaScript, Ruby, Python, Swift, Go, Java, Kotlin, PHP, C# and Rust source files: role-not-type names, verb-led function names, named boolean operands, honest names, names unambiguous at the use site and honest about their kind and owner, repeated domain checks, and file names unique without their path and consistent with their siblings. Use when writing or reviewing code that adds or renames a variable, function, boolean, parameter, export or file, or when choosing a name."
 user-invocable: false
 paths:
   - "**/*.{ts,tsx,js,jsx,mjs,cjs,rb,py,swift,go,java,kt,php,cs,rs}"
@@ -15,11 +15,14 @@ paths:
 - Review detail
   - §N1. Names should describe the *role*, not the *type*
   - §N2. Inline boolean chains: evaluate the operands, not just the outer name
-  - §N3. The same predicate repeated in 2+ places gets a named helper
+  - §N3. A repeated domain check gets a named `isX` from its owner
   - §N4. Names must be honest about what the thing does
   - §N5. A name has to be unambiguous where it is READ, not where it is declared
   - §N6. Functions start with a verb
   - §N7. A file name identifies the file without its path
+  - §N8. A new file follows its siblings
+  - §N9. A name says what kind of thing it is and what it belongs to
+  - §N10. Parts of one unit keep its prefix and end with their kind
   - §N2 evidence requirement: enumerate boolean chains by grep, do not eyeball
 - Sweeps
 
@@ -33,10 +36,13 @@ A name is read far more often than it is written, and a wrong one survives refac
 - Booleans read as assertions: `isSyncing`, `hasBalance`, `canEdit`, `shouldRetry`.
 - A name must read as a true sentence about what it holds. Watch for the four common lies: the subject elided (`items` in a file about invoices), the context borrowed as subject (`total` that is really `taxTotal`), the name left stale after a refactor, and a familiar shape hiding different behaviour (`useQuery` that mutates).
 - A boolean chain with two or more non-obvious operands (raw comparisons, enum equality, negations, optional field access) gets **each** operand extracted to its own named boolean. Naming the whole chain does not count: `const canSubmit = a && b > 0 && c !== Locked` still leaves three unnamed conditions for the reader to decode.
-- A name must be unambiguous **where it is read**, not where it is declared. Beside the declaration the surrounding lines supply the subject for free; at the use site they do not. A bare generic verb or noun that names the mechanism rather than the subject (`check`, `run`, `wrap`, `guard`, `handle`) is wrong even when it is accurate, and so is any name that collides with an unrelated declaration elsewhere. Applies to locals as much as exports; distance and collision are what matter, not module boundaries.
-- A repeated predicate becomes a named helper or type guard. Twice is the threshold.
+- A name must be unambiguous **where it is read**, not where it is declared. Beside the declaration the surrounding lines supply the subject for free; at the use site they do not. A bare generic verb or noun that names the mechanism rather than the subject (`check`, `run`, `wrap`, `guard`, `handle`) is wrong even when it is accurate, and so is a boolean prefix on a bare state word (`isOn`, `isOpen`, `hasData`: on what? open what?), and any name that collides with an unrelated declaration elsewhere. Applies to locals as much as exports; distance and collision are what matter, not module boundaries.
+- A domain check that combines fields or hides a rule (`widget.provider === Provider.A && !widget.disconnectedAt`) and appears 3 or more times in the repo becomes a named `isX` from the module that owns the data. One field compared to one enum value (`status === Status.DONE`) already reads as the question, so it stays inline at any count.
+- A name says, at the import site with no folder path, what kind of thing it is (a data hook, a form-state hook, a component, a util, a constant) and what it belongs to. A hook that only fills one form's fields does not read like a data hook.
+- Parts of one unit keep its prefix and end with their kind: the parts of `WidgetPanel` are `WidgetPanelSyncSection` and `WidgetPanelRow`, not `WidgetPanelSync` (reads like a second panel) or `WidgetSyncSection` (loses the family).
 - Match the language's own casing: `snake_case` columns and plural tables in SQL, `UpperCamelCase` types with the file named after the type, `kebab-case` plural nouns in routes.
 - A file name identifies the file without its path. Tabs, search results and stack traces show it bare, so `header.tsx` deep in a feature folder is `widget-list-header.tsx`, and no two files share a basename unless the framework requires it.
+- Before naming a new file, look at 2-3 existing files of the same kind and follow their naming pattern and location. Sibling precedent never excuses a generic or colliding basename: the subject still goes in the name.
 
 Detection criteria and per-box review failure modes live in the `## Review checklist` of the `naming` skill (`conventions:naming`), with the detail under its `## Review detail`. These rules are the statement of the convention; that checklist is how a diff gets graded against it.
 
@@ -46,15 +52,18 @@ The naming gate agent ticks every box against the diff. A box is FAIL if any mat
 
 - [ ] §N1 Role-not-type names: new variables/functions describe the role, not the type (no `data`/`result`/`value`/`temp`/`item`/`obj` for behavior-bearing values); function names describe the effect, not just the trigger. (N/A: no new identifiers)
 - [ ] §N2 Inline boolean chains — evaluate the OPERANDS, not just the outer name: any `&&`/`||` chain with 2+ non-obvious operands (raw comparisons, enum (in)equalities, negations, `?.` field access) has EACH non-obvious operand extracted to its own named boolean. Assigning the whole chain to a named boolean does NOT satisfy this. A parenthesized sub-expression in a mixed `&&`/`||` chain (e.g. `(a || b) && c`) also gets its own name — parentheses alone don't pass. Enumerate with the `and-or-chains.sh` sweep, do not eyeball. (N/A: only when `and-or-chains.sh` returns 0 hits, stated as `grepped &&/||: 0 hits`)
-- [ ] §N3 Cross-call-site predicate: the same predicate repeated in 2+ places is extracted to a named helper (type guard when narrowing helps). (N/A: no repeated predicate)
+- [ ] §N3 Repeated domain check: an expression that answers a domain question by combining fields or hiding a rule the line does not show, and that appears 3+ times in the repo counting the diff's copy, is a named `isX` (a type guard when narrowing helps) returned by the hook or util that owns the data, and the diff uses it instead of adding another copy. One field compared to one enum value (`status === Status.DONE`) and a plain mechanic (a `find` by id) are exempt at any count, and proposing an `isX` for one is itself a miss (simplicity §P11). **Enumerate**: list each domain check the diff adds with its repo-wide count. (N/A: no domain check added)
 - [ ] §N4 Honest names: each new name reads as a sentence that matches the actual behavior/subject — no surface-word gluing, no subject elision, no context-as-subject, no stale-after-refactor names, no familiar-shaped name hiding a different behavior or constraint. (N/A: no new names)
-- [ ] §N5 Unambiguous where READ, not where declared: every new identifier (local, destructured value, parameter, closure, returned key, export) is qualified enough to read at its use site without scrolling back to the declaration. A bare generic verb/noun naming the mechanism rather than the subject (`check`, `run`, `wrap`, `guard`, `handle`, `process`, `filter`, `format`, `validate`, and any other single word of that shape) FAILS even though it is accurate, and a collision with an unrelated declaration elsewhere FAILS on its own. Enumerate with the `bare-word-declarations.sh` sweep, do not eyeball. (N/A: only when the diff adds no identifiers, stated as `grepped bare-word declarations: 0 hits`)
+- [ ] §N5 Unambiguous where READ, not where declared: every new identifier (local, destructured value, parameter, closure, returned key, export) is qualified enough to read at its use site without scrolling back to the declaration. A bare generic verb/noun naming the mechanism rather than the subject (`check`, `run`, `wrap`, `guard`, `handle`, `process`, `filter`, `format`, `validate`, and any other single word of that shape) FAILS even though it is accurate, and so does a boolean prefix on a bare state word (`isOn`, `isOpen`, `isActive`, `isValid`, `hasData`), and a collision with an unrelated declaration elsewhere FAILS on its own. Enumerate with the `bare-word-declarations.sh` sweep, do not eyeball. (N/A: only when the diff adds no identifiers, stated as `grepped bare-word declarations: 0 hits`)
 - [ ] §N6 Verb-led functions: every new function (declaration, arrow-function const, or object method) starts with a verb that says what calling it does: predicates `is`/`has`/`can`/`should`, value getters `get`/`to`, mutators and handlers `set`/`toggle`/`handle`. A noun-phrase name (`sameOwner`, `itemLabel`, `widgetKey`) reads like a value, not a callable, and FAILS. PascalCase components and `use*` hooks are exempt. Enumerate with the `unverbed-functions.sh` sweep, do not eyeball. (N/A: only when `unverbed-functions.sh` returns 0 hits, stated as `grepped unverbed functions: 0 hits`)
 - [ ] §N7 Unique file names: every new file name identifies the file without its path, since tabs, search results, and stack traces show it bare. A basename that already exists elsewhere in the repo FAILS, and so does a generic one (`header.tsx`, `helpers.ts`) deep in a folder whose path carries the only meaning. Framework-mandated names (`index`, `page`, `layout`, `route` and equivalents) are exempt, and a test file is judged by its unit's name. Check collisions with the `file-name-collisions.sh` sweep. (N/A: no new files in diff)
+- [ ] §N8 Sibling comparison recorded: for every new file, the evidence names 2-3 existing files of the same kind (a hook, a component, a types file, a test) and the new file follows their naming pattern (casing, suffix, how the subject is carried) and sits where files of its kind sit, or the evidence says why it cannot. A new file with no named siblings FAILS by default. Siblings with generic basenames do not excuse §N7. (N/A: no new file)
+- [ ] §N9 Kind and owner read at the import site: every new or renamed export, read with no folder path, lets a reader guess both what kind of thing it is (data hook, form-state hook, component, util, constant, type) and what it belongs to (which form, table, feature). A wrong guess on either FAILS: a hook that only fills one form's fields named like a data hook, a co-located hook carrying the name of a shared data layer, a one-table helper named like an app-wide util. **Enumerate**: every new or renamed export gets a verdict. (N/A: no new or renamed export)
+- [ ] §N10 Parts of one unit keep its prefix AND end with their kind: sibling pieces of `WidgetPanel` are `WidgetPanelSyncSection`, `WidgetPanelRow`. Keeping the prefix but dropping the kind (`WidgetPanelSync`) FAILS, and so does keeping the kind but dropping the prefix (`WidgetSyncSection`). (N/A: no new file or export in a family of sibling parts)
 
 ## Review detail
 
-Identifier-naming rules for the diff under review. Covers seven independent failure modes: type-shaped names on behavior-bearing values, undecoded inline boolean chains, repeated predicates that should be a shared helper, names that are dishonest about what the code actually does, names that only read well beside their declaration, noun-phrase names on functions, and file names that need their path to mean anything.
+Identifier-naming rules for the diff under review. Covers ten independent failure modes: type-shaped names on behavior-bearing values, undecoded inline boolean chains, repeated domain checks that should be a named `isX`, names that are dishonest about what the code actually does, names that only read well beside their declaration, noun-phrase names on functions, file names that need their path to mean anything, new files that ignore their siblings, names that hide their kind or owner, and family parts that drop their prefix or kind.
 
 ### §N1. Names should describe the *role*, not the *type*
 
@@ -157,11 +166,13 @@ const hasElevatedRole = isAdmin || isOwner
 const canShow = hasElevatedRole && hasAccess
 ```
 
-### §N3. The same predicate repeated in 2+ places gets a named helper
+### §N3. A repeated domain check gets a named `isX` from its owner
 
-When the same predicate appears in 2+ places, extract it to a named function — not just a local boolean. A local `const isX = ...` only names it for one scope; a duplicate elsewhere creates a drift risk (one site updates, the other doesn't). The same applies to JSX `&&` chains, `catch` blocks, derived selectors, and hook bodies. Use a type guard (`(x: unknown): x is T => ...`) when narrowing is useful at the call site.
+A domain check answers a question about some data (is this record locked, is this account on a given provider, is this error a conflict) by combining fields or applying a rule the line does not show. When the same check appears 3+ times in the repo, counting the diff's copy, the hook or util that owns the data returns it as a named `isX`, and the diff uses that instead of adding a copy. Grep the repo for the expression and state the count. A local `const isX = ...` only names it for one scope; copies elsewhere drift (one site updates, the other doesn't). The same applies to JSX `&&` chains, `catch` blocks, derived selectors, and hook bodies. Use a type guard (`(x: unknown): x is T => ...`) when narrowing is useful at the call site.
 
-Bad — the same predicate in a derived boolean and a catch block, drift-prone:
+**Exempt at any count:** one field compared to one enum value (`status === Status.DONE`), which already reads as the domain question, and a plain mechanic (a `find` by id). Proposing an `isX` for either is a miss (simplicity §P11). Below 3 copies, extracting a check that carries knowledge is welcome, not required.
+
+Illustration, the same check in a derived boolean and a catch block (drift-prone once a third copy lands):
 
 ```ts
 const isConflictError =
@@ -239,6 +250,7 @@ Walk each box independently; failing one is a finding:
 - [ ] It is read far from where it is declared: a different function, a template branch, a nested callback, another file.
 - [ ] Another declaration of the same bare identifier exists elsewhere in the repo for an unrelated purpose.
 - [ ] Sibling identifiers at the use site are built from the same word (`fooWrapped`, `wrappedFoo`, `wrapper`), so this one no longer stands out.
+- [ ] It is a boolean prefix plus a bare state word (`isOn`, `isOpen`, `isActive`, `isValid`, `hasData`). The prefix only says "this is a boolean"; the reader still asks "what is on?". Name the subject: `isPanelOpen`, `isFeatureEnabled`, `hasSavedDraft`. `disabled={isPending || (!isOn && isLocked)}` makes the reader stop; `disabled={isPending || (!isFeatureEnabled && !canEnableFeature)}` reads on its own.
 
 Bad — accurate, and useless where it is used:
 ```ts
@@ -256,7 +268,7 @@ const checkRetentionPolicy = <A extends unknown[], R>(action: (...args: A) => R)
 const handleArchive = checkRetentionPolicy(() => archive(id))
 ```
 
-**Enumerate by grep, do not eyeball.** Genericness and collisions are both mechanical. Run the `bare-word-declarations.sh` sweep (see Sweeps) to list every new declaration over the diff's added lines, pick out each one whose name is a single bare word, then list that name's whole-word hits across the repo's tracked files:
+**Enumerate by grep, do not eyeball.** Genericness and collisions are both mechanical. Run the `bare-word-declarations.sh` sweep (see Sweeps) to list every new declaration over the diff's added lines, pick out each one whose name is a single bare word, or `is`/`has`/`can` plus one bare word, then list that name's whole-word hits across the repo's tracked files:
 
 ```bash
 bash "${CLAUDE_PLUGIN_ROOT}/skills/naming/scripts/name-collisions.sh" <name> [<repo-root>]
@@ -314,6 +326,34 @@ A file's name is what shows in an editor tab, a search result, a stack trace, an
 **Check mechanically.** Run the `file-name-collisions.sh` sweep (see Sweeps) from the repo root. For each file the diff adds (including untracked files on a local branch), it counts basename matches across the repo and prints the new files whose basename another file already has.
 
 Every printed file is a collision. A new file it does not print still gets the generic-name read. One line per new file in the evidence, stated as `checked new file names: N files, M collisions`.
+
+### §N8. A new file follows its siblings
+
+Before naming and placing a new file, look at 2-3 existing files of the same kind (a hook, a component, a types file, a test) and follow them: the same casing, the same suffix, the same way of carrying the subject, the same kind of folder. Name the siblings in the evidence; precedent is the test, so "looks reasonable" is not a comparison. When the new file cannot sit where its siblings sit, the evidence says why.
+
+Precedent never overrides §N7. If the siblings are `header.tsx` and `helpers.ts` deep in a feature folder, the new file still carries its subject in its name (`widget-list-filters.ts`); follow what the siblings do well (casing, suffix, folder), not the generic basename. Placement follows the structure skill, so a sibling in the wrong layer is not precedent either.
+
+### §N9. A name says what kind of thing it is and what it belongs to
+
+A name is read at its import site, usually with no folder path. There it must not suggest a different kind of unit, or a wider or different owner, than the real one. Illustrations, not a boundary:
+
+- A hook that only reads or writes one form's fields, named like a data hook: `useTypedPrice` beside `useWidgets` and `usePrices` reads as something that fetches prices.
+- A hook co-located with one component, named like the shared data layer (`useWidgetActions` sitting in a component folder reads as the app's widget actions hook).
+- A helper used by one table, named like an app-wide util; a cell component named like a page; a constant scoped to one feature named like a global setting.
+
+```ts
+// Flag: beside useWidgets and usePrices this reads like a data hook that fetches prices
+export const useTypedPrice = () => { /* fills whichever price field the user types in */ }
+
+// Prefer: the name says it belongs to the widget form and what it handles there
+export const useWidgetFormTypedPrice = () => { /* ... */ }
+```
+
+For each new or renamed export, ask: from the name alone, would a reader guess both the kind and the owner correctly? A wrong guess on either fails.
+
+### §N10. Parts of one unit keep its prefix and end with their kind
+
+The parts of a `WidgetPanel` named `WidgetPanelSummary`, `WidgetPanelSync` and `WidgetPanelSettings` share the right prefix, but with no kind, `WidgetPanelSync` reads like a separate panel for syncing. `WidgetPanelSyncSection` says what it is. Renaming them to `WidgetSyncSection` swaps one problem for another: the kind is back, but nothing ties the file to its panel. Keep both halves, so each name reads right on its own at the import site.
 
 ### §N2 evidence requirement: enumerate boolean chains by grep, do not eyeball
 
