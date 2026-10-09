@@ -19,6 +19,7 @@ paths:
   - §T4. Repeated setup becomes a local helper
   - §T5. A test sits beside its unit
   - §T6. Exact assertions when the value is known
+  - §T7. A submit is tested per state, by its request body
 - Sweeps
 
 ## Rules
@@ -36,6 +37,7 @@ The loop is not a formality at the end. A change is not done until it is green.
 - Setup repeated across tests becomes a local helper (`renderWidget(overrides?)`, `makeItem(id)`), not copy-paste.
 - Cover the unhappy paths deliberately: the empty collection, the expired token, the duplicate submit, the interrupted write. The happy path is the one that already works.
 - When a bug is fixed, the regression test comes with it in the same change, and it must fail without the fix.
+- A form or request that saves user input is tested for every state that behaves differently (at least clearing a saved value), asserting the request body that goes out, not only that the save succeeded.
 
 Detection criteria and per-box review failure modes live in the `## Review checklist` of the `testing` skill (`conventions:testing`), with the detail under its `## Review detail`. These rules are the statement of the convention; that checklist is how a diff gets graded against it.
 
@@ -49,10 +51,11 @@ The testing gate agent ticks every box against the diff. A box is FAIL if any ma
 - [ ] §T4 Setup repeated across 2+ tests (the same render-plus-provider boilerplate, fixture literals, or datetime construction) is a local helper, not copy-paste. (N/A: no repeated setup in the diff's tests)
 - [ ] §T5 A new or moved test sits beside the unit it covers and is named after it. (N/A: no test file added or moved)
 - [ ] §T6 Assertions are exact when the value is known (`toBe(3)`, `toEqual([0, 25, 50])`), not bounds or truthiness that a wrong value also satisfies (`toBeGreaterThan(0)`, `toBeTruthy()`, `toBeDefined()`). A tolerance is fine where the value is genuinely inexact (floating point, measured geometry), stated as `toBeCloseTo`. **Enumerate with the `loose-assertions.sh` sweep** (see below). (N/A: only when `loose-assertions.sh` returns 0 hits, stated as `grepped loose assertions: 0 hits`)
+- [ ] §T7 A submit is tested per state: each form or request that saves user input has a test for every field state that behaves differently (at least clearing a saved value; see correctness §B5), and each test asserts the request body sent, not only the success path. (N/A: the diff adds or changes no submit of user input)
 
 ## Review detail
 
-Test rules for the diff under review. Covers six independent failure modes: behavior shipped without a test, class names asserted as a proxy for behavior, a gate tested from one side only, setup copied between tests instead of named once, a test placed away from its unit, and bounds asserted where the exact value is known.
+Test rules for the diff under review. Covers seven independent failure modes: behavior shipped without a test, class names asserted as a proxy for behavior, a gate tested from one side only, setup copied between tests instead of named once, a test placed away from its unit, bounds asserted where the exact value is known, and a submit tested only on its happy path.
 
 ### §T1. New behavior has a test
 
@@ -148,6 +151,20 @@ A tolerance is correct where the value is genuinely inexact (floating point, geo
 **Enumerate by grep, do not eyeball.** Run the `loose-assertions.sh` sweep (see Sweeps) over the diff's added test lines.
 
 The script knows Jest, Vitest and Bun matcher names. If the target repo's test framework names its matchers differently, run the equivalent pattern by hand as well, and state which script or pattern was used. One line per hit with a verdict, and the count. `0 hits` is printed explicitly.
+
+### §T7. A submit is tested per state, by its request body
+
+A save that works when every field is filled in can still break when one is cleared: the field drops out of the payload, or arrives as `''` and fails validation (correctness §B5). For each form or request that saves user input, submit once per field state that behaves differently, at least once after clearing a saved value, and assert the body that went out (from the test's request mock or the recorded call), not only the success message.
+
+```ts
+// Flag: only the happy path, and only the outcome
+await submitWidgetForm({ note: 'Fragile' })
+expect(screen.getByText('Saved')).toBeVisible()
+
+// Prefer: the cleared state too, asserting what was sent
+await submitWidgetForm({ note: '' })
+expect(lastRequestBody()).toEqual({ name: 'Widget A', note: null })
+```
 
 ## Sweeps
 

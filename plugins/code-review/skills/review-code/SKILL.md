@@ -28,6 +28,9 @@ The correctness gate hunts bugs on every diff. The other gates catch what slips 
 - **No em dashes (U+2014) in any output.** Not in the chat report, verdict blocks, drafted comments or replies. Use a period, comma, colon or parentheses instead.
 - **A pre-existing problem is flagged at most once, and only when it intersects the change.** Code the diff did not touch is not the author's to fix in this PR. When an untouched line interacts with a changed one (the change calls into it, extends it, or depends on its behavior), raise it once, briefly, marked as pre-existing; otherwise leave it out. A violation the diff copies or moves is not pre-existing: it is the diff's own (see "Matches the existing pattern" below).
 - **Read the actual changed code yourself** with the `Read` tool, after fetching the diff. Gate verdicts are a starting point: the specific issues live in specific lines and you need to see them to call them out usefully.
+- **A gate finding is a lead, not a fact. Verify every one before it reaches the user.** Gates apply a real rule to the wrong line, cite a file that does not hold what they claim, miscount, or assert behavior nobody ran. Before a finding enters the report, tick all four: (a) re-read the cited `file:line` at the head SHA and confirm it holds what the finding says; (b) when the finding names several files, check each one, not only the first; (c) when it asserts behavior, measure it rather than relaying the gate's reasoning; (d) confirm the measurement ran against the real module, not a global test mock or stub. A finding failing any box is dropped and listed on the report's `Dropped:` line with a one-clause reason, never omitted silently. The same bar applies to a finding you produced yourself.
+- **A sweep is complete or it did not happen.** Every hit a sweep prints gets its own `file:line` verdict. Never pipe a sweep through `head` or `tail`, take the "first N", sample, or stop reading at the first find: the hit count must equal the verdict count. A sampled sweep fails its box exactly like a sweep never run, because the line nobody read is where the miss is.
+- **Any fix proposed must itself pass every rule, of every gate.** Before a suggested rewrite goes into a finding (yours or a gate's), walk it against all the checklists, not only the rule that surfaced it. A replacement that still holds a multi-line ternary, a conditional spread, a hand-rolled helper or a subject-less name like `isOn` is worse than no suggestion, because it launders the violation as the reviewer's own recommendation.
 - **Cite line numbers, file paths, and head SHA** for every finding. Vague feedback is useless.
 - **Locale diffs require a per-key audit table, never an aggregate grep, never your memory.** This is enforced by the i18n gate agent: if the diff touches translation/locale files, that agent must produce a per-key audit table (one row per new key, checking namespace placement, pluralization, naming, and duplication; see the `conventions:i18n` skill's §I1) as its evidence, and a missing/incomplete table is a gate FAIL. You may NOT write any locale verdict, including "no new keys", "no issues this round", or silently dropping i18n from the checklist, without the table. An aggregate report ("greped N keys, all unique") is an automatic incomplete review: a direct-duplicate grep alone cannot catch a generic noun that belongs in a shared strings file, a singular-only label that should be a plural-aware key, or a key whose name doesn't match its own value. "It matches the neighbors" / "low-value" / "no new keys" are the three rationalizations that have caused this miss; none of them is valid without the table.
 
@@ -116,8 +119,9 @@ Each agent must:
    FINDINGS:
    - <severity 🔴|🟠|🟡> <file>:<line>: <issue>. <fix>
    ```
-5. Failure semantics: a box is **FAIL** if ANY matching construct in the diff violates it; the gate STATUS is **FAIL** if ANY box is FAIL. Do not average, do not "mostly pass".
+5. Failure semantics: a box is **FAIL** if ANY matching construct in the diff violates it; a sweep whose hit count differs from its verdict count is FAIL too (never truncated or sampled); the gate STATUS is **FAIL** if ANY box is FAIL. Do not average, do not "mostly pass".
 6. Drop a finding it cannot confirm, never a confirmed one, and write no em dash (U+2014) in the block.
+7. Walk every fix it proposes against every gate's checklist, not only its own, before writing it into a finding.
 
 A verdict that does not have this shape, or that has a box with no evidence, is rejected: send it back to the same agent for the per-box `BOXES:` breakdown before aggregating.
 
@@ -130,7 +134,7 @@ A verdict that does not have this shape, or that has a box with no evidence, is 
 - Emit the gate-status table first, then the deduped findings, then the explicit `PASSED`/`FAILED` verdict (see Output format).
 - On a re-review, run Steps 1-4 again in full, and fold in the author's replies to your prior comments (Step 1): mark each carried-over item as fixed (verify the whole class), declined-with-reason (surface it, don't re-post over their reply), or still-open. Report the new verdict; do not carry forward a prior round's PASS.
 
-**Self-review trigger:** when *I* am the one implementing changes (not reviewing a teammate's PR), the same gate fan-out applies before I declare work "complete" / "verified" / "ready for review". Lint and types passing is not the same as gate-clean. For a small self-review I may run the gates inline rather than spawning agents, invoking each `conventions:<topic>` skill and walking its `## Review checklist`, but every gate's checklist must still be walked box-by-box and reach a PASS before I call the work done.
+**Self-review trigger:** when *I* am the one implementing changes (not reviewing a teammate's PR), the gate fan-out runs in two cases only: when the user asks for a review, or once when a big piece of work is finished and a PR is about to be opened. It does not run after each fix or for small changes; the fan-out costs too much time and too many tokens for that. When it runs, lint and types passing is not the same as gate-clean, and every gate's checklist is walked box by box to a PASS. Separately, UI work is looked at rendered in a browser before I call it done (see the verification gate's self-review group), since tests lay nothing out.
 
 **"Matches the existing pattern" is a yellow flag, not a green light.** A gate agent must not pass a box because the diff copied the shape of nearby code. If the surrounding pattern violates the rule, the new code that extends it violates it too. Every copied block, every matched helper, every duplicated key style is evaluated against the rule on its own; nearby precedent is not the evaluation.
 
@@ -185,6 +189,9 @@ Report directly in chat. No file output. **Be terse.** The reader is the user, n
 - Always: <files read at sha, findings cite file:line + sha, nothing posted to GitHub>.
 - Scope: <§G1-§G4 results, e.g. "not stacked (author has no other open PR); title matches; no linked issue; diff read whole">.
 - <trigger group>: <receipt, or "n/a, diff does not touch X">.
+- Integrity: <n> fixes re-checked; <n> rewrites checked; <n> findings, <n> verified, <n> dropped.
+
+**Dropped:** (only when a finding failed the lead-not-fact check) `<file>:L<n>` <finding>: <one-clause reason>. One entry per dropped finding.
 
 **Fallbacks:** (only when a gate ran as a `general-purpose` agent) <gate>: `code-review:<gate>` unavailable, ran as general-purpose with `conventions:<topic>`.
 
@@ -265,7 +272,7 @@ This skill is in active iteration. When the user gives feedback ("you missed X",
 
 5. Keep `SKILL.md` lean. If a section grows beyond a few paragraphs, move it to the agent or topic skill that owns it and replace it with a one-line summary plus pointer.
 
-6. **Hard cap: every `SKILL.md` and agent file stays under 500 lines.** When a topic skill crosses that line, split its `## Review detail` into a sibling file in that skill's directory, linked directly from the section it replaces. Do not let a single file become a kitchen sink.
+6. **Hard cap: every `SKILL.md` and agent file stays under 500 lines.** When a topic skill crosses that line, move a cluster of its `## Review detail` into `skills/<topic>/references/<cluster>.md`, linked from the section it replaces by its `${CLAUDE_PLUGIN_ROOT}/skills/<topic>/references/<cluster>.md` path so a gate can read it (examples: `clarity/references/ternaries.md`, `react/references/forms.md`). Keep `## Rules`, `## Review checklist` and `## Sweeps` in `SKILL.md`: `build-rules.sh` reads only `## Rules`, and gates tick only the checklist. Do not let a single file become a kitchen sink.
 
 7. **Splits group by topic, not by physical proximity.** When the 500-line cap forces a split, factor out a *cluster of related rules*, not a single section, and not a grab-bag of whatever happened to be adjacent. A rule that applies broadly to "any unit of code" or "anywhere in the codebase" belongs in the general topic it was already in, not in a narrower one, just because it sat next to that topic's rules in the source.
 

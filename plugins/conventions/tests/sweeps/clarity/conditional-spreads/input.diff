@@ -1,0 +1,29 @@
+diff --git a/src/widget-request.ts b/src/widget-request.ts
+new file mode 100644
+index 0000000..1111111
+--- /dev/null
++++ b/src/widget-request.ts
+@@ -0,0 +1,13 @@
++const body = { name, ...(note ? { note } : {}) }
++const params = { ...base, ...(isArchived && { archived: true }) }
++const extra = hasOwner && { owner }
++const options = isPaged ? { page, perPage } : {}
++const rows = [...(showTotal ? [totalRow] : [])]
++const widgets = [...(await loadWidgets())]
++const merged = { ...base, ...extra }
++const isReady = isLoaded && hasItems
++const payload = { name, note: note || undefined }
++const label = isOn ? 'On' : 'Off'
++const equal = a === b
++const handler = () => onSave(widget)
++const editProps = mode === Mode.EDIT && { onEdit }
+diff --git a/src/widget-panel.tsx b/src/widget-panel.tsx
+index 2222222..3333333 100644
+--- a/src/widget-panel.tsx
++++ b/src/widget-panel.tsx
+@@ -4,3 +4,4 @@ export const WidgetPanel = () => {
+   return (
+-    <Widget {...props} />
++    <Widget {...props} {...(isEditable && { onEdit })} />
++    <Widget onEdit={isEditable ? onEdit : undefined} />
+   )
