@@ -256,7 +256,7 @@ This skill is in active iteration. When the user gives feedback ("you missed X",
    - PR scope, stacking, linked issues, reading large diffs → the scope checks in this `SKILL.md` (Step 1)
    - PR comment format, label, tone, posting protocol → `plugins/code-review/skills/post-review/SKILL.md`
    - Workflow change, output format change, hard rule → this `SKILL.md`
-   - Feedback that is specific to one target repo, not a general rule → suggest the user add it to that repo's own `.claude/review-conventions.md` (format: `docs/review-conventions.md` in the kit) instead of any file in this kit.
+   - Feedback that is specific to one target repo, not a general rule → suggest the user add it to that repo's own `.claude/review-conventions.md` instead of any file in this kit.
 
    A topic skill's `## Rules` section is copied into `plugins/conventions/rules/<topic>.md` by `scripts/build-rules.sh`; never edit `rules/` by hand. After changing a `## Rules` section, run `bash plugins/conventions/scripts/build-rules.sh` to regenerate, and `--check` to confirm.
 
