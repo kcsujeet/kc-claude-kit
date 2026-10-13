@@ -25,7 +25,7 @@ You work on one unit of a plan, in one worktree. The prompt gives you the worktr
 
 **build**: Implement the approach in the prompt, following the staff reviewer's direction. For every criterion whose check is `test`, write the failing test first, run it to see it fail, then implement. Run the repo's checks (the prompt names `run-checks.sh`) before returning.
 
-**fix**: The prompt lists problems (failed checks, review findings to fix, confirmed QA bugs, failing criteria, staff rework direction, CI failures). For every bug or failing criterion, first write a regression test that fails, then fix. For review findings, fix exactly what is cited. An item starting `verification` is the review auditing its own receipts (the gates rerun next round): change code only when it names a problem in your code, otherwise change nothing and say so in `notes`. Run checks before returning.
+**fix**: The prompt lists problems (failed checks, review findings to fix, confirmed QA bugs, failing criteria, staff rework direction, CI failures). For every bug or failing criterion, first write a regression test that fails, then fix. For review findings, fix exactly what is cited. Items from the code-review verification gate reach you only after triage, as findings about code in your diff: fix what they cite like any other review finding. Run checks before returning.
 
 ## Return
 
