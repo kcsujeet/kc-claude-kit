@@ -14,6 +14,10 @@ export const meta = {
 const A = args
 const CFG = A.config
 const LIMITS = CFG.limits
+// Review rounds in which minor findings still cost an engineer fix round. After them, each fix
+// adds new code for the gates to nit, so a large unit would never run dry; minor findings are
+// listed in the PR instead.
+const MINOR_FIX_ROUNDS = 2
 const WORKERS = CFG.models.workers
 const STAFF = CFG.models.staff
 const SCRIPTS = `${A.plugin_root}/scripts`
@@ -189,7 +193,7 @@ async function runUnit(unit, baseBranch, progress, parentPr) {
   await engineer('build', `Approach: ${JSON.stringify(decision.approach)}\nStaff direction: ${decision.direction}`)
 
   let pending = null
-  let reviewLog = { fixed: [], dismissed: [] }
+  let reviewLog = { fixed: [], dismissed: [], deferred_minor: [] }
   // Every earlier fix and dismissal, so later rounds do not reverse them without a new scenario.
   const history = []
   const qaLog = Object.fromEntries(personas.map(p => [p.name, { persona: p.name, confirmed: [], evidence: [] }]))
@@ -216,6 +220,7 @@ async function runUnit(unit, baseBranch, progress, parentPr) {
 
     const review = await reviewStage({ ...ctx, history, reviewRound: progress.rounds + 1 })
     reviewReceipts = review.receipts
+    reviewLog.deferred_minor = (review.deferred || []).map(f => `${f.location} ${f.scenario}`)
     reviewLog.fixed.push(...review.fix.map(f => f.finding))
     reviewLog.dismissed.push(...review.dismiss)
     history.push(...review.fix.map(f => ({ round: progress.rounds + 1, decision: 'fixed', finding: f.finding, reason: f.reason })),
@@ -276,8 +281,8 @@ function contractResults(unit, checked) {
 }
 
 // ---------- review: code-review gates + lenses, skeptics, triage ----------
-// Returns {fix, dismiss, receipts}: triage's verdict on every gate FAIL and
-// surviving lens finding, plus the review's incomplete receipts.
+// Returns {fix, dismiss, receipts, deferred}: triage's verdict on every gate FAIL and
+// surviving lens finding, the review's incomplete receipts, and minor findings deferred to the PR.
 async function reviewStage({ unit, tag, worktree, baseBranch, state, context, call, note, retryOnce, history, reviewRound }) {
   const earlier = history.length
     ? `Earlier review decisions (do not re-raise or reverse one unless you give a new concrete scenario it did not consider): ${JSON.stringify(history)}`
@@ -314,11 +319,16 @@ async function reviewStage({ unit, tag, worktree, baseBranch, state, context, ca
   const judged = await settle(lensFindings.filter(serious).map(f => () => survives(f)))
   const kept = [...judged.filter(Boolean), ...lensFindings.filter(f => !serious(f))]
   const receipts = gateResult.receiptsIncomplete
-  if (!gateResult.fails.length && !kept.length) return { fix: [], dismiss: [], receipts }
+  const deferMinor = reviewRound > MINOR_FIX_ROUNDS
+  const minor = f => f.severity === 'minor'
+  const deferred = deferMinor ? [...gateResult.fails, ...kept].filter(minor) : []
+  const fails = deferMinor ? gateResult.fails.filter(f => !minor(f)) : gateResult.fails
+  const toTriage = deferMinor ? kept.filter(f => !minor(f)) : kept
+  if (!fails.length && !toTriage.length) return { fix: [], dismiss: [], receipts, deferred }
 
-  const triage = await call(`Triage these findings for ${worktree}.\n${planSpecs(unit)}\nGate FAILs: ${JSON.stringify(gateResult.fails)}\nLens findings: ${JSON.stringify(kept)}${gateResult.fails.some(f => f.lens === 'verification') ? '\nItems with lens "verification" cite code in this diff: never dismiss one as a format or citation issue.' : ''}${earlier && `\n${earlier}\nDismiss an item that only reverses an earlier decision, with reason "reverses round N decision without new scenario" (N from that decision).`}`,
+  const triage = await call(`Triage these findings for ${worktree}.\n${planSpecs(unit)}\nGate FAILs: ${JSON.stringify(fails)}\nLens findings: ${JSON.stringify(toTriage)}${fails.some(f => f.lens === 'verification') ? '\nItems with lens "verification" cite code in this diff: never dismiss one as a format or citation issue.' : ''}${earlier && `\n${earlier}\nDismiss an item that only reverses an earlier decision, with reason "reverses round N decision without new scenario" (N from that decision).`}`,
     { agentType: 'autopilot:triage', model: WORKERS, schema: TRIAGE, label: `${tag} triage`, phase: 'Review' })
-  return { ...(triage || { fix: [...gateResult.fails, ...kept].map(f => ({ finding: `${f.location} ${f.scenario}`, reason: 'triage returned nothing' })), dismiss: [] }), receipts }
+  return { ...(triage || { fix: [...fails, ...toTriage].map(f => ({ finding: `${f.location} ${f.scenario}`, reason: 'triage returned nothing' })), dismiss: [] }), receipts, deferred }
 }
 
 // What the plan fixes for this unit: names, signatures and files there are

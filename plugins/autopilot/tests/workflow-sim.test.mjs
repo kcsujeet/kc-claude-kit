@@ -539,6 +539,35 @@ const tests = {
     assert.equal(labelled(calls, 'U1 triage').length, 1)
   },
 
+  'after two review rounds a minor gate finding is deferred to the PR instead of costing a round': async () => {
+    const nit = gateBlock('clarity', 'FAIL', ['[FAIL] §C3: counter.js:3 comment restates code'], ['🟡 counter.js:3: the comment restates the code. Delete it'])
+    const { byId, calls } = await simulate({
+      limits: { max_fix_rounds: 4 },
+      answer: (p, { agentType }) => {
+        if (agentType === 'code-review:clarity-gate') return nit
+        if (agentType === 'autopilot:triage') return { fix: [{ finding: 'counter.js:3 comment restates code', reason: 'gate FAIL in this diff' }], dismiss: [] }
+        return undefined
+      },
+    })
+    assert.equal(byId.U1.status, 'done')
+    assert.equal(byId.U1.rounds, 2, 'minor findings cost only the first two review rounds')
+    assert.equal(labelled(calls, 'U1 triage').length, 2)
+    assert.deepEqual(byId.U1.result.review.deferred_minor, ['counter.js:3 clarity: 🟡 counter.js:3: the comment restates the code. Delete it'])
+  },
+
+  'a major gate finding still costs a fix round after two rounds': async () => {
+    const bug = gateBlock('correctness', 'FAIL', ['[FAIL] §K1: counter.js:4 off by one'], ['🟠 counter.js:4: reset writes 1 instead of 0. Write 0'])
+    const { byId } = await simulate({
+      limits: { max_fix_rounds: 3 },
+      answer: (p, { agentType }) => {
+        if (agentType === 'code-review:correctness-gate') return bug
+        if (agentType === 'autopilot:triage') return { fix: [{ finding: 'counter.js:4 off by one', reason: 'real bug' }], dismiss: [] }
+        return undefined
+      },
+    })
+    assert.equal(byId.U1.status, 'blocked:no-converge')
+  },
+
   // ---- decision history across rounds ----
   'a round-2 finding that reverses a round-1 fix is dismissed with the history in view': async () => {
     let triageCalls = 0
