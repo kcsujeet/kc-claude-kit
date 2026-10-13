@@ -48,7 +48,7 @@ Each unit is the `validate-plan.sh` unit unchanged (same order and fields) plus 
              "seed": "bun run db:seed", "ready_timeout_s": 120, "ports": {"base": 4100, "per_unit": 10},
              "login": {"url": "/login", "user_env": "AUTOPILOT_QA_USER", "password_env": "AUTOPILOT_QA_PASSWORD"}},
   "checks": ["bun run lint", "bun run typecheck", "bun test"],
-  "risky_paths": ["db/migrate/**", "**/auth/**", "**/payments/**"],
+  "risky_paths": [],
   "review": {"extra_agents": []},
   "limits": {"max_fix_rounds": 4, "max_parallel_units": 4, "qa_personas": {"min": 3, "max": 5}, "max_agents_per_unit": 200},
   "models": {"workers": "sonnet", "staff": "best"}
