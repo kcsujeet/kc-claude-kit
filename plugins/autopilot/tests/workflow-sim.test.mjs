@@ -48,8 +48,8 @@ function defaultAnswer(prompt, { agentType, label }) {
   if (agentType === 'autopilot:verifier') return { criteria: [{ id: 'AC1', passes: true, evidence: 'test ok' }], confirmed: [], dropped: [] }
   if (agentType === 'autopilot:shipper') return { pr_url: `https://github.com/o/r/pull/${unit}`, body: `/s/${unit}/pr-body.md`, stack: 'none', ci: 'pass', failures: '', notes: '' }
   if (agentType && agentType.startsWith('code-review:')) return gateBlock(agentType.slice(12, -5), 'PASS')
-  if (label.endsWith('review prep')) return { exit_code: 0, output: 'HEAD_SHA=abc', head_sha: 'abc', diff_file: '/s/review.diff', changed_files: '/s/changed-files.txt', files: ['counter.js', 'a.ts'], scope: SCOPE_PASS }
-  if (label.includes('skeptic')) return { refuted: false, reason: 'reproduces' }
+  if (agentType === 'autopilot:review-prep') return { exit_code: 0, output: 'HEAD_SHA=abc', head_sha: 'abc', diff_file: '/s/review.diff', changed_files: '/s/changed-files.txt', files: ['counter.js', 'a.ts'], scope: SCOPE_PASS }
+  if (agentType === 'autopilot:skeptic') return { refuted: false, reason: 'reproduces' }
   throw new Error(`no scripted answer for ${label}`)
 }
 
@@ -585,6 +585,18 @@ const tests = {
     const { byId } = await simulate({ answer: firstCalls(hasLabel('lens security r1'), null, 2) })
     assert.equal(byId.U1.status, 'failed')
     assert.equal(byId.U1.reason, 'lens security did not run')
+  },
+
+  'every agent call names an agent type, so the guard applies; prep and skeptics are autopilot agents on workers': async () => {
+    const { calls } = await simulate({
+      answer: firstCalls(hasLabel('lens data r1'), { findings: [{ location: 'b.ts:2', scenario: 's', consequence: 'c', severity: 'major' }] }),
+    })
+    assert.deepEqual(calls.filter(c => !c.agentType).map(c => c.label), [])
+    const prep = labelled(calls, 'U1 review prep')
+    assert.deepEqual(prep.map(c => [c.agentType, c.model]), [['autopilot:review-prep', 'sonnet']])
+    const skeptics = calls.filter(c => c.label.includes('skeptic'))
+    assert.equal(skeptics.length, 2)
+    assert.ok(skeptics.every(c => c.agentType === 'autopilot:skeptic' && c.model === 'sonnet'))
   },
 
   'a lens skip is recorded in the decision log': async () => {

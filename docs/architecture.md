@@ -43,7 +43,7 @@ kc-claude-kit/
     │   │   ├── init/SKILL.md            # user-invoked: writes and proves .claude/autopilot.json
     │   │   └── run/                     # the staff engineer: validate, decide, contract, start the workflow, report
     │   ├── workflows/deliver.js         # per-unit pipeline: engineer, review, QA, verify, ship
-    │   ├── agents/<role>.md             # engineer, staff-reviewer, lens-reviewer, triage, qa-persona, verifier, ops, shipper
+    │   ├── agents/<role>.md             # engineer, staff-reviewer, review-prep, lens-reviewer, skeptic, triage, qa-persona, verifier, ops, shipper
     │   ├── hooks/hooks.json             # PreToolUse guard for autopilot:* agents
     │   ├── scripts/*.sh                 # guard, read-config, validate-plan, worktree, boot-app, run-checks, qa-browser, pr-body, ...
     │   └── tests/                       # script runners, workflow syntax and simulation; e2e/ is manual and costs money
@@ -79,7 +79,9 @@ Autopilot agents, at `plugins/autopilot/agents/<role>.md`, dispatched by `workfl
 |---|---|---|
 | `autopilot:engineer` | `sonnet` | Proposes approaches, then builds the chosen one, tests first, in the unit's worktree |
 | `autopilot:staff-reviewer` | `best` | Picks the approach before any code; judges the final diff before a PR opens |
+| `autopilot:review-prep` | `sonnet` | Runs `code-review`'s gather step and writes the SCOPE block; returns them verbatim |
 | `autopilot:lens-reviewer` | `sonnet` | Reviews the diff through one lens (security, data, compatibility, and so on) |
+| `autopilot:skeptic` | `sonnet` | Read-only: tries to refute one serious lens finding; two run per finding |
 | `autopilot:triage` | `sonnet` | Sorts findings into fix or dismiss, with reasons |
 | `autopilot:qa-persona` | `sonnet` | Drives the running app in a headless browser as one persona and reports bugs |
 | `autopilot:verifier` | `sonnet` | Reproduces QA bugs and checks every criterion itself; never the author of the code |

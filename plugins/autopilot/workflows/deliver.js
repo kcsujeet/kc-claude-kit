@@ -307,7 +307,7 @@ async function reviewStage({ unit, tag, worktree, baseBranch, state, context, ca
   const survives = async finding => {
     const votes = await settle([1, 2].map(n => () => call(
       `Try to refute this review finding. Read the code at ${worktree}. Return refuted=false only if you confirm the scenario really breaks; otherwise refuted=true with the reason.\nFinding: ${JSON.stringify(finding)}`,
-      { model: WORKERS, schema: REFUTE, label: `${tag} skeptic ${n} ${finding.location}`, phase: 'Review' })))
+      { agentType: 'autopilot:skeptic', model: WORKERS, schema: REFUTE, label: `${tag} skeptic ${n} ${finding.location}`, phase: 'Review' })))
     if (votes.some(v => !v)) note(`skeptic ${finding.location}`, 'null', 'a skeptic returned nothing; counted as not refuted')
     return votes.filter(v => v && v.refuted).length < 2 ? finding : null
   }
@@ -387,7 +387,7 @@ async function codeReviewGates({ unit, tag, worktree, baseBranch, state, call, n
     `1. Run exactly: cd ${worktree} && bash ${CR()}/scripts/gather-review.sh --branch ${baseBranch} --out-dir ${outDir}\n` +
     `2. Read the diff it saved in full (in offset/limit chunks if it is 35KB or more), and write the SCOPE: block for this local branch, one box per line in the BOXES: shape, each with evidence or its N/A reason: §G1 (N/A: local diff), §G2 against the stated purpose "${unit.title}: ${unit.scope}", §G3 (N/A: no linked issue), §G4.\n` +
     `Return exit_code (gather-review.sh's), output (its stdout and stderr), head_sha, diff_file and changed_files (HEAD_SHA, DIFF_FILE, CHANGED_FILES from its meta.env), files (the paths listed in CHANGED_FILES), and scope (the whole SCOPE: block starting with "SCOPE:").`,
-    { model: WORKERS, effort: 'low', schema: PREP, label: `${tag} ${label}`, phase: 'Review' }))
+    { agentType: 'autopilot:review-prep', model: WORKERS, effort: 'low', schema: PREP, label: `${tag} ${label}`, phase: 'Review' }))
   if (!prep) throw new Stop('failed', 'code-review prep did not run')
   if (prep.exit_code !== 0) throw new Stop('failed', `code-review gather failed: ${prep.output || ''}`)
   const inputs = [`Head SHA: ${prep.head_sha}`, `Diff file: ${prep.diff_file}`, `Changed files: ${prep.changed_files}`, `Repo root: ${worktree}`].join('\n')

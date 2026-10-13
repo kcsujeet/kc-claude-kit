@@ -45,6 +45,8 @@ check deny  "1 redirect after 2>&1"  "$(bash_payload autopilot:ops "cat x 2>&1 >
 check deny  "1 >&file is a write"    "$(bash_payload autopilot:ops "cat x >&$wt/.autopilot/runs/r1/units.json")"
 check deny  "2 merge"                "$(bash_payload autopilot:shipper 'gh pr merge 12 --squash')"
 check deny  "2 auto-merge"           "$(bash_payload autopilot:shipper 'gh pr merge --auto 12')"
+check deny  "2 merge, skeptic"       "$(bash_payload autopilot:skeptic 'gh pr merge 1')"
+check deny  "2 merge, review prep"   "$(bash_payload autopilot:review-prep 'gh pr merge 1')"
 check deny  "3 force push"           "$(bash_payload autopilot:shipper 'git push --force origin autopilot/r1/U1')"
 check deny  "3 push main"            "$(bash_payload autopilot:shipper 'git push origin HEAD:main')"
 check allow "3 push own branch"      "$(bash_payload autopilot:shipper 'git push -u origin autopilot/r1/U1')"
