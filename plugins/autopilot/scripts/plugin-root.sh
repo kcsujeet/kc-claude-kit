@@ -3,7 +3,13 @@
 # workflow can run that plugin's own scripts (code-review's gather step).
 #
 # Usage: plugin-root.sh <autopilot-root> <plugin-name>
-# Looks, in order, at:
+# First, Claude Code's install record,
+# ${CLAUDE_CONFIG_DIR:-~/.claude}/plugins/installed_plugins.json
+# ({"plugins": {"<name>@<marketplace>": [{scope, projectPath?, installPath}]}}):
+# the marketplace is the one whose autopilot entry installed <autopilot-root>,
+# and <name>@<that marketplace> wins, preferring the entry for the current
+# directory's project, then the user-scope one, then any other. Then, as a
+# fallback, in order:
 #   <autopilot-root>/../<name>            plugins side by side (a marketplace
 #                                         checkout, or --plugin-dir siblings)
 #   <autopilot-root>/../../<name>/<ver>   the plugin cache layout,
@@ -23,6 +29,28 @@ name=$2
 names_plugin() {
   [ -f "$1/.claude-plugin/plugin.json" ] && [ "$(jq -r '.name // empty' "$1/.claude-plugin/plugin.json" 2>/dev/null)" = "$name" ]
 }
+
+# Prints the install path recorded for <name> in autopilot's marketplace.
+from_install_record() {
+  local record=${CLAUDE_CONFIG_DIR:-$HOME/.claude}/plugins/installed_plugins.json real_root project
+  [ -f "$record" ] || return 1
+  real_root=$(cd "$root" && pwd -P) || return 1
+  project=$(git rev-parse --show-toplevel 2>/dev/null || pwd -P)
+  jq -r --arg root "$real_root" --arg name "$name" --arg project "$project" '
+    (.plugins // {}) as $p
+    | [$p | to_entries[] | select(.key | startswith("autopilot@"))
+       | select(any(.value[]?; .installPath == $root)) | .key | sub("^autopilot@"; "")] as $markets
+    | [$markets[] as $m | $p["\($name)@\($m)"] // [] | .[]] as $entries
+    | ([$entries[] | select(.projectPath == $project)] + [$entries[] | select(.scope == "user")] + $entries)
+    | map(.installPath | strings) | .[]' "$record" 2>/dev/null
+}
+
+while IFS= read -r candidate; do
+  if [ -n "$candidate" ] && names_plugin "$candidate"; then
+    (cd "$candidate" && pwd -P)
+    exit 0
+  fi
+done < <(from_install_record || true)
 
 if names_plugin "$root/../$name"; then
   (cd "$root/../$name" && pwd -P)
