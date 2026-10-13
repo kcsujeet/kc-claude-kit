@@ -1,6 +1,6 @@
 ---
 name: simplicity
-description: "DRY, YAGNI and KISS conventions for TypeScript, JavaScript and other source files: reuse before writing, search for an existing capability first, delete or collapse what adds nothing, numeric coercion, types as narrow as their consumers, refactor leftovers, and props added to a shared component for one caller. Use when writing or reviewing code that adds a helper, component, type, prop, option or abstraction, or that repeats logic."
+description: "DRY, YAGNI and KISS conventions for TypeScript, JavaScript and other source files: reuse before writing, search for an existing capability first, delete or collapse what adds nothing, numeric coercion, types as narrow as their consumers, refactor leftovers, props added to a shared component for one caller, helpers that earn their place, defaults over per-scenario variants, and precedent for new patterns. Use when writing or reviewing code that adds a helper, component, type, prop, option or abstraction, or that repeats logic."
 user-invocable: false
 paths:
   - "**/*.{ts,tsx,js,jsx,mjs,cjs,rb,py,swift,go,java,kt,php,cs,rs}"
@@ -21,24 +21,30 @@ paths:
   - §P8. "This mirrors X" is diffed, not asserted
   - §P9. Refactor leftovers
   - §P10. A shared prop added for one caller
+  - §P11. A helper earns its place by the knowledge it carries
+  - §P12. Defaults carry the everyday case
+  - §P13. A new pattern needs precedent, or the developer's OK
 
 ## Rules
 
 The simplest code that does the job is the easiest to read, change and delete. Every construct earns its place.
 
-- DRY: logic, a value, a literal or a block of markup has one source. Twice is the threshold: at the second copy, extract it to a named helper or constant.
+- DRY is about knowledge: a rule, a format, an API call or a meaningful value has one source. Code that only looks alike is not duplication.
+- A helper earns its place by carrying knowledge its callers should not hold (an API call, a data format or conversion, a domain rule, several steps), or by wide use. One plain expression (a `find` by id, a filter plus a sort, a one-field object) stays inline, even with two callers.
 - YAGNI: no speculative code. No param, prop or config option that nothing passes, no abstraction built for a hypothetical second caller, no dead branch. A generality the change does not use is removed, even if it might be needed later.
 - KISS: take the materially simpler equivalent when one exists. A lookup object beats nested conditionals, an early return beats nesting, an existing util or standard-library call beats a hand-roll.
 - Reuse before writing. Assume the capability already exists and look for it, in order: a prop or slot on the component already in use, a shared hook or util, a variant of an existing component, data already in state or the store. Search by shape (a type's field set, a component's props and markup), not only by name.
 - Ask what breaks if a new construct is deleted or collapsed. If nothing does, use the simpler form. A named intermediate that makes a line readable is not a candidate.
 - Finish the refactor: no leftover duplicate block, unused import, parameter nobody reads, or commented-out code.
 - A prop added to a shared component for one caller's case makes every other caller carry it. Let that caller own or compose the behavior instead.
+- Defaults carry the everyday case, and a caller overrides only what differs. No variant per scenario (`WidgetWithIcon`, `useWidgetsForToday`, `formatPriceShort`, `mockOrderWithOwner`): give the base unit a default and let the one caller pass a prop, argument or override.
+- A new pattern or technique follows 2 places in the repo that already do it. When nothing does, ask the developer before introducing it.
 
 ## Review checklist
 
 The simplicity gate agent ticks every box against the diff. A box is FAIL if any matching construct violates the rule; the gate is FAIL if any box is FAIL. N/A a box only when the diff has no matching construct (state which).
 
-- [ ] §P1 DRY: no logic, value, literal, or markup duplicated that should be a single source (a copied block, a re-declared constant, a re-implemented helper). (N/A: nothing duplicated in the diff)
+- [ ] §P1 DRY: no knowledge duplicated that should have one source (a copied block of real logic, a re-declared constant, a re-implemented helper, a repeated format or domain rule). Lines that only look alike, with a meaning plain on sight, are not a DRY finding at any count; see §P11. (N/A: nothing duplicated in the diff)
 - [ ] §P2 YAGNI: no speculative or unused code — no unused params/props, no abstraction with a single caller built for a hypothetical second one, no config option nothing passes, no dead branch. (N/A: no new abstraction, param, prop, or config option in the diff)
 - [ ] §P3 KISS: no materially simpler equivalent left on the table — a lookup object beats nested conditionals, an early return beats nesting, an existing util/stdlib call beats a hand-roll. (N/A: nothing in the diff has a simpler available equivalent)
 - [ ] §P4 Assume-it-exists: any new hand-rolled capability was checked against a prop/slot on the component already in use, a shared hook/util, a component variant, and data already in state/store, in that order, before being written; a component that only reuses a shared *hook* is still checked against a shared *component* that composes that same hook; a new type was grepped by its field set and a new component by its core props and markup, not only by name. (N/A: nothing hand-rolled in the diff)
@@ -48,16 +54,19 @@ The simplicity gate agent ticks every box against the diff. A box is FAIL if any
 - [ ] §P8 Mirror claims are diffed: wherever the PR or the review says a new member mirrors, follows, or matches an existing sibling, the two signatures are set side by side in the evidence; an unjustified difference between siblings is a finding. (N/A: no new member beside an existing sibling, and no such claim)
 - [ ] §P9 No refactor leftovers: no markup or block left duplicated by an incomplete refactor, no import nothing uses, no prop or param threaded through and never read, no commented-out code. (N/A: none in the diff)
 - [ ] §P10 A prop or option added to a shared component or shared helper for a single caller's case is questioned: could the caller own it, or compose the shared piece instead? (N/A: no shared component or helper signature changed)
+- [ ] §P11 A helper earns its place: every new or proposed helper (util, hook, small component) carries knowledge its callers should not hold (an API call, a data format or conversion, a domain rule, several steps) or is used in many places. A helper around one plain expression FAILS even with two callers, and so does a finding that proposes one. (N/A: no helper added or proposed)
+- [ ] §P12 Defaults carry the everyday case: no new variant per scenario of a component, hook, util, fixture or test helper when the base unit could hold the common data or behavior with a default and the one differing caller could pass a prop, argument or override. A caller that depends on something being absent says so in its own override. (N/A: no new variant or scenario helper)
+- [ ] §P13 A new pattern has precedent: every new abstraction or technique in the diff (a hook wrapping a hook, a new option on a shared hook or type, a new way of holding UI state, a new layout helper) cites 2 places in the repo that already do it, and follows them. A file with a similar name is not precedent, and neither is an option a shared type declares but no caller passes. With no precedent, the finding is a `question` to the author (in a self-review, ask the developer before writing it). (N/A: nothing new in kind in the diff)
 
 ## Review detail
 
-Covers the standing DRY/YAGNI/KISS lens applied to every diff, reuse-over-reinvention (including the "assume it already exists" search), two numeric-hygiene rules (safe coercion and repeated-conversion extraction), the delete-or-collapse test on every new construct, type signatures wider than their sink needs, unverified "this mirrors X" claims, refactor leftovers, and shared-component props added for one caller.
+Covers the standing DRY/YAGNI/KISS lens applied to every diff, reuse-over-reinvention (including the "assume it already exists" search), two numeric-hygiene rules (safe coercion and repeated-conversion extraction), the delete-or-collapse test on every new construct, type signatures wider than their sink needs, unverified "this mirrors X" claims, refactor leftovers, shared-component props added for one caller, helpers that carry no knowledge, per-scenario variants, and new patterns with no precedent.
 
 ### §P1–P3. The DRY / YAGNI / KISS standing lens
 
 Apply this to every diff, not just the constructs called out elsewhere in this file. Evaluate every change against three questions and surface a finding whenever the answer is "no" — these are first-class smells with the same any-finding-fails weight as any other rule here, not stylistic extras to mention only if there's room.
 
-- **DRY (§P1)** — is any logic, value, literal, or markup duplicated that should be a single source? A copied block, a re-declared constant, a re-implemented helper, a repeated JSX shape. (Repeated *conversions* have their own rule, §P5 below; repeated *sibling JSX* is covered by the `react` skill's §R6 — don't double-flag the same instance under both.)
+- **DRY (§P1)** — is any knowledge duplicated that should be a single source? A copied block of real logic, a re-declared constant, a re-implemented helper, a repeated format or domain rule, a repeated JSX shape. DRY is about knowledge, not about lines that look alike: two copies of a plain expression are not a finding (§P11). (Repeated *conversions* have their own rule, §P5 below; repeated *sibling JSX* is covered by the `react` skill's §R6 — don't double-flag the same instance under both.)
 - **YAGNI (§P2)** — is there speculative or unused code? Concretely: unused params/props; an abstraction built for a hypothetical second caller when there is only one; a config option nothing in the diff actually passes; a dead branch. A generality the PR doesn't use is a finding even if it "might be needed later."
 - **KISS (§P3)** — is there a materially simpler equivalent already available? Concretely: a lookup object beating nested conditionals; an early return beating nesting; an existing util or stdlib call beating a hand-roll. Fewer moving parts for the same behavior wins.
 
@@ -217,6 +226,45 @@ An incomplete refactor leaves debris the diff no longer needs:
 ### §P10. A shared prop added for one caller
 
 A prop or option added to a shared component or helper so that one caller can get a special case makes every other caller carry it. Ask whether the caller could own the behavior (wrap or compose the shared piece), or whether the case is general enough that several callers would plausibly use it today. A shared component with many props, several of which only one caller passes, is the accumulated form of this finding.
+
+### §P11. A helper earns its place by the knowledge it carries
+
+A new util, hook or small component is worth its indirection when it holds something its callers should not have to know, whatever its length: an API call, a data format or conversion, a domain rule, several steps in a fixed order. Wide use earns it too. Code whose meaning is plain on sight stays inline even with two callers:
+
+```ts
+// Not a finding at two call sites: the line says what it does
+const widget = widgets.find((item) => item.id === widgetId)
+
+// Earns a helper even with one caller: it holds a format the call site should not know
+const toWidgetSlug = (name: string) => name.trim().toLowerCase().replace(/\s+/g, '-')
+```
+
+A finding that proposes a helper for a plain expression is itself a miss, under any gate. The naming skill's §N3 applies the same test to repeated predicates, and clarity §C12 to helpers that only restate their body.
+
+### §P12. Defaults carry the everyday case
+
+A variant per scenario is duplication in disguise: a component plus `WidgetWithIcon`, a hook plus a sibling that only presets one argument, `formatPriceShort` beside `formatPriceLong`, a fixture plus `mockOrderWithOwner`, a test file's `renderWidget` plus `renderWidgetWithNotes`. Each new case needs another variant, and a reader has to compare two definitions to see what differs. This applies to every unit of code, tests included.
+
+Give the base unit the defaults most callers can live with. The caller that differs passes a prop, an argument or a one-field override, so the call site shows what it depends on:
+
+```tsx
+// Flag: a variant per scenario
+const WidgetWithIcon = (props: WidgetProps) => <Widget {...props} icon={<StarIcon />} />
+export const mockOrderWithOwner = { ...mockOrder, owner: mockOwner }
+
+// Prefer: one unit with defaults; the caller that differs says how
+<Widget icon={<StarIcon />} />
+render(<OwnerBadge order={{ ...mockOrder, owner: undefined }} />) // this case is about "no owner"
+```
+
+When moving data into a shared default breaks some callers, they were silently relying on it being missing. Fix them with an explicit override rather than keeping a second variant, and re-run every consumer (for a test fixture, every test that imports it).
+
+### §P13. A new pattern needs precedent, or the developer's OK
+
+§P4 asks whether a *capability* already exists. This asks the same of a *technique*. Before accepting a new way of doing something, find 2 places in the repo that already do it that way. Illustrations of new patterns, each of which can pass every other box: a wrapper hook every component calls instead of the data hook itself; showing a pending value from a mutation's input while it saves, where other controls show the saved value; a new option on a shared hook.
+
+1. **Look first.** Name the pattern, grep for how the repo already does the job, and cite 2 hits. Files with similar *names* are not precedent; the *pattern* is. An option a shared type declares but no caller passes is not precedent either.
+2. **Nothing found? Ask before building.** A pattern nobody has used yet is the developer's decision. In a self-review, stop and ask, with what you found and what you would propose. In a review, raise it as a `question`. Do not introduce it and explain it afterwards.
 
 ## Sweeps
 

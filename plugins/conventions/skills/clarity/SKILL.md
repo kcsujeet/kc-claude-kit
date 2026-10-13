@@ -31,6 +31,7 @@ paths:
   - §C16. Question magic numbers; use named constants or design tokens
   - §C17. Type escape hatches: lying casts, `any`, non-null assertions
   - §C18. Do not suggest removing a readable intermediate
+  - §C19. Conditional spreads
 - Sweeps
 
 ## Rules
@@ -47,6 +48,7 @@ Code that takes three readings costs more than code that took an extra minute to
 - Resist the symmetric smell too: a wrapper that adds nothing but a name is over-extraction, not clarity.
 - A named intermediate that makes a line readable stays, even when it costs an extra type-narrowing step or evaluates a trivial branch eagerly.
 - Fixing a ternary must not create a new problem: `flagA && value` is not a stand-in for `value | undefined` (it yields `false`), and an options object spread in conditionally is a hidden ternary.
+- No conditional spread: `...(flagA ? { key } : {})`, `...(flagA && { key })`, or an object built conditionally and spread later. Give the key a permanent slot whose value may be `undefined` (`key: value ?? undefined`), after checking that whatever reads the object drops `undefined`.
 
 Detection criteria and per-box review failure modes live in the `## Review checklist` of the `clarity` skill (`conventions:clarity`), with the detail under its `## Review detail`. These rules are the statement of the convention; that checklist is how a diff gets graded against it.
 
@@ -57,7 +59,7 @@ The clarity gate agent ticks every box against the diff. A box is FAIL if any ma
 - [ ] §C1 No dense guard clauses (3+ early returns with non-self-explanatory conditions, uncommented). (N/A: no guard-clause chain in diff)
 - [ ] §C2 No defensive coercion on an already-typed value (`Number(x)` on a `number`), except genuinely defensive form/input-boundary comparisons. (N/A: no coercion added)
 - [ ] §C3 Every new `record.someField` access is declared on the record's type/interface; optional-chained access to an undeclared field is a FAIL. (N/A: no new field access)
-- [ ] §C4 No redundant `as T` assertion on a value the compiler already infers as `T`. **Enumerate with the `as-casts.sh` sweep, do not eyeball** — see below. (N/A: only when `as-casts.sh` returns 0 hits, stated as `grepped as-casts: 0 hits`)
+- [ ] §C4 No redundant `as T` assertion on a value the compiler already infers as `T`. **Enumerate with the `as-casts.sh` sweep, do not eyeball**; the evidence format is in §C15's detail file. (N/A: only when `as-casts.sh` returns 0 hits, stated as `grepped as-casts: 0 hits`)
 - [ ] §C5 No side effects inside render/computation closures (map/filter/reduce callbacks, memoized selectors, inline JSX expressions); side effects live in named handlers called from outside the closure. (N/A: no closure with a side effect in diff)
 - [ ] §C6 Comments earn their place AND are sparse: none paraphrase the next line or restate a name; none narrate the task, ticket, or review round instead of the code; the diff does not comment most blocks by default (over-commenting density is itself a FAIL); non-obvious constraints are commented. (N/A: no comments added)
 - [ ] §C7 Two-step / order-dependent state mutations have an ordering rationale comment. (N/A: no ordered mutation pair in diff)
@@ -65,17 +67,18 @@ The clarity gate agent ticks every box against the diff. A box is FAIL if any ma
 - [ ] §C9 No inline anonymous structural type in a variable declaration (name it at module scope). (N/A: no inline structural type in diff)
 - [ ] §C10 Multi-fallback `||`/`??` chains with 3+ operands extracted to a named helper. (N/A: no such chain in diff)
 - [ ] §C11 Unhappy-path complexity not tangled into the happy path. (N/A: no error branch with 3+ inline statements)
-- [ ] §C12 No thin-wrapper helper whose name only restates a one-line body (over-extraction). (N/A: no new single-purpose helper in diff)
+- [ ] §C12 No thin-wrapper helper whose name only restates a one-line body (over-extraction); a second caller does not rescue a plain one-expression helper (simplicity §P11). (N/A: no new single-purpose helper in diff)
 - [ ] §C13 An expression (template literal, call argument, JSX prop, or return) that inlines 2+ non-trivial sub-expressions (each a `??`/optional-chain fallback, call, ternary, or cast) extracts them to named locals first. (N/A: no such multi-part expression in diff)
 - [ ] §C14 No circular imports introduced (soft). (N/A: no cross-module import change)
-- [ ] §C15 Ternaries: none nested/chained (2+ `?`), long, multi-line once formatted, or with a non-trivial branch (more than a short value/identifier). Applies to value/assignment/returned/arg ternaries too, not just JSX — the branch content is irrelevant, only the shape. Walk every ternary in the diff. A proposed fix respects the remedy limits in §C15 (no `flagA && value` for a value-or-absent prop, no conditionally spread options object). **Enumerate with the `ternaries.sh` sweep, do not eyeball** — see below. (N/A: only when `ternaries.sh` returns 0 hits, stated as `grepped ternaries: 0 hits`)
+- [ ] §C15 Ternaries: none nested/chained (2+ `?`), long, multi-line once formatted, or with a non-trivial branch (more than a short value/identifier). Applies to value/assignment/returned/arg ternaries too, not just JSX — the branch content is irrelevant, only the shape. Walk every ternary in the diff. A proposed fix respects the remedy limits in §C15 (no `flagA && value` for a value-or-absent prop, no conditionally spread options object). **Enumerate with the `ternaries.sh` sweep, do not eyeball**, labelling every hit single-line or MULTI-LINE; see §C15. (N/A: only when `ternaries.sh` returns 0 hits, stated as `grepped ternaries: 0 hits`)
 - [ ] §C16 Bare numeric literals for dimensions/thresholds/timeouts are named constants with a one-line why, or a design token when the project has a token system; a magic value repeated 2+ times is also a DRY finding. (N/A: no magic literal added)
 - [ ] §C17 No type escape hatches: no `as` cast (including `as unknown as T`) that asserts a type the value does not actually have in order to silence a mismatch; no `any`, explicit or through an untyped boundary; no non-null assertion (`value!`). **Enumerate with the `as-casts.sh`, `any-types.sh` and `non-null-assertions.sh` sweeps, do not eyeball**; see §C17. (N/A: only when all three sweeps return 0 hits, stated as `grepped as-casts: 0 hits`, `grepped any: 0 hits`, `grepped non-null assertions: 0 hits`)
 - [ ] §C18 No finding this gate proposes suggests removing a named intermediate that makes an expression readable on the grounds that it looks redundant, costs a type-narrowing step, or eagerly evaluates a trivial branch the ternary will not take. Sibling gates that propose inlining (simplicity §P6, structure §S4) apply the same test. (N/A: no finding proposes removing a named intermediate)
+- [ ] §C19 No conditional spread, of any size and whatever its comment: no `...(flagA ? { key } : {})` or `...(flagA && { key })` inline, and no object built conditionally (`const extra = flagA && { key }`) and spread later into an object or as component props. The fix gives the key or prop a permanent slot set to `undefined` when absent, and the finding confirms the consumer drops `undefined`. **Enumerate with the `conditional-spreads.sh` sweep.** (N/A: only when `conditional-spreads.sh` returns 0 hits, stated as `grepped conditional spreads: 0 hits`)
 
 ## Review detail
 
-Readability rules for the diff under review. None of these are automatically wrong — they are prompts to look harder at new logic. Covers eighteen independent failure modes: guard-clause density, defensive coercion, undeclared field access, redundant casts, tangled side effects, comment hygiene, ordered mutations, magic spreads, inline anonymous types, fallback chains, unhappy-path tangling, thin wrappers, dense sub-expressions, circular imports, ternary shape, magic numbers, type escape hatches (lying casts, `any`, non-null assertions), and review suggestions that strip readable intermediates.
+Readability rules for the diff under review. None of these are automatically wrong — they are prompts to look harder at new logic. Covers nineteen independent failure modes: guard-clause density, defensive coercion, undeclared field access, redundant casts, tangled side effects, comment hygiene, ordered mutations, magic spreads, inline anonymous types, fallback chains, unhappy-path tangling, thin wrappers, dense sub-expressions, circular imports, ternary shape, magic numbers, type escape hatches (lying casts, `any`, non-null assertions), review suggestions that strip readable intermediates, and conditional spreads.
 
 ### §C1. Dense guard clauses without comment
 
@@ -255,7 +258,7 @@ The named-fallback helper earns its keep (4-way precedence is real logic); the J
 
 A helper earns its keep when **at least one** of these holds:
 - The body has multiple meaningful steps the name summarizes (e.g. `extractErrorMessage` wraps a 4-way fallback chain — the name names the *selection*, the body shows the precedence).
-- It's called from 2+ places (eliminates real duplication).
+- It carries knowledge its callers should not hold (an API call, a format, a domain rule), or it is used in many places (simplicity §P11). A plain one-expression body with two callers still stays inline.
 - The body is genuinely subtle and the name encodes a non-obvious invariant.
 
 A helper does NOT earn its keep when:
@@ -315,109 +318,7 @@ You will not catch every cycle by reading — that is fine. Flag the obvious one
 
 ### §C15. Ternaries: flag when nested, long, or multi-line
 
-A single, short, one-line ternary (`x ? a : b`) is fine and clear. Anything past that — nested, long, or wrapping onto multiple lines — should be broken down. Walk **every ternary in the diff** against this checklist:
-
-- [ ] **Nested / chained** — `x ? a : y ? b : c`, or a ternary whose true/false branch contains another ternary. Two or more `?` on one expression → break down (named booleans, guards, sub-components, or a lookup object).
-- [ ] **Long** — the whole expression, or either branch, is long (rough trip-wire: the line would exceed the formatter's print width, or a branch is more than a short value/single element). → extract each branch to a named `const`, or pull the choice into a helper / `if`-`else`.
-- [ ] **Multi-line** — if the ternary spans more than one line once formatted (branches on their own lines, stacked closing parens), it's already too big for an inline ternary. → break into `if`/`else`, early returns, named-boolean guards, or extracted variables.
-- [ ] **Non-trivial JSX branch** — a branch that is more than a single element with a couple of props. → use a guard render (`cond && <X />`) per state, or a sub-component.
-
-The fix is almost always one of: named boolean predicates + separate guarded renders (preferred for JSX, see below), an extracted `const` per branch, an `if`/`else` or early return, or a lookup object when the discriminator is a finite enum.
-
-The reasoning: each additional `?` and `:` doubles the mental load — the reader has to track which colons pair with which question marks — and a ternary that wraps across lines hides its own structure behind stacked parens.
-
-This is especially common in JSX render: "if success, show A; else if conflict, show B; else if data, show C; else null." Written as a 3-way nested ternary it looks compact but reads as a wall.
-
-**Bad:**
-```tsx
-return (
-  <Dialog>
-    {displaySuccess && result ? (
-      <Success ... />
-    ) : hasConflict ? (
-      <Conflict ... />
-    ) : data ? (
-      <Form ... />
-    ) : null}
-  </Dialog>
-)
-```
-
-**Good** (named boolean predicates + mutually-exclusive conditional renders):
-```tsx
-const showSuccessScreen = displaySuccess && Boolean(result)
-const showConflictScreen = !showSuccessScreen && hasConflict
-const showFormScreen = !showSuccessScreen && !showConflictScreen && Boolean(data)
-
-return (
-  <Dialog>
-    {showSuccessScreen && result ? <Success ... /> : null}
-    {showConflictScreen ? <Conflict ... /> : null}
-    {showFormScreen && data ? <Form ... /> : null}
-  </Dialog>
-)
-```
-
-The named-boolean form reads top-to-bottom in priority order, makes mutual exclusion explicit at the variable level (so the rule of "only one screen at a time" is enforced by construction), and survives adding a fifth state by adding one more named boolean.
-
-**Other acceptable fixes for the same shape:**
-- **Sub-components** (`<SuccessScreen ... />`, `<FormScreen ... />`) when each branch carries enough JSX/state to deserve its own file. The cost is prop-drilling closure state; only do this when the branch is substantial or reusable.
-- **Lookup-object dispatch** when the discriminator is a finite enum and conditions don't overlap. Not a fit when priority matters (e.g. success > conflict > form).
-
-**Value / assignment ternaries count too — the checklist is not JSX-only.** A ternary assigned to a variable (or returned, or passed as an arg) is subject to every box above. What triggers a flag is the *shape* — nested, long, or multi-line — never what the branches happen to contain. The branch content is irrelevant: a spread, a method call, an object literal, a computation, a function call, anything. If the ternary spans multiple lines, or a branch is more than a short value/identifier, break it down — extract each branch to a named `const` so the choice reads on one line, or use `if`/`else`.
-
-**Bad** (multi-line value ternary — the branch content is incidental, only the shape matters):
-```ts
-const next = isOn
-  ? [...items, item]
-  : items.filter((entry) => entry !== item)
-```
-
-**Good** (named branches, one-line choice):
-```ts
-const withItem = [...items, item]
-const withoutItem = items.filter((entry) => entry !== item)
-const next = isOn ? withItem : withoutItem
-```
-
-**Remedy limits.** A fix for a ternary must not trade it for a different defect:
-
-- A value-or-absent prop is never rewritten as `flagA && value`. That yields `false`, not `undefined`, which a prop typed `T | undefined` rejects and a renderer may print. Assign a named const with an `if`, or keep a one-line ternary with `undefined` as the other branch. (Inside a class-merging helper, `flagA && 'some-class'` is fine, because the helper drops `false`.)
-- Never propose a conditionally built partial object spread into a call (`widgetFn({ ...base, ...(flagA ? { optA, optB } : {}) })`). It moves the ternary out of sight instead of removing it; branch at the call site or name the options object instead.
-- For trivial branches (string formatting, key building, a cheap lookup), computing both named branches eagerly is the accepted cost of a one-line choice and is not an efficiency finding (§C18).
-
-**Acceptable single-ternary patterns** (do NOT flag):
-- One condition selecting between two values inline: `<Title>{flagA ? 'Confirm' : 'Send Request'}</Title>`.
-- A ternary whose branches are single primitive values (a number, a class name, a short string) or a single short identifier, on one line.
-
-#### Enumerate ternaries and casts by grep, do not eyeball
-
-§C15 says "walk every ternary in the diff" and §C4 says the same for `as` casts. Both are graded on whether you **listed** them, not on whether you noticed them: reading a long diff and forming impressions is how a multi-line ternary survives on a gate reported as PASS.
-
-Find them mechanically **before** reading for meaning, over the diff's **added lines only** — over the diff you were given (e.g. `gh pr diff <num>` for a PR, `git diff <default-branch>...HEAD` for a branch), saved to a file and passed to two sweeps (see Sweeps):
-
-- `ternaries.sh`: a `?` that is not `?.`, `??`, or an optional `?:`.
-- `as-casts.sh`: type assertions, including `as string`, `as const`, `as unknown as T`.
-
-The ternary pattern matches the `?` itself rather than dropping lines, so a line that holds both an optional property and a real ternary is still a hit, and a `?` left at the end of a line by the formatter is caught too.
-
-The scripts match TypeScript and JavaScript syntax. For another language (`and`/`or` chains, `a if c else b` conditional expressions, `x.(T)` / `cast()` type assertions, etc.), run the language-appropriate pattern by hand as well; `0 hits` is only a valid receipt after the language-appropriate pattern was run, and the receipt states which script or pattern was used.
-
-Both greps over-match, and that is fine — the point is that every candidate gets named and dismissed in writing rather than never being looked at. Expect to discard a `?` inside a string or a regex from the ternary grep, and import/export aliases (`import { x as y }`) and the word "as" in comments or strings from the cast grep; say so per hit. `as const` is a hit too: it is usually fine, and the verdict says so.
-
-Emit one line per hit with a verdict and the count:
-
-```
-grepped ternaries: 5 hits (1 discarded: `?` inside a regex)
-- [FAIL] someLabel.ts:18: multi-line, template-literal branch; use an early return
-- [PASS] useSelectionResource.ts:27: single line, both branches trivial
-...
-grepped as-casts: 3 hits
-- [FAIL] SubmissionFieldRow.tsx:29: unchecked narrowing of a union
-- [PASS] useSelectionActions.ts:115: `as ApiQueryParams` matches useMenuCategoryActions.ts:73
-```
-
-**Silence is not a pass:** a gate that found none must print `grepped ternaries: 0 hits` / `grepped as-casts: 0 hits`, so a missing receipt can never be mistaken for a clean sweep.
+The full detail (the four failure modes, the fixes, the remedy limits, the acceptable shapes) and the evidence format for the ternary and cast sweeps are in `${CLAUDE_PLUGIN_ROOT}/skills/clarity/references/ternaries.md`. Read it in full before grading §C15 or §C4.
 
 ### §C16. Question magic numbers; use named constants or design tokens
 
@@ -462,6 +363,28 @@ A named intermediate that splits an expression into readable parts (a named bran
 
 This does not protect a pure alias that renames one identifier to another with nothing added (`const handleClose = onClose`): that is a dead wrapper (structure §S4). The line is whether the name describes a computed value or only repeats an existing one. The clarity gate grades its own proposed fixes against this box; simplicity §P6 and structure §S4 point here so their inline suggestions pass the same test.
 
+### §C19. Conditional spreads
+
+A spread whose object exists only on some runs makes an object's shape, or a component's props, depend on runtime state. The reader has to work out which keys exist in which case. Each form below is a finding, however small, and a comment explaining it does not excuse it:
+
+- [ ] **Inline:** `...(flagA && { key })`, `...(flagA ? { key } : {})`, and the array form `...(flagA ? [item] : [])`.
+- [ ] **Built and spread later:** `const extra = flagA && { key }`, then `{ ...base, ...extra }` or `<Widget {...extra} />`.
+- [ ] **One key:** a single conditional key is still a finding, not "small enough".
+
+The fix is a permanent slot whose value may be `undefined`:
+
+```ts
+// Flag
+const body = { name, ...(note ? { note } : {}) }
+
+// Prefer
+const body = { name, note: note || undefined }
+```
+
+On a component, `prop={flagA ? value : undefined}`. Before proposing it, check the consumer: a JSON request body drops `undefined` keys (`JSON.stringify` omits them), but `URLSearchParams` and string templates turn `undefined` into the text `"undefined"`, so there the key needs filtering or the spread is doing real work. Name the consumer and what it does with `undefined` in the finding.
+
+**Enumerate by grep, do not eyeball.** Run the `conditional-spreads.sh` sweep (see Sweeps). It over-matches (a spread of a plain call, `...(await loadWidgets())`), and each such hit is dismissed in writing. One line per hit with a verdict, and `grepped conditional spreads: 0 hits` printed explicitly when none are found.
+
 ## Sweeps
 
 Save the diff under review to a file (`gh pr diff <num> > /tmp/review.diff`, or `git diff <default-branch>...HEAD > /tmp/review.diff`) and run each script over it; `-` reads the diff from stdin. Each prints one `path:line: text` hit per line, where `line` is the new-side line number, and nothing else. Give every hit its own verdict, and state each receipt on its own line with its count, `0 hits` included.
@@ -488,6 +411,12 @@ Save the diff under review to a file (`gh pr diff <num> > /tmp/review.diff`, or 
 
   ```bash
   bash "${CLAUDE_PLUGIN_ROOT}/skills/clarity/scripts/any-types.sh" <diff-file>
+  ```
+
+- `conditional-spreads.sh` (§C19): added lines holding `...(`, an object built with `= ... && {`, or a ternary whose other branch is `{}`. Receipt: `grepped conditional spreads: N hits`.
+
+  ```bash
+  bash "${CLAUDE_PLUGIN_ROOT}/skills/clarity/scripts/conditional-spreads.sh" <diff-file>
   ```
 
 - `non-null-assertions.sh` (§C17): added lines holding a non-null assertion, skipping `!=`, `!==` and negation. Receipt: `grepped non-null assertions: N hits`.

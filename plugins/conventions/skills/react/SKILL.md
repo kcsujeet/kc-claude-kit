@@ -1,6 +1,6 @@
 ---
 name: react
-description: "React conventions for .tsx and .jsx components, hooks and API modules: component and markup structure, keys, conditional rendering, data-fetching hooks and cache updates, forms as the source of truth, state placement, memoization, render cost, and layout at narrow widths. Use when writing or reviewing React components, hooks, queries, mutations, forms or layout CSS."
+description: "React conventions for .tsx and .jsx components, hooks and API modules: component and markup structure, keys, conditional rendering, data-fetching hooks and cache updates, forms as the source of truth, state placement, memoization, render cost, layout at narrow widths, and `ref` as a prop on React 19. Use when writing or reviewing React components, hooks, queries, mutations, forms or layout CSS."
 user-invocable: false
 paths:
   - "**/*.{tsx,jsx}"
@@ -17,8 +17,8 @@ paths:
 - Review detail
   - Section 1: Project structure (bulletproof-react)
   - Section 2: Components & JSX
-  - Section 3: Data fetching
-  - Section 4: Forms
+  - Section 3: Data fetching (in `references/data-fetching.md`)
+  - Section 4: Forms (in `references/forms.md`)
   - Section 5: State
   - Section 6: Render cost and layout
 - Sweeps
@@ -39,6 +39,7 @@ Placement is covered by the `structure` skill, which defers to bulletproof-react
 - Do not reach for `useMemo` or `useCallback` by default when the project runs React Compiler. Write the plain value or function.
 - Without React Compiler, a `useMemo` or `useCallback` has to hit: empty dependencies mean a module constant, and a dependency that changes every render (an inline object, array or function) means the memo never does. Pass stable references to memoized children.
 - A block of markup past about thirty lines that reads as its own unit is a named component, and a wrapper element that only repeats its parent's styling is deleted.
+- On React 19 and later, `ref` is a plain prop. Do not add `forwardRef`, and never declare `ref` in the props of a component that is also wrapped in `forwardRef`.
 
 ### Data access
 
@@ -46,10 +47,17 @@ Placement is covered by the `structure` skill, which defers to bulletproof-react
 - The fetch lives with the actual consumer. A page does not duplicate a fetch its child already owns, especially with different params, and nothing fetches a whole list to derive one boolean.
 - After a write, patch the cache first, then update surgically, and invalidate only as a last resort.
 - Prefer `mutate` with callbacks over `mutateAsync` with `await` when the resolved value only drives a side effect.
+- A request's method matches its effect: a read uses GET unless its input cannot fit in a query string.
+- A cache patch or invalidation targets the narrowest key that shows the change.
+- A write hook touches only its own resource. Another resource's writes live in that resource's hook, and the caller composes the two.
+- A read hook wires up every option it accepts. Accepting an option and ignoring it is dead surface.
 
 ### Forms and state
 
 - The form is the single source of truth. No `useState` shadowing a value the form already holds.
+- A form-state hook returns form plumbing only (the methods, submit and discard, saving state). One field's fetching, watching and lookup state live in that field's component.
+- Each form watch lives in the smallest component that renders from it; a child reads shared form values itself rather than taking them as props.
+- A form that edits a record seeds the related record its inputs render from, not just the id.
 - Check the validation library's own API before hand-rolling a check, a regex, or a coercion. Most of them already exist there.
 - New state lives at the lowest common ancestor of its actual consumers, never lifted because a parent might want it later.
 - Two state updates whose order matters carry a one-line comment at the call site saying why.
@@ -80,10 +88,18 @@ The react gate agent ticks every box against the diff. A box is FAIL if any matc
 - [ ] §R17 No wasted render work: a memo, effect, or loop whose result is unused in the current mode is guarded out; an inline object or callback passed to a memoized child, or into a dependency array, is stabilized; dependency arrays list the underlying data, not a function reference whose identity changes; a value already memoized is not recomputed elsewhere. (N/A: no hook dependency array, memoized child, or mode-dependent computation in diff)
 - [ ] §R18 A JSX block past roughly 30 lines that reads as its own unit is a named component; no wrapper element that only repeats its parent's styling or adds nothing to layout. (N/A: no JSX block over 30 lines and no wrapper element added)
 - [ ] §R19 A change to width, height, min/max sizing, flex/grid layout, or positioning is checked at 375, 600, 768, and 1024 px: the usable width per column or cell after padding is computed or measured at each, and the numbers appear in the finding; removing a minimum-size floor without a responsive fallback FAILS. (N/A: no CSS or layout change in diff)
+- [ ] §R20 On React 19 or later, `ref` is a plain prop: no new `forwardRef`, and no props type declaring `ref` on a component also wrapped in `forwardRef` (the declaration is unreachable). **Enumerate**: grep the changed files for `forwardRef`, one verdict per hit; a `forwardRef` in an existing file the diff touches is a FAIL at nitpick weight. (N/A: the project's React version is below 19, confirmed from its manifest, or `grepped forwardRef: 0 hits`)
+- [ ] §R21 A request's method matches its effect: a new request that only reads and saves nothing uses GET; a read hook whose request is POST, PUT or PATCH FAILS unless the input genuinely cannot fit in a query string, and a comment at the request says so. (N/A: no new request)
+- [ ] §R22 A cache patch or invalidation targets the narrowest key that shows the change: an update to one record patches that record's own key when that is where it shows, and a broad base key is used only when lists showing the same record need it too, with a comment saying so. (N/A: no cache patch or invalidation added)
+- [ ] §R23 A write hook touches only its own resource: it imports no other resource's requests or hooks. A write to another resource lives in that resource's write hook, and the caller composes the two, updating its own cached data in the call's `onSuccess`. (N/A: no write hook added or edited)
+- [ ] §R24 A form-state hook returns form plumbing only (form methods, submit and discard, saving state). One that returns field data or field handlers (options, a lookup function, a pick handler) FAILS; that logic lives in the field's own component, or the form component when small. (N/A: no form added or edited)
+- [ ] §R25 Each form watch (and each piece of field state) lives in the smallest component that renders from it; a child reads shared form values through the form context instead of the parent watching them and passing them down. A watch in the form or its setup hook FAILS unless that component renders from the value too. (N/A: no watch or field state added in a form)
+- [ ] §R26 A form that edits an existing record seeds the related record its inputs render from (`owner_id` and `owner`), not just the id, and no picker gets a label prop hand-built from a record the form already holds. (N/A: no form editing an existing record)
+- [ ] §R27 A read hook accepts the repo's standard read-hook options (extended with its own fields, not a re-declared subset) and wires every option it accepts; an accepted option the hook never reads FAILS. (N/A: no read hook added or edited)
 
 ## Review detail
 
-Project-structure, component/JSX, data-fetching, form, and state-placement conventions for React/JSX UI code. Covers nineteen independent failure modes across six areas: where code lives (bulletproof-react), how components and markup are structured, how reads/writes are split and owned, how forms hold state, where new component state itself lives, and what renders cost and how layout holds up at narrow widths.
+Project-structure, component/JSX, data-fetching, form, and state-placement conventions for React/JSX UI code. Covers twenty-seven independent failure modes across six areas: where code lives (bulletproof-react), how components and markup are structured, how reads/writes are split and owned, how forms hold state, where new component state itself lives, and what renders cost and how layout holds up at narrow widths.
 
 ---
 
@@ -275,105 +291,32 @@ Suggested fix order (match whatever shape the target repo already uses for the c
 
 **`renderXxx()` inline render functions are an anti-pattern, not a fix.** A `const renderContent = () => (...)` called from the same component's return: re-runs on every parent render without its own reconciliation, doesn't show up in DevTools, hides a missing sub-component behind a method-shape that pretends to be cheap, obscures the JSX tree (readers scanning the return have to jump elsewhere to find the actual content), and closures over scoped variables make later extraction harder. Flag any new `renderXxx` called from its own component's return; point at §R9's named-component extraction instead. **Acceptable shapes:** a function handed to a render-prop API the library demands (`renderRow={(row) => ...}`); or a `useCallback`-wrapped handler that returns JSX for an event-driven mount (rare; usually still a missed component). Further reading: Nadia Makarevich, *React re-renders guide*, ["Antipattern: creating components in render function"](https://www.developerway.com/posts/react-re-renders-guide#%EF%B8%8F-antipattern-creating-components-in-render-function).
 
+#### §R20. React 19: `ref` is a prop, `forwardRef` is not needed
+
+Check the project's React version first; this box applies from React 19. There `ref` is an ordinary prop, so new components take it in their props and never use `forwardRef`:
+
+```tsx
+// Flag
+export const WidgetInput = forwardRef<WidgetInputHandle, WidgetInputProps>(({ label }, ref) => { /* ... */ })
+
+// Prefer
+interface WidgetInputProps { label: string; ref?: Ref<WidgetInputHandle> }
+export const WidgetInput = ({ label, ref }: WidgetInputProps) => { /* ... */ }
+```
+
+**The half-migrated case is the one to look for:** a props type that already declares `ref?: Ref<T>` while the component is still wrapped in `forwardRef`. `forwardRef` strips `ref` out of props, so the declaration is unreachable and misleading.
+
 ---
 
 ### Section 3 — Data fetching
 
-#### §R11. Reads and writes live in separate hooks
-
-No raw `fetch`/`axios`/`useMutation`/`useQuery` call inside a component — they belong in the project's data-hook layer. Grep how sibling features structure their read/write hooks before proposing a shape; match it. A hook that mixes a query and a mutation, or a component that inlines either, is a finding — point at the sibling pattern.
-
-#### §R12. Fetch ownership — by consumer, not convenience
-
-When a read hook is added or moved, ask **where it belongs**, not just whether it works. The fetch should live with the component that actually *consumes* the data: single consumer → the consumer owns it; several siblings need it → lift to their nearest common parent.
-
-Two failure modes:
-- **Duplicated ownership** — a parent fetches a list a child already fetches for itself. With identical query keys the cache layer dedupes to one request, but **different params = different keys = two separate requests**, owned in two places that can drift.
-- **Over-fetch for a derived flag** — pulling a full list only to compute a boolean (is-it-empty, show/hide a tab, gate a skeleton) is wasteful, and gating a whole page's skeleton on data only one section needs blocks the rest of the page.
-
-```tsx
-// Flag: parent fetches the whole list just to gate visibility, while a child
-// already fetches (a filtered version of) the same data
-const { data: items, isLoading } = useItems({ enabled })
-if (isLoading) return <Skeleton />
-// ...elsewhere: <ChildList /> independently calls useItems({ filter })
-
-// Prefer: the consumer owns the fetch; let it render its own empty/loading state
-```
-
-Name the consumers in the review and ask whether the fetch is at the right altitude.
-
-#### §R13. Invalidation last resort; `mutate` + callbacks over `mutateAsync` + `await`
-
-**Invalidation is a last resort.** Forcing a refetch is a network round-trip plus a loading flicker, and better tools usually exist. Order of preference: (1) the mutation returns the updated record — patch the cache directly on success; (2) a surgical cache update (add/remove/update one item in a list cache) without hitting the network; (3) only when neither is feasible, invalidate/refetch. (This is react-query framing since it's the dominant library; if the target repo uses SWR/RTK-Query or similar, map to its equivalents.) **Look first, flag second** — read what the mutation does and what the server returns before flagging; some invalidations are genuinely necessary (server-side cascading effects the client can't model).
-
-**Prefer `mutate` + callbacks over `mutateAsync` + `await`.** Use `mutate(variables, { onSuccess, onError })` by default. Reach for `mutateAsync` + `await` only when: a subsequent statement in the same control flow genuinely depends on the resolved value and can't move into `onSuccess`; the caller's own contract requires returning a promise that resolves after the mutation completes; or multiple mutations must sequence in a way too tangled for nested `onSuccess`.
-
-```ts
-// Flag: resolved value only drives a side effect
-const handleSubmit = async () => {
-  const result = await someMutation.mutateAsync(variables)
-  doSideEffect(result)
-}
-
-// Better
-const handleSubmit = () => {
-  someMutation.mutate(variables, { onSuccess: (result) => doSideEffect(result) })
-}
-```
-
-Test: does the resolved value only drive a side effect (snackbar, redirect, cache patch, parent callback)? If yes, it belongs in `onSuccess` — errors flow through `onError` without a `try/catch` per call site, and pending/error state stays in sync automatically.
-
-**Enumerate `mutateAsync` by grep, do not eyeball.** This box is graded on whether the hits were listed, not on whether they were noticed. Find them mechanically over the diff's added lines with the `mutate-async.sh` sweep (see Sweeps).
-
-Emit one line per hit with a verdict:
-
-```
-grepped mutateAsync: 2 hits
-- [FAIL] useSubmitOrder.ts:34: resolved value only drives a snackbar; switch to `mutate` + `onSuccess`
-- [PASS] useCheckoutFlow.ts:52: awaited because the caller's own contract returns a promise after settlement
-```
-
-**Silence is not a pass:** a sweep that finds none must print `grepped mutateAsync: 0 hits` explicitly, so "no receipt" is never mistaken for "nothing there."
+The detail for §R11-§R13, §R21-§R23 and §R27 is in `${CLAUDE_PLUGIN_ROOT}/skills/react/references/data-fetching.md`. Read it in full before grading any of them.
 
 ---
 
 ### Section 4 — Forms
 
-#### §R14. Form is the single source of truth; validate via the library's own API
-
-**No `useState` shadowing a form-held value.** When a form-bound input already holds a value, don't keep a parallel `useState` just to read it in a handler.
-
-- **One-shot read** (submit handler, onClick): the library's one-shot getter (e.g. `getValues('foo')`), or the submit handler's own data argument. Note: a one-shot getter does not subscribe — it won't re-render the component when the value changes, unlike a reactive watch.
-- **Reactive read** (a dependent field, a preview that must update live): the library's reactive watch equivalent (e.g. `useWatch`).
-
-```tsx
-// Flag: shadows the form value with parallel state
-const [selected, setSelected] = useState<Foo>()
-const handleChange = (foo?: Foo) => setSelected(foo)
-const handleSubmit = methods.handleSubmit(() => selected && mutate(selected))
-return <FooAutocomplete onChange={handleChange} />
-
-// Better: read straight from the form
-const handleSubmit = methods.handleSubmit((data) => data.foo && mutate(data.foo))
-return <FooAutocomplete />
-```
-
-Why: two sources of truth get out of sync (a form reset, `defaultValues`, or a programmatic `setValue` all bypass the `useState`); the `onChange` that updates local state is a dead wrapper around the form's own `onChange`. **Flag whenever** a `useState<DomainRecord>` sits adjacent to a form-bound input with an `onChange` that just calls the setter — the setter, the state, and the handler are all redundant.
-
-**Validation schemas: check the library's API before hand-rolling.** Whatever validation library the target repo uses (zod, yup, and similar), any hand-rolled `check`/`refine`/inline regex/`.length`/manual `Number(...)` comparison that re-implements something the library already ships natively is a finding, regardless of data type. Before flagging, open the library's own API docs and look for a native validator/transform covering the same rule.
-
-- Coerce the input once in a `transform`, then validate with native rules — don't sprinkle `Number(value)` inside every check.
-- Optionality/blank handling uses the library's own `optional`/`nullable`/`nullish` combinators, not a hand-written short-circuit.
-- Any surviving hand-rolled check should be genuinely custom (cross-field, a domain invariant, a conditional requirement) — say so in the finding, so the reader knows it was considered, not missed.
-
-```ts
-// Flag: manual coercion repeated inside checks
-check((v) => Number(v) >= 0) // and again in another check
-
-// Better: coerce once, validate with the library's native actions
-pipe(union([string(), number()]), transform((v) => (v === '' ? 0 : Number(v))), minValue(0))
-```
+The detail for §R14 and §R24-§R26 is in `${CLAUDE_PLUGIN_ROOT}/skills/react/references/forms.md`. Read it in full before grading any of them.
 
 ---
 

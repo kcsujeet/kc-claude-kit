@@ -9,8 +9,6 @@ model: sonnet
 
 This is the kit's per-repo extension point. Every other gate ships fixed rules; this one instead reads the *target repo's own* `.claude/review-conventions.md` and turns whatever it says into first-class review rules for that repo only. No skill is preloaded: the rules come from the target repo.
 
-Repo authors write that file to the shape in the kit's [`docs/review-conventions.md`](../../../docs/review-conventions.md), which has the format guide and a worked example.
-
 ## Inputs
 
 The dispatch prompt gives you:

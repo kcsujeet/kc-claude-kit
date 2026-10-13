@@ -1,0 +1,8 @@
+src/widget-request.ts:1: const body = { name, ...(note ? { note } : {}) }
+src/widget-request.ts:2: const params = { ...base, ...(isArchived && { archived: true }) }
+src/widget-request.ts:3: const extra = hasOwner && { owner }
+src/widget-request.ts:4: const options = isPaged ? { page, perPage } : {}
+src/widget-request.ts:5: const rows = [...(showTotal ? [totalRow] : [])]
+src/widget-request.ts:6: const widgets = [...(await loadWidgets())]
+src/widget-request.ts:13: const editProps = mode === Mode.EDIT && { onEdit }
+src/widget-panel.tsx:5:     <Widget {...props} {...(isEditable && { onEdit })} />
