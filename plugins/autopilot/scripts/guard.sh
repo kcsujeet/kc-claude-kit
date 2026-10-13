@@ -168,8 +168,12 @@ merge_parts=(
 MERGE=$(alternatives "${merge_parts[@]}")
 
 # gh stack (the built-in stacked-PR command) is denied except read-only
-# subcommands; autopilot agents stack through the REST API instead.
-readonly GH_STACK='(^|[^[:alnum:]_-])gh[[:space:]]+(.*[[:space:]])?stack([[:space:]]|$)'
+# subcommands; autopilot agents stack through the REST API instead. stack
+# counts only as gh's subcommand, after any global flags (and their values),
+# so "Stack" in a PR title is not one. After it, -R/--repo and its value may
+# come before the read-only subcommand; any other word there denies.
+readonly GH_STACK='(^|[^[:alnum:]_-])gh([[:space:]]+-[^[:space:]]+([[:space:]]+[^-[:space:]][^[:space:]]*)?)*[[:space:]]+stack([[:space:]]|$)'
+readonly GH_STACK_REPO_FLAG='^[[:space:]]+(-R|--repo)([[:space:]]+|=)[^-[:space:]][^[:space:]]*'
 readonly GH_STACK_READ_ONLY='^([[:space:]]+(view|list|status|--help|-h))([[:space:]]|$)'
 
 readonly PUSH_WORD='(^|[^[:alnum:]_-])push([[:space:]]|$)'
@@ -456,7 +460,8 @@ check_bash() {
     if [[ $norm =~ $MERGE ]]; then deny "agents never merge; the user merges"; fi
 
     if [[ $norm =~ $GH_STACK ]]; then
-      stack_rest=${norm#*stack}
+      stack_rest=" ${norm#*"${BASH_REMATCH[0]}"}"
+      while [[ $stack_rest =~ $GH_STACK_REPO_FLAG ]]; do stack_rest=${stack_rest#"${BASH_REMATCH[0]}"}; done
       [[ $stack_rest =~ $GH_STACK_READ_ONLY ]] || deny "gh stack is limited to view, list and status; stack through the REST API"
     fi
 

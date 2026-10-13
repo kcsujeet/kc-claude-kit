@@ -76,6 +76,11 @@ check deny  "32 stack api merge"      "$(bash_payload $E 'gh api -X POST repos/o
 check allow "32 stack create via api" "$(bash_payload $E 'gh api -X POST repos/o/r/stacks -f pull_requests[]=1 -f pull_requests[]=2')"
 check allow "32 stack add via api"    "$(bash_payload $E 'gh api -X POST repos/o/r/stacks/4/add -f pull_requests[]=3')"
 check allow "32 main session stack"   "$(bash_payload '' 'gh stack submit')"
+check allow "34 Stack in a PR title"   "$(bash_payload autopilot:shipper 'gh pr create --title "Reset: Stack the counter cards" --body-file /s/U1/pr-body.md')"
+check allow "34 stack view with -R"    "$(bash_payload $E 'gh stack -R a/b view')"
+check allow "34 stack list with --repo=" "$(bash_payload $E 'gh stack --repo=a/b list')"
+check deny  "34 global -R before stack merge" "$(bash_payload $E 'gh -R a/b stack merge 3')"
+check deny  "34 -R then submit view"   "$(bash_payload $E 'gh stack -R a/b submit view')"
 check allow "8 main session"         "$(bash_payload '' 'gh pr merge 12')"
 check allow "8 other plugin agent"   "$(bash_payload code-review:naming-gate 'gh pr merge 12')"
 
