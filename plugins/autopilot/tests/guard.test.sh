@@ -275,6 +275,10 @@ check deny  "31 read PATH before heredoc"      "$(bash_payload $S "read PATH < f
 check deny  "31 mapfile PATH before heredoc"   "$(bash_payload $S "mapfile -t PATH < f${nl}cat <<EOF${nl}gh pr merge 1${nl}EOF")"
 check deny  "31 any other command before heredoc" "$(bash_payload $S "ls${nl}cat <<EOF${nl}gh pr merge 1${nl}EOF")"
 check allow "31 comment and blank before heredoc" "$(bash_payload $S "# notes${nl}${nl}cd $wt${nl}cat > src/notes.md <<'EOF'${nl}gh pr merge 1${nl}EOF")"
+# A comment line never continues in bash, even when it ends in a backslash,
+# so it cannot fold the next line into the clean prelude.
+check deny  "33 comment backslash hides a function before heredoc" "$(bash_payload $S "# note \\${nl}cat() { bash; }${nl}cat > f <<'EOF'${nl}git push --force origin main${nl}EOF")"
+check deny  "33 comment backslash then merge" "$(bash_payload $S "# x \\${nl}gh pr merge 1")"
 
 # 9: fail closed without jq. PATH without jq, keeping bash core utilities.
 nojq="$tmp/nojq"; mkdir -p "$nojq"

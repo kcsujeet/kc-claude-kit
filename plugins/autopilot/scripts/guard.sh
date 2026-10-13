@@ -334,8 +334,8 @@ check_file_write() {
 }
 
 # Prints $1 as the lines the guard checks, in one linear awk pass:
-# backslash-newline continuations joined; quotes, backslashes and backticks
-# stripped; >| read as >. A heredoc body is dropped only when bash certainly
+# backslash-newline continuations joined (a comment line never continues);
+# quotes, backslashes and backticks stripped; >| read as >. A heredoc body is dropped only when bash certainly
 # reads it as data, which this guard decides by allowlist rather than by
 # modelling bash quoting:
 # - the opener line is exactly `[cd P && ](cat|tee [-a] [P]) [> P] <<TAG
@@ -353,7 +353,9 @@ check_file_write() {
 # Exit 4: over MAX_SEGMENTS segments, or a logical line over that many lines.
 # shellcheck disable=SC2016 # $ in the awk program is awk's, not the shell's
 readonly READ_COMMANDS_AWK='
-function continues(s) { return match(s, /\\+$/) ? RLENGTH % 2 : 0 }
+# A comment line never continues: bash reads its trailing backslash as part
+# of the comment, so the next line stays a command of its own.
+function continues(s) { if (s ~ /^[ \t]*#/) return 0; return match(s, /\\+$/) ? RLENGTH % 2 : 0 }
 # The logical line starting at line i; sets next_i to the line after it.
 function logical_at(i,   s, parts) {
   s = line[i]; i++; parts = 1
