@@ -222,6 +222,41 @@ check deny  "28 function before heredoc"  "$(bash_payload $S "function cat { bas
 check deny  "28 enable -n before heredoc" "$(bash_payload $S "enable -n cat${nl}cat <<EOF${nl}gh pr merge 1${nl}EOF")"
 check allow "28 cd before heredoc"        "$(bash_payload $S "cd $wt${nl}cat > src/notes.md <<'EOF'${nl}gh pr merge 1${nl}EOF")"
 
+# Fix round 5: the verdict is the job's exit status, job children never
+# outlive the guard, and only blank, comment and cd lines may precede an
+# allowlisted heredoc opener.
+# Runs the guard under a 0-byte file size limit, so the job cannot write its
+# reason file: with SIGXFSZ ignored the write fails, by default it kills the job.
+check_full() {
+  local expectation=$1 label=$2 payload=$3 prelude=$4 output
+  output=$(printf '%s' "$payload" | bash -c "$prelude; exec bash \"\$0\"" "$guard")
+  if printf '%s' "$output" | grep -q "\"permissionDecision\":\"deny\".*$expectation"; then
+    echo "ok   $label"; passes=$((passes + 1))
+  else echo "FAIL $label"; echo "     expected deny with '$expectation', got: $output"; failures=$((failures + 1)); fi
+}
+check_full "tool call denied" "29 merge denied generically when the reason file cannot be written (XFSZ ignored)" "$(bash_payload $S 'gh pr merge 1')" "ulimit -f 0; trap '' XFSZ"
+check_full "tool call denied" "29 rm test denied generically when the reason file cannot be written (XFSZ ignored)" "$(bash_payload $E 'rm src/a.test.ts')" "ulimit -f 0; trap '' XFSZ"
+check_full "guard error"  "29 merge denied when the job dies writing the reason (default XFSZ)" "$(bash_payload $S 'gh pr merge 1')" "ulimit -f 0"
+check_full "guard error"  "29 merge denied when the job dies writing (XFSZ reset to default)" "$(bash_payload $S 'gh pr merge 1')" "ulimit -f 0; trap - XFSZ"
+# A job shell killed by TERM leaves its sleep behind unless the parent kills the group.
+AUTOPILOT_GUARD_DEADLINE_S=95 AUTOPILOT_GUARD_TEST_DELAY_S=91 bash "$guard" <<< "$(bash_payload $E 'ls')" > "$tmp/term.out" &
+guard_pid=$!
+for _ in $(seq 1 50); do sleep_pid=$(pgrep -fx 'sleep 91' || true); [ -n "$sleep_pid" ] && break; sleep 0.1; done
+job_pid=$(ps -o ppid= -p "$sleep_pid" | tr -d ' ')
+kill -TERM "$job_pid"
+wait "$guard_pid" || true
+if grep -q 'guard error' "$tmp/term.out" && ! pgrep -fx 'sleep 91' > /dev/null && ! pgrep -fx 'sleep 95' > /dev/null; then
+  echo "ok   30 TERM to the job shell: denied, sleep and timer gone"; passes=$((passes + 1))
+else
+  echo "FAIL 30 TERM to the job shell: denied, sleep and timer gone"; echo "     got: $(cat "$tmp/term.out"); left: $(pgrep -lfx 'sleep 9[15]')"; failures=$((failures + 1))
+  pkill -fx 'sleep 9[15]' || true
+fi
+check deny  "31 printf -v PATH before heredoc" "$(bash_payload $S "printf -v PATH /evil${nl}cat <<EOF${nl}gh pr merge 1${nl}EOF")"
+check deny  "31 read PATH before heredoc"      "$(bash_payload $S "read PATH < f${nl}cat <<EOF${nl}gh pr merge 1${nl}EOF")"
+check deny  "31 mapfile PATH before heredoc"   "$(bash_payload $S "mapfile -t PATH < f${nl}cat <<EOF${nl}gh pr merge 1${nl}EOF")"
+check deny  "31 any other command before heredoc" "$(bash_payload $S "ls${nl}cat <<EOF${nl}gh pr merge 1${nl}EOF")"
+check allow "31 comment and blank before heredoc" "$(bash_payload $S "# notes${nl}${nl}cd $wt${nl}cat > src/notes.md <<'EOF'${nl}gh pr merge 1${nl}EOF")"
+
 # 9: fail closed without jq. PATH without jq, keeping bash core utilities.
 nojq="$tmp/nojq"; mkdir -p "$nojq"
 for tool in bash cat grep sed tr printf dirname; do

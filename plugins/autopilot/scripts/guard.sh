@@ -41,12 +41,30 @@ IFS= read -r -d '' input || true
 readonly AUTOPILOT_AGENT='"agent_type"[[:space:]]*:[[:space:]]*"autopilot:'
 looks_like_autopilot() { [[ $input =~ $AUTOPILOT_AGENT ]]; }
 
+# Exit codes of the decision job (see the end of the file). Allow is the one
+# verdict that must be proven: only EXIT_ALLOW allows, every other status,
+# a plain 0 included, denies.
+readonly EXIT_ALLOW=42 EXIT_DENY=10
+in_job=0
+verdict_file=""
+
 decided=0
 deny() {
+  local json
   decided=1
+  if [ "$in_job" = 1 ]; then
+    # The reason is best effort; the verdict itself is the exit status, so a
+    # file that cannot be written (disk full, size limit) still denies.
+    printf '%s' "$1" > "$verdict_file" 2>/dev/null
+    exit "$EXIT_DENY"
+  fi
+  json=""
   if command -v jq >/dev/null 2>&1; then
-    jq -cn --arg reason "autopilot: $1" \
-      '{hookSpecificOutput:{hookEventName:"PreToolUse",permissionDecision:"deny",permissionDecisionReason:$reason}}'
+    json=$(jq -cn --arg reason "autopilot: $1" \
+      '{hookSpecificOutput:{hookEventName:"PreToolUse",permissionDecision:"deny",permissionDecisionReason:$reason}}' 2>/dev/null)
+  fi
+  if [ -n "$json" ]; then
+    printf '%s\n' "$json"
   else
     # Only fixed reasons reach this branch; strip anything JSON-unsafe anyway.
     printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"autopilot: %s"}}\n' \
@@ -60,7 +78,6 @@ deny() {
 # job or timer still running (see the end of the file) is killed first.
 job=""
 timer=""
-verdict_file=""
 # shellcheck disable=SC2329 # invoked by the EXIT trap
 on_exit() {
   local status=$?
@@ -316,11 +333,10 @@ check_file_write() {
 # - the opener line is exactly `[cd P && ](cat|tee [-a] [P]) [> P] <<TAG
 #   [> P]` or `[cd P && ]git commit [-flags] -F - <<TAG`, where P is a
 #   plain path and TAG is 'TAG', "TAG" or TAG;
-# - every line before it is plain text (no quotes, $, `, \, brackets or #),
-#   so it cannot be inside a multi-line string or construct, and none of
-#   them can change what the opener's command word runs (alias, hash,
-#   enable, shopt, builtin, command, exec, eval, source, function or
-#   name() definitions, PATH= or CDPATH= assignments);
+# - every line before it is blank, a comment, or `cd P` (an allowlist: any
+#   other line could open a multi-line string or construct, or change what
+#   the opener's command word runs, as alias, hash, enable, PATH=, printf -v
+#   PATH, read PATH < f, a function definition and many more do);
 # - its terminator line is exactly TAG (leading tabs allowed for <<-);
 # - an unquoted TAG's body has no $( or backtick (bash would run those).
 # Any other line containing << means nothing is dropped and every line is
@@ -360,19 +376,14 @@ BEGIN {
   HEREDOC = "<<-?[ \t]*" TAG
   OPENER_CAT = "^[ \t]*" CD "(cat|tee([ \t]+-a)?([ \t]+" P ")?)[ \t]*(>>?[ \t]*" P "[ \t]*)?" HEREDOC "([ \t]*>>?[ \t]*" P ")?[ \t]*$"
   OPENER_COMMIT = "^[ \t]*" CD "git[ \t]+commit([ \t]+-[A-Za-z]+)*[ \t]+-F[ \t]+-[ \t]*" HEREDOC "[ \t]*$"
-  PLAIN = "^[^" SQ DQ "$`\\\\(){}\\[\\]#]*$"
-  # A plain line that can still change what cat, tee, git or cd run.
-  WORD = "(^|[;&|][ \t]*|[ \t])"
-  PRELUDE = WORD "(alias|unalias|hash|enable|shopt|builtin|command|exec|eval|source|function|\\.)([ \t]|$)" \
-    "|(^|[^A-Za-z0-9_])(PATH|CDPATH)=" \
-    "|[A-Za-z_][A-Za-z0-9_]*[ \t]*\\(\\)"
+  CLEAN = "^[ \t]*(#.*)?$|^[ \t]*cd[ \t]+" P "[ \t]*$"
 }
 { line[++n] = $0; if (index($0, "<<")) has_heredoc = 1 }
 END {
   unsure = 0; i = 1
   while (i <= n && has_heredoc && !unsure) {
     s = logical_at(i); i = next_i
-    if (!index(s, "<<")) { if (s !~ PLAIN || s ~ PRELUDE) dirty = 1; continue }
+    if (!index(s, "<<")) { if (s !~ CLEAN) dirty = 1; continue }
     if (dirty || !allowlisted_opener(s)) { unsure = 1; break }
     found = 0; j = i
     while (j <= n) {
@@ -500,30 +511,37 @@ decide() {
 }
 
 # The decision runs as a job in its own process group (set -m gives each
-# background job one, tty or not) and writes its verdict to a file; a timer
-# job kills the whole group at the deadline. The parent alone prints: the
-# verdict when the job ended on its own, a deny when it was killed or
-# failed. Whichever job finishes first, the other group is killed and
-# reaped, so nothing outlives the guard. The jobs drop the EXIT trap and
-# job control so their children share their group and nothing they do
-# touches the verdict file.
+# background job one, tty or not); a timer job kills the whole group at the
+# deadline. The verdict travels in the job's exit status: EXIT_ALLOW when
+# decide() ran to the end without a deny, EXIT_DENY from deny() with the
+# reason in the verdict file (best effort), anything else is an error or
+# the kill. The parent alone prints, and allows only on EXIT_ALLOW. Both
+# groups are killed and reaped whichever finishes first, so nothing outlives
+# the guard, not even a child of a job shell that died abnormally. The jobs
+# drop the EXIT trap and job control so their children share their group
+# and nothing they do touches the verdict file.
 deadline=${AUTOPILOT_GUARD_DEADLINE_S:-8}
 case "$deadline" in ''|*[!0-9]*) deadline=8 ;; esac
 verdict_file=$(mktemp "${TMPDIR:-/tmp}/autopilot-guard.XXXXXX") || deny "guard error; refusing the tool call"
 set -m
-( trap - EXIT; set +m; decide ) > "$verdict_file" &
+( trap - EXIT; set +m; in_job=1; decide; exit "$EXIT_ALLOW" ) > /dev/null &
 job=$!
 ( trap - EXIT; set +m; sleep "$deadline"; kill -KILL -- "-$job" ) 2>/dev/null &
 timer=$!
 wait "$job" 2>/dev/null
 job_status=$?
+kill -KILL -- "-$job" 2>/dev/null
 kill -KILL -- "-$timer" 2>/dev/null
 wait "$timer" 2>/dev/null
 job=""
 timer=""
 set +m
 case "$job_status" in
-  0) decided=1; cat "$verdict_file" ;;
+  "$EXIT_ALLOW") ;;
+  "$EXIT_DENY")
+    reason=""
+    [ -r "$verdict_file" ] && IFS= read -r -d '' reason < "$verdict_file"
+    deny "${reason:-tool call denied}" ;;
   137) deny "guard timed out; command denied" ;;
   *) deny "guard error; refusing the tool call" ;;
 esac
