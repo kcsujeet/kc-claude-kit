@@ -13,8 +13,8 @@
 # Hook schema and deny JSON: https://code.claude.com/docs/en/hooks
 #
 # Bash commands are read the way bash reads them where it matters:
-# backslash-newline continuations are joined, and heredoc bodies are data,
-# not commands. Per-segment checks use builtins only, so long commands stay
+# backslash-newline continuations are joined, and the bodies of allowlisted
+# heredocs are data, not commands (anything else is checked line by line). Per-segment checks use builtins only, so long commands stay
 # fast (a hook that times out is non-blocking, i.e. it fails open).
 #
 # Output: the PreToolUse deny JSON on a block, nothing otherwise.
@@ -149,6 +149,8 @@ readonly CD_DIR='^[[:space:]]*(builtin[[:space:]]+)?(cd|pushd)[[:space:]]+([^-[:
 # outside heredoc bodies together); more is denied. At this size the worst
 # case stays well under the hook timeout.
 readonly MAX_LINE=65536
+# Most shell segments (and continuation lines in one logical line) checked.
+readonly MAX_SEGMENTS=2000
 
 # Sets $resolved to $1 made absolute against directory $2, with //, /./ and
 # /../ collapsed so a .. cannot step out of an allowed directory.
@@ -279,104 +281,75 @@ check_file_write() {
   check_path_write "$path" 1
 }
 
-# Prints $1 as bash would read its commands: backslash-newline continuations
-# joined, each heredoc body dropped once its delimiter line is found, then
-# quotes, backslashes and backticks stripped and >| read as >. One
-# linear awk pass (a per-character bash loop is quadratic on long lines).
-# Quote state ('…', "…", $'…', `…`, $( ), $(( ))) carries across lines. When
-# the parser is unsure (a line ends inside an open quote, a << inside $( ) or
-# backticks, a delimiter that is not a plain word, or no delimiter line), it
-# drops nothing and every line is checked as a command.
-# Exit 3: a logical line, or all the command text left to check (heredoc
-# bodies excluded), is longer than MAX bytes.
+# Prints $1 as the lines the guard checks, in one linear awk pass:
+# backslash-newline continuations joined; quotes, backslashes and backticks
+# stripped; >| read as >. A heredoc body is dropped only when bash certainly
+# reads it as data, which this guard decides by allowlist rather than by
+# modelling bash quoting:
+# - the opener line is exactly `[cd P && ](cat|tee [-a] [P]) [> P] <<TAG
+#   [> P]` or `[cd P && ]git commit [-flags] -F - <<TAG`, where P is a
+#   plain path and TAG is 'TAG', "TAG" or TAG;
+# - every line before it is plain text (no quotes, $, `, \, brackets or #),
+#   so it cannot be inside a multi-line string or construct;
+# - its terminator line is exactly TAG (leading tabs allowed for <<-);
+# - an unquoted TAG's body has no $( or backtick (bash would run those).
+# Any other line containing << means nothing is dropped and every line is
+# checked as a command.
+# Exit 3: a logical line, or all the text left to check, is over MAX bytes.
+# Exit 4: over MAX_SEGMENTS segments, or a logical line over that many lines.
 # shellcheck disable=SC2016 # $ in the awk program is awk's, not the shell's
 readonly READ_COMMANDS_AWK='
 function continues(s) { return match(s, /\\+$/) ? RLENGTH % 2 : 0 }
 # The logical line starting at line i; sets next_i to the line after it.
-function logical_at(i,   s) {
-  s = line[i]; i++
+function logical_at(i,   s, parts) {
+  s = line[i]; i++; parts = 1
   while (continues(s) && i <= n) {
     s = substr(s, 1, length(s) - 1) line[i]; i++
-    if (length(s) > MAX) exit 3
+    if (++parts > MAX_SEGMENTS || length(s) > MAX) exit 4
   }
   if (length(s) > MAX) exit 3
   next_i = i
   return s
 }
-# Scans one logical line, updating the carried quote state. Fills tag[],
-# tag_quoted[] and tag_dash[] with the heredocs it opens and returns their
-# count, or -1 when unsure.
-function scan(s,   len, k, c, prev, count, word, plain, singles, doubles) {
-  len = split(s, ch, "")
-  count = 0; prev = " "
-  for (k = 1; k <= len; k++) {
-    c = ch[k]
-    if (in_single) { if (c == SQ) in_single = 0; continue }
-    if (in_ansi) { if (c == BS) { k++; continue }; if (c == SQ) in_ansi = 0; continue }
-    if (c == BS) { k++; prev = "x"; continue }
-    if (in_double) { if (c == DQ) in_double = 0; continue }
-    if (c == SQ) { if (prev == "$") in_ansi = 1; else in_single = 1; prev = c; continue }
-    if (c == DQ) { in_double = 1; prev = c; continue }
-    if (c == "`") { in_backtick = !in_backtick; prev = c; continue }
-    if (c == "#" && prev ~ /^[ \t;&|(]$/) break
-    if (c == "(") {
-      if (ch[k + 1] == "(") { arith++; k++; prev = "("; continue }
-      if (prev == "$") subst++
-      prev = c; continue
-    }
-    if (c == ")") {
-      if (arith > 0 && ch[k + 1] == ")") { arith--; k++; prev = ")"; continue }
-      if (subst > 0) subst--
-      prev = c; continue
-    }
-    if (c == "<" && ch[k + 1] == "<") {
-      if (ch[k + 2] == "<") { k += 2; prev = "<"; continue }
-      if (arith > 0) { k++; prev = "<"; continue }
-      if (subst > 0 || in_backtick) return -1
-      k += 2
-      count++
-      tag_dash[count] = 0
-      if (ch[k] == "-") { tag_dash[count] = 1; k++ }
-      while (ch[k] == " " || ch[k] == "\t") k++
-      word = ""
-      while (k <= len && ch[k] !~ /^[ \t;|&<>()]$/) { word = word ch[k]; k++ }
-      k--
-      plain = word
-      singles = gsub(SQ, "", plain)
-      doubles = gsub(DQ, "", plain)
-      if (singles % 2 || doubles % 2) return -1
-      tag_quoted[count] = (singles + doubles > 0 || index(word, BS) > 0)
-      gsub(/\\/, "", plain)
-      if (plain !~ /^[A-Za-z0-9_.-]+$/) return -1
-      tag[count] = plain
-      prev = "x"; continue
-    }
-    prev = c
-  }
-  if (in_single || in_double || in_ansi || in_backtick || subst > 0 || arith > 0) return -1
-  return count
+# Sets tag, tag_quoted and tag_dash when s is an allowlisted opener.
+function allowlisted_opener(s,   rest) {
+  if (s !~ OPENER_CAT && s !~ OPENER_COMMIT) return 0
+  rest = substr(s, index(s, "<<") + 2)
+  tag_dash = (substr(rest, 1, 1) == "-")
+  sub(/^-?[ \t]*/, "", rest)
+  tag_quoted = (substr(rest, 1, 1) == SQ || substr(rest, 1, 1) == DQ)
+  match(rest, /[A-Za-z_][A-Za-z0-9_]*/)
+  tag = substr(rest, RSTART, RLENGTH)
+  return 1
 }
-BEGIN { SQ = sprintf("%c", 39); DQ = "\""; BS = "\\" }
+BEGIN {
+  SQ = sprintf("%c", 39); DQ = "\""
+  P = "[A-Za-z0-9_./~-]+"
+  TAG = "(" SQ "[A-Za-z_][A-Za-z0-9_]*" SQ "|" DQ "[A-Za-z_][A-Za-z0-9_]*" DQ "|[A-Za-z_][A-Za-z0-9_]*)"
+  CD = "(cd[ \t]+" P "[ \t]*&&[ \t]*)?"
+  HEREDOC = "<<-?[ \t]*" TAG
+  OPENER_CAT = "^[ \t]*" CD "(cat|tee([ \t]+-a)?([ \t]+" P ")?)[ \t]*(>>?[ \t]*" P "[ \t]*)?" HEREDOC "([ \t]*>>?[ \t]*" P ")?[ \t]*$"
+  OPENER_COMMIT = "^[ \t]*" CD "git[ \t]+commit([ \t]+-[A-Za-z]+)*[ \t]+-F[ \t]+-[ \t]*" HEREDOC "[ \t]*$"
+  PLAIN = "^[^" SQ DQ "$`\\\\(){}\\[\\]#]*$"
+}
 { line[++n] = $0; if (index($0, "<<")) has_heredoc = 1 }
 END {
   unsure = 0; i = 1
   while (i <= n && has_heredoc && !unsure) {
     s = logical_at(i); i = next_i
-    count = scan(s)
-    if (count < 0) { unsure = 1; break }
-    j = i
-    for (h = 1; h <= count; h++) {
-      found = 0
-      while (j <= n) {
-        start = j
-        if (tag_quoted[h]) { body = line[j]; j++ } else { body = logical_at(j); j = next_i }
-        for (m = start; m < j; m++) skip[m] = 1
-        if (tag_dash[h]) sub(/^\t+/, "", body)
-        if (body == tag[h]) { found = 1; break }
-      }
-      if (!found) { unsure = 1; break }
+    if (!index(s, "<<")) { if (s !~ PLAIN) dirty = 1; continue }
+    if (dirty || !allowlisted_opener(s)) { unsure = 1; break }
+    found = 0; j = i
+    while (j <= n) {
+      start = j
+      if (tag_quoted) { body = line[j]; j++ } else { body = logical_at(j); j = next_i }
+      if (!tag_quoted && (index(body, "$(") || index(body, "`"))) break
+      for (m = start; m < j; m++) skip[m] = 1
+      if (tag_dash) sub(/^\t+/, "", body)
+      if (body == tag) { found = 1; break }
     }
-    if (!unsure) i = j
+    if (!found) { unsure = 1; break }
+    i = j
   }
   i = 1
   while (i <= n) {
@@ -389,16 +362,19 @@ END {
     gsub(/["`\\]/, "", s)
     total += length(s) + 1
     if (total > MAX) exit 3
+    segments += gsub(/&&|\|\||;|\|/, "&", s) + 1
+    if (segments > MAX_SEGMENTS) exit 4
     print s
   }
 }'
 
 # Sets $command_text from $1 via READ_COMMANDS_AWK; denies a command too long
-# to parse in time (a hook that times out fails open).
+# or too complex to check in time (a hook that times out fails open).
 read_commands() {
   local status=0
-  command_text=$(printf '%s\n' "$1" | LC_ALL=C awk -v MAX="$MAX_LINE" "$READ_COMMANDS_AWK") || status=$?
+  command_text=$(printf '%s\n' "$1" | LC_ALL=C awk -v MAX="$MAX_LINE" -v MAX_SEGMENTS="$MAX_SEGMENTS" "$READ_COMMANDS_AWK") || status=$?
   if [ "$status" = 3 ]; then deny "command too long for the guard"; fi
+  if [ "$status" = 4 ]; then deny "command too complex for the guard"; fi
   if [ "$status" != 0 ]; then deny "guard error; refusing the tool call"; fi
 }
 

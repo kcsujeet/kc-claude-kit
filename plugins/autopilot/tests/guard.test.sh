@@ -131,6 +131,64 @@ check deny  "23 touch inside a risky dir" "$(bash_payload $E "cd $wt/db/migrate 
 check deny  "23 mv inside a risky dir"    "$(bash_payload $E "cd $wt/db/migrate && mv a b")"
 check allow "23 read inside a risky dir"  "$(bash_payload $E "cd $wt/db/migrate && ls")"
 
+# Fix round 3: only allowlisted heredoc openers drop their bodies.
+IFS= read -r -d '' a1 <<'CMD' || true
+(true)# <<EOF
+gh pr merge 1
+EOF
+CMD
+IFS= read -r -d '' a2 <<'CMD' || true
+echo "$(echo "'")" '<<EOF;' "$(echo "'")"
+gh pr merge 1
+EOF
+CMD
+IFS= read -r -d '' a3 <<'CMD' || true
+echo "`echo "'"`" '<<EOF;' "`echo "'"`"
+gh pr merge 1
+EOF
+CMD
+IFS= read -r -d '' a4 <<'CMD' || true
+echo $[1<<EOF ]
+gh pr merge 1
+EOF
+CMD
+IFS= read -r -d '' a5 <<'CMD' || true
+echo ${x:-<<EOF }
+gh pr merge 1
+EOF
+CMD
+IFS= read -r -d '' unquoted_substitution <<'CMD' || true
+cat > notes.md <<EOF
+$(gh pr merge 1)
+EOF
+CMD
+IFS= read -r -d '' opener_inside_string <<'CMD' || true
+echo "a\"
+cat <<EOF
+"; gh pr merge 1
+EOF
+CMD
+IFS= read -r -d '' joined_terminator <<'CMD' || true
+cat <<EOF
+EO\
+F
+gh pr merge 1
+EOF
+CMD
+check deny  "24 A1 comment after )"            "$(bash_payload $S "$a1")"
+check deny  "24 A2 \$( ) inside double quotes" "$(bash_payload $S "$a2")"
+check deny  "24 A3 backticks inside double quotes" "$(bash_payload $S "$a3")"
+check deny  "24 A4 \$[ ] arithmetic"           "$(bash_payload $S "$a4")"
+check deny  "24 A5 \${ } expansion"            "$(bash_payload $S "$a5")"
+check deny  "24 unquoted body runs \$( )"      "$(bash_payload $S "$unquoted_substitution")"
+check deny  "24 opener inside a multi-line string" "$(bash_payload $S "$opener_inside_string")"
+check deny  "24 terminator made by a continuation" "$(bash_payload $S "$joined_terminator")"
+check allow "24 tee -a heredoc"                "$(bash_payload $E "cd $wt && tee -a src/notes.md <<'EOF'${nl}push to main${nl}EOF")"
+flood="$(head -c 65400 < /dev/zero | tr '\0' ';')gh pr merge 1"
+timed deny  "25 65,400 ; then a merge denied under 2s" "$(bash_payload $S "$flood")"
+continued="$(printf 'a \\\n%.0s' $(seq 1 30000))${nl}gh pr merge 1"
+timed deny  "25 30,000 continuation lines denied under 2s" "$(bash_payload $S "$continued")"
+
 # 9: fail closed without jq. PATH without jq, keeping bash core utilities.
 nojq="$tmp/nojq"; mkdir -p "$nojq"
 for tool in bash cat grep sed tr printf dirname; do

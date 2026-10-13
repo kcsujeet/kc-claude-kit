@@ -9,7 +9,7 @@
             "type": "command",
             "command": "bash \"${CLAUDE_PLUGIN_ROOT}/scripts/guard.sh\"",
             "shell": "bash",
-            "timeout": 10
+            "timeout": 60
           }
         ]
       }
