@@ -47,7 +47,7 @@ cat > "$tmp/inject.json" <<'JSON'
 JSON
 status=0
 body=$(bash "$script" "$tmp/inject.json" 2>&1) || status=$?
-if [ "$status" = 0 ] && [ "$(printf '%s\n' "$body" | grep -c '</details>')" = 1 ] && ! printf '%s\n' "$body" | grep -q '^## injected'; then pass "free text cannot break the page"; else fail "free text cannot break the page" "status $status: $body"; fi
+if [ "$status" = 0 ] && [ "$(printf '%s\n' "$body" | grep -c '</details>')" = 2 ] && ! printf '%s\n' "$body" | grep -q '^## injected'; then pass "free text cannot break the page"; else fail "free text cannot break the page" "status $status: $body"; fi
 if printf '%s\n' "$body" | grep -q 'in 1 fix round\.'; then pass "singular fix round"; else fail "singular fix round" "$body"; fi
 
 cat > "$tmp/preexisting.json" <<'JSON'
@@ -76,6 +76,17 @@ if [ "$status" = 0 ] && printf '%s\n' "$body" | grep -q '^Review receipts incomp
   pass "incomplete review receipts: listed, sanitized"
 else fail "incomplete review receipts: listed, sanitized" "status $status: $body"; fi
 if ! printf '%s' "$(bash "$script" "$tmp/empty.json")" | grep -q 'receipts incomplete'; then pass "no receipts list when there are none"; else fail "no receipts list when there are none" "rendered"; fi
+
+cat > "$tmp/paths.json" <<'JSON'
+{"plan_title":"P","unit":{"id":"U1","title":"T"},"rounds":0,
+ "criteria":[],"staff":{"design":"see /wt/u1/app/a.rb:3","final":"f"},
+ "review":{"fixed":[],"dismissed":[],"deferred_minor":["/wt/u1/app/b.rb:9 nit"]},"qa":[],"decisions":[]}
+JSON
+body=$(bash "$script" "$tmp/paths.json" /wt/u1/)
+if printf '%s\n' "$body" | grep -qF 'see app/a.rb:3' && printf '%s\n' "$body" | grep -qxF -- '- app/b.rb:9 nit' && ! printf '%s' "$body" | grep -q '/wt/u1'; then
+  pass "worktree paths become repo-relative"
+else fail "worktree paths become repo-relative" "$body"; fi
+if printf '%s\n' "$body" | head -1 | grep -qxF '<details><summary>Autopilot report: U1 T</summary>'; then pass "report is one collapsed block"; else fail "report is one collapsed block" "$(printf '%s' "$body" | head -1)"; fi
 
 echo "pr-body: $passes passed, $failures failed"
 [ "$failures" = 0 ]

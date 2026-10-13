@@ -1,6 +1,6 @@
-## Saved replies: U2 Picker UI
+<details><summary>Autopilot report: U2 Picker UI</summary>
 
-Delivered by autopilot in 2 fix rounds. Every criterion below was checked by the verifier, not the author.
+Plan: Saved replies. Delivered by autopilot in 2 fix rounds. Every criterion below was checked by the verifier, not the author.
 
 ### Acceptance criteria
 
@@ -32,5 +32,7 @@ Dismissed:
 |---|---|---|
 | design gate | approach 2 | matches composer |
 | round 1 qa | 1 bug | double insert |
+
+</details>
 
 </details>
