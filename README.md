@@ -9,7 +9,7 @@ Sujeet's personal Claude Code toolkit for any codebase: portable coding conventi
 | `instructions` | Audits a repo's instruction setup and proposes what stays in CLAUDE.md, what becomes a path-scoped rule, a skill, or a hook. |
 | `testing` | Verification workflows: look at the UI before calling it done, and drive a cross-layer change end to end. |
 | `usage-band` | A row of pills above the prompt: the model, the current git branch, how full the context window is, the 5-hour and 7-day rate limits with their reset times, input, output and cache-read tokens, and the session's cost. The context, 5-hour and 7-day percentages turn amber from 70% and red from 90%. |
-| `autopilot` | Plan in, PRs out. `/autopilot:run` takes an approved plan file and a staff-engineer agent splits it into units; each unit goes through engineer, code review and lens reviewers, persona QA in a real browser and an independent verifier until clean, then opens a ready PR. You merge. |
+| `autopilot` | Plan in, PRs out. `/autopilot:run` takes an approved plan file and the staff-engineer `run` skill (on `best`) splits it into units; each unit goes through engineer, code review and lens reviewers, persona QA in a real browser and an independent verifier until clean, then opens a ready PR. You merge. |
 | `image-preview` | Thumbnails of the images you paste, above the prompt, instead of bare `[Image #1]` tags: the real picture in Ghostty and kitty, colored cells in other terminals. |
 
 ## Contents
@@ -181,7 +181,7 @@ If a gate agent is unavailable, for example because the `conventions` dependency
 
 ## Delivering a plan with autopilot
 
-`autopilot` turns an approved plan into pull requests. Your only touch points are writing (or agreeing) the plan and pressing merge. In between, a staff-engineer agent splits the plan into units and decides the approach, then a workflow takes each unit through an engineer, `code-review`'s gates, lens reviewers, persona QA in a real headless browser and an independent verifier, fixing until clean or giving up with a reason. It depends on `code-review`, `conventions` and `testing`, which install with it.
+`autopilot` turns an approved plan into pull requests. Your only touch points are writing (or agreeing) the plan and pressing merge. In between, the staff-engineer `run` skill (on `best`) splits the plan into units and decides the approach, then a workflow takes each unit through an engineer, `code-review`'s gates, lens reviewers, persona QA in a real headless browser and an independent verifier, fixing until clean or giving up with a reason. It depends on `code-review`, `conventions` and `testing`, which install with it.
 
 **Once per repo: `/autopilot:init`.** It checks that `git`, `jq`, `gh`, `node` and `curl` are present, installs a pinned Playwright, works out how to install, boot, seed, log in to and check your app, writes `.claude/autopilot.json`, and proves it by booting the app once and running your checks. Data isolation matters here: units run in parallel, each with its own copy of the app, so they share your database unless the recipe isolates it per unit (a database name or file built from the unit's port). If you cannot isolate it, `init` sets `limits.max_parallel_units` to 1.
 
@@ -200,7 +200,9 @@ You can also say "run this plan". The working tree must be clean, on the base br
 - Blocked units, each with the reason (no approach, did not converge, plan conflict, risky path, budget).
 - Bugs QA found that the change did not cause, left alone, so you can plan a fix.
 
-**Models.** Workers run on `sonnet` and the staff roles on `best`, both set in `.claude/autopilot.json` `models` ([model config](https://code.claude.com/docs/en/model-config)). Run `/model best` first if you want the main session on the top model throughout.
+**Models.** Workers run on `sonnet` and the staff roles on `best`, both set in `.claude/autopilot.json` `models` ([model config](https://code.claude.com/docs/en/model-config)). The `run` skill already sets `model: best` for its turn, so the staff engineer runs on the top model whatever your session's `/model` is.
+
+**Size.** A run is bounded by the workflow runtime's cap of 1,000 agents per run ([workflows, Behavior and limits](https://code.claude.com/docs/en/workflows#behavior-and-limits)), and each unit takes up to `limits.max_agents_per_unit` of them, so split very large plans (5 or more units) into several runs.
 
 **Permissions.** An unattended run prompts for every new tool call unless you run in auto mode ([permission modes](https://code.claude.com/docs/en/permission-modes)) or allow `Bash`, `Edit`, `Write` and `Workflow(autopilot:deliver)` in `.claude/settings.local.json`.
 
