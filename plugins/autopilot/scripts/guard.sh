@@ -78,7 +78,9 @@ deny() {
 # job or timer still running (see the end of the file) is killed first.
 job=""
 timer=""
-# shellcheck disable=SC2329 # invoked by the EXIT trap
+# Invoked by the EXIT trap. ShellCheck 0.11 reports that as SC2329; older
+# releases (the CI runner's) report the body as SC2317.
+# shellcheck disable=SC2317,SC2329
 on_exit() {
   local status=$?
   [ -n "$job" ] && kill -KILL -- "-$job" 2>/dev/null
