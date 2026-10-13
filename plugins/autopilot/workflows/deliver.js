@@ -25,7 +25,7 @@ const CONFIG_PATH = `${A.run_dir}/config.json`
 // review-code's phase-1 gates (plugins/code-review/skills/review-code/SKILL.md, Step 2):
 // all ten every round; a gate that does not apply returns PASS (N/A) itself.
 const GATE_TOPICS = ['naming', 'clarity', 'structure', 'simplicity', 'datetime', 'react', 'i18n', 'testing', 'correctness', 'project-conventions']
-const LENSES = ['security', 'data', 'compatibility', 'concurrency', 'accessibility', 'observability', 'plan-fit',
+const LENSES = ['security', 'data', 'compatibility', 'concurrency', 'accessibility', 'observability', 'plan-fit', 'readability',
   'type-safety', 'error-handling', 'performance', 'dependencies']
 
 // ---------- schemas ----------
