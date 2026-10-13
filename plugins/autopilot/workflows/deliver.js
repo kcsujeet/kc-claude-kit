@@ -236,6 +236,8 @@ async function runUnit(unit, baseBranch, progress, parentPr) {
     }
     const failing = criteria.filter(c => !c.passes).map(c => (c.evidence === NOT_CHECKED ? `${c.id} ${NOT_CHECKED}` : `${c.id} fails: ${c.evidence}`))
     const bugs = caused.map(b => `${b.title}: ${b.steps.join(' → ')} (evidence ${b.evidence})`)
+    // A QA-driven fix is a decision later review rounds may not revert without a new scenario.
+    history.push(...caused.map(b => ({ round: progress.rounds + 1, decision: 'fixed', finding: `QA: ${b.title}`, reason: `confirmed by the verifier (${b.persona || 'unattributed'}): ${b.steps.join(' → ')}` })))
     if (failing.length || bugs.length) { nextRound('qa', [...failing, ...bugs]); continue }
 
     const final = await call(`Final gate.\n${context}\nGet the diff with: git -C ${worktree} diff ${baseBranch}...HEAD\nContract results: ${JSON.stringify(criteria)}\nDecision log: ${JSON.stringify(decisions)}`,

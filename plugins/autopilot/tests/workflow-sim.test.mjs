@@ -421,6 +421,22 @@ const tests = {
     assert.match(verification[1].prompt, /Re-review\. Earlier review decisions/)
   },
 
+  'a QA-driven fix enters the history later review rounds see': async () => {
+    let verifierCalls = 0
+    const { byId, calls } = await simulate({
+      answer: (p, { agentType }) => {
+        if (agentType !== 'autopilot:verifier' || verifierCalls++ > 0) return undefined
+        return { criteria: [{ id: 'AC1', passes: true, evidence: 'ok' }], dropped: [], confirmed: [
+          { title: 'corrupt count shows NaN', steps: ['set count=abc', 'reload'], evidence: '/e/1.png', persona: 'newbie', origin: 'caused' }] }
+      },
+    })
+    assert.equal(byId.U1.status, 'done')
+    const secondLens = labelled(calls, 'U1 lens plan-fit r1')[1].prompt
+    const history = JSON.parse(secondLens.match(/^Earlier review decisions .*?: (\[.*\])$/m)[1])
+    assert.deepEqual(history, [{ round: 1, decision: 'fixed', finding: 'QA: corrupt count shows NaN', reason: 'confirmed by the verifier (newbie): set count=abc → reload' }])
+    assert.match(calls.filter(c => c.agentType === 'code-review:verification-gate')[1].prompt, /QA: corrupt count shows NaN/)
+  },
+
   // ---- lenses and personas ----
   'a lens that returns nothing once is retried': async () => {
     const { byId, calls } = await simulate({ answer: firstCalls(hasLabel('lens security r1'), null) })
