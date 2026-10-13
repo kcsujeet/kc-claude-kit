@@ -14,12 +14,19 @@
 #
 # Bash commands are read the way bash reads them where it matters:
 # backslash-newline continuations are joined, and the bodies of allowlisted
-# heredocs are data, not commands (anything else is checked line by line). Per-segment checks use builtins only, so long commands stay
-# fast (a hook that times out is non-blocking, i.e. it fails open).
+# heredocs are data, not commands (anything else is checked line by line).
+# Per-segment checks use builtins only, so long commands stay fast.
+#
+# A hook that times out is non-blocking, i.e. it fails open, so for an
+# autopilot:* agent the decision runs as a background job under a deadline
+# (AUTOPILOT_GUARD_DEADLINE_S, default 8, below hooks.json's timeout of 60):
+# past it the job's whole process group is killed and the call is denied.
+# Command size and path complexity are capped as well (deny), so the
+# deadline is a backstop rather than the normal way long input is handled.
 #
 # Output: the PreToolUse deny JSON on a block, nothing otherwise.
 # Exit: always 0. Fails closed for autopilot:* agents when jq is missing,
-# the input cannot be parsed, or the guard itself errors.
+# the input cannot be parsed, the deadline passes, or the guard itself errors.
 #
 # Only `set -u`: a failing command must never abort the guard and let the
 # tool call through (a hook that errors is non-blocking). `set -f`: words
@@ -49,10 +56,17 @@ deny() {
 }
 
 # An unexpected error (e.g. an unbound variable under set -u) denies instead
-# of exiting non-zero, which Claude Code would treat as "allow".
+# of exiting non-zero, which Claude Code would treat as "allow". Any decision
+# job or timer still running (see the end of the file) is killed first.
+job=""
+timer=""
+verdict_file=""
 # shellcheck disable=SC2329 # invoked by the EXIT trap
 on_exit() {
   local status=$?
+  [ -n "$job" ] && kill -KILL -- "-$job" 2>/dev/null
+  [ -n "$timer" ] && kill -KILL -- "-$timer" 2>/dev/null
+  [ -n "$verdict_file" ] && rm -f "$verdict_file"
   if [ "$status" != 0 ] && [ "$decided" = 0 ] && looks_like_autopilot; then
     deny "guard error; refusing the tool call"
   fi
@@ -151,12 +165,25 @@ readonly CD_DIR='^[[:space:]]*(builtin[[:space:]]+)?(cd|pushd)[[:space:]]+([^-[:
 readonly MAX_LINE=65536
 # Most shell segments (and continuation lines in one logical line) checked.
 readonly MAX_SEGMENTS=2000
+# Most path parts a resolved path (a write target, or the directory tracked
+# through cd) may have, and most bytes that directory may take; more is
+# denied. Keeps path work linear in the command: each resolve walks at most
+# this many parts, and the tracked directory never grows past a real path.
+readonly MAX_PATH_PARTS=256
+readonly MAX_PATH_BYTES=4096
 
 # Sets $resolved to $1 made absolute against directory $2, with //, /./ and
-# /../ collapsed so a .. cannot step out of an allowed directory.
+# /../ collapsed so a .. cannot step out of an allowed directory. A path
+# that is already in that form is returned as is, without a walk.
 resolve() {
-  local path=$1 out="" seg
+  local path=$1 out="" seg parts
   case "$path" in /*) ;; *) path="$2/$path" ;; esac
+  parts=${path//[!\/]/}
+  if [ "${#parts}" -gt "$MAX_PATH_PARTS" ]; then deny "command too complex for the guard"; fi
+  case "$path" in
+    *//*|*/./*|*/../*|*/.|*/..) ;;
+    *) path=${path%/}; resolved=${path:-/}; return ;;
+  esac
   local IFS=/
   for seg in $path; do
     case "$seg" in
@@ -290,7 +317,10 @@ check_file_write() {
 #   [> P]` or `[cd P && ]git commit [-flags] -F - <<TAG`, where P is a
 #   plain path and TAG is 'TAG', "TAG" or TAG;
 # - every line before it is plain text (no quotes, $, `, \, brackets or #),
-#   so it cannot be inside a multi-line string or construct;
+#   so it cannot be inside a multi-line string or construct, and none of
+#   them can change what the opener's command word runs (alias, hash,
+#   enable, shopt, builtin, command, exec, eval, source, function or
+#   name() definitions, PATH= or CDPATH= assignments);
 # - its terminator line is exactly TAG (leading tabs allowed for <<-);
 # - an unquoted TAG's body has no $( or backtick (bash would run those).
 # Any other line containing << means nothing is dropped and every line is
@@ -331,13 +361,18 @@ BEGIN {
   OPENER_CAT = "^[ \t]*" CD "(cat|tee([ \t]+-a)?([ \t]+" P ")?)[ \t]*(>>?[ \t]*" P "[ \t]*)?" HEREDOC "([ \t]*>>?[ \t]*" P ")?[ \t]*$"
   OPENER_COMMIT = "^[ \t]*" CD "git[ \t]+commit([ \t]+-[A-Za-z]+)*[ \t]+-F[ \t]+-[ \t]*" HEREDOC "[ \t]*$"
   PLAIN = "^[^" SQ DQ "$`\\\\(){}\\[\\]#]*$"
+  # A plain line that can still change what cat, tee, git or cd run.
+  WORD = "(^|[;&|][ \t]*|[ \t])"
+  PRELUDE = WORD "(alias|unalias|hash|enable|shopt|builtin|command|exec|eval|source|function|\\.)([ \t]|$)" \
+    "|(^|[^A-Za-z0-9_])(PATH|CDPATH)=" \
+    "|[A-Za-z_][A-Za-z0-9_]*[ \t]*\\(\\)"
 }
 { line[++n] = $0; if (index($0, "<<")) has_heredoc = 1 }
 END {
   unsure = 0; i = 1
   while (i <= n && has_heredoc && !unsure) {
     s = logical_at(i); i = next_i
-    if (!index(s, "<<")) { if (s !~ PLAIN) dirty = 1; continue }
+    if (!index(s, "<<")) { if (s !~ PLAIN || s ~ PRELUDE) dirty = 1; continue }
     if (dirty || !allowlisted_opener(s)) { unsure = 1; break }
     found = 0; j = i
     while (j <= n) {
@@ -417,6 +452,7 @@ check_bash() {
     if [[ $norm =~ $CD_DIR ]]; then
       resolve "${BASH_REMATCH[3]}" "$base"
       base=$resolved
+      if [ "${#base}" -gt "$MAX_PATH_BYTES" ]; then deny "command too complex for the guard"; fi
       # Inside a risky directory every write target is risky: touch add_col.
       base_risky=0
       if [ "$agent" = autopilot:engineer ] && is_risky "$base/_"; then base_risky=1; fi
@@ -454,8 +490,41 @@ check_bash() {
   done < <(split_segments "$command_text")
 }
 
-case "$tool" in
-  Edit|Write|MultiEdit) check_file_write ;;
-  Bash) check_bash ;;
+decide() {
+  # Test hook: a delay inside the job, so the deadline can be exercised.
+  if [ -n "${AUTOPILOT_GUARD_TEST_DELAY_S:-}" ]; then sleep "$AUTOPILOT_GUARD_TEST_DELAY_S"; fi
+  case "$tool" in
+    Edit|Write|MultiEdit) check_file_write ;;
+    Bash) check_bash ;;
+  esac
+}
+
+# The decision runs as a job in its own process group (set -m gives each
+# background job one, tty or not) and writes its verdict to a file; a timer
+# job kills the whole group at the deadline. The parent alone prints: the
+# verdict when the job ended on its own, a deny when it was killed or
+# failed. Whichever job finishes first, the other group is killed and
+# reaped, so nothing outlives the guard. The jobs drop the EXIT trap and
+# job control so their children share their group and nothing they do
+# touches the verdict file.
+deadline=${AUTOPILOT_GUARD_DEADLINE_S:-8}
+case "$deadline" in ''|*[!0-9]*) deadline=8 ;; esac
+verdict_file=$(mktemp "${TMPDIR:-/tmp}/autopilot-guard.XXXXXX") || deny "guard error; refusing the tool call"
+set -m
+( trap - EXIT; set +m; decide ) > "$verdict_file" &
+job=$!
+( trap - EXIT; set +m; sleep "$deadline"; kill -KILL -- "-$job" ) 2>/dev/null &
+timer=$!
+wait "$job" 2>/dev/null
+job_status=$?
+kill -KILL -- "-$timer" 2>/dev/null
+wait "$timer" 2>/dev/null
+job=""
+timer=""
+set +m
+case "$job_status" in
+  0) decided=1; cat "$verdict_file" ;;
+  137) deny "guard timed out; command denied" ;;
+  *) deny "guard error; refusing the tool call" ;;
 esac
 exit 0

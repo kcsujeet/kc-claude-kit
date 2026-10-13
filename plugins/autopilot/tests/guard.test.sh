@@ -90,15 +90,18 @@ check deny  "20 risky directory target" "$(bash_payload $E "cd $wt && cp /tmp/x.
 check deny  "18 git clean tests"     "$(bash_payload $E 'git clean -f src/__tests__')"
 
 # Timing: a hook that times out fails open, so long commands must stay fast.
+# $4 is the most seconds allowed (default 2); extra arguments are VAR=value
+# settings for the guard's environment.
 timed() {
-  local expectation=$1 label=$2 payload=$3 output seconds verdict
+  local expectation=$1 label=$2 payload=$3 limit=${4:-2} output seconds verdict
+  shift 3; [ $# = 0 ] || shift
   TIMEFORMAT=%R
-  seconds=$( { time printf '%s' "$payload" | bash "$guard" > "$tmp/timed.out"; } 2>&1 )
+  seconds=$( { time printf '%s' "$payload" | env "$@" bash "$guard" > "$tmp/timed.out"; } 2>&1 )
   output=$(cat "$tmp/timed.out")
   if [ -z "$output" ]; then verdict=allow
-  elif printf '%s' "$output" | grep -q '"permissionDecision":"deny"'; then verdict=deny
+  elif [ "$(grep -c '"permissionDecision":"deny"' "$tmp/timed.out")" = 1 ]; then verdict=deny
   else verdict="unexpected: $output"; fi
-  if [ "$verdict" = "$expectation" ] && awk -v s="$seconds" 'BEGIN { exit !(s < 2) }'; then
+  if [ "$verdict" = "$expectation" ] && awk -v s="$seconds" -v max="$limit" 'BEGIN { exit !(s < max) }'; then
     echo "ok   $label (${seconds}s)"; passes=$((passes + 1))
   else
     echo "FAIL $label"; echo "     expected $expectation, got $verdict in ${seconds}s"; failures=$((failures + 1))
@@ -188,6 +191,36 @@ flood="$(head -c 65400 < /dev/zero | tr '\0' ';')gh pr merge 1"
 timed deny  "25 65,400 ; then a merge denied under 2s" "$(bash_payload $S "$flood")"
 continued="$(printf 'a \\\n%.0s' $(seq 1 30000))${nl}gh pr merge 1"
 timed deny  "25 30,000 continuation lines denied under 2s" "$(bash_payload $S "$continued")"
+
+# Fix round 4: cd chains stay linear, a deadline fails closed, and lines
+# before a heredoc opener cannot redefine its command.
+deep=$(printf 'a/%.0s' $(seq 1 100)); deep=${deep%/}
+chain1=""; for i in $(seq 1 300); do chain1="${chain1}cd $deep;"; done
+chain2=""; for i in $(seq 1 1999); do chain2="${chain2}cd a/../b/../c/../d/../e/f/g;"; done
+timed deny  "26 300 deep relative cds then a merge denied under 3s" "$(bash_payload $E "${chain1}gh pr merge 1")" 3
+timed deny  "26 1999 dotted relative cds denied under 3s"          "$(bash_payload $E "${chain2}ls")" 3
+check allow "26 a few relative cds"  "$(bash_payload $E "cd src && cd ../db && cd .. && ls")"
+check deny  "26 relative cd into a risky dir" "$(bash_payload $E "cd $wt/src && cd ../db/./migrate && touch add_col")"
+# The guard's jobs are `sleep <deadline>` and, with the test delay, `sleep <delay>`;
+# unusual values make them findable. None may outlive the guard.
+timed deny  "27 deadline of 1s denies within 2s" "$(bash_payload $E 'ls')" 2 AUTOPILOT_GUARD_DEADLINE_S=1 AUTOPILOT_GUARD_TEST_DELAY_S=93
+if grep -q 'guard timed out' "$tmp/timed.out" && ! pgrep -fx 'sleep 93' > /dev/null; then
+  echo "ok   27 timed-out job and its sleep are gone"; passes=$((passes + 1))
+else
+  echo "FAIL 27 timed-out job and its sleep are gone"; echo "     got: $(cat "$tmp/timed.out"); left: $(pgrep -lfx 'sleep 93')"; failures=$((failures + 1))
+fi
+timed allow "27 normal command under the deadline" "$(bash_payload $E 'ls')" 2 AUTOPILOT_GUARD_DEADLINE_S=97
+if ! pgrep -fx 'sleep 97' > /dev/null; then
+  echo "ok   27 no timer left after a normal decision"; passes=$((passes + 1))
+else
+  echo "FAIL 27 no timer left after a normal decision"; echo "     left: $(pgrep -lfx 'sleep 97')"; failures=$((failures + 1))
+fi
+check deny  "28 hash -p before heredoc"   "$(bash_payload $S "hash -p /bin/bash cat${nl}cat <<EOF${nl}gh pr merge 1${nl}EOF")"
+check deny  "28 alias before heredoc"     "$(bash_payload $S "shopt -s expand_aliases; alias cat=bash${nl}cat <<EOF${nl}gh pr merge 1${nl}EOF")"
+check deny  "28 PATH before heredoc"      "$(bash_payload $S "export PATH=/evil:/bin${nl}cat <<EOF${nl}gh pr merge 1${nl}EOF")"
+check deny  "28 function before heredoc"  "$(bash_payload $S "function cat { bash; }${nl}cat <<EOF${nl}gh pr merge 1${nl}EOF")"
+check deny  "28 enable -n before heredoc" "$(bash_payload $S "enable -n cat${nl}cat <<EOF${nl}gh pr merge 1${nl}EOF")"
+check allow "28 cd before heredoc"        "$(bash_payload $S "cd $wt${nl}cat > src/notes.md <<'EOF'${nl}gh pr merge 1${nl}EOF")"
 
 # 9: fail closed without jq. PATH without jq, keeping bash core utilities.
 nojq="$tmp/nojq"; mkdir -p "$nojq"
