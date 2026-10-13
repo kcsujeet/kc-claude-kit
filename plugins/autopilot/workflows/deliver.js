@@ -416,14 +416,14 @@ async function codeReviewGates({ unit, tag, worktree, baseBranch, state, call, n
   // FAIL; receipt-only items re-run the gates they name once, then whatever is
   // left is recorded as incomplete receipts and does not block the unit.
   let verification = await verify('')
-  let audit = auditItems(verification, prep.files || [])
+  let audit = auditItems(verification, prep.files || [], worktree)
   if (audit.receipts.length) {
     const named = GATE_TOPICS.filter(g => audit.receipts.some(r => r.gates.includes(g)))
     const findings = audit.receipts.map(r => `- ${r.text}`).join('\n')
     const rerun = await settle(named.map(gate => () => runGate(gate, `${inputs}\n\nThe verification gate failed your last verdict's receipts:\n${findings}\nReturn a complete verdict block that fixes them.`, ' recheck')))
     phase1 = phase1.map(g => rerun.find(r => r.gate === g.gate) || g)
     verification = await verify(' recheck')
-    audit = auditItems(verification, prep.files || [])
+    audit = auditItems(verification, prep.files || [], worktree)
   }
 
   const scope = parseGateBlock(`STATUS: PASS\n${prep.scope}`) || { failBoxes: ['scope block unreadable'], findings: [] }
@@ -438,25 +438,48 @@ async function codeReviewGates({ unit, tag, worktree, baseBranch, state, call, n
 // lead naming a gate or the SCOPE block is receipt-only; a lead citing a file
 // in the diff is code. A finding with neither, and every FAIL box when there
 // are no findings, is receipt-only and names the gates its text mentions.
-function auditItems(verification, files) {
+function auditItems(verification, files, worktree) {
   if (!(verification.status === 'FAIL' || verification.findings.length)) return { code: [], receipts: [] }
   const mentioned = text => GATE_TOPICS.filter(g => new RegExp(`(^|[^\\w-])${g}([^\\w-]|$)`, 'i').test(text))
   const code = []
   const receipts = []
+  // An item naming no gate has nothing to re-run, so triage judges it as code.
+  const sort = (text, location, severity, receiptLike) => {
+    const gates = mentioned(text)
+    if (receiptLike && gates.length) receipts.push({ text, gates })
+    else code.push({ location: location || 'verification', scenario: text, severity, lens: 'verification' })
+  }
   for (const f of verification.findings) {
     const sev = Object.keys(SEVERITY).find(e => f.startsWith(e))
     const lead = ((sev ? f.slice(sev.length) : f).trim().match(/^(.+?):\s/) || [null, ''])[1]
     const leadsWithGate = /^scope\b/i.test(lead) || GATE_TOPICS.some(g => new RegExp(`^${g}([^\\w-]|$)`, 'i').test(lead))
-    const location = locationOf(lead)
-    const inDiff = location && files.includes(location.split(':')[0])
-    if (!leadsWithGate && inDiff) code.push({ location, scenario: `verification: ${f}`, severity: sev ? SEVERITY[sev] : 'major', lens: 'verification' })
-    else receipts.push({ text: `verification: ${f}`, gates: mentioned(f) })
+    const location = diffLocation(lead, files, worktree)
+    sort(`verification: ${f}`, location || diffLocation(f, files, worktree), sev ? SEVERITY[sev] : 'major', leadsWithGate || !location)
   }
   if (!verification.findings.length) {
     const boxes = verification.failBoxes.length ? verification.failBoxes : ['FAILED without box details']
-    receipts.push(...boxes.map(b => ({ text: `verification ${b}`, gates: mentioned(b) })))
+    for (const b of boxes) sort(`verification ${b}`, diffLocation(b, files, worktree), 'major', true)
   }
   return { code, receipts }
+}
+
+// The first "<path>:<line>", "<path>:L<line>" or "<path> line <line>" in text
+// whose path is a changed file, as "<changed path>:<line>". The path may carry
+// ./, a/, b/ or the worktree prefix, and matches a changed file by path suffix,
+// or by basename when only one changed file has it.
+function diffLocation(text, files, worktree) {
+  const prefix = worktree ? `${worktree.replace(/\/$/, '')}/` : null
+  for (const m of text.matchAll(/([\w./@+-]*\w\.\w+)(?::L?(\d+)|\s+line\s+(\d+))/gi)) {
+    let path = m[1]
+    if (prefix && path.startsWith(prefix)) path = path.slice(prefix.length)
+    path = path.replace(/^(\.\/|[ab]\/)+/, '')
+    const base = path.split('/').pop()
+    const bySuffix = files.filter(f => f === path || f.endsWith(`/${path}`) || path.endsWith(`/${f}`))
+    const byBase = files.filter(f => f.split('/').pop() === base)
+    const file = bySuffix.length === 1 ? bySuffix[0] : (!bySuffix.length && byBase.length === 1 ? byBase[0] : null)
+    if (file) return `${file}:${m[2] || m[3]}`
+  }
+  return null
 }
 
 // ---------- QA: boot, personas in parallel, verifier, stop ----------

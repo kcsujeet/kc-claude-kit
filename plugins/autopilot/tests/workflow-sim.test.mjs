@@ -364,11 +364,49 @@ const tests = {
     assert.deepEqual(byId.U1.result.review_receipts_incomplete, ['verification §V3: testing §T6 gives a count, not per-hit verdicts'])
   },
 
-  'a verification FAIL with no boxes or findings is receipt-only': async () => {
+  'a verification FAIL with no boxes or findings names no gate, so triage gets it': async () => {
     const bare = gateBlock('verification', 'FAIL', ['[PASS] §V1: ok'])
-    const { byId } = await simulate({ answer: firstCalls(opts => opts.agentType === 'code-review:verification-gate', bare, 2) })
+    const { byId, calls } = await simulate({ answer: firstCalls(opts => opts.agentType === 'code-review:verification-gate', bare) })
     assert.equal(byId.U1.status, 'done')
-    assert.deepEqual(byId.U1.result.review_receipts_incomplete, ['verification FAILED without box details'])
+    assert.equal(labelled(calls, 'U1 gate verification recheck').length, 0)
+    const fails = JSON.parse(labelled(calls, 'U1 triage')[0].prompt.match(/^Gate FAILs: (.*)$/m)[1])
+    assert.deepEqual(fails.map(f => [f.location, f.scenario]), [['verification', 'verification FAILED without box details']])
+    assert.deepEqual(byId.U1.result.review_receipts_incomplete, [])
+  },
+
+  'verification findings citing diff code in any common form go to triage': async () => {
+    const forms = [
+      ['🟠 src/counter.js:L12: zero written twice. Show one write', 'src/counter.js:12'],
+      ['🟠 counter.js:12: basename only. Fix', 'src/counter.js:12'],
+      ['🟠 ./src/counter.js:12: dot prefix. Fix', 'src/counter.js:12'],
+      ['🟠 b/src/counter.js:7: diff prefix. Fix', 'src/counter.js:7'],
+      ['🟠 /wt/U1/src/counter.js:9: worktree prefix. Fix', 'src/counter.js:9'],
+      ['🟠 src/counter.js line 12: prose form. Fix', 'src/counter.js:12'],
+    ]
+    const { calls } = await simulate({
+      answer: (p, { agentType, label }, seen) => {
+        if (label.endsWith('review prep')) return { exit_code: 0, output: '', head_sha: 'abc', diff_file: '/d', changed_files: '/c', files: ['src/counter.js', 'test/counter.test.js'], scope: SCOPE_PASS }
+        if (agentType === 'code-review:verification-gate' && !label.includes('recheck') && labelled(seen, 'U1 triage').length === 0) {
+          return gateBlock('verification', 'FAIL', ['[FAIL] §V1: see findings'], forms.map(f => f[0]))
+        }
+        return undefined
+      },
+    })
+    const fails = JSON.parse(labelled(calls, 'U1 triage')[0].prompt.match(/^Gate FAILs: (.*)$/m)[1])
+    assert.deepEqual(fails.map(f => f.location), forms.map(f => f[1]))
+    assert.ok(fails.every(f => f.lens === 'verification'))
+  },
+
+  'a basename shared by two changed files is not guessed': async () => {
+    const { calls } = await simulate({
+      answer: (p, { agentType, label }, seen) => {
+        if (label.endsWith('review prep')) return { exit_code: 0, output: '', head_sha: 'abc', diff_file: '/d', changed_files: '/c', files: ['a/index.js', 'b/index.js'], scope: SCOPE_PASS }
+        if (agentType === 'code-review:verification-gate' && !label.includes('recheck') && labelled(seen, 'U1 triage').length === 0) return gateBlock('verification', 'FAIL', ['[FAIL] §V1: x'], ['🟠 index.js:3: ambiguous. Fix'])
+        return undefined
+      },
+    })
+    const fails = JSON.parse(labelled(calls, 'U1 triage')[0].prompt.match(/^Gate FAILs: (.*)$/m)[1])
+    assert.deepEqual(fails.map(f => f.location), ['verification'], 'no gate named and no unique file: still triaged, never dropped')
   },
 
   'a gate that returns nothing once is retried': async () => {
