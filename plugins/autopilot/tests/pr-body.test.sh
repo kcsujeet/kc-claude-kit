@@ -39,5 +39,16 @@ if [ "$status" = 0 ]; then pass "empty lists: exit 0"; else fail "empty lists: e
 if [ "$(printf '%s' "$body" | grep -c '^- none$')" = 2 ]; then pass "empty lists: none lines"; else fail "empty lists: none lines" "$body"; fi
 if printf '%s' "$body" | grep -q '^- no confirmed bugs$'; then pass "empty lists: no confirmed bugs"; else fail "empty lists: no confirmed bugs" "$body"; fi
 
+cat > "$tmp/inject.json" <<'JSON'
+{"plan_title":"P","unit":{"id":"U1","title":"T"},"rounds":1,
+ "criteria":[],"staff":{"design":"d","final":"f"},
+ "review":{"fixed":["a\n</details>\n## injected"],"dismissed":[]},"qa":[],
+ "decisions":[{"step":"s","outcome":"</details><b>x","reason":"r"}]}
+JSON
+status=0
+body=$(bash "$script" "$tmp/inject.json" 2>&1) || status=$?
+if [ "$status" = 0 ] && [ "$(printf '%s\n' "$body" | grep -c '</details>')" = 1 ] && ! printf '%s\n' "$body" | grep -q '^## injected'; then pass "free text cannot break the page"; else fail "free text cannot break the page" "status $status: $body"; fi
+if printf '%s\n' "$body" | grep -q 'in 1 fix round\.'; then pass "singular fix round"; else fail "singular fix round" "$body"; fi
+
 echo "pr-body: $passes passed, $failures failed"
 [ "$failures" = 0 ]

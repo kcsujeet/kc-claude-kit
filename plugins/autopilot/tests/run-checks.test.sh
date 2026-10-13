@@ -22,5 +22,17 @@ if [ "$(cat "$tmp/where.txt" 2>/dev/null)" = "$tmp" ]; then pass "runs in worktr
 echo '{"checks":["true"]}' > "$tmp/ok.json"
 if bash "$script" "$tmp/ok.json" "$tmp" >/dev/null 2>&1; then pass "exit 0 when all pass"; else fail "exit 0 when all pass" "non-zero"; fi
 
+echo '{"checks":["cat >/dev/null","echo second"]}' > "$tmp/stdin.json"
+status=0
+out=$(bash "$script" "$tmp/stdin.json" "$tmp" 2>&1) || status=$?
+if [ "$status" = 0 ] && printf '%s' "$out" | grep -q '^checks: 2/2 passed$'; then pass "a check reading stdin does not swallow the rest"; else fail "a check reading stdin does not swallow the rest" "status $status: $out"; fi
+
+for bad in '{}' '{"checks":[]}' 'not json'; do
+  echo "$bad" > "$tmp/bad.json"
+  status=0
+  out=$(bash "$script" "$tmp/bad.json" "$tmp" 2>&1) || status=$?
+  if [ "$status" = 1 ] && printf '%s' "$out" | grep -q '^run-checks:'; then pass "unreadable or empty checks fail: $bad"; else fail "unreadable or empty checks fail: $bad" "status $status: $out"; fi
+done
+
 echo "run-checks: $passes passed, $failures failed"
 [ "$failures" = 0 ]
