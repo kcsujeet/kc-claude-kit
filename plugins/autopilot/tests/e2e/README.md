@@ -25,9 +25,8 @@ Pass when all hold:
 - U2's verifier evidence for AC2 is a screenshot after a reload showing 0.
 - Both `unit-result.json` and `pr-body.md` exist under `.autopilot/runs/<id>/U*/`, and no push or PR happened.
 
-Negative check, on a fresh fixture (repeat step 1 into a new directory): before step 3, edit `docs/plans/reset.md` so U1's scope line (the line under `- Covers: AC3`) reads exactly ``Call the existing `reset(storage)` in counter.js from a test.`` Leave the edit uncommitted (the run allows the plan file to be dirty). counter.js has no `reset`, so the pass condition is:
-- U1 ends `blocked:plan-conflict`, and its reason quotes both the plan's scope line and the code (counter.js exports only `load` and `add`).
-- U2 ends `skipped` (depends on U1).
-- The report tells the user what to decide: change the plan, or add `reset` to the code first.
+Negative check, on a fresh fixture (repeat step 1 into a new directory): before step 3, edit `docs/plans/reset.md` so U1's scope line (the line under `- Covers: AC3`) reads exactly ``Call the existing `reset(storage)` in counter.js from a test.`` Leave the edit uncommitted (the run allows the plan file to be dirty). counter.js has no `reset`. The staff engineer reads the code before starting the workflow (`skills/run/SKILL.md` step 2), so it should stop there. Pass when either holds:
+- The run stops before the workflow (no `.autopilot/runs/` directory, plan unedited), quoting the plan's scope line and the code (counter.js exports only `load` and `add`), and tells the user what to decide: change the plan, or add `reset` to the code first. (Seen on 2026-10-12.)
+- Or, if the conflict is only caught inside the workflow: U1 ends `blocked:plan-conflict` with a reason quoting the plan and the code, U2 ends `skipped`, and the report says what the user needs to decide. (This path is also covered by `tests/workflow-sim.test.mjs`, "plan-conflict blocks the unit and skips its dependent".)
 
 Record the run's agent count and wall time from `/workflows` (or the headless JSON's `total_cost_usd` and `duration_ms`) in the release notes.
