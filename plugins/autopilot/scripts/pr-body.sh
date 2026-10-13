@@ -2,7 +2,8 @@
 # Renders a unit's PR body from the unit result JSON the shipper agent writes.
 # Usage: pr-body.sh <unit-result.json>
 # Output: PR body markdown on stdout. Missing or empty lists render as
-#   "- none" / "- no confirmed bugs".
+#   "- none" / "- no confirmed bugs"; the "Found by QA, not caused by this
+#   change" section (qa_preexisting) appears only when it has entries.
 # Exit: 0 ok; 2 jq missing; jq's own status on bad input.
 set -euo pipefail
 command -v jq >/dev/null 2>&1 || { echo "autopilot: jq is required" >&2; exit 2; }
@@ -30,6 +31,9 @@ jq -r '
   (if ((.qa // []) | length) == 0 then "- no confirmed bugs" else
     ((.qa // [])[] | . as $p | ($p.persona | clean) as $who | if (($p.confirmed // []) | length) == 0 then "- \($who): no confirmed bugs"
       else ($p.confirmed | to_entries | map("- \($who): fixed \"\(.value | clean)\" (\((($p.evidence // [])[.key] // "no artifact") | clean))") | join("\n")) end) end),
+  (if ((.qa_preexisting // []) | length) == 0 then empty else
+    "\n### Found by QA, not caused by this change\n",
+    ((.qa_preexisting // [])[] | "- \(.title | clean): \((.steps // []) | map(clean) | join(" → ")) (\(.evidence | clean))") end),
   "\n<details><summary>Decision log</summary>\n",
   "| Step | Outcome | Reason |",
   "|---|---|---|",

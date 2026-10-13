@@ -50,5 +50,19 @@ body=$(bash "$script" "$tmp/inject.json" 2>&1) || status=$?
 if [ "$status" = 0 ] && [ "$(printf '%s\n' "$body" | grep -c '</details>')" = 1 ] && ! printf '%s\n' "$body" | grep -q '^## injected'; then pass "free text cannot break the page"; else fail "free text cannot break the page" "status $status: $body"; fi
 if printf '%s\n' "$body" | grep -q 'in 1 fix round\.'; then pass "singular fix round"; else fail "singular fix round" "$body"; fi
 
+cat > "$tmp/preexisting.json" <<'JSON'
+{"plan_title":"P","unit":{"id":"U1","title":"T"},"rounds":0,
+ "criteria":[],"staff":{"design":"d","final":"f"},"review":{"fixed":[],"dismissed":[]},"qa":[],
+ "qa_preexisting":[{"title":"NaN on corrupt count\n</details>","steps":["set count=abc","reload <b>"],"evidence":"qa/nan.png"}],
+ "decisions":[]}
+JSON
+status=0
+body=$(bash "$script" "$tmp/preexisting.json" 2>&1) || status=$?
+if [ "$status" = 0 ] && printf '%s\n' "$body" | grep -qx '### Found by QA, not caused by this change' \
+  && printf '%s\n' "$body" | grep -qxF -- '- NaN on corrupt count &lt;/details>: set count=abc → reload &lt;b> (qa/nan.png)'; then
+  pass "pre-existing QA bugs: own section, sanitized"
+else fail "pre-existing QA bugs: own section, sanitized" "status $status: $body"; fi
+if ! printf '%s' "$(bash "$script" "$tmp/empty.json")" | grep -q 'Found by QA'; then pass "no pre-existing section when there are none"; else fail "no pre-existing section when there are none" "section rendered"; fi
+
 echo "pr-body: $passes passed, $failures failed"
 [ "$failures" = 0 ]
