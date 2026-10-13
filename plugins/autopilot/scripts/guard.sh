@@ -79,7 +79,7 @@ hook_cwd=$(field .cwd)
 # Picker.Test.tsx is a test. Applies to every [[ ]] and case below.
 shopt -s nocasematch
 
-readonly NL=$'\n' TAB=$'\t' SQ="'"
+readonly NL=$'\n' TAB=$'\t'
 
 # Joins its arguments into one ERE alternation.
 alternatives() { local IFS='|'; printf '%s' "$*"; }
@@ -145,7 +145,10 @@ BAD_PUSH=$(alternatives "${bad_push_parts[@]}")
 
 readonly ADD_DEPENDENCY='(^|[^[:alnum:]_-])((npm|pnpm|yarn|bun)[[:space:]]+(add|install|i)([[:space:]]+-[^[:space:]]*)*[[:space:]]+[^-[:space:]]|bundle[[:space:]]+add|gem[[:space:]]+install|pip[0-9.]*[[:space:]]+install|uv[[:space:]]+add|poetry[[:space:]]+add|cargo[[:space:]]+add|go[[:space:]]+get)'
 readonly CD_DIR='^[[:space:]]*(builtin[[:space:]]+)?(cd|pushd)[[:space:]]+([^-[:space:]][^[:space:]]*)'
-readonly HEREDOC_TAG='^[A-Za-z0-9_.-]+$'
+# Most command text the guard checks (any one logical line, and all lines
+# outside heredoc bodies together); more is denied. At this size the worst
+# case stays well under the hook timeout.
+readonly MAX_LINE=65536
 
 # Sets $resolved to $1 made absolute against directory $2, with //, /./ and
 # /../ collapsed so a .. cannot step out of an allowed directory.
@@ -212,14 +215,14 @@ repo_info() {
   fi
 }
 
-# Engineer only: deny a write to a risky_paths glob from the worktree's
-# .claude/autopilot.json (falling back to the launch repo's). The globs are
-# read once per repo top.
+# True when $1 matches a risky_paths glob from the worktree's
+# .claude/autopilot.json (falling back to the launch repo's); sets $risky_rel.
+# The globs are read once per repo top.
 config_top=$NL
 config_patterns=""
-check_risky() {
+is_risky() {
   local rel repo_top config pattern
-  repo_info "$1" || return 0
+  repo_info "$1" || return 1
   if [ "$repo_top" != "$config_top" ]; then
     config_top=$repo_top
     config="$repo_top/.claude/autopilot.json"
@@ -236,9 +239,16 @@ check_risky() {
     # "$rel/" catches a directory target: cp x db/migrate.
     # shellcheck disable=SC2053
     if [[ $rel == $pattern || $rel == ${pattern#\*\*/} || $rel/ == $pattern || $rel/ == ${pattern#\*\*/} ]]; then
-      deny "risky path $rel: stop and return status risky"
+      risky_rel=$rel
+      return 0
     fi
   done
+  return 1
+}
+
+# Engineer only: deny a write to a risky path.
+check_risky() {
+  if is_risky "$1"; then deny "risky path $risky_rel: stop and return status risky"; fi
 }
 
 # Rules for any write to $1, an absolute normalized path. $2 is 1 when the
@@ -269,117 +279,127 @@ check_file_write() {
   check_path_write "$path" 1
 }
 
-# True when $1 ends in an odd number of backslashes (a line continuation).
-continues() {
-  local line=$1 count=0
-  while [ "${line%\\}" != "$line" ]; do
-    line=${line%\\}
-    count=$((count + 1))
-  done
-  [ $((count % 2)) = 1 ]
+# Prints $1 as bash would read its commands: backslash-newline continuations
+# joined, each heredoc body dropped once its delimiter line is found, then
+# quotes, backslashes and backticks stripped and >| read as >. One
+# linear awk pass (a per-character bash loop is quadratic on long lines).
+# Quote state ('…', "…", $'…', `…`, $( ), $(( ))) carries across lines. When
+# the parser is unsure (a line ends inside an open quote, a << inside $( ) or
+# backticks, a delimiter that is not a plain word, or no delimiter line), it
+# drops nothing and every line is checked as a command.
+# Exit 3: a logical line, or all the command text left to check (heredoc
+# bodies excluded), is longer than MAX bytes.
+# shellcheck disable=SC2016 # $ in the awk program is awk's, not the shell's
+readonly READ_COMMANDS_AWK='
+function continues(s) { return match(s, /\\+$/) ? RLENGTH % 2 : 0 }
+# The logical line starting at line i; sets next_i to the line after it.
+function logical_at(i,   s) {
+  s = line[i]; i++
+  while (continues(s) && i <= n) {
+    s = substr(s, 1, length(s) - 1) line[i]; i++
+    if (length(s) > MAX) exit 3
+  }
+  if (length(s) > MAX) exit 3
+  next_i = i
+  return s
 }
-
-# Sets $heredocs to the heredocs opened on logical line $1, in order, as
-# "quoted:dash:TAG" words; empty when there are none. A heredoc operator
-# inside quotes, a comment, $(( )) or after a backslash is not one. When a
-# delimiter is anything but a plain word, $heredocs is emptied so the lines
-# after it are checked as commands (the safe direction).
-scan_heredocs() {
-  local line=$1 len=${#1} k=0 char prev=' ' single=0 double=0 arith=0 word quoted dash
-  heredocs=""
-  case "$line" in *'<<'*) ;; *) return ;; esac
-  while [ "$k" -lt "$len" ]; do
-    char=${line:k:1}
-    if [ "$single" = 1 ]; then
-      [ "$char" = "$SQ" ] && single=0
-      k=$((k + 1)); continue
-    fi
-    if [ "$char" = "\\" ]; then
-      k=$((k + 2)); prev=x; continue
-    fi
-    if [ "$double" = 1 ]; then
-      [ "$char" = '"' ] && double=0
-      k=$((k + 1)); continue
-    fi
-    case "$char" in
-      "$SQ") single=1 ;;
-      '"') double=1 ;;
-      '#')
-        case "$prev" in ' '|"$TAB"|';'|'&'|'|'|'(') return ;; esac ;;
-      '(')
-        if [ "${line:k:2}" = '((' ]; then arith=$((arith + 1)); k=$((k + 2)); prev='('; continue; fi ;;
-      ')')
-        if [ "${line:k:2}" = '))' ] && [ "$arith" -gt 0 ]; then arith=$((arith - 1)); k=$((k + 2)); prev=')'; continue; fi ;;
-      '<')
-        if [ "${line:k:3}" = '<<<' ]; then k=$((k + 3)); prev='<'; continue; fi
-        if [ "${line:k:2}" = '<<' ] && [ "$arith" = 0 ]; then
-          k=$((k + 2)); dash=0
-          if [ "${line:k:1}" = - ]; then dash=1; k=$((k + 1)); fi
-          while [ "$k" -lt "$len" ] && { [ "${line:k:1}" = ' ' ] || [ "${line:k:1}" = "$TAB" ]; }; do k=$((k + 1)); done
-          word=""
-          while [ "$k" -lt "$len" ]; do
-            char=${line:k:1}
-            case "$char" in ' '|"$TAB"|';'|'|'|'&'|'<'|'>'|'('|')') break ;; esac
-            word="$word$char"; k=$((k + 1))
-          done
-          quoted=0
-          case "$word" in *[\"\'\\]*) quoted=1 ;; esac
-          word=${word//[\"$SQ\\]/}
-          if ! [[ $word =~ $HEREDOC_TAG ]]; then heredocs=""; return; fi
-          heredocs="$heredocs $quoted:$dash:$word"
-          prev=x; continue
-        fi ;;
-    esac
-    prev=$char
-    k=$((k + 1))
-  done
+# Scans one logical line, updating the carried quote state. Fills tag[],
+# tag_quoted[] and tag_dash[] with the heredocs it opens and returns their
+# count, or -1 when unsure.
+function scan(s,   len, k, c, prev, count, word, plain, singles, doubles) {
+  len = split(s, ch, "")
+  count = 0; prev = " "
+  for (k = 1; k <= len; k++) {
+    c = ch[k]
+    if (in_single) { if (c == SQ) in_single = 0; continue }
+    if (in_ansi) { if (c == BS) { k++; continue }; if (c == SQ) in_ansi = 0; continue }
+    if (c == BS) { k++; prev = "x"; continue }
+    if (in_double) { if (c == DQ) in_double = 0; continue }
+    if (c == SQ) { if (prev == "$") in_ansi = 1; else in_single = 1; prev = c; continue }
+    if (c == DQ) { in_double = 1; prev = c; continue }
+    if (c == "`") { in_backtick = !in_backtick; prev = c; continue }
+    if (c == "#" && prev ~ /^[ \t;&|(]$/) break
+    if (c == "(") {
+      if (ch[k + 1] == "(") { arith++; k++; prev = "("; continue }
+      if (prev == "$") subst++
+      prev = c; continue
+    }
+    if (c == ")") {
+      if (arith > 0 && ch[k + 1] == ")") { arith--; k++; prev = ")"; continue }
+      if (subst > 0) subst--
+      prev = c; continue
+    }
+    if (c == "<" && ch[k + 1] == "<") {
+      if (ch[k + 2] == "<") { k += 2; prev = "<"; continue }
+      if (arith > 0) { k++; prev = "<"; continue }
+      if (subst > 0 || in_backtick) return -1
+      k += 2
+      count++
+      tag_dash[count] = 0
+      if (ch[k] == "-") { tag_dash[count] = 1; k++ }
+      while (ch[k] == " " || ch[k] == "\t") k++
+      word = ""
+      while (k <= len && ch[k] !~ /^[ \t;|&<>()]$/) { word = word ch[k]; k++ }
+      k--
+      plain = word
+      singles = gsub(SQ, "", plain)
+      doubles = gsub(DQ, "", plain)
+      if (singles % 2 || doubles % 2) return -1
+      tag_quoted[count] = (singles + doubles > 0 || index(word, BS) > 0)
+      gsub(/\\/, "", plain)
+      if (plain !~ /^[A-Za-z0-9_.-]+$/) return -1
+      tag[count] = plain
+      prev = "x"; continue
+    }
+    prev = c
+  }
+  if (in_single || in_double || in_ansi || in_backtick || subst > 0 || arith > 0) return -1
+  return count
 }
+BEGIN { SQ = sprintf("%c", 39); DQ = "\""; BS = "\\" }
+{ line[++n] = $0; if (index($0, "<<")) has_heredoc = 1 }
+END {
+  unsure = 0; i = 1
+  while (i <= n && has_heredoc && !unsure) {
+    s = logical_at(i); i = next_i
+    count = scan(s)
+    if (count < 0) { unsure = 1; break }
+    j = i
+    for (h = 1; h <= count; h++) {
+      found = 0
+      while (j <= n) {
+        start = j
+        if (tag_quoted[h]) { body = line[j]; j++ } else { body = logical_at(j); j = next_i }
+        for (m = start; m < j; m++) skip[m] = 1
+        if (tag_dash[h]) sub(/^\t+/, "", body)
+        if (body == tag[h]) { found = 1; break }
+      }
+      if (!found) { unsure = 1; break }
+    }
+    if (!unsure) i = j
+  }
+  i = 1
+  while (i <= n) {
+    if (!unsure && skip[i]) { i++; continue }
+    s = logical_at(i); i = next_i
+    # >| is a redirect (noclobber override), not a pipe. Quotes, backslashes
+    # and backticks go, so "gh" pr merge reads as written.
+    gsub(/>\|/, ">", s)
+    gsub(SQ, "", s)
+    gsub(/["`\\]/, "", s)
+    total += length(s) + 1
+    if (total > MAX) exit 3
+    print s
+  }
+}'
 
-# Sets $command_text to $1 as bash would read its commands: continuations
-# joined, and each heredoc body dropped once its delimiter line is found. A
-# heredoc whose delimiter never appears keeps its lines (checked as commands).
+# Sets $command_text from $1 via READ_COMMANDS_AWK; denies a command too long
+# to parse in time (a hook that times out fails open).
 read_commands() {
-  local lines=() count=0 line i=0 j logical body found all_found entry quoted dash tag
-  while IFS= read -r line || [ -n "$line" ]; do
-    lines[count]=$line
-    count=$((count + 1))
-  done <<EOF
-$1
-EOF
-  command_text=""
-  while [ "$i" -lt "$count" ]; do
-    logical=${lines[i]}
-    i=$((i + 1))
-    while continues "$logical" && [ "$i" -lt "$count" ]; do
-      logical="${logical%\\}${lines[i]}"
-      i=$((i + 1))
-    done
-    command_text="$command_text$logical$NL"
-    scan_heredocs "$logical"
-    [ -n "$heredocs" ] || continue
-    j=$i
-    all_found=1
-    for entry in $heredocs; do
-      quoted=${entry%%:*}; entry=${entry#*:}
-      dash=${entry%%:*}; tag=${entry#*:}
-      found=0
-      while [ "$j" -lt "$count" ]; do
-        body=${lines[j]}
-        j=$((j + 1))
-        # An unquoted delimiter means bash also joins continuations in the body.
-        if [ "$quoted" = 0 ]; then
-          while continues "$body" && [ "$j" -lt "$count" ]; do
-            body="${body%\\}${lines[j]}"
-            j=$((j + 1))
-          done
-        fi
-        if [ "$dash" = 1 ]; then body=${body#"${body%%[!"$TAB"]*}"}; fi
-        if [ "$body" = "$tag" ]; then found=1; break; fi
-      done
-      if [ "$found" = 0 ]; then all_found=0; break; fi
-    done
-    if [ "$all_found" = 1 ]; then i=$j; fi
-  done
+  local status=0
+  command_text=$(printf '%s\n' "$1" | LC_ALL=C awk -v MAX="$MAX_LINE" "$READ_COMMANDS_AWK") || status=$?
+  if [ "$status" = 3 ]; then deny "command too long for the guard"; fi
+  if [ "$status" != 0 ]; then deny "guard error; refusing the tool call"; fi
 }
 
 # One shell segment per line; literal newlines in the replacement work in
@@ -393,16 +413,13 @@ split_segments() {
 }
 
 check_bash() {
-  local cmd segment norm base word target next_is_target path_like
+  local cmd norm base word target next_is_target path_like base_risky=0 base_guarded=0 first
   cmd=$(field .tool_input.command)
   [ -n "$cmd" ] || return 0
   read_commands "$cmd"
-  # >| is a redirect (noclobber override), not a pipe.
-  command_text=${command_text//'>|'/'>'}
   base=${hook_cwd:-/}
-  while IFS= read -r segment; do
-    # Strip quotes, backslashes and backticks so "gh" pr merge reads as written.
-    norm=${segment//[\"$SQ\\\`]/}
+  if is_run_file "$base/_"; then base_guarded=1; fi
+  while IFS= read -r norm; do
 
     if [[ $norm =~ $MERGE ]]; then deny "agents never merge; the user merges"; fi
 
@@ -424,12 +441,20 @@ check_bash() {
     if [[ $norm =~ $CD_DIR ]]; then
       resolve "${BASH_REMATCH[3]}" "$base"
       base=$resolved
+      # Inside a risky directory every write target is risky: touch add_col.
+      base_risky=0
+      if [ "$agent" = autopilot:engineer ] && is_risky "$base/_"; then base_risky=1; fi
+      base_guarded=$base_risky
+      if is_run_file "$base/_" || is_config_file "$base/autopilot.json"; then base_guarded=1; fi
     fi
 
     [[ $norm =~ $WRITE_VERB ]] || continue
     next_is_target=0
+    first=1
     for word in $norm; do
       path_like=$next_is_target
+      # The command word itself is not a target.
+      if [ "$first" = 1 ]; then first=0; else [ "$base_risky" = 1 ] && path_like=1; fi
       next_is_target=0
       case "$word" in
         [0-9\&]'>'|[0-9\&]'>>'|'>'|'>>') next_is_target=1; continue ;;
@@ -438,7 +463,14 @@ check_bash() {
       # Leading redirection operators (>, 2>, &>, <) off; dd of=PATH to PATH.
       while [[ $word == [0-9\&\<\>]*[\<\>]* || $word == [\<\>]* ]]; do word=${word#?}; done
       word=${word#*=}
-      case "$word" in ''|-*) continue ;; */*|*.*) path_like=1 ;; esac
+      case "$word" in
+        ''|-*) continue ;;
+        */*|*.*) path_like=1 ;;
+        Gemfile|Pipfile) ;;
+        # A bare word (no / or .) can only land on a guarded path when it
+        # is a redirect target or the cd directory itself is guarded.
+        *) [ "$path_like" = 1 ] || [ "$base_guarded" = 1 ] || continue ;;
+      esac
       resolve "$word" "$base"
       target=$resolved
       check_path_write "$target" "$path_like"

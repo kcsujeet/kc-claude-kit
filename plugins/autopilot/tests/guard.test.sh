@@ -90,15 +90,18 @@ check deny  "20 risky directory target" "$(bash_payload $E "cd $wt && cp /tmp/x.
 check deny  "18 git clean tests"     "$(bash_payload $E 'git clean -f src/__tests__')"
 
 # Timing: a hook that times out fails open, so long commands must stay fast.
-timed_allow() {
-  local label=$1 payload=$2 output seconds
+timed() {
+  local expectation=$1 label=$2 payload=$3 output seconds verdict
   TIMEFORMAT=%R
   seconds=$( { time printf '%s' "$payload" | bash "$guard" > "$tmp/timed.out"; } 2>&1 )
   output=$(cat "$tmp/timed.out")
-  if [ -z "$output" ] && awk -v s="$seconds" 'BEGIN { exit !(s < 2) }'; then
+  if [ -z "$output" ]; then verdict=allow
+  elif printf '%s' "$output" | grep -q '"permissionDecision":"deny"'; then verdict=deny
+  else verdict="unexpected: $output"; fi
+  if [ "$verdict" = "$expectation" ] && awk -v s="$seconds" 'BEGIN { exit !(s < 2) }'; then
     echo "ok   $label (${seconds}s)"; passes=$((passes + 1))
   else
-    echo "FAIL $label"; echo "     ${seconds}s, output: $output"; failures=$((failures + 1))
+    echo "FAIL $label"; echo "     expected $expectation, got $verdict in ${seconds}s"; failures=$((failures + 1))
   fi
 }
 heredoc="cat > $wt/src/gen.ts <<'EOF'"
@@ -108,8 +111,25 @@ for i in $(seq 1 200); do
   copies="$copies && cp src/a$i.ts src/b$i.ts"
 done
 heredoc="$heredoc${nl}EOF"
-timed_allow "19 200-line heredoc under 2s" "$(bash_payload $E "$heredoc")"
-timed_allow "19 200 cp segments under 2s"  "$(bash_payload $E "$copies")"
+timed allow "19 200-line heredoc under 2s" "$(bash_payload $E "$heredoc")"
+timed allow "19 200 cp segments under 2s"  "$(bash_payload $E "$copies")"
+
+# Fix round 2: quote state carries across lines; long lines; risky cd.
+check deny  "21 << inside a multi-line double-quoted string" "$(bash_payload $S "echo \"x${nl}<<true\"${nl}gh pr merge 1${nl}true")"
+check deny  "21 << inside a multi-line single-quoted string" "$(bash_payload $S "echo 'a${nl}<<EOF'${nl}gh pr merge 1${nl}EOF")"
+check deny  "21 quoted delimiter spanning lines" "$(bash_payload $S "cat <<'E${nl}' ; gh pr merge 1${nl}E")"
+check deny  "21 escaped quote in \$'...'" "$(bash_payload $S "echo \$'a\\' <<EOF${nl}' ; gh pr merge 1${nl}EOF")"
+long_line="echo $(printf 'aaaa bbbb <<cc %.0s' $(seq 1 6800))"
+timed deny  "22 100 KB line denied under 2s" "$(bash_payload $S "$long_line")"
+medium_line="cp $(printf 'src/a.ts \"b\" (c) %.0s' $(seq 1 3000)) src/out"
+timed allow "22 60 KB line allowed under 2s" "$(bash_payload $E "$medium_line")"
+many_lines=$(for i in $(seq 1 300); do printf 'echo %0250d\n' 0; done)
+timed deny  "22 300 KB over many lines denied under 2s" "$(bash_payload $S "$many_lines")"
+big_heredoc="cat > $wt/src/big.ts <<'EOF'${nl}$(for i in $(seq 1 400); do printf 'export const v%d = \"%0250d\"\n' "$i" 0; done)${nl}EOF"
+timed allow "22 100 KB heredoc body allowed under 2s" "$(bash_payload $E "$big_heredoc")"
+check deny  "23 touch inside a risky dir" "$(bash_payload $E "cd $wt/db/migrate && touch add_col")"
+check deny  "23 mv inside a risky dir"    "$(bash_payload $E "cd $wt/db/migrate && mv a b")"
+check allow "23 read inside a risky dir"  "$(bash_payload $E "cd $wt/db/migrate && ls")"
 
 # 9: fail closed without jq. PATH without jq, keeping bash core utilities.
 nojq="$tmp/nojq"; mkdir -p "$nojq"
