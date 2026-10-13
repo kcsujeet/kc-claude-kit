@@ -60,6 +60,57 @@ check allow "7 plain install"        "$(bash_payload $E "bun install")"
 check allow "8 main session"         "$(bash_payload '' 'gh pr merge 12')"
 check allow "8 other plugin agent"   "$(bash_payload code-review:naming-gate 'gh pr merge 12')"
 
+# Fix round 1: rewordings of the rules above.
+S=autopilot:shipper
+nl=$'\n'
+run="$wt/.autopilot/runs/r1"
+check deny  "10 continuation push"   "$(bash_payload $S "git push \\${nl}--force origin x")"
+check deny  "10 continuation merge"  "$(bash_payload $S "gh pr \\${nl}merge 12")"
+check deny  "10 continuation write"  "$(bash_payload $S "echo x > \\${nl}$run/units.json")"
+check deny  "10 continuation rm"     "$(bash_payload $E "rm \\${nl}src/picker.test.tsx")"
+check allow "11 heredoc body is data" "$(bash_payload $S "git commit -F - <<EOF${nl}feat: x${nl}${nl}Next: push to main after review${nl}EOF")"
+check deny  "11 command after heredoc" "$(bash_payload $S "cat > src/gen.ts <<'EOF'${nl}x${nl}EOF${nl}gh pr merge 1")"
+check deny  "11 quoted << is no heredoc" "$(bash_payload $S "echo \"<<EOF\"${nl}gh pr merge 1${nl}EOF")"
+check deny  "11 heredoc opener redirect" "$(bash_payload $S "cat > $run/units.json <<'EOF'${nl}{}${nl}EOF")"
+check allow "12 skip property in test"   "$(edit_payload $E "$wt/src/picker.test.ts" "expect(page.skip).toBe(10)")"
+check allow "12 skip option in test"     "$(edit_payload $E "$wt/src/repo.test.ts" "repo.findMany({ take: 5, skip: 10 })")"
+check allow "12 pending variable in test" "$(edit_payload $E "$wt/src/load.test.ts" "  pending = await load()")"
+check allow "12 skip call in test"       "$(edit_payload $E "$wt/src/load.test.ts" "  skip(3)")"
+check deny  "12 skip.each"               "$(edit_payload $E "$wt/src/picker.test.ts" "it.skip.each([1])('x', () => {})")"
+check deny  "13 merge with -R"       "$(bash_payload $S 'gh pr -R a/b merge 12')"
+check deny  "13 merge with --repo"   "$(bash_payload $S 'gh pr --repo a/b merge 12')"
+check deny  "14 noclobber redirect"  "$(bash_payload $S "echo x >| $run/units.json")"
+check allow "15 push --follow-tags"  "$(bash_payload $S 'git push --follow-tags origin autopilot/r1/U1')"
+check deny  "16 rm mixed-case test"  "$(bash_payload $E 'rm -f src/Picker.Test.tsx')"
+check deny  "17 rm cypress spec"     "$(bash_payload $E 'rm src/login.cy.ts')"
+check deny  "17 rm e2e file"         "$(bash_payload $E 'rm e2e/flows/login.ts')"
+check deny  "17 skip in Django tests.py" "$(write_payload $E "$wt/app/tests.py" "@pytest.mark.skip")"
+check deny  "18 find -delete tests"  "$(bash_payload $E "find src -name '*.test.ts' -delete")"
+check deny  "20 risky directory target" "$(bash_payload $E "cd $wt && cp /tmp/x.rb db/migrate")"
+check deny  "18 git clean tests"     "$(bash_payload $E 'git clean -f src/__tests__')"
+
+# Timing: a hook that times out fails open, so long commands must stay fast.
+timed_allow() {
+  local label=$1 payload=$2 output seconds
+  TIMEFORMAT=%R
+  seconds=$( { time printf '%s' "$payload" | bash "$guard" > "$tmp/timed.out"; } 2>&1 )
+  output=$(cat "$tmp/timed.out")
+  if [ -z "$output" ] && awk -v s="$seconds" 'BEGIN { exit !(s < 2) }'; then
+    echo "ok   $label (${seconds}s)"; passes=$((passes + 1))
+  else
+    echo "FAIL $label"; echo "     ${seconds}s, output: $output"; failures=$((failures + 1))
+  fi
+}
+heredoc="cat > $wt/src/gen.ts <<'EOF'"
+copies="cd $wt"
+for i in $(seq 1 200); do
+  heredoc="$heredoc${nl}export const value$i = cp(\"src/a$i.ts\") > limit; // rm x.test.ts push main"
+  copies="$copies && cp src/a$i.ts src/b$i.ts"
+done
+heredoc="$heredoc${nl}EOF"
+timed_allow "19 200-line heredoc under 2s" "$(bash_payload $E "$heredoc")"
+timed_allow "19 200 cp segments under 2s"  "$(bash_payload $E "$copies")"
+
 # 9: fail closed without jq. PATH without jq, keeping bash core utilities.
 nojq="$tmp/nojq"; mkdir -p "$nojq"
 for tool in bash cat grep sed tr printf dirname; do
