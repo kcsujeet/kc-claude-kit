@@ -17,14 +17,14 @@ root="${AUTOPILOT_CACHE:-$HOME/.cache/autopilot}"
 cache="$root/playwright-$PLAYWRIGHT_VERSION"
 lock="$cache.lock"
 
+# Runs from the caller's directory, not $cache, so version managers (asdf,
+# mise) resolve the repo's node. Every step checks its own status: run calls
+# this inside $(...), where bash turns set -e off.
 install_pinned() {
-  mkdir -p "$cache"
-  (
-    cd "$cache"
-    [ -f package.json ] || npm init -y >&2
-    npm i --no-audit --no-fund "playwright@$PLAYWRIGHT_VERSION" >&2
-    PLAYWRIGHT_BROWSERS_PATH="$cache/browsers" npx --no-install playwright install chromium >&2
-  )
+  mkdir -p "$cache" || return 1
+  [ -f "$cache/package.json" ] || printf '{"private": true}\n' > "$cache/package.json" || return 1
+  npm i --prefix "$cache" --no-audit --no-fund "playwright@$PLAYWRIGHT_VERSION" >&2 || return 1
+  PLAYWRIGHT_BROWSERS_PATH="$cache/browsers" "$cache/node_modules/.bin/playwright" install chromium >&2 || return 1
   touch "$cache/.ready"
 }
 
@@ -44,7 +44,7 @@ ensure() {
     # Here we hold the lock unless the loop broke out because .ready appeared.
     if [ ! -f "$cache/.ready" ]; then
       trap 'rmdir "$lock" 2>/dev/null || true' EXIT
-      install_pinned
+      install_pinned || { echo "autopilot: Playwright install failed" >&2; exit 1; }
     fi
     rmdir "$lock" 2>/dev/null || true
     trap - EXIT
@@ -56,7 +56,7 @@ case "${1:-}" in
   ensure) ensure ;;
   run)
     shift
-    modules=$(ensure)
+    modules=$(ensure) || exit 1
     NODE_PATH="$modules" PLAYWRIGHT_BROWSERS_PATH="$cache/browsers" exec node "$@"
     ;;
   *) echo "usage: qa-browser.sh ensure | run <script.cjs> [args...]" >&2; exit 1 ;;
