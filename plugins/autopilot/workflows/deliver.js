@@ -296,6 +296,7 @@ async function reviewStage({ unit, tag, worktree, baseBranch, state, context, ca
     return found
   }
   const [gateResult, ...lensResults] = await settle([gates, ...lenses.map(l => () => lensUntilDry(l))])
+  if (gateResult.rework.length) return { rework: gateResult.rework }
   if (!gateResult.passed && !gateResult.fails.length) return { rework: ['code-review reported FAILED without box details'] }
   const lensFindings = lensResults.flat()
 
@@ -396,11 +397,14 @@ async function codeReviewGates({ unit, tag, worktree, baseBranch, state, call, n
   ].filter(Boolean).join('\n\n'))
 
   const scope = parseGateBlock(`STATUS: PASS\n${prep.scope}`) || { failBoxes: ['scope block unreadable'], findings: [] }
-  const all = [...phase1, verification]
-  const fails = [...all.flatMap(g => (g.status === 'FAIL' || g.findings.length ? gateFails(g.gate, g) : [])),
+  const failed = g => g.status === 'FAIL' || g.findings.length > 0
+  // The verification gate audits the review itself, so triage may not dismiss it: its FAILs go straight back as a round.
+  const rework = failed(verification) ? gateFails('verification', verification).map(f => f.scenario) : []
+  if (failed(verification) && !rework.length) rework.push('verification gate FAILED without box details')
+  const fails = [...phase1.flatMap(g => (failed(g) ? gateFails(g.gate, g) : [])),
     ...scope.failBoxes.map(b => ({ location: 'scope', scenario: `scope ${b}`, severity: 'major', lens: 'scope' }))]
-  const passed = all.every(g => g.status !== 'FAIL' && !g.findings.length) && !scope.failBoxes.length
-  return { passed, fails }
+  const passed = !phase1.some(failed) && !failed(verification) && !scope.failBoxes.length
+  return { passed, fails, rework }
 }
 
 // ---------- QA: boot, personas in parallel, verifier, stop ----------

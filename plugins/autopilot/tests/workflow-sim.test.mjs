@@ -320,18 +320,25 @@ const tests = {
     assert.deepEqual(fails, [{ location: 'counter.js:4', scenario: 'naming: 🟡 counter.js:4: `x` is opaque. Rename `nextCount`', severity: 'minor', lens: 'naming' }])
   },
 
-  'a verification FAIL becomes a finding': async () => {
+  'a verification FAIL skips triage and goes straight back as a review round': async () => {
     let failed = false
-    const { calls } = await simulate({
+    const { byId, calls } = await simulate({
       answer: (p, { agentType }) => {
         if (agentType !== 'code-review:verification-gate' || failed) return undefined
         failed = true
         return gateBlock('verification', 'FAIL', ['[FAIL] §V2: testing gate shows no loose-assertion receipt'])
       },
     })
-    const fails = JSON.parse(labelled(calls, 'U1 triage')[0].prompt.match(/^Gate FAILs: (.*)$/m)[1])
-    assert.deepEqual(fails.map(f => f.lens), ['verification'])
-    assert.match(fails[0].scenario, /§V2: testing gate shows no loose-assertion receipt/)
+    assert.equal(byId.U1.status, 'done')
+    assert.equal(byId.U1.rounds, 1)
+    assert.equal(labelled(calls, 'U1 triage').length, 0)
+    assert.match(labelled(calls, 'U1 engineer fix')[0].prompt, /^- verification §V2: testing gate shows no loose-assertion receipt$/m)
+  },
+
+  'a verification FAIL with no boxes or findings is still a round': async () => {
+    const { byId, calls } = await simulate({ answer: firstCalls(opts => opts.agentType === 'code-review:verification-gate', gateBlock('verification', 'FAIL', ['[PASS] §V1: ok'])) })
+    assert.equal(byId.U1.rounds, 1)
+    assert.match(labelled(calls, 'U1 engineer fix')[0].prompt, /^- verification gate FAILED without box details$/m)
   },
 
   'a gate that returns nothing once is retried': async () => {
