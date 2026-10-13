@@ -48,7 +48,7 @@ function defaultAnswer(prompt, { agentType, label }) {
   if (agentType === 'autopilot:verifier') return { criteria: [{ id: 'AC1', passes: true, evidence: 'test ok' }], confirmed: [], dropped: [] }
   if (agentType === 'autopilot:shipper') return { pr_url: `https://github.com/o/r/pull/${unit}`, stack: 'none', ci: 'pass', failures: '', notes: '' }
   if (agentType && agentType.startsWith('code-review:')) return gateBlock(agentType.slice(12, -5), 'PASS')
-  if (label.endsWith('review prep')) return { exit_code: 0, output: 'HEAD_SHA=abc', head_sha: 'abc', diff_file: '/s/review.diff', changed_files: '/s/changed-files.txt', scope: SCOPE_PASS }
+  if (label.endsWith('review prep')) return { exit_code: 0, output: 'HEAD_SHA=abc', head_sha: 'abc', diff_file: '/s/review.diff', changed_files: '/s/changed-files.txt', files: ['counter.js', 'a.ts'], scope: SCOPE_PASS }
   if (label.includes('skeptic')) return { refuted: false, reason: 'reproduces' }
   throw new Error(`no scripted answer for ${label}`)
 }
@@ -130,7 +130,7 @@ const tests = {
     assert.equal(labelled(calls, 'U1 engineer fix').length, 0)
     assert.deepEqual(byId.U1.result.qa_preexisting, [{ title: bug.title, steps: bug.steps, evidence: bug.evidence }])
     assert.deepEqual(byId.U1.result.qa.find(q => q.persona === 'newbie').confirmed, [])
-    assert.match(labelled(calls, 'U1 ship')[0].prompt, /^Unit result counts: .*"qa_preexisting":1\}$/m)
+    assert.match(labelled(calls, 'U1 ship')[0].prompt, /^Unit result counts: .*"qa_preexisting":1,"review_receipts_incomplete":0\}$/m)
   },
 
   'a caused QA bug is fixed while a pre-existing one in the same verdict is only reported': async () => {
@@ -227,7 +227,7 @@ const tests = {
     const prompt = labelled(calls, 'U1 ship')[0].prompt
     const json = JSON.parse(prompt.split('Unit result JSON:\n')[1])
     const counts = JSON.parse(prompt.match(/^Unit result counts: (.*)$/m)[1])
-    assert.deepEqual(counts, { criteria: 1, decisions: json.decisions.length, fixed: 0, dismissed: 1, qa_preexisting: 0 })
+    assert.deepEqual(counts, { criteria: 1, decisions: json.decisions.length, fixed: 0, dismissed: 1, qa_preexisting: 0, review_receipts_incomplete: 0 })
     assert.ok(json.decisions.length > 0)
   },
 
@@ -320,25 +320,46 @@ const tests = {
     assert.deepEqual(fails, [{ location: 'counter.js:4', scenario: 'naming: 🟡 counter.js:4: `x` is opaque. Rename `nextCount`', severity: 'minor', lens: 'naming' }])
   },
 
-  'a verification FAIL skips triage and goes straight back as a review round': async () => {
-    let failed = false
-    const { byId, calls } = await simulate({
-      answer: (p, { agentType }) => {
-        if (agentType !== 'code-review:verification-gate' || failed) return undefined
-        failed = true
-        return gateBlock('verification', 'FAIL', ['[FAIL] §V2: testing gate shows no loose-assertion receipt'])
-      },
+  'a verification finding citing code in the diff goes to triage, which may not dismiss it as format': async () => {
+    const { calls } = await simulate({
+      answer: firstCalls(opts => opts.agentType === 'code-review:verification-gate',
+        gateBlock('verification', 'FAIL', ['[FAIL] §V1: counter.js:4 not read at head'], ['🟠 counter.js:4: reset writes the literal 0 that no gate covered. Show the zero check'])),
     })
-    assert.equal(byId.U1.status, 'done')
-    assert.equal(byId.U1.rounds, 1)
-    assert.equal(labelled(calls, 'U1 triage').length, 0)
-    assert.match(labelled(calls, 'U1 engineer fix')[0].prompt, /^- verification §V2: testing gate shows no loose-assertion receipt$/m)
+    const triage = labelled(calls, 'U1 triage')[0].prompt
+    const fails = JSON.parse(triage.match(/^Gate FAILs: (.*)$/m)[1])
+    assert.deepEqual(fails.map(f => [f.location, f.lens, f.severity]), [['counter.js:4', 'verification', 'major']])
+    assert.match(triage, /never dismiss one as a format or citation issue/)
+    assert.equal(labelled(calls, 'U1 gate verification recheck').length, 0)
   },
 
-  'a verification FAIL with no boxes or findings is still a round': async () => {
-    const { byId, calls } = await simulate({ answer: firstCalls(opts => opts.agentType === 'code-review:verification-gate', gateBlock('verification', 'FAIL', ['[PASS] §V1: ok'])) })
-    assert.equal(byId.U1.rounds, 1)
-    assert.match(labelled(calls, 'U1 engineer fix')[0].prompt, /^- verification gate FAILED without box details$/m)
+  'a receipt-only verification finding re-runs only the gate it names, then verification once more': async () => {
+    const { byId, calls } = await simulate({
+      answer: firstCalls(opts => opts.agentType === 'code-review:verification-gate',
+        gateBlock('verification', 'FAIL', ['[FAIL] §V1: naming finding lacks the short SHA'], ['🟡 naming (counter.js:3, `reset`): the finding cites no short head SHA. Cite counter.js:3@abc'])),
+    })
+    assert.equal(byId.U1.status, 'done')
+    assert.equal(byId.U1.rounds, 0, 'receipt-only items never cost an engineer round')
+    assert.equal(labelled(calls, 'U1 triage').length, 0)
+    const rechecks = calls.filter(c => c.label.endsWith(' recheck'))
+    assert.deepEqual(rechecks.map(c => c.label), ['U1 gate naming recheck', 'U1 gate verification recheck'])
+    assert.match(rechecks[0].prompt, /The verification gate failed your last verdict's receipts:\n- verification: 🟡 naming \(counter\.js:3/)
+    assert.deepEqual(byId.U1.result.review_receipts_incomplete, [])
+  },
+
+  'receipt-only FAILs left after the recheck are recorded and do not block the unit': async () => {
+    const stillFailing = gateBlock('verification', 'FAIL', ['[FAIL] §V3: testing §T6 gives a count, not per-hit verdicts'])
+    const { byId, calls } = await simulate({ answer: firstCalls(opts => opts.agentType === 'code-review:verification-gate', stillFailing, 2) })
+    assert.equal(byId.U1.status, 'done')
+    assert.equal(byId.U1.rounds, 0)
+    assert.equal(labelled(calls, 'U1 gate testing recheck').length, 1)
+    assert.deepEqual(byId.U1.result.review_receipts_incomplete, ['verification §V3: testing §T6 gives a count, not per-hit verdicts'])
+  },
+
+  'a verification FAIL with no boxes or findings is receipt-only': async () => {
+    const bare = gateBlock('verification', 'FAIL', ['[PASS] §V1: ok'])
+    const { byId } = await simulate({ answer: firstCalls(opts => opts.agentType === 'code-review:verification-gate', bare, 2) })
+    assert.equal(byId.U1.status, 'done')
+    assert.deepEqual(byId.U1.result.review_receipts_incomplete, ['verification FAILED without box details'])
   },
 
   'a gate that returns nothing once is retried': async () => {

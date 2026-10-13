@@ -47,8 +47,8 @@ const FINAL = {
 const FINDING = { type: 'object', required: ['location', 'scenario', 'severity'], properties: { location: str, scenario: str, consequence: str, severity: str, lens: str } }
 const FINDINGS = { type: 'object', required: ['findings'], properties: { findings: { type: 'array', items: FINDING }, skipped: str } }
 const PREP = {
-  type: 'object', required: ['exit_code', 'head_sha', 'diff_file', 'changed_files', 'scope'],
-  properties: { exit_code: { type: 'number' }, output: str, head_sha: str, diff_file: str, changed_files: str, scope: str },
+  type: 'object', required: ['exit_code', 'head_sha', 'diff_file', 'changed_files', 'files', 'scope'],
+  properties: { exit_code: { type: 'number' }, output: str, head_sha: str, diff_file: str, changed_files: str, files: strs, scope: str },
 }
 const REFUTE = { type: 'object', required: ['refuted', 'reason'], properties: { refuted: { type: 'boolean' }, reason: str } }
 const TRIAGE = {
@@ -195,6 +195,8 @@ async function runUnit(unit, baseBranch, progress, parentPr) {
   const qaLog = Object.fromEntries(personas.map(p => [p.name, { persona: p.name, confirmed: [], evidence: [] }]))
   // Confirmed bugs the verifier traced to the base branch, outside this unit's criteria.
   const qaPreexisting = []
+  // Receipt-only verification FAILs left after one gate recheck, from the last review.
+  let reviewReceipts = []
   let criteria = []
   let finalRationale = ''
   let prUrl = null
@@ -214,6 +216,7 @@ async function runUnit(unit, baseBranch, progress, parentPr) {
 
     const review = await reviewStage({ ...ctx, history, reviewRound: progress.rounds + 1 })
     if (review.rework) { nextRound('review', review.rework); continue }
+    reviewReceipts = review.receipts
     reviewLog.fixed.push(...review.fix.map(f => f.finding))
     reviewLog.dismissed.push(...review.dismiss)
     history.push(...review.fix.map(f => ({ round: progress.rounds + 1, decision: 'fixed', finding: f.finding, reason: f.reason })),
@@ -246,7 +249,7 @@ async function runUnit(unit, baseBranch, progress, parentPr) {
     finalRationale = final.rationale
     note('final gate', 'approve', final.rationale)
 
-    const result = unitResult(unit, progress.rounds, criteria, decision.rationale, finalRationale, reviewLog, { qa: Object.values(qaLog), preexisting: qaPreexisting }, decisions)
+    const result = unitResult(unit, progress.rounds, criteria, decision.rationale, finalRationale, reviewLog, { qa: Object.values(qaLog), preexisting: qaPreexisting, receipts: reviewReceipts }, decisions)
     const ship = await call(`Worktree: ${worktree}\nBranch: ${branch}\nBase: ${baseBranch}\nTitle: ${A.plan.title}: ${unit.title}\nScratch: ${state}\nScripts directory: ${SCRIPTS}\ndry_run: ${A.dry_run}\nparent_pr: ${parentPr || 'none'}\nUnit result counts: ${resultCounts(result)}\nUnit result JSON:\n${JSON.stringify(result)}`,
       { agentType: 'autopilot:shipper', model: WORKERS, schema: SHIP, label: `${tag} ship`, phase: 'Ship' })
     if (!ship) throw new Stop('failed', 'shipper returned nothing')
@@ -296,7 +299,6 @@ async function reviewStage({ unit, tag, worktree, baseBranch, state, context, ca
     return found
   }
   const [gateResult, ...lensResults] = await settle([gates, ...lenses.map(l => () => lensUntilDry(l))])
-  if (gateResult.rework.length) return { rework: gateResult.rework }
   if (!gateResult.passed && !gateResult.fails.length) return { rework: ['code-review reported FAILED without box details'] }
   const lensFindings = lensResults.flat()
 
@@ -311,11 +313,12 @@ async function reviewStage({ unit, tag, worktree, baseBranch, state, context, ca
   }
   const judged = await settle(lensFindings.filter(serious).map(f => () => survives(f)))
   const kept = [...judged.filter(Boolean), ...lensFindings.filter(f => !serious(f))]
-  if (!gateResult.fails.length && !kept.length) return { fix: [], dismiss: [] }
+  const receipts = gateResult.receiptsIncomplete
+  if (!gateResult.fails.length && !kept.length) return { fix: [], dismiss: [], receipts }
 
-  const triage = await call(`Triage these findings for ${worktree}.\nGate FAILs: ${JSON.stringify(gateResult.fails)}\nLens findings: ${JSON.stringify(kept)}${earlier && `\n${earlier}\nDismiss an item that only reverses an earlier decision, with reason "reverses round N decision without new scenario" (N from that decision).`}`,
+  const triage = await call(`Triage these findings for ${worktree}.\nGate FAILs: ${JSON.stringify(gateResult.fails)}\nLens findings: ${JSON.stringify(kept)}${gateResult.fails.some(f => f.lens === 'verification') ? '\nItems with lens "verification" cite code in this diff: never dismiss one as a format or citation issue.' : ''}${earlier && `\n${earlier}\nDismiss an item that only reverses an earlier decision, with reason "reverses round N decision without new scenario" (N from that decision).`}`,
     { agentType: 'autopilot:triage', model: WORKERS, schema: TRIAGE, label: `${tag} triage`, phase: 'Review' })
-  return triage || { fix: [...gateResult.fails, ...kept].map(f => ({ finding: `${f.location} ${f.scenario}`, reason: 'triage returned nothing' })), dismiss: [] }
+  return { ...(triage || { fix: [...gateResult.fails, ...kept].map(f => ({ finding: `${f.location} ${f.scenario}`, reason: 'triage returned nothing' })), dismiss: [] }), receipts }
 }
 
 // ---------- code-review gates, dispatched the way review-code does ----------
@@ -371,17 +374,17 @@ async function codeReviewGates({ unit, tag, worktree, baseBranch, state, call, n
     `You are review-code's orchestrator for Step 1 only (read ${CR()}/skills/review-code/SKILL.md, "Step 1: gather context" and "Scope checks").\n` +
     `1. Run exactly: cd ${worktree} && bash ${CR()}/scripts/gather-review.sh --branch ${baseBranch} --out-dir ${outDir}\n` +
     `2. Read the diff it saved in full (in offset/limit chunks if it is 35KB or more), and write the SCOPE: block for this local branch, one box per line in the BOXES: shape, each with evidence or its N/A reason: §G1 (N/A: local diff), §G2 against the stated purpose "${unit.title}: ${unit.scope}", §G3 (N/A: no linked issue), §G4.\n` +
-    `Return exit_code (gather-review.sh's), output (its stdout and stderr), head_sha, diff_file and changed_files (HEAD_SHA, DIFF_FILE, CHANGED_FILES from its meta.env), and scope (the whole SCOPE: block starting with "SCOPE:").`,
+    `Return exit_code (gather-review.sh's), output (its stdout and stderr), head_sha, diff_file and changed_files (HEAD_SHA, DIFF_FILE, CHANGED_FILES from its meta.env), files (the paths listed in CHANGED_FILES), and scope (the whole SCOPE: block starting with "SCOPE:").`,
     { model: WORKERS, effort: 'low', schema: PREP, label: `${tag} ${label}`, phase: 'Review' }))
   if (!prep) throw new Stop('failed', 'code-review prep did not run')
   if (prep.exit_code !== 0) throw new Stop('failed', `code-review gather failed: ${prep.output || ''}`)
   const inputs = [`Head SHA: ${prep.head_sha}`, `Diff file: ${prep.diff_file}`, `Changed files: ${prep.changed_files}`, `Repo root: ${worktree}`].join('\n')
 
   // A null or malformed block is retried once (review-code sends a shapeless verdict back); twice fails closed.
-  const runGate = async (gate, prompt) => {
+  const runGate = async (gate, prompt, pass = '') => {
     let parsed = null
     let text = null
-    for (const label of [`gate ${gate}`, `gate ${gate} retry`]) {
+    for (const label of [`gate ${gate}${pass}`, `gate ${gate}${pass} retry`]) {
       text = await call(prompt, { agentType: `code-review:${gate}-gate`, model: WORKERS, label: `${tag} ${label}`, phase: 'Review' })
       parsed = parseGateBlock(text)
       if (parsed) break
@@ -390,21 +393,58 @@ async function codeReviewGates({ unit, tag, worktree, baseBranch, state, call, n
     if (!parsed) throw new Stop('failed', `code-review ${gate} gate did not return a verdict block`)
     return { gate, text: text.trim(), ...parsed }
   }
-  const phase1 = await settle(GATE_TOPICS.map(gate => () => runGate(gate, inputs)))
-  const verification = await runGate('verification', [
+  let phase1 = await settle(GATE_TOPICS.map(gate => () => runGate(gate, inputs)))
+  const verify = pass => runGate('verification', [
     inputs, `Phase-1 gate verdict blocks, verbatim:\n\n${phase1.map(g => g.text).join('\n\n')}`, prep.scope,
     earlier && `Re-review. ${earlier}`,
-  ].filter(Boolean).join('\n\n'))
+  ].filter(Boolean).join('\n\n'), pass)
+  const failed = g => g.status === 'FAIL' || g.findings.length > 0
+
+  // Verification items that cite code in the diff go to triage like any gate
+  // FAIL; receipt-only items re-run the gates they name once, then whatever is
+  // left is recorded as incomplete receipts and does not block the unit.
+  let verification = await verify('')
+  let audit = auditItems(verification, prep.files || [])
+  if (audit.receipts.length) {
+    const named = GATE_TOPICS.filter(g => audit.receipts.some(r => r.gates.includes(g)))
+    const findings = audit.receipts.map(r => `- ${r.text}`).join('\n')
+    const rerun = await settle(named.map(gate => () => runGate(gate, `${inputs}\n\nThe verification gate failed your last verdict's receipts:\n${findings}\nReturn a complete verdict block that fixes them.`, ' recheck')))
+    phase1 = phase1.map(g => rerun.find(r => r.gate === g.gate) || g)
+    verification = await verify(' recheck')
+    audit = auditItems(verification, prep.files || [])
+  }
 
   const scope = parseGateBlock(`STATUS: PASS\n${prep.scope}`) || { failBoxes: ['scope block unreadable'], findings: [] }
-  const failed = g => g.status === 'FAIL' || g.findings.length > 0
-  // The verification gate audits the review itself, so triage may not dismiss it: its FAILs go straight back as a round.
-  const rework = failed(verification) ? gateFails('verification', verification).map(f => f.scenario) : []
-  if (failed(verification) && !rework.length) rework.push('verification gate FAILED without box details')
-  const fails = [...phase1.flatMap(g => (failed(g) ? gateFails(g.gate, g) : [])),
+  const fails = [...phase1.flatMap(g => (failed(g) ? gateFails(g.gate, g) : [])), ...audit.code,
     ...scope.failBoxes.map(b => ({ location: 'scope', scenario: `scope ${b}`, severity: 'major', lens: 'scope' }))]
-  const passed = !phase1.some(failed) && !failed(verification) && !scope.failBoxes.length
-  return { passed, fails, rework }
+  const passed = !phase1.some(failed) && !audit.code.length && !scope.failBoxes.length
+  return { passed, fails, receiptsIncomplete: audit.receipts.map(r => r.text) }
+}
+
+// Sorts a verification verdict's items. Its FINDINGS lead with "<gate, or
+// file:line>" (plugins/code-review/agents/verification-gate.md, Output): a
+// lead naming a gate or the SCOPE block is receipt-only; a lead citing a file
+// in the diff is code. A finding with neither, and every FAIL box when there
+// are no findings, is receipt-only and names the gates its text mentions.
+function auditItems(verification, files) {
+  if (!(verification.status === 'FAIL' || verification.findings.length)) return { code: [], receipts: [] }
+  const mentioned = text => GATE_TOPICS.filter(g => new RegExp(`(^|[^\\w-])${g}([^\\w-]|$)`, 'i').test(text))
+  const code = []
+  const receipts = []
+  for (const f of verification.findings) {
+    const sev = Object.keys(SEVERITY).find(e => f.startsWith(e))
+    const lead = ((sev ? f.slice(sev.length) : f).trim().match(/^(.+?):\s/) || [null, ''])[1]
+    const leadsWithGate = /^scope\b/i.test(lead) || GATE_TOPICS.some(g => new RegExp(`^${g}([^\\w-]|$)`, 'i').test(lead))
+    const location = locationOf(lead)
+    const inDiff = location && files.includes(location.split(':')[0])
+    if (!leadsWithGate && inDiff) code.push({ location, scenario: `verification: ${f}`, severity: sev ? SEVERITY[sev] : 'major', lens: 'verification' })
+    else receipts.push({ text: `verification: ${f}`, gates: mentioned(f) })
+  }
+  if (!verification.findings.length) {
+    const boxes = verification.failBoxes.length ? verification.failBoxes : ['FAILED without box details']
+    receipts.push(...boxes.map(b => ({ text: `verification ${b}`, gates: mentioned(b) })))
+  }
+  return { code, receipts }
 }
 
 // ---------- QA: boot, personas in parallel, verifier, stop ----------
@@ -441,14 +481,15 @@ async function qaStage({ unit, tag, worktree, state, context, call, ops, note })
 // check that nothing was shortened (it compares them with jq, see shipper.md).
 function resultCounts(result) {
   return JSON.stringify({ criteria: result.criteria.length, decisions: result.decisions.length,
-    fixed: result.review.fixed.length, dismissed: result.review.dismissed.length, qa_preexisting: result.qa_preexisting.length })
+    fixed: result.review.fixed.length, dismissed: result.review.dismissed.length, qa_preexisting: result.qa_preexisting.length,
+    review_receipts_incomplete: result.review_receipts_incomplete.length })
 }
 
-function unitResult(unit, rounds, criteria, design, final, review, { qa, preexisting }, decisions) {
+function unitResult(unit, rounds, criteria, design, final, review, { qa, preexisting, receipts }, decisions) {
   return {
     plan_title: A.plan.title, unit: { id: unit.id, title: unit.title }, rounds,
     criteria: criteria.map(({ id, statement, passes, evidence }) => ({ id, statement, passes, evidence })),
-    staff: { design, final }, review, qa, qa_preexisting: preexisting, decisions,
+    staff: { design, final }, review, review_receipts_incomplete: receipts, qa, qa_preexisting: preexisting, decisions,
   }
 }
 
