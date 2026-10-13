@@ -44,7 +44,7 @@ function defaultAnswer(prompt, { agentType, label }) {
   }
   if (agentType === 'autopilot:lens-reviewer') return { findings: [], skipped: '' }
   if (agentType === 'autopilot:triage') return { fix: [], dismiss: [] }
-  if (agentType === 'autopilot:qa-persona') return { bugs: [], covered: ['AC1'], not_covered: [] }
+  if (agentType === 'autopilot:qa-persona') return { bugs: [], covered: ['AC1'], not_covered: [], ran: ['qa/0/probe.sh'] }
   if (agentType === 'autopilot:verifier') return { criteria: [{ id: 'AC1', passes: true, evidence: 'test ok' }], confirmed: [], dropped: [] }
   if (agentType === 'autopilot:shipper') return { pr_url: `https://github.com/o/r/pull/${unit}`, body: `/s/${unit}/pr-body.md`, stack: 'none', ci: 'pass', failures: '', notes: '' }
   if (agentType && agentType.startsWith('code-review:')) return gateBlock(agentType.slice(12, -5), 'PASS')
@@ -656,6 +656,17 @@ const tests = {
   'a lens skip is recorded in the decision log': async () => {
     const { byId } = await simulate({ answer: firstCalls(hasLabel('lens accessibility'), { findings: [], skipped: 'no UI files' }) })
     assert.ok(byId.U1.decisions.some(d => d.step === 'lens accessibility' && d.outcome === 'skipped' && d.reason === 'no UI files'))
+  },
+
+  'a persona that saved no evidence does not count as a report': async () => {
+    const { byId } = await simulate({
+      units: [unit('U1', 0, [], { personas: [persona('newbie'), persona('expert')] })],
+      limits: { qa_personas: { min: 2, max: 5 } },
+      answer: firstCalls(hasLabel('qa expert'), { bugs: [], covered: ['AC1'], not_covered: [], ran: [] }),
+    })
+    assert.equal(byId.U1.status, 'failed')
+    assert.equal(byId.U1.reason, 'only 1 personas reported')
+    assert.ok(byId.U1.decisions.some(d => d.step === 'qa expert' && d.outcome === 'no evidence'))
   },
 
   'fewer persona reports than qa_personas.min fail the unit': async () => {

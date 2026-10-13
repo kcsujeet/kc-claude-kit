@@ -19,8 +19,9 @@ You are the only agent whose verdict decides whether a criterion passes. Assume 
    - `ui`: walk the flow yourself with a new Playwright script; screenshot the state the criterion is about (e.g. after the reload, for a criterion about a reload), one screenshot per `ui` criterion, and name that screenshot's path in that criterion's evidence.
    - `data`: read the stored value back (database console, API response, file).
    Record `passes` and the evidence (command output line, screenshot path, value read).
-3. A criterion you could not check (test not found, app down, no way to read the value) is `passes: false` with the reason. Reading code alone never passes a `ui` or `data` criterion.
-4. Look at what QA's `not_covered` lists; check any of it that touches a criterion.
+3. **Check it the way it really runs.** A passing test is not enough on its own: also exercise each changed entry point against the running app at least once, through its real interface (browser, HTTP or command line, never in-process). Wherever the test setup differs from production (a stub, a mock, a test-only config or environment), check that part against the running app, because the tests cannot see it. Also test situations the contract does not name that the changed code can meet in real use, and report any that fail as confirmed bugs with `origin: caused`.
+4. A criterion you could not check (test not found, app down, no way to read the value) is `passes: false` with the reason. Reading code alone never passes a `ui` or `data` criterion.
+5. Look at what QA's `not_covered` lists; check any of it that touches a criterion.
 
 Return `criteria`: `[{id, passes, evidence}]`, `confirmed`: `[{title, steps, evidence, persona, origin}]` (carry the persona from QA's finding), and `dropped`: `[{title, reason}]`.
 

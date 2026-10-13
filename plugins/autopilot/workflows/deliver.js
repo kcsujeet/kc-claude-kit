@@ -61,9 +61,9 @@ const TRIAGE = {
     dismiss: { type: 'array', items: { type: 'object', required: ['finding', 'reason'], properties: { finding: str, reason: str } } } },
 }
 const QA = {
-  type: 'object', required: ['bugs', 'covered'],
+  type: 'object', required: ['bugs', 'covered', 'ran'],
   properties: { bugs: { type: 'array', items: { type: 'object', required: ['title', 'steps', 'expected', 'actual', 'evidence', 'script', 'severity'],
-    properties: { title: str, steps: strs, expected: str, actual: str, evidence: str, script: str, severity: str } } }, covered: strs, not_covered: strs },
+    properties: { title: str, steps: strs, expected: str, actual: str, evidence: str, script: str, severity: str } } }, covered: strs, not_covered: strs, ran: strs },
 }
 const VERDICT = {
   type: 'object', required: ['criteria', 'confirmed', 'dropped'],
@@ -514,7 +514,11 @@ async function qaStage({ unit, tag, worktree, state, context, call, ops, note })
     const reports = await settle(personas.map((persona, n) => () => call(
       `Persona: ${JSON.stringify(persona)}\nApp: ${url}\n${login}\nEvidence directory: ${state}/qa/${n}\n${context}`,
       { agentType: 'autopilot:qa-persona', model: WORKERS, schema: QA, label: `${tag} qa ${persona.name}`, phase: 'QA' })))
-    reports.forEach((r, n) => { if (!r) note(`qa ${personas[n].name}`, 'null', 'persona returned nothing') })
+    // A persona that saved nothing it ran did not really run; it counts as no report.
+    reports.forEach((r, n) => {
+      if (!r) note(`qa ${personas[n].name}`, 'null', 'persona returned nothing')
+      else if (!(r.ran || []).length) { note(`qa ${personas[n].name}`, 'no evidence', 'persona saved nothing it ran; not counted'); reports[n] = null }
+    })
     const reported = reports.filter(Boolean).length
     if (reported < LIMITS.qa_personas.min) throw new Stop('failed', `only ${reported} personas reported`)
     const qa = reports.map((r, n) => ({ persona: personas[n].name, bugs: r ? r.bugs : [], not_covered: r ? (r.not_covered || []) : ['agent returned nothing'] }))
