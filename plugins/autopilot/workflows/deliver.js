@@ -316,9 +316,19 @@ async function reviewStage({ unit, tag, worktree, baseBranch, state, context, ca
   const receipts = gateResult.receiptsIncomplete
   if (!gateResult.fails.length && !kept.length) return { fix: [], dismiss: [], receipts }
 
-  const triage = await call(`Triage these findings for ${worktree}.\nGate FAILs: ${JSON.stringify(gateResult.fails)}\nLens findings: ${JSON.stringify(kept)}${gateResult.fails.some(f => f.lens === 'verification') ? '\nItems with lens "verification" cite code in this diff: never dismiss one as a format or citation issue.' : ''}${earlier && `\n${earlier}\nDismiss an item that only reverses an earlier decision, with reason "reverses round N decision without new scenario" (N from that decision).`}`,
+  const triage = await call(`Triage these findings for ${worktree}.\n${planSpecs(unit)}\nGate FAILs: ${JSON.stringify(gateResult.fails)}\nLens findings: ${JSON.stringify(kept)}${gateResult.fails.some(f => f.lens === 'verification') ? '\nItems with lens "verification" cite code in this diff: never dismiss one as a format or citation issue.' : ''}${earlier && `\n${earlier}\nDismiss an item that only reverses an earlier decision, with reason "reverses round N decision without new scenario" (N from that decision).`}`,
     { agentType: 'autopilot:triage', model: WORKERS, schema: TRIAGE, label: `${tag} triage`, phase: 'Review' })
   return { ...(triage || { fix: [...gateResult.fails, ...kept].map(f => ({ finding: `${f.location} ${f.scenario}`, reason: 'triage returned nothing' })), dismiss: [] }), receipts }
+}
+
+// What the plan fixes for this unit: names, signatures and files there are
+// out of scope for gate-driven fixes (triage dismisses with "specified by plan").
+function planSpecs(unit) {
+  const brief = u => ({ id: u.id, title: u.title, scope: u.scope, criteria: u.contract.criteria.map(c => c.statement) })
+  const dependents = A.units.filter(u => ancestors(u.id).has(unit.id)).map(brief)
+  return [`Plan specifies (names, signatures and files here are not changed by a gate-driven fix; dismiss such a fix with reason "specified by plan"):`,
+    `Cross-unit architecture: ${A.architecture}`, `This unit: ${JSON.stringify(brief(unit))}`,
+    `Units that depend on this one: ${JSON.stringify(dependents)}`].join('\n')
 }
 
 // ---------- code-review gates, dispatched the way review-code does ----------

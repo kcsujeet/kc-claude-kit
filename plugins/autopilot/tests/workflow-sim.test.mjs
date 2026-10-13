@@ -416,6 +416,35 @@ const tests = {
     assert.match(labelled(calls, 'U1 engineer fix')[0].prompt, /^- code-review reported FAILED without box details$/m)
   },
 
+  'triage sees what the plan and dependent units specify, and dismisses a rename of it': async () => {
+    let failed = false
+    const units = [unit('U1', 0, [], { criteria: [{ id: 'AC1', statement: 'reset(storage) returns 0.', check: { kind: 'test', how: 't' } }] }),
+      unit('U2', 1, ['U1'], { criteria: [{ id: 'AC2', statement: 'The Reset button calls reset.', check: { kind: 'ui', how: 'u' } }] })]
+    units[0].scope = 'A `reset(storage)` function in counter.js with a test.'
+    units[1].scope = 'The button wired to reset.'
+    const { byId, calls } = await simulate({
+      units,
+      answer: (p, { agentType }) => {
+        if (agentType === 'autopilot:verifier') return passing(['AC1', 'AC2'])
+        if (agentType === 'code-review:naming-gate' && !failed) {
+          failed = true
+          return gateBlock('naming', 'FAIL', ['[FAIL] §N5: counter.js:3 bare verb'], ['🟡 counter.js:3: `reset` is a bare verb. Rename `resetCount`'])
+        }
+        if (agentType === 'autopilot:triage') {
+          assert.match(p, /^Plan specifies .*"specified by plan"/m)
+          assert.match(p, /^This unit: .*reset\(storage\)/m)
+          assert.match(p, /^Units that depend on this one: .*"id":"U2".*The Reset button calls reset\./m)
+          return { fix: [], dismiss: [{ finding: 'counter.js:3 rename reset', reason: 'specified by plan: U1 scope names `reset(storage)` and U2 calls it' }] }
+        }
+        return undefined
+      },
+    })
+    assert.equal(byId.U1.status, 'done')
+    assert.equal(byId.U1.rounds, 0)
+    assert.match(byId.U1.result.review.dismissed[0].reason, /^specified by plan/)
+    assert.equal(labelled(calls, 'U1 triage').length, 1)
+  },
+
   // ---- decision history across rounds ----
   'a round-2 finding that reverses a round-1 fix is dismissed with the history in view': async () => {
     let triageCalls = 0
