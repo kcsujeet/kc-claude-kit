@@ -6,6 +6,8 @@ set -euo pipefail
 tests_dir=$(cd "$(dirname "$0")" && pwd)
 script="$(dirname "$tests_dir")/scripts/read-config.sh"
 fixtures="$tests_dir/fixtures/config"
+stderr_file=$(mktemp)
+trap 'rm -f "$stderr_file"' EXIT
 passes=0
 failures=0
 
@@ -13,18 +15,23 @@ pass() { echo "ok   $1"; passes=$((passes + 1)); }
 fail() { echo "FAIL $1"; echo "     $2"; failures=$((failures + 1)); }
 
 expect_value() {
-  local label=$1 fixture=$2 filter=$3 expected=$4 actual
-  actual=$(bash "$script" "$fixtures/$fixture" 2>/dev/null | jq -c "$filter") || actual="<exit $?>"
-  if [ "$actual" = "$expected" ]; then pass "$label"; else fail "$label" "expected $expected, got $actual"; fi
+  local label=$1 fixture=$2 filter=$3 expected=$4 out actual status=0
+  out=$(bash "$script" "$fixtures/$fixture" 2>"$stderr_file") || status=$?
+  actual=$(printf '%s' "$out" | jq -c "$filter") || actual="<jq failed>"
+  if [ "$status" = 0 ] && [ "$actual" = "$expected" ]; then
+    pass "$label"
+  else
+    fail "$label" "expected $expected, got $actual (status $status); stderr: $(cat "$stderr_file")"
+  fi
 }
 
 expect_error() {
-  local label=$1 fixture=$2 needle=$3 stderr status=0
-  stderr=$(bash "$script" "$fixtures/$fixture" 2>&1 >/dev/null) || status=$?
-  if [ "$status" = 1 ] && printf '%s' "$stderr" | grep -qF "$needle"; then
+  local label=$1 fixture=$2 needle=$3 status=0
+  bash "$script" "$fixtures/$fixture" >/dev/null 2>"$stderr_file" || status=$?
+  if [ "$status" = 1 ] && grep -qF "$needle" "$stderr_file"; then
     pass "$label"
   else
-    fail "$label" "status $status, stderr: $stderr"
+    fail "$label" "status $status, stderr: $(cat "$stderr_file")"
   fi
 }
 
@@ -40,6 +47,11 @@ expect_error "rejects ready without {port}" bad-start.json  'launch.ready must c
 expect_error "rejects empty checks"         bad-checks.json 'checks must be a non-empty array'
 expect_error "rejects non-JSON"             not-json.json   'not valid JSON'
 expect_error "rejects missing file"         missing.json    'not found'
+expect_error "rejects launch as a string"   launch-string.json  'launch must be an object'
+expect_error "rejects ports as a number"    ports-number.json   'launch.ports must be an object'
+expect_error "rejects top-level array"      top-array.json      'must be a JSON object'
+expect_error "rejects limits as a string"   limits-string.json  'limits must be an object'
+expect_error "rejects models as an array"   models-array.json   'models must be an object'
 
 echo "read-config: $passes passed, $failures failed"
 [ "$failures" = 0 ]

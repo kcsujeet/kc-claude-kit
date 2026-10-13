@@ -1,0 +1,1 @@
+{"launch":{"start":"x {port}","ready":"http://h:{port}/"},"checks":["true"],"models":["opus"]}

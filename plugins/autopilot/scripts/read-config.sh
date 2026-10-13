@@ -18,34 +18,67 @@ if ! jq empty "$config" >/dev/null 2>&1; then
   echo "autopilot.json: $config is not valid JSON" >&2
   exit 1
 fi
+if [ "$(jq -r 'type' "$config")" != object ]; then
+  echo "autopilot.json: $config must be a JSON object" >&2
+  exit 1
+fi
 
+# Sections of the wrong type read as {} so normalization never crashes;
+# SHAPE reports them.
+# jq program: $-variables are jq's, not the shell's.
+# shellcheck disable=SC2016
 readonly NORMALIZE='
-  def strs: type == "array" and all(.[]; type == "string");
-  {
-    launch: {
-      install: (.launch.install // ""),
-      start: .launch.start,
-      ready: .launch.ready,
-      seed: (.launch.seed // ""),
-      ready_timeout_s: (.launch.ready_timeout_s // 120),
-      ports: { base: (.launch.ports.base // 4100), per_unit: (.launch.ports.per_unit // 10) },
-      login: (.launch.login // null)
-    },
-    checks: .checks,
-    risky_paths: (.risky_paths // []),
-    review: { extra_agents: (.review.extra_agents // []) },
-    limits: {
-      max_fix_rounds: (.limits.max_fix_rounds // 4),
-      max_parallel_units: (.limits.max_parallel_units // 4),
-      qa_personas: { min: (.limits.qa_personas.min // 3), max: (.limits.qa_personas.max // 5) },
-      max_agents_per_unit: (.limits.max_agents_per_unit // 120)
-    },
-    models: { workers: (.models.workers // "sonnet"), staff: (.models.staff // "best") }
-  }'
+  def o: if type == "object" then . else {} end;
+  . as $c
+  | ($c.launch | o) as $l
+  | ($l.ports | o) as $p
+  | ($c.review | o) as $r
+  | ($c.limits | o) as $lim
+  | ($lim.qa_personas | o) as $qa
+  | ($c.models | o) as $m
+  | {
+      launch: {
+        install: ($l.install // ""),
+        start: $l.start,
+        ready: $l.ready,
+        seed: ($l.seed // ""),
+        ready_timeout_s: ($l.ready_timeout_s // 120),
+        ports: { base: ($p.base // 4100), per_unit: ($p.per_unit // 10) },
+        login: ($l.login // null)
+      },
+      checks: $c.checks,
+      risky_paths: ($c.risky_paths // []),
+      review: { extra_agents: ($r.extra_agents // []) },
+      limits: {
+        max_fix_rounds: ($lim.max_fix_rounds // 4),
+        max_parallel_units: ($lim.max_parallel_units // 4),
+        qa_personas: { min: ($qa.min // 3), max: ($qa.max // 5) },
+        max_agents_per_unit: ($lim.max_agents_per_unit // 120)
+      },
+      models: { workers: ($m.workers // "sonnet"), staff: ($m.staff // "best") }
+    }'
+
+# jq program: $-variables are jq's, not the shell's.
+# shellcheck disable=SC2016
+readonly SHAPE='
+  def wrong($v): $v != null and ($v | type) != "object";
+  def o: if type == "object" then . else {} end;
+  . as $c
+  | ($c.launch | o) as $l
+  | ($c.limits | o) as $lim
+  | [
+      (if wrong($c.launch) then "launch must be an object" else empty end),
+      (if wrong($l.ports) then "launch.ports must be an object" else empty end),
+      (if wrong($l.login) then "launch.login must be an object or null" else empty end),
+      (if wrong($c.limits) then "limits must be an object" else empty end),
+      (if wrong($lim.qa_personas) then "limits.qa_personas must be an object" else empty end),
+      (if wrong($c.review) then "review must be an object" else empty end),
+      (if wrong($c.models) then "models must be an object" else empty end)
+    ] | .[]'
 
 readonly PROBLEMS='
-  def strs: type == "array" and all(.[]; type == "string");
   def posint: type == "number" and . >= 1 and floor == .;
+  def strs: type == "array" and all(.[]; type == "string");
   [
     (if (.launch.start | type) == "string" and (.launch.start | contains("{port}")) then empty else "launch.start must contain {port}" end),
     (if (.launch.ready | type) == "string" and (.launch.ready | contains("{port}")) then empty else "launch.ready must contain {port}" end),
@@ -58,8 +91,10 @@ readonly PROBLEMS='
     (if .limits.qa_personas.min <= .limits.qa_personas.max then empty else "limits.qa_personas.min must be <= max" end)
   ] | .[]'
 
+shape_problems=$(jq -r "$SHAPE" "$config")
 normalized=$(jq -c "$NORMALIZE" "$config")
-problems=$(printf '%s' "$normalized" | jq -r "$PROBLEMS")
+value_problems=$(printf '%s' "$normalized" | jq -r "$PROBLEMS")
+problems=$(printf '%s\n%s\n' "$shape_problems" "$value_problems" | sed '/^$/d')
 if [ -n "$problems" ]; then
   printf '%s\n' "$problems" | sed 's/^/autopilot.json: /' >&2
   exit 1
