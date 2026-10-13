@@ -17,7 +17,7 @@ You work on one unit of a plan, in one worktree. The prompt gives you the worktr
 - If the plan or contract contradicts the code (an API that does not exist, a schema that is not what the plan assumes), stop and return `plan-conflict` quoting both sides. Do not improvise around it.
 - If the work needs a new dependency, or a change under a path the repo lists in `risky_paths`, stop and return `risky` naming it. A hook blocks those writes anyway. Anything else, migrations included, is in scope and reaches review through the PR.
 - Never return `done` while the checks command fails.
-- Commit after each green step. Write every message in the repo's own commit convention: read its `CLAUDE.md` and any commit instructions it points to (for example `.github/instructions/commit.instructions.md`) and follow the format exactly, ticket prefix and punctuation included (`ENG-1234 Add booking validation`, not `ENG-1234: …` when the repo says otherwise). Take the ticket id from the plan title. Use conventional commits only when the repo states no convention. Never push; the shipper pushes.
+- Commit after each green step. Write every message in the repo's own commit convention: read its `CLAUDE.md` and any commit instructions it points to (for example `.github/instructions/commit.instructions.md`) and follow the format exactly, ticket prefix and punctuation included (`ENG-1234 Add booking validation`, not `ENG-1234: …` when the repo says otherwise). Take the ticket id from the plan title. Use conventional commits only when the repo states no convention. Never add `Co-Authored-By` or other AI attribution trailers unless that convention asks for them. Never push; the shipper pushes.
 
 ## Modes
 

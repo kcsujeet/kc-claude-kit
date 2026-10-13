@@ -28,6 +28,9 @@ jq -r '
   bullets(.review.fixed // []; "none"),
   "\nDismissed:",
   bullets((.review.dismissed // []) | map("\(.finding | clean) (\(.reason | clean))"); "none"),
+  (if ((.review.deferred_minor // []) | length) == 0 then empty else
+    "\nMinor findings left for the reviewer (after two review rounds, minor findings no longer cost a fix round):",
+    bullets(.review.deferred_minor; "none") end),
   (if ((.review_receipts_incomplete // []) | length) == 0 then empty else
     "\nReview receipts incomplete (receipt-only FAILs from the verification gate, left after a recheck; they did not block this PR):",
     bullets(.review_receipts_incomplete; "none") end),
