@@ -41,7 +41,7 @@ JS
 
 cat > .claude/autopilot.json <<'JSON'
 {"launch":{"start":"python3 -m http.server {port} --bind 127.0.0.1","ready":"http://127.0.0.1:{port}/"},
- "checks":["node --test test/*.test.js"],"limits":{"max_fix_rounds":3,"max_parallel_units":2,"qa_personas":{"min":3,"max":3},"max_agents_per_unit":80}}
+ "checks":["node --test test/*.test.js"],"limits":{"max_fix_rounds":3,"max_parallel_units":2,"qa_personas":{"min":3,"max":3},"max_agents_per_unit":200}}
 JSON
 
 cat > docs/plans/reset.md <<'MD'
