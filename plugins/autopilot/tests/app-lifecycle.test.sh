@@ -66,5 +66,13 @@ started=$SECONDS
 err=$(bash "$scripts/boot-app.sh" "$tmp/exits.json" "$tmp/wt" 0 "$tmp/state" 2>&1 >/dev/null) || status=$?
 if [ "$status" = 1 ] && printf '%s' "$err" | grep -q 'app exited early' && [ $((SECONDS - started)) -lt 10 ]; then pass "start that exits fails early"; else fail "start that exits fails early" "status=$status after $((SECONDS - started))s err=$err"; fi
 
+# A bad or self-referential pgid file is removed and nothing is killed.
+own_pgid=$(ps -o pgid= -p $$ | tr -d ' ')
+for bad in "" 0 1 abc "-5" "$own_pgid"; do
+  printf '%s\n' "$bad" > "$tmp/state/app-9.pgid"
+  bash "$scripts/stop-app.sh" "$tmp/state" 9
+  if [ ! -f "$tmp/state/app-9.pgid" ]; then pass "stop ignores pgid '$bad'"; else fail "stop ignores pgid '$bad'" "file kept"; fi
+done
+
 echo "app-lifecycle: $passes passed, $failures failed"
 [ "$failures" = 0 ]
