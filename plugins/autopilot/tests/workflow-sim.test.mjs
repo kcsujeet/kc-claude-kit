@@ -16,6 +16,13 @@ const deliver = new AsyncFunction('agent', 'parallel', 'pipeline', 'phase', 'log
 
 const unitOf = label => label.split(' ')[0]
 
+const SCOPE_PASS = 'SCOPE:\n- [N/A] §G1: local diff\n- [PASS] §G2: diff matches the unit scope\n- [N/A] §G3: no linked issue\n- [PASS] §G4: diff read whole'
+// A review-code verdict block; boxes and findings are lines without the "- ".
+function gateBlock(gate, status, boxes = [`[${status === 'FAIL' ? 'FAIL' : 'PASS'}] §X1: a.ts:3 checked`], findings = []) {
+  return [`GATE: ${gate}`, `STATUS: ${status}`, 'BOXES:', ...boxes.map(b => `- ${b}`), 'FINDINGS:', ...findings.map(f => `- ${f}`)].join('\n')
+}
+const GATE_TOPICS = ['naming', 'clarity', 'structure', 'simplicity', 'datetime', 'react', 'i18n', 'testing', 'correctness', 'project-conventions']
+
 // Answers every agent with a clean, passing result; a scenario overrides by
 // returning something other than undefined.
 function defaultAnswer(prompt, { agentType, label }) {
@@ -40,7 +47,8 @@ function defaultAnswer(prompt, { agentType, label }) {
   if (agentType === 'autopilot:qa-persona') return { bugs: [], covered: ['AC1'], not_covered: [] }
   if (agentType === 'autopilot:verifier') return { criteria: [{ id: 'AC1', passes: true, evidence: 'test ok' }], confirmed: [], dropped: [] }
   if (agentType === 'autopilot:shipper') return { pr_url: `https://github.com/o/r/pull/${unit}`, stack: 'none', ci: 'pass', failures: '', notes: '' }
-  if (label.includes('code-review gates')) return { passed: true, fails: [] }
+  if (agentType && agentType.startsWith('code-review:')) return gateBlock(agentType.slice(12, -5), 'PASS')
+  if (label.endsWith('review prep')) return { exit_code: 0, output: 'HEAD_SHA=abc', head_sha: 'abc', diff_file: '/s/review.diff', changed_files: '/s/changed-files.txt', scope: SCOPE_PASS }
   if (label.includes('skeptic')) return { refuted: false, reason: 'reproduces' }
   throw new Error(`no scripted answer for ${label}`)
 }
@@ -69,7 +77,7 @@ const hasLabel = text => opts => opts.label.includes(text)
 async function simulate({ units = [unit('U1', 0)], limits = {}, answer = () => undefined } = {}) {
   const calls = []
   const args = {
-    run_id: 'r1', repo: '/repo', run_dir: '/repo/.autopilot/runs/r1', plugin_root: '/plugin', dry_run: false, base_branch: 'main',
+    run_id: 'r1', repo: '/repo', code_review_root: '/cr', run_dir: '/repo/.autopilot/runs/r1', plugin_root: '/plugin', dry_run: false, base_branch: 'main',
     plan: { title: 'Plan', goal: 'goal', out_of_scope: 'none' }, architecture: 'arch',
     config: {
       launch: { login: null }, review: { extra_agents: [] },
@@ -252,22 +260,99 @@ const tests = {
   },
 
   // ---- code-review gates ----
-  'code-review gates that return nothing once are retried': async () => {
-    const { byId, calls } = await simulate({ answer: firstCalls(hasLabel('code-review gates'), null) })
+  'review dispatches every code-review gate agent, then verification on their blocks': async () => {
+    const { byId, calls } = await simulate()
     assert.equal(byId.U1.status, 'done')
-    assert.equal(labelled(calls, 'U1 code-review gates retry').length, 1)
-    assert.ok(byId.U1.decisions.some(d => d.step === 'code-review gates' && d.outcome === 'null'))
+    const prep = labelled(calls, 'U1 review prep')[0]
+    assert.match(prep.prompt, /cd \/wt\/U1 && bash \/cr\/scripts\/gather-review\.sh --branch main --out-dir \/repo\/\.autopilot\/runs\/r1\/U1\/review\/r1$/m)
+    const gateCalls = calls.filter(c => c.agentType && c.agentType.startsWith('code-review:'))
+    assert.deepEqual(gateCalls.map(c => c.agentType), [...GATE_TOPICS, 'verification'].map(g => `code-review:${g}-gate`))
+    for (const c of gateCalls) {
+      for (const input of ['Head SHA: abc', 'Diff file: /s/review.diff', 'Changed files: /s/changed-files.txt', 'Repo root: /wt/U1']) assert.ok(c.prompt.includes(input), `${c.label} lacks ${input}`)
+    }
+    const verification = gateCalls.at(-1)
+    assert.ok(calls.indexOf(verification) > Math.max(...gateCalls.slice(0, -1).map(c => calls.indexOf(c))), 'verification runs after phase 1')
+    for (const g of GATE_TOPICS) assert.ok(verification.prompt.includes(`GATE: ${g}\nSTATUS: PASS`), `verification lacks ${g}'s block`)
+    assert.ok(verification.prompt.includes(SCOPE_PASS))
   },
 
-  'code-review gates that return nothing twice fail the unit': async () => {
-    const { byId, calls } = await simulate({ answer: firstCalls(hasLabel('code-review gates'), null, 2) })
+  'a FAIL box becomes a gate finding for triage': async () => {
+    let failed = false
+    const { byId, calls } = await simulate({
+      answer: (p, { agentType }) => {
+        if (agentType !== 'code-review:naming-gate' || failed) return undefined
+        failed = true
+        return gateBlock('naming', 'FAIL', ['[FAIL] §N2: counter.js:4 `x` is opaque'], ['🟡 counter.js:4: `x` is opaque. Rename `nextCount`'])
+      },
+    })
+    assert.equal(byId.U1.status, 'done')
+    const triage = labelled(calls, 'U1 triage')[0].prompt
+    const fails = JSON.parse(triage.match(/^Gate FAILs: (.*)$/m)[1])
+    assert.deepEqual(fails, [{ location: 'counter.js:4', scenario: 'naming: 🟡 counter.js:4: `x` is opaque. Rename `nextCount`', severity: 'minor', lens: 'naming' }])
+  },
+
+  'a verification FAIL becomes a finding': async () => {
+    let failed = false
+    const { calls } = await simulate({
+      answer: (p, { agentType }) => {
+        if (agentType !== 'code-review:verification-gate' || failed) return undefined
+        failed = true
+        return gateBlock('verification', 'FAIL', ['[FAIL] §V2: testing gate shows no loose-assertion receipt'])
+      },
+    })
+    const fails = JSON.parse(labelled(calls, 'U1 triage')[0].prompt.match(/^Gate FAILs: (.*)$/m)[1])
+    assert.deepEqual(fails.map(f => f.lens), ['verification'])
+    assert.match(fails[0].scenario, /§V2: testing gate shows no loose-assertion receipt/)
+  },
+
+  'a gate that returns nothing once is retried': async () => {
+    const { byId, calls } = await simulate({ answer: firstCalls(opts => opts.agentType === 'code-review:clarity-gate', null) })
+    assert.equal(byId.U1.status, 'done')
+    assert.equal(labelled(calls, 'U1 gate clarity retry').length, 1)
+    assert.ok(byId.U1.decisions.some(d => d.step === 'gate clarity' && d.outcome === 'null'))
+  },
+
+  'a gate that returns nothing twice fails the unit closed': async () => {
+    const { byId, calls } = await simulate({ answer: firstCalls(opts => opts.agentType === 'code-review:clarity-gate', null, 2) })
     assert.equal(byId.U1.status, 'failed')
-    assert.equal(byId.U1.reason, 'code-review gates did not run')
+    assert.equal(byId.U1.reason, 'code-review clarity gate did not return a verdict block')
     assert.equal(labelled(calls, 'U1 triage').length, 0)
   },
 
-  'a FAILED code-review verdict without FAIL boxes is a round, never triaged': async () => {
-    const { byId, calls } = await simulate({ answer: firstCalls(hasLabel('code-review gates'), { passed: false, fails: [] }) })
+  'a gate block without STATUS or BOXES is rejected like a null': async () => {
+    const { byId } = await simulate({ answer: firstCalls(opts => opts.agentType === 'code-review:naming-gate', 'naming looks fine', 2) })
+    assert.equal(byId.U1.status, 'failed')
+  },
+
+  'a PASS that lists a finding fails the review': async () => {
+    let done = false
+    const { calls } = await simulate({
+      answer: (p, { agentType }) => {
+        if (agentType !== 'code-review:testing-gate' || done) return undefined
+        done = true
+        return gateBlock('testing', 'PASS', ['[PASS] §T1: ok'], ['🟠 a.test.js:9: loose toBeTruthy. Use toBe(1)'])
+      },
+    })
+    const fails = JSON.parse(labelled(calls, 'U1 triage')[0].prompt.match(/^Gate FAILs: (.*)$/m)[1])
+    assert.deepEqual(fails.map(f => [f.location, f.severity]), [['a.test.js:9', 'major']])
+  },
+
+  'a FAIL in the SCOPE block fails the review': async () => {
+    const { byId, calls } = await simulate({
+      answer: firstCalls(hasLabel('review prep'), { exit_code: 0, output: '', head_sha: 'abc', diff_file: '/d', changed_files: '/c', scope: 'SCOPE:\n- [FAIL] §G2: adds an unrelated refactor of load()' }),
+    })
+    assert.equal(byId.U1.status, 'done')
+    assert.ok(labelled(calls, 'U1 triage')[0].prompt.includes('§G2: adds an unrelated refactor of load()'))
+  },
+
+  'a failed gather fails the unit': async () => {
+    const { byId } = await simulate({ answer: firstCalls(hasLabel('review prep'), { exit_code: 2, output: 'base not found', head_sha: '', diff_file: '', changed_files: '', scope: '' }) })
+    assert.equal(byId.U1.status, 'failed')
+    assert.match(byId.U1.reason, /code-review gather failed: base not found/)
+  },
+
+  'a FAILED gate without FAIL boxes or findings is a round, never triaged': async () => {
+    const { byId, calls } = await simulate({ answer: firstCalls(opts => opts.agentType === 'code-review:naming-gate', gateBlock('naming', 'FAIL', ['[PASS] §N1: ok'])) })
     assert.equal(byId.U1.status, 'done')
     assert.equal(byId.U1.rounds, 1)
     assert.equal(labelled(calls, 'U1 triage').length, 0)
@@ -324,8 +409,8 @@ const tests = {
 
   // ---- app cleanup ----
   'a spent budget still stops the app': async () => {
-    // 18 calls reach boot: worktree, propose, design, build, checks, gates, 11 lenses, boot.
-    const { byId, calls } = await simulate({ limits: { max_agents_per_unit: 18 } })
+    // 29 calls reach boot: worktree, propose, design, build, checks, review prep, 10 gates, verification, 11 lenses, boot.
+    const { byId, calls } = await simulate({ limits: { max_agents_per_unit: 29 } })
     assert.equal(byId.U1.status, 'blocked:budget')
     assert.equal(labelled(calls, 'U1 stop app').length, 1)
   },

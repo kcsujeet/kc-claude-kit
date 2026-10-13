@@ -21,6 +21,7 @@ Run every check below even after one fails (skip only a check that needs a value
 - **Repo.** `repo=$(git rev-parse --show-toplevel)`; run every later command from `repo`. Resolve the plan path to an absolute path before changing directory.
 - **Plan.** `bash ${CLAUDE_PLUGIN_ROOT}/scripts/validate-plan.sh <plan>` exits 0. On exit 1, print its problems and point to `${CLAUDE_PLUGIN_ROOT}/skills/run/references/plan-template.md`.
 - **Config.** `.claude/autopilot.json` exists and `bash ${CLAUDE_PLUGIN_ROOT}/scripts/read-config.sh .claude/autopilot.json` exits 0. If the file is missing, tell the user to run `/autopilot:init`; if it is invalid, print its errors. Note `limits.qa_personas.min` and `max` from its output; step 3 needs them.
+- **code-review.** `bash ${CLAUDE_PLUGIN_ROOT}/scripts/plugin-root.sh ${CLAUDE_PLUGIN_ROOT} code-review` exits 0; note the path it prints as `code_review_root` (the workflow runs code-review's gather script and dispatches its gate agents itself). On exit 1, tell the user to install the `code-review` plugin.
 - **Ignored run files.** `git check-ignore -q .autopilot/x && git check-ignore -q .claude/worktrees/x` succeeds; otherwise tell the user to run `/autopilot:init` (it adds them to `.gitignore`).
 - **Base branch.** If the repo has an `origin` remote: `base` is `git symbolic-ref --short refs/remotes/origin/HEAD` minus the `origin/` prefix (if that fails: `git ls-remote --symref origin HEAD | awk '/^ref:/ {sub("refs/heads/", "", $2); print $2}'`, which turns `ref: refs/heads/main<TAB>HEAD` into `main`). With no `origin` remote: only with `--dry-run`, `base` is the current branch (`git branch --show-current`); without `--dry-run`, stop (PRs need a remote).
 - **Clean and current.** The current branch is `base`. `git status --porcelain --untracked-files=all` lists nothing except the plan file itself. With an `origin` remote: `git fetch origin <base>`, then `git rev-parse HEAD` equals `git rev-parse origin/<base>` (if not, tell the user to pull or push first).
@@ -59,9 +60,9 @@ Then build the workflow arguments from those files, so every field has the type 
 
 ```bash
 jq -n --arg run_id "<run_id>" --arg repo "<repo>" --arg run_dir "<run_dir>" --arg plugin_root "${CLAUDE_PLUGIN_ROOT}" \
-  --arg base_branch "<base>" --argjson dry_run <true|false> \
+  --arg base_branch "<base>" --arg code_review_root "<code_review_root>" --argjson dry_run <true|false> \
   --slurpfile plan "$run_dir/plan.json" --slurpfile config "$run_dir/config.json" --slurpfile units "$run_dir/units.json" \
-  '{run_id: $run_id, repo: $repo, run_dir: $run_dir, plugin_root: $plugin_root, dry_run: $dry_run, base_branch: $base_branch,
+  '{run_id: $run_id, repo: $repo, run_dir: $run_dir, plugin_root: $plugin_root, dry_run: $dry_run, base_branch: $base_branch, code_review_root: $code_review_root,
     plan: ($plan[0] | {title, goal, out_of_scope}), architecture: $units[0].architecture,
     config: $config[0], units: $units[0].units}' > "$run_dir/args.json"
 ```

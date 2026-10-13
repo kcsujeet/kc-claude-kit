@@ -18,6 +18,9 @@ const WORKERS = CFG.models.workers
 const STAFF = CFG.models.staff
 const SCRIPTS = `${A.plugin_root}/scripts`
 const CONFIG_PATH = `${A.run_dir}/config.json`
+// review-code's phase-1 gates (plugins/code-review/skills/review-code/SKILL.md, Step 2):
+// all ten every round; a gate that does not apply returns PASS (N/A) itself.
+const GATE_TOPICS = ['naming', 'clarity', 'structure', 'simplicity', 'datetime', 'react', 'i18n', 'testing', 'correctness', 'project-conventions']
 const LENSES = ['security', 'data', 'compatibility', 'concurrency', 'accessibility', 'observability', 'plan-fit',
   'type-safety', 'error-handling', 'performance', 'dependencies']
 
@@ -43,7 +46,10 @@ const FINAL = {
 }
 const FINDING = { type: 'object', required: ['location', 'scenario', 'severity'], properties: { location: str, scenario: str, consequence: str, severity: str, lens: str } }
 const FINDINGS = { type: 'object', required: ['findings'], properties: { findings: { type: 'array', items: FINDING }, skipped: str } }
-const GATES = { type: 'object', required: ['passed', 'fails'], properties: { passed: { type: 'boolean' }, fails: { type: 'array', items: FINDING } } }
+const PREP = {
+  type: 'object', required: ['exit_code', 'head_sha', 'diff_file', 'changed_files', 'scope'],
+  properties: { exit_code: { type: 'number' }, output: str, head_sha: str, diff_file: str, changed_files: str, scope: str },
+}
 const REFUTE = { type: 'object', required: ['refuted', 'reason'], properties: { refuted: { type: 'boolean' }, reason: str } }
 const TRIAGE = {
   type: 'object', required: ['fix', 'dismiss'],
@@ -195,7 +201,7 @@ async function runUnit(unit, baseBranch, progress, parentPr) {
     const checks = await ops('checks', `bash ${SCRIPTS}/run-checks.sh ${CONFIG_PATH} ${worktree}`, worktree)
     if (checks.exit_code !== 0) { nextRound('checks', [checks.output]); continue }
 
-    const review = await reviewStage(ctx)
+    const review = await reviewStage({ ...ctx, reviewRound: progress.rounds + 1 })
     if (review.rework) { nextRound('review', review.rework); continue }
     reviewLog.fixed.push(...review.fix.map(f => f.finding))
     reviewLog.dismissed.push(...review.dismiss)
@@ -248,14 +254,8 @@ function contractResults(unit, checked) {
 // ---------- review: code-review gates + lenses, skeptics, triage ----------
 // Returns {fix, dismiss} from triage, or {rework} when the gate verdict must go
 // straight back to the engineer without triage.
-async function reviewStage({ tag, worktree, baseBranch, context, call, note, retryOnce }) {
-  const gates = async () => {
-    const out = await retryOnce('code-review gates', label => call(
-      `Invoke the code-review:review-code skill on the current HEAD of the repo at ${worktree} against base ${baseBranch}, and run it to completion including its verification gate. Return passed (true only if the overall verdict is PASSED) and fails: one entry per FAIL box with location (file:line), scenario (the box id and evidence), severity "major".`,
-      { model: WORKERS, schema: GATES, label: `${tag} ${label}`, phase: 'Review' }))
-    if (!out) throw new Stop('failed', 'code-review gates did not run')
-    return out
-  }
+async function reviewStage({ unit, tag, worktree, baseBranch, state, context, call, note, retryOnce, reviewRound }) {
+  const gates = () => codeReviewGates({ unit, tag, worktree, baseBranch, state, call, note, retryOnce, reviewRound })
   const lenses = [...LENSES.map(lens => ({ lens, agentType: 'autopilot:lens-reviewer' })),
     ...CFG.review.extra_agents.map(type => ({ lens: type, agentType: type }))]
   const lensUntilDry = async ({ lens, agentType }) => {
@@ -292,6 +292,91 @@ async function reviewStage({ tag, worktree, baseBranch, context, call, note, ret
   const triage = await call(`Triage these findings for ${worktree}.\nGate FAILs: ${JSON.stringify(gateResult.fails)}\nLens findings: ${JSON.stringify(kept)}`,
     { agentType: 'autopilot:triage', model: WORKERS, schema: TRIAGE, label: `${tag} triage`, phase: 'Review' })
   return triage || { fix: [...gateResult.fails, ...kept].map(f => ({ finding: `${f.location} ${f.scenario}`, reason: 'triage returned nothing' })), dismiss: [] }
+}
+
+// ---------- code-review gates, dispatched the way review-code does ----------
+// Workflow agents cannot spawn agents, so the workflow runs review-code's
+// orchestration itself (plugins/code-review/skills/review-code/SKILL.md):
+// Step 1 gather + SCOPE block, Step 2 phase-1 gates in parallel, then the
+// verification gate on their verbatim blocks, Step 4 aggregation.
+const CR = () => A.code_review_root
+const SEVERITY = { '🔴': 'blocker', '🟠': 'major', '🟡': 'minor' }
+
+// Parses a gate's verdict block (GATE/STATUS/BOXES/FINDINGS lines; a SCOPE:
+// header reads as BOXES); null when it does not have review-code's shape.
+function parseGateBlock(text) {
+  if (typeof text !== 'string') return null
+  const sections = { BOXES: [], FINDINGS: [] }
+  let status = null
+  let current = null
+  let sawBoxes = false
+  for (const raw of text.split('\n')) {
+    const line = raw.trim()
+    const header = line.match(/^(GATE|STATUS|BOXES|FINDINGS|SCOPE):\s*(.*)$/)
+    if (header) {
+      current = header[1] === 'SCOPE' ? 'BOXES' : header[1]
+      if (current === 'STATUS') status = (header[2].match(/^(PASS \(N\/A\)|PASS|FAIL)\b/) || [])[1] || null
+      if (current === 'BOXES') sawBoxes = true
+      if (!(current in sections)) current = null
+      continue
+    }
+    if (current && line.startsWith('- ')) sections[current].push(line.slice(2))
+  }
+  if (!status || !sawBoxes) return null
+  const failBoxes = sections.BOXES.filter(b => b.startsWith('[FAIL]')).map(b => b.slice(6).trim())
+  const findings = sections.FINDINGS.filter(f => !/^(none|n\/a)\.?$/i.test(f))
+  return { status, failBoxes, findings }
+}
+
+const locationOf = text => (text.match(/[\w./-]+\.[\w]+:\d+(?:[-,]\d+)*(?:@[0-9a-f]+)?/) || [null])[0]
+
+// One fail entry per finding line, plus one per FAIL box in a gate that listed no findings.
+function gateFails(gate, parsed) {
+  const fromFindings = parsed.findings.map(f => {
+    const sev = Object.keys(SEVERITY).find(e => f.startsWith(e))
+    return { location: locationOf(f) || gate, scenario: `${gate}: ${f}`, severity: sev ? SEVERITY[sev] : 'major', lens: gate }
+  })
+  if (fromFindings.length) return fromFindings
+  return parsed.failBoxes.map(b => ({ location: locationOf(b) || gate, scenario: `${gate} ${b}`, severity: 'major', lens: gate }))
+}
+
+async function codeReviewGates({ unit, tag, worktree, baseBranch, state, call, note, retryOnce, reviewRound }) {
+  if (!CR()) throw new Stop('failed', 'code_review_root missing from the workflow args')
+  const outDir = `${state}/review/r${reviewRound}`
+  const prep = await retryOnce('review prep', label => call(
+    `You are review-code's orchestrator for Step 1 only (read ${CR()}/skills/review-code/SKILL.md, "Step 1: gather context" and "Scope checks").\n` +
+    `1. Run exactly: cd ${worktree} && bash ${CR()}/scripts/gather-review.sh --branch ${baseBranch} --out-dir ${outDir}\n` +
+    `2. Read the diff it saved in full (in offset/limit chunks if it is 35KB or more), and write the SCOPE: block for this local branch, one box per line in the BOXES: shape, each with evidence or its N/A reason: §G1 (N/A: local diff), §G2 against the stated purpose "${unit.title}: ${unit.scope}", §G3 (N/A: no linked issue), §G4.\n` +
+    `Return exit_code (gather-review.sh's), output (its stdout and stderr), head_sha, diff_file and changed_files (HEAD_SHA, DIFF_FILE, CHANGED_FILES from its meta.env), and scope (the whole SCOPE: block starting with "SCOPE:").`,
+    { model: WORKERS, effort: 'low', schema: PREP, label: `${tag} ${label}`, phase: 'Review' }))
+  if (!prep) throw new Stop('failed', 'code-review prep did not run')
+  if (prep.exit_code !== 0) throw new Stop('failed', `code-review gather failed: ${prep.output || ''}`)
+  const inputs = [`Head SHA: ${prep.head_sha}`, `Diff file: ${prep.diff_file}`, `Changed files: ${prep.changed_files}`, `Repo root: ${worktree}`].join('\n')
+
+  // A null or malformed block is retried once (review-code sends a shapeless verdict back); twice fails closed.
+  const runGate = async (gate, prompt) => {
+    let parsed = null
+    let text = null
+    for (const label of [`gate ${gate}`, `gate ${gate} retry`]) {
+      text = await call(prompt, { agentType: `code-review:${gate}-gate`, model: WORKERS, label: `${tag} ${label}`, phase: 'Review' })
+      parsed = parseGateBlock(text)
+      if (parsed) break
+      note(`gate ${gate}`, 'null', text ? 'verdict block has no STATUS:/BOXES:; retrying once' : 'returned nothing; retrying once')
+    }
+    if (!parsed) throw new Stop('failed', `code-review ${gate} gate did not return a verdict block`)
+    return { gate, text: text.trim(), ...parsed }
+  }
+  const phase1 = await settle(GATE_TOPICS.map(gate => () => runGate(gate, inputs)))
+  const verification = await runGate('verification', [
+    inputs, `Phase-1 gate verdict blocks, verbatim:\n\n${phase1.map(g => g.text).join('\n\n')}`, prep.scope,
+  ].join('\n\n'))
+
+  const scope = parseGateBlock(`STATUS: PASS\n${prep.scope}`) || { failBoxes: ['scope block unreadable'], findings: [] }
+  const all = [...phase1, verification]
+  const fails = [...all.flatMap(g => (g.status === 'FAIL' || g.findings.length ? gateFails(g.gate, g) : [])),
+    ...scope.failBoxes.map(b => ({ location: 'scope', scenario: `scope ${b}`, severity: 'major', lens: 'scope' }))]
+  const passed = all.every(g => g.status !== 'FAIL' && !g.findings.length) && !scope.failBoxes.length
+  return { passed, fails }
 }
 
 // ---------- QA: boot, personas in parallel, verifier, stop ----------
