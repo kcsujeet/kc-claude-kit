@@ -13,14 +13,16 @@ The user's involvement is the plan and the merge button. Do not ask them anythin
 
 Shell state does not persist between Bash calls: once a step prints a value (`repo`, `base`, `run_id`, `run_dir`), write the literal value into later commands.
 
-## 1. Preconditions (stop and say what is wrong if any fails)
+## 1. Preconditions
+
+Run every check below even after one fails (skip only a check that needs a value a failed check left unknown, such as `repo` or `base`). If any failed, print every failure together, each with what the user should do, and stop.
 
 - **Arguments.** `$ARGUMENTS` holds a plan path and optionally `--dry-run` (`dry_run` is `true` with it, `false` without). Any other flag: stop and show the argument hint.
 - **Repo.** `repo=$(git rev-parse --show-toplevel)`; run every later command from `repo`. Resolve the plan path to an absolute path before changing directory.
 - **Plan.** `bash ${CLAUDE_PLUGIN_ROOT}/scripts/validate-plan.sh <plan>` exits 0. On exit 1, print its problems and point to `${CLAUDE_PLUGIN_ROOT}/skills/run/references/plan-template.md`.
 - **Config.** `.claude/autopilot.json` exists and `bash ${CLAUDE_PLUGIN_ROOT}/scripts/read-config.sh .claude/autopilot.json` exits 0. If the file is missing, tell the user to run `/autopilot:init`; if it is invalid, print its errors. Note `limits.qa_personas.min` and `max` from its output; step 3 needs them.
 - **Ignored run files.** `git check-ignore -q .autopilot/x && git check-ignore -q .claude/worktrees/x` succeeds; otherwise tell the user to run `/autopilot:init` (it adds them to `.gitignore`).
-- **Base branch.** If the repo has an `origin` remote: `base` is `git symbolic-ref --short refs/remotes/origin/HEAD` minus the `origin/` prefix (if that fails, read it from `git ls-remote --symref origin HEAD`). With no `origin` remote: only with `--dry-run`, `base` is the current branch (`git branch --show-current`); without `--dry-run`, stop (PRs need a remote).
+- **Base branch.** If the repo has an `origin` remote: `base` is `git symbolic-ref --short refs/remotes/origin/HEAD` minus the `origin/` prefix (if that fails: `git ls-remote --symref origin HEAD | awk '/^ref:/ {sub("refs/heads/", "", $2); print $2}'`, which turns `ref: refs/heads/main<TAB>HEAD` into `main`). With no `origin` remote: only with `--dry-run`, `base` is the current branch (`git branch --show-current`); without `--dry-run`, stop (PRs need a remote).
 - **Clean and current.** The current branch is `base`. `git status --porcelain --untracked-files=all` lists nothing except the plan file itself. With an `origin` remote: `git fetch origin <base>`, then `git rev-parse HEAD` equals `git rev-parse origin/<base>` (if not, tell the user to pull or push first).
 - **GitHub.** Unless `--dry-run`, `gh auth status` succeeds.
 
@@ -72,7 +74,14 @@ Tell the user in one line that it is running, how many units, and that `/workflo
 
 ## 6. Report
 
-When it completes, save its result (`{"units": [...]}`) to `$run_dir/result.json` exactly as returned. If it ended with an error and no result, write the report from what you have: the error, and every worktree under `<repo>/.claude/worktrees/autopilot-<run_id>-*` kept for the user; skip to the push notification.
+When it completes, save its result (`{"units": [...]}`) to `$run_dir/result.json` exactly as returned. Then check that each `done` unit's PR describes the contract you wrote; every line this prints is a unit whose `result.criteria` ids or statements differ from `units.json`:
+```bash
+jq -rn --slurpfile r "$run_dir/result.json" --slurpfile u "$run_dir/units.json" '
+  ($u[0].units | map({key: .id, value: (.contract.criteria | map({key: .id, value: .statement}) | from_entries)}) | from_entries) as $want
+  | $r[0].units[] | select(.status == "done")
+  | select(((.result.criteria // []) | map({key: .id, value: .statement}) | from_entries) != $want[.id]) | .id'
+```
+ If it ended with an error and no result, write the report from what you have: the error, and every worktree under `<repo>/.claude/worktrees/autopilot-<run_id>-*` kept for the user; skip to the push notification.
 
 Each result unit has `id`, `status` (`done`, `blocked:no-approach`, `blocked:no-converge`, `blocked:plan-conflict`, `blocked:risky`, `blocked:budget`, `skipped`, `failed`), `reason`, `pr_url`, `rounds`, `agents`, `decisions` (`{step, outcome, reason}`), `branch`, `worktree`; `done` units also have `stack` and `result` (with `review.dismissed`). Fields a unit never reached are missing or null.
 
@@ -85,7 +94,13 @@ Each result unit has `id`, `status` (`done`, `blocked:no-approach`, `blocked:no-
 - Write `$run_dir/report.md` and print it, in this order:
   1. A heading with the plan title and run id, then one line: how many units are done and how many are not. With `--dry-run`, say no branch was pushed and no PR opened. If `limits.max_parallel_units` in `config.json` is 1, say units ran one at a time because `limits.max_parallel_units` is 1 in `.claude/autopilot.json`; do not give a cause the config does not state.
   2. One line per unit, in plan order: `done` with its PR link (or `dry run, no PR` and its branch), or its status with the reason in one sentence. A blocked unit with a `pr_url` (shipped, then CI failed) also gets that link, marked not ready to merge.
-  3. Merging (skip in a dry run). A unit's parent is its highest-numbered dependency. Name each stack by its number: its PRs are the `done` units with that `stack` plus their parents down the chain (the bottom unit reports `none`, because it shipped before the stack existed), listed bottom to top with their PR links; say it merges bottom-up as one operation from GitHub's stack UI (https://docs.github.com/en/pull-requests/how-tos/merge-and-close-pull-requests/merging-stacked-pull-requests). For each unit whose `stack` starts with `fallback`, its PR is based on its parent's branch: say which PR must merge first and that the next PR retargets when the merged branch is deleted, with the fallback reason. Any other `done` unit merges on its own.
+  3. Merging (skip in a dry run). A unit's parent is its highest-numbered dependency. The shipper links a PR into its parent's stack before CI finishes, so a unit that is not `done` but has a `pr_url` (and a `done` parent) has its PR sitting above its parent's PR, in the parent's stack or base-branch chain; its result carries no `stack`, because the workflow records the stack only on success.
+     - Name each stack by its number: its PRs are the `done` units with that `stack` plus their parents down the chain (the bottom unit reports `none`, because it shipped before the stack existed), listed bottom to top with their PR links, plus any not-`done` unit with a `pr_url` whose parent is in it. A stack whose number no `done` unit reports (the not-`done` unit's ship created it) is named by its PRs instead.
+     - If every PR in a stack is `done`, say it merges bottom-up as one operation from GitHub's stack UI (https://docs.github.com/en/pull-requests/how-tos/merge-and-close-pull-requests/merging-stacked-pull-requests).
+     - For every not-`done` unit with a `pr_url` whose parent is `done`: say its PR sits above the parent's PR (link both) in the parent's stack or chain and is NOT ready, and tell the user to merge only up to the last `done` PR (the parent): in the stack UI, merging that PR merges everything below it and leaves this one open. Never describe a stack containing a PR that is not `done` as merging in one operation.
+     - For each unit whose `stack` starts with `fallback`, its PR is based on its parent's branch: say which PR must merge first and that the next PR retargets when the merged branch is deleted, with the fallback reason.
+     - Any other `done` unit merges on its own.
+     - If the drift check above printed any unit, say its PR body's criteria differ from the contract (name the unit) and that the user should compare the PR with the plan before merging.
   4. For every unit that is not `done`: what was tried (rounds, and the last few `decisions`), and what the user would need to decide, by status: `plan-conflict` the plan or the code must change (quote the reason); `risky` whether the guarded action is allowed (do it by hand or change `risky_paths`); `no-converge` what kept failing (narrow the unit, fix by hand, or raise `limits.max_fix_rounds`); `no-approach` the staff reviewer's reasons (settle the design in the plan's Notes); `budget` split the unit or raise `limits.max_agents_per_unit`; `skipped` resolve the unit it depends on, then re-run; `failed` the infrastructure error to fix. Give its branch and worktree path when it has them.
   5. Dismissed review findings per `done` unit, each with its reason (`result.review.dismissed`), or "none".
   6. Where to look next: `run_dir`, `decisions.tsv`, and `/workflows` for token usage.
