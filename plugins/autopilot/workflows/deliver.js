@@ -470,13 +470,14 @@ function auditItems(verification, files, worktree) {
   return { code, receipts }
 }
 
-// The first "<path>:<line>", "<path>:L<line>" or "<path> line <line>" in text
+// The first "<path>:<line>", "<path>:L<line>", "<path>#L<line>" (a GitHub
+// anchor) or "<path> line <line>" in text
 // whose path is a changed file, as "<changed path>:<line>". The path may carry
 // ./, a/, b/ or the worktree prefix, and matches a changed file by path suffix,
 // or by basename when only one changed file has it.
 function diffLocation(text, files, worktree) {
   const prefix = worktree ? `${worktree.replace(/\/$/, '')}/` : null
-  for (const m of text.matchAll(/([\w./@+-]*\w\.\w+)(?::L?(\d+)|\s+line\s+(\d+))/gi)) {
+  for (const m of text.matchAll(/([\w./@+-]*\w\.\w+)(?::L?(\d+)|#L(\d+)|\s+line\s+(\d+))/gi)) {
     let path = m[1]
     if (prefix && path.startsWith(prefix)) path = path.slice(prefix.length)
     path = path.replace(/^(\.\/|[ab]\/)+/, '')
@@ -484,7 +485,7 @@ function diffLocation(text, files, worktree) {
     const bySuffix = files.filter(f => f === path || f.endsWith(`/${path}`) || path.endsWith(`/${f}`))
     const byBase = files.filter(f => f.split('/').pop() === base)
     const file = bySuffix.length === 1 ? bySuffix[0] : (!bySuffix.length && byBase.length === 1 ? byBase[0] : null)
-    if (file) return `${file}:${m[2] || m[3]}`
+    if (file) return `${file}:${m[2] || m[3] || m[4]}`
   }
   return null
 }

@@ -407,6 +407,21 @@ const tests = {
     assert.ok(fails.every(f => f.lens === 'verification'))
   },
 
+  'a verification finding citing file#L<line> is code even when it names a gate': async () => {
+    const { calls } = await simulate({
+      answer: (p, { agentType, label }, seen) => {
+        if (label.endsWith('review prep')) return { exit_code: 0, output: '', head_sha: 'abc', diff_file: '/d', changed_files: '/c', files: ['src/counter.js'], scope: SCOPE_PASS }
+        if (agentType === 'code-review:verification-gate' && labelled(seen, 'U1 triage').length === 0) {
+          return gateBlock('verification', 'FAIL', ['[FAIL] §V1: see findings'], ['🟠 src/counter.js#L12: the naming gate missed that reset writes zero twice. Show one write'])
+        }
+        return undefined
+      },
+    })
+    assert.equal(calls.filter(c => c.label.endsWith(' recheck')).length, 0, 'a code item re-runs no gate')
+    const fails = JSON.parse(labelled(calls, 'U1 triage')[0].prompt.match(/^Gate FAILs: (.*)$/m)[1])
+    assert.deepEqual(fails.map(f => [f.location, f.lens]), [['src/counter.js:12', 'verification']])
+  },
+
   'a basename shared by two changed files is not guessed': async () => {
     const { calls } = await simulate({
       answer: (p, { agentType, label }, seen) => {
