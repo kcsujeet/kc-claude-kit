@@ -464,13 +464,13 @@ const tests = {
     assert.match(byId.U1.reason, /code-review gather failed: base not found/)
   },
 
-  'a FAILED gate without FAIL boxes or findings is a round, never triaged': async () => {
-    const { byId, calls } = await simulate({ answer: firstCalls(opts => opts.agentType === 'code-review:naming-gate', gateBlock('naming', 'FAIL', ['[PASS] §N1: ok'])) })
+  'a FAILED gate without FAIL boxes or findings still reaches triage': async () => {
+    const { byId, calls } = await simulate({ answer: firstCalls(opts => opts.agentType === 'code-review:naming-gate', gateBlock('naming', 'FAIL', ['PASS §N1: ok, not in [FAIL] form'])) })
     assert.equal(byId.U1.status, 'done')
-    assert.equal(byId.U1.rounds, 1)
-    assert.equal(labelled(calls, 'U1 triage').length, 0)
-    assert.match(labelled(calls, 'U1 engineer fix')[0].prompt, /^- code-review reported FAILED without box details$/m)
+    const fails = JSON.parse(labelled(calls, 'U1 triage')[0].prompt.match(/^Gate FAILs: (.*)$/m)[1])
+    assert.deepEqual(fails.map(f => f.scenario), ['naming: FAILED without box details'])
   },
+
 
   'triage sees what the plan and dependent units specify, and dismisses a rename of it': async () => {
     let failed = false

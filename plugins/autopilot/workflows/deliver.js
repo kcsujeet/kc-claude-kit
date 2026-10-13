@@ -215,7 +215,6 @@ async function runUnit(unit, baseBranch, progress, parentPr) {
     if (checks.exit_code !== 0) { nextRound('checks', [checks.output]); continue }
 
     const review = await reviewStage({ ...ctx, history, reviewRound: progress.rounds + 1 })
-    if (review.rework) { nextRound('review', review.rework); continue }
     reviewReceipts = review.receipts
     reviewLog.fixed.push(...review.fix.map(f => f.finding))
     reviewLog.dismissed.push(...review.dismiss)
@@ -277,8 +276,8 @@ function contractResults(unit, checked) {
 }
 
 // ---------- review: code-review gates + lenses, skeptics, triage ----------
-// Returns {fix, dismiss} from triage, or {rework} when the gate verdict must go
-// straight back to the engineer without triage.
+// Returns {fix, dismiss, receipts}: triage's verdict on every gate FAIL and
+// surviving lens finding, plus the review's incomplete receipts.
 async function reviewStage({ unit, tag, worktree, baseBranch, state, context, call, note, retryOnce, history, reviewRound }) {
   const earlier = history.length
     ? `Earlier review decisions (do not re-raise or reverse one unless you give a new concrete scenario it did not consider): ${JSON.stringify(history)}`
@@ -301,7 +300,6 @@ async function reviewStage({ unit, tag, worktree, baseBranch, state, context, ca
     return found
   }
   const [gateResult, ...lensResults] = await settle([gates, ...lenses.map(l => () => lensUntilDry(l))])
-  if (!gateResult.passed && !gateResult.fails.length) return { rework: ['code-review reported FAILED without box details'] }
   const lensFindings = lensResults.flat()
 
   // Skeptics guard against plausible-but-wrong serious findings; minor ones go straight to triage.
@@ -369,14 +367,16 @@ function parseGateBlock(text) {
 
 const locationOf = text => (text.match(/[\w./-]+\.[\w]+:\d+(?:[-,]\d+)*(?:@[0-9a-f]+)?/) || [null])[0]
 
-// One fail entry per finding line, plus one per FAIL box in a gate that listed no findings.
+// One fail entry per finding line; with no findings, one per FAIL box; with
+// neither, one saying the gate FAILED without box details (never nothing).
 function gateFails(gate, parsed) {
   const fromFindings = parsed.findings.map(f => {
     const sev = Object.keys(SEVERITY).find(e => f.startsWith(e))
     return { location: locationOf(f) || gate, scenario: `${gate}: ${f}`, severity: sev ? SEVERITY[sev] : 'major', lens: gate }
   })
   if (fromFindings.length) return fromFindings
-  return parsed.failBoxes.map(b => ({ location: locationOf(b) || gate, scenario: `${gate} ${b}`, severity: 'major', lens: gate }))
+  if (parsed.failBoxes.length) return parsed.failBoxes.map(b => ({ location: locationOf(b) || gate, scenario: `${gate} ${b}`, severity: 'major', lens: gate }))
+  return [{ location: gate, scenario: `${gate}: FAILED without box details`, severity: 'major', lens: gate }]
 }
 
 async function codeReviewGates({ unit, tag, worktree, baseBranch, state, call, note, retryOnce, earlier, reviewRound }) {
