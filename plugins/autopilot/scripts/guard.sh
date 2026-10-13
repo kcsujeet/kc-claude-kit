@@ -147,6 +147,8 @@ ruby_skip_parts=(
 RUBY_SKIP_MARKER=$(alternatives "${ruby_skip_parts[@]}")
 
 readonly LOCKFILE='(^|/)(package-lock\.json|npm-shrinkwrap\.json|yarn\.lock|pnpm-lock\.yaml|bun\.lockb?|Gemfile|Gemfile\.lock|poetry\.lock|uv\.lock|Pipfile|Pipfile\.lock|requirements[^/]*\.txt|Cargo\.lock|go\.mod|go\.sum|composer\.lock)$'
+# A file-descriptor duplication (2>&1, 1>&2, >&2, 2>&-) writes no file.
+readonly FD_DUP='(^|[[:space:]])[0-9]*>&([0-9]+-?|-)([[:space:]]|$)'
 readonly WRITE_VERB='>|(^|[^[:alnum:]_.-])(tee|cp|mv|rm|ln|install|truncate|touch|dd|rsync|unlink|shred|python[0-9.]*|node|ruby|perl)([[:space:]]|$)|(^|[[:space:]])sed[[:space:]].*-i'
 
 delete_parts=(
@@ -482,6 +484,7 @@ check_bash() {
       if is_run_file "$base/_" || is_config_file "$base/autopilot.json"; then base_guarded=1; fi
     fi
 
+    while [[ $norm =~ $FD_DUP ]]; do norm=${norm/"${BASH_REMATCH[0]}"/ }; done
     [[ $norm =~ $WRITE_VERB ]] || continue
     next_is_target=0
     first=1

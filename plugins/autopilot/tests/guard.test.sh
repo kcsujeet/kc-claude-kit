@@ -38,6 +38,11 @@ check deny  "1 outside runs"         "$(write_payload $E "$wt/.autopilot/notes.m
 check allow "1 unit scratch"         "$(write_payload autopilot:qa-persona "$wt/.autopilot/runs/r1/U1/qa/0/flow.cjs" 'x')"
 check deny  "1 bash redirect"        "$(bash_payload autopilot:shipper "echo x > $wt/.autopilot/runs/r1/units.json")"
 check allow "1 bash unit scratch"    "$(bash_payload autopilot:shipper "bash pr-body.sh in.json > $wt/.autopilot/runs/r1/U1/pr-body.md")"
+# e2e: ops reads run files (config.json) with stderr folded into stdout.
+check allow "1 read run file with 2>&1" "$(bash_payload autopilot:ops "cd $wt && bash run-checks.sh $wt/.autopilot/runs/r1/config.json $wt 2>&1 | tail -200")"
+check allow "1 read run file with >&2" "$(bash_payload autopilot:ops "bash run-checks.sh $wt/.autopilot/runs/r1/config.json $wt 1>&2")"
+check deny  "1 redirect after 2>&1"  "$(bash_payload autopilot:ops "cat x 2>&1 > $wt/.autopilot/runs/r1/units.json")"
+check deny  "1 >&file is a write"    "$(bash_payload autopilot:ops "cat x >&$wt/.autopilot/runs/r1/units.json")"
 check deny  "2 merge"                "$(bash_payload autopilot:shipper 'gh pr merge 12 --squash')"
 check deny  "2 auto-merge"           "$(bash_payload autopilot:shipper 'gh pr merge --auto 12')"
 check deny  "3 force push"           "$(bash_payload autopilot:shipper 'git push --force origin autopilot/r1/U1')"
