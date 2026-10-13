@@ -46,7 +46,7 @@ function defaultAnswer(prompt, { agentType, label }) {
   if (agentType === 'autopilot:triage') return { fix: [], dismiss: [] }
   if (agentType === 'autopilot:qa-persona') return { bugs: [], covered: ['AC1'], not_covered: [] }
   if (agentType === 'autopilot:verifier') return { criteria: [{ id: 'AC1', passes: true, evidence: 'test ok' }], confirmed: [], dropped: [] }
-  if (agentType === 'autopilot:shipper') return { pr_url: `https://github.com/o/r/pull/${unit}`, stack: 'none', ci: 'pass', failures: '', notes: '' }
+  if (agentType === 'autopilot:shipper') return { pr_url: `https://github.com/o/r/pull/${unit}`, body: `/s/${unit}/pr-body.md`, stack: 'none', ci: 'pass', failures: '', notes: '' }
   if (agentType && agentType.startsWith('code-review:')) return gateBlock(agentType.slice(12, -5), 'PASS')
   if (label.endsWith('review prep')) return { exit_code: 0, output: 'HEAD_SHA=abc', head_sha: 'abc', diff_file: '/s/review.diff', changed_files: '/s/changed-files.txt', files: ['counter.js', 'a.ts'], scope: SCOPE_PASS }
   if (label.includes('skeptic')) return { refuted: false, reason: 'reproduces' }
@@ -74,10 +74,10 @@ function firstCalls(match, value, times = 1) {
 const isType = type => opts => opts.agentType === `autopilot:${type}`
 const hasLabel = text => opts => opts.label.includes(text)
 
-async function simulate({ units = [unit('U1', 0)], limits = {}, answer = () => undefined } = {}) {
+async function simulate({ units = [unit('U1', 0)], limits = {}, answer = () => undefined, dryRun = false } = {}) {
   const calls = []
   const args = {
-    run_id: 'r1', repo: '/repo', code_review_root: '/cr', run_dir: '/repo/.autopilot/runs/r1', plugin_root: '/plugin', dry_run: false, base_branch: 'main',
+    run_id: 'r1', repo: '/repo', code_review_root: '/cr', run_dir: '/repo/.autopilot/runs/r1', plugin_root: '/plugin', dry_run: dryRun, base_branch: 'main',
     plan: { title: 'Plan', goal: 'goal', out_of_scope: 'none' }, architecture: 'arch',
     config: {
       launch: { login: null }, review: { extra_agents: [] },
@@ -201,15 +201,24 @@ const tests = {
 
   'CI that keeps failing blocks the unit but keeps its PR url': async () => {
     const { byId } = await simulate({
-      answer: (p, { agentType, label }) => (agentType === 'autopilot:shipper' ? { pr_url: `https://github.com/o/r/pull/${unitOf(label)}`, stack: 'none', ci: 'fail', failures: 'lint' } : undefined),
+      answer: (p, { agentType, label }) => (agentType === 'autopilot:shipper' ? { pr_url: `https://github.com/o/r/pull/${unitOf(label)}`, body: '/b', stack: 'none', ci: 'fail', failures: 'lint' } : undefined),
     })
     assert.equal(byId.U1.status, 'blocked:no-converge')
     assert.equal(byId.U1.pr_url, 'https://github.com/o/r/pull/U1')
   },
 
+  'a shipper that rendered no PR body fails the unit, even in a dry run': async () => {
+    const { byId } = await simulate({
+      dryRun: true,
+      answer: firstCalls(isType('shipper'), { pr_url: null, body: '', stack: 'none', ci: 'skipped', notes: 'hook denied the write' }),
+    })
+    assert.equal(byId.U1.status, 'failed')
+    assert.equal(byId.U1.reason, 'shipper rendered no PR body: hook denied the write')
+  },
+
   'a shipper that opens no PR outside a dry run fails the unit': async () => {
     const { byId } = await simulate({
-      answer: (p, { agentType }) => (agentType === 'autopilot:shipper' ? { pr_url: null, stack: 'none', ci: 'none', notes: 'push rejected' } : undefined),
+      answer: (p, { agentType }) => (agentType === 'autopilot:shipper' ? { pr_url: null, body: '/b', stack: 'none', ci: 'none', notes: 'push rejected' } : undefined),
     })
     assert.equal(byId.U1.status, 'failed')
     assert.match(byId.U1.reason, /push rejected/)
@@ -588,7 +597,7 @@ const tests = {
   // ---- shipping ----
   'CI that did not finish fails the unit without an engineer round': async () => {
     const { byId, calls } = await simulate({
-      answer: firstCalls(isType('shipper'), { pr_url: 'https://github.com/o/r/pull/1', stack: 'none', ci: 'fail', failures: 'CI did not finish: pending' }),
+      answer: firstCalls(isType('shipper'), { pr_url: 'https://github.com/o/r/pull/1', body: '/b', stack: 'none', ci: 'fail', failures: 'CI did not finish: pending' }),
     })
     assert.equal(byId.U1.status, 'failed')
     assert.match(byId.U1.reason, /^CI did not finish/)

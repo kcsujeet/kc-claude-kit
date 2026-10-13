@@ -69,7 +69,7 @@ const VERDICT = {
     dropped: { type: 'array', items: { type: 'object', required: ['title', 'reason'], properties: { title: str, reason: str } } },
   },
 }
-const SHIP = { type: 'object', required: ['ci'], properties: { pr_url: { type: ['string', 'null'] }, stack: str, ci: { type: 'string', enum: ['pass', 'fail', 'none', 'skipped'] }, failures: str, notes: str } }
+const SHIP = { type: 'object', required: ['ci', 'body'], properties: { pr_url: { type: ['string', 'null'] }, body: str, stack: str, ci: { type: 'string', enum: ['pass', 'fail', 'none', 'skipped'] }, failures: str, notes: str } }
 
 // ---------- one unit ----------
 class Stop extends Error { constructor(status, reason) { super(reason); this.status = status } }
@@ -253,6 +253,8 @@ async function runUnit(unit, baseBranch, progress, parentPr) {
     const ship = await call(`Worktree: ${worktree}\nBranch: ${branch}\nBase: ${baseBranch}\nTitle: ${A.plan.title}: ${unit.title}\nScratch: ${state}\nScripts directory: ${SCRIPTS}\ndry_run: ${A.dry_run}\nparent_pr: ${parentPr || 'none'}\nUnit result counts: ${resultCounts(result)}\nUnit result JSON:\n${JSON.stringify(result)}`,
       { agentType: 'autopilot:shipper', model: WORKERS, schema: SHIP, label: `${tag} ship`, phase: 'Ship' })
     if (!ship) throw new Stop('failed', 'shipper returned nothing')
+    // Even a dry run must leave unit-result.json and the rendered PR body behind.
+    if (!ship.body) throw new Stop('failed', `shipper rendered no PR body: ${ship.notes || 'no notes'}`)
     prUrl = ship.pr_url
     progress.pr_url = prUrl // a unit blocked later by CI still reports its open PR
     // Only a dry run may finish without a PR or without CI having run.
