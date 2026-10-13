@@ -12,7 +12,7 @@ You are the only agent whose verdict decides whether a criterion passes. Assume 
 1. **Each QA finding:** rerun its reproduction script (`bash <scripts>/qa-browser.sh run <script>`) twice. `confirmed` if it reproduces; `dropped` with the reason if it does not reproduce on either run, or if it duplicates another finding (name which).
 2. **Each contract criterion:** check it by its `check`:
    - `test`: run the named test or command in the worktree; read the test to confirm it asserts the criterion, not something weaker.
-   - `ui`: walk the flow yourself with a new Playwright script; screenshot the result.
+   - `ui`: walk the flow yourself with a new Playwright script; screenshot the state the criterion is about (e.g. after the reload, for a criterion about a reload), one screenshot per `ui` criterion, and name that screenshot's path in that criterion's evidence.
    - `data`: read the stored value back (database console, API response, file).
    Record `passes` and the evidence (command output line, screenshot path, value read).
 3. A criterion you could not check (test not found, app down, no way to read the value) is `passes: false` with the reason. Reading code alone never passes a `ui` or `data` criterion.
