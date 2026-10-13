@@ -37,6 +37,16 @@ kc-claude-kit/
     │   ├── scripts/*.sh                 # gather-review, scope-facts, review-threads, build-comment-payloads
     │   ├── tests/
     │   └── evals/
+    ├── autopilot/
+    │   ├── .claude-plugin/plugin.json   # depends on code-review, conventions, testing
+    │   ├── skills/
+    │   │   ├── init/SKILL.md            # user-invoked: writes and proves .claude/autopilot.json
+    │   │   └── run/                     # the staff engineer: validate, decide, contract, start the workflow, report
+    │   ├── workflows/deliver.js         # per-unit pipeline: engineer, review, QA, verify, ship
+    │   ├── agents/<role>.md             # engineer, staff-reviewer, lens-reviewer, triage, qa-persona, verifier, ops, shipper
+    │   ├── hooks/hooks.json             # PreToolUse guard for autopilot:* agents
+    │   ├── scripts/*.sh                 # guard, read-config, validate-plan, worktree, boot-app, run-checks, qa-browser, pr-body, ...
+    │   └── tests/                       # script runners, workflow syntax and simulation; e2e/ is manual and costs money
     ├── instructions/                    # was claude-md; renamed, the claude- prefix is reserved
     └── testing/                         # unchanged
 ```
@@ -62,6 +72,19 @@ Convention topics, each a skill at `plugins/conventions/skills/<topic>/SKILL.md`
 | dependencies | no (rules only) | |
 
 Two gate agents own no topic skill: `code-review:project-conventions-gate` (reads the target repo's `.claude/review-conventions.md`) and `code-review:verification-gate` (audits the other gates' receipts, dispatched second).
+
+Autopilot agents, at `plugins/autopilot/agents/<role>.md`, dispatched by `workflows/deliver.js` as `agentType: 'autopilot:<role>'`:
+
+| Agent | Model | Does |
+|---|---|---|
+| `autopilot:engineer` | `sonnet` | Proposes approaches, then builds the chosen one, tests first, in the unit's worktree |
+| `autopilot:staff-reviewer` | `best` | Picks the approach before any code; judges the final diff before a PR opens |
+| `autopilot:lens-reviewer` | `sonnet` | Reviews the diff through one lens (security, data, compatibility, and so on) |
+| `autopilot:triage` | `sonnet` | Sorts findings into fix or dismiss, with reasons |
+| `autopilot:qa-persona` | `sonnet` | Drives the running app in a headless browser as one persona and reports bugs |
+| `autopilot:verifier` | `sonnet` | Reproduces QA bugs and checks every criterion itself; never the author of the code |
+| `autopilot:ops` | `sonnet` | Runs a bundled script and returns its output verbatim |
+| `autopilot:shipper` | `sonnet` | Pushes the branch, opens the ready PR, stacks it, waits for CI |
 
 A topic skill's body has these sections, in this order:
 
@@ -99,6 +122,26 @@ Orchestration steps are scripts too, tested against a stub `gh`: `init` runs `co
 ### Posting is user-invoked and enforced
 
 Posting is task content, the kind that takes `disable-model-invocation: true` ([skills](https://code.claude.com/docs/en/skills)). Instructions are "context, not enforced configuration"; a PreToolUse hook is what blocks an action ([memory](https://code.claude.com/docs/en/memory), [hooks](https://code.claude.com/docs/en/hooks)).
+
+### autopilot: orchestration is a workflow, judgment is the staff model
+
+Measured on Claude Code 2.1.292 unless stated.
+
+**Orchestration is a workflow script.** A unit's loop (engineer, review, triage, QA, verify, fix, ship) is a fixed sequence with fan-out and a bounded number of rounds, which is what a workflow script is for: plain JavaScript that dispatches agents and returns a result, with no model deciding the control flow ([workflows](https://code.claude.com/docs/en/workflows)). The script keeps to the documented rules: a pure-literal `meta` first and no clocks, randomness or `import()`, so a run is resumable. A skill starts it by name: a skill that called the Workflow tool with `spike:s1` started a plugin workflow, and the commit landed only in the worktree it was given (spike S3). Approval-prompt behaviour could not be observed headlessly, so the README tells users to pre-allow `Workflow(autopilot:deliver)` or use auto mode ([permission modes](https://code.claude.com/docs/en/permission-modes)).
+
+**Judgment is the staff model, and only there.** The decisions a junior cannot be trusted with, the cross-unit approach, each unit's contract and personas, picking among the engineer's approaches and the final proportionality gate, belong to the `run` skill and `autopilot:staff-reviewer`, on `best`. Everything mechanical runs on `sonnet`. Both come from `.claude/autopilot.json` `models` ([model config](https://code.claude.com/docs/en/model-config)), and the skill's own `model: best` applies to that skill's turn only, so the README suggests `/model best` for users who want the main session on it throughout.
+
+**Workers are plugin agents.** A workflow resolves a plugin agent by `agentType`; the hook input for such an agent carries `agent_type` as `<plugin>:<name>`, here `autopilot:engineer` (spike S1, [subagents](https://code.claude.com/docs/en/sub-agents)). A worktree is chosen by the absolute path in the agent's prompt: both the agents' and the hooks' `cwd` stay at the launch repo, not the worktree (spike S1, confirmed in the e2e run). So `guard.sh` decides on `tool_input` paths and never on `cwd`.
+
+**Workflow agents cannot spawn agents.** Measured in the e2e run: an agent dispatched from a workflow has no `Agent` tool. `code-review:review-code` fans out its gates by dispatching agents, so inside a unit it cannot run as written; `deliver.js` runs the gate fan-out itself, using code-review's gather script and gate agents (found through `scripts/plugin-root.sh`) and aggregating the receipts the same way.
+
+**QA is a real browser, driven by Bash.** Three parallel runs of a pinned Playwright 1.64.0 script, started within 7 ms of each other, each produced its screenshot with no profile-lock errors, because `launch()` uses a temporary profile per browser (spike S2). So each persona drives its own headless browser against its unit's own app instance, whose port comes from `launch.ports` and whose data must be isolated per unit by the recipe, otherwise `init` sets `max_parallel_units` to 1.
+
+**The guard is a hook, and a guardrail rather than a sandbox.** Instructions are context; a `PreToolUse` hook is what blocks ([hooks](https://code.claude.com/docs/en/hooks)). `scripts/guard.sh` acts only when `agent_type` starts with `autopilot:`, so it never touches the user's own session or other plugins' agents, and it fails closed for those agents (missing `jq`, unparseable input, a decision slower than its deadline, since a timed-out hook is non-blocking). It reads Bash the way bash does for the cases that matter, joined continuations and allowlisted heredoc bodies, and denies merges and auto-merge, force-pushes and pushes to `main`, edits to run files and the config, skipped or deleted tests, and, for the engineer, risky paths and new dependencies. It cannot see what a script an agent writes and then runs will do. The backstop is the staff reviewer's final gate on every diff and the fact that the user merges.
+
+**Stacks use GitHub's native API, with a fallback.** Units that depend on each other are linked as stacked pull requests through the REST API ([stacks](https://docs.github.com/en/rest/pulls/stacks)), pinned to an API version, not through a `gh` subcommand whose behaviour varies with the installed version. Any failure leaves a plain base-branch chain and says so in the report; nothing is merged to make a stack linear.
+
+**Cost is real and measured, not estimated.** A 2-unit dry run on the fixture in `plugins/autopilot/tests/e2e/` cost about $6 to $8 and 8 to 12 minutes, with roughly 75 to 110 agents. That path is manual, not in CI, for the reason evals are on demand: it spends model calls.
 
 ### Versioning
 
