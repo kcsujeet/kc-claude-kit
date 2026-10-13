@@ -76,10 +76,17 @@ class Stop extends Error { constructor(status, reason) { super(reason); this.sta
 
 const NOT_CHECKED = 'not checked by verifier'
 
-// Bundled scripts print one JSON line last; ops returns stdout and stderr together.
+// Bundled scripts print one JSON line last; ops returns stdout and stderr
+// together and may add a line of its own after it (seen: "exit=0"), so the
+// last line that parses as a JSON object wins.
 function lastLineJson(label, output) {
-  try { return JSON.parse(output.trim().split('\n').pop()) }
-  catch { throw new Stop('failed', `${label} printed no JSON: ${output}`) }
+  for (const line of output.trim().split('\n').reverse()) {
+    try {
+      const value = JSON.parse(line)
+      if (value && typeof value === 'object' && !Array.isArray(value)) return value
+    } catch { /* not the JSON line */ }
+  }
+  throw new Stop('failed', `${label} printed no JSON: ${output}`)
 }
 
 // parallel() turns a throwing thunk into null, which would let a stage that

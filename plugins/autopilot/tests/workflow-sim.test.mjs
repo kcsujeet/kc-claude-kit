@@ -448,6 +448,13 @@ const tests = {
     assert.equal(labelled(calls, 'U1 stop app').length, 1)
   },
 
+  'a line ops appends after the JSON (exit=0) does not hide it': async () => {
+    const { byId } = await simulate({
+      answer: firstCalls(hasLabel('boot app'), { exit_code: 0, output: '{"url":"http://127.0.0.1:4100/","port":4100,"log":"/l"}\nexit=0' }),
+    })
+    assert.equal(byId.U1.status, 'done')
+  },
+
   'boot output without JSON fails the unit and still stops the app': async () => {
     const { byId, calls } = await simulate({ answer: firstCalls(hasLabel('boot app'), { exit_code: 0, output: 'starting…' }) })
     assert.equal(byId.U1.status, 'failed')
