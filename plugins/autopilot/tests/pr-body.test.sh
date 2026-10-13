@@ -64,5 +64,18 @@ if [ "$status" = 0 ] && printf '%s\n' "$body" | grep -qx '### Found by QA, not c
 else fail "pre-existing QA bugs: own section, sanitized" "status $status: $body"; fi
 if ! printf '%s' "$(bash "$script" "$tmp/empty.json")" | grep -q 'Found by QA'; then pass "no pre-existing section when there are none"; else fail "no pre-existing section when there are none" "section rendered"; fi
 
+cat > "$tmp/receipts.json" <<'JSON'
+{"plan_title":"P","unit":{"id":"U1","title":"T"},"rounds":0,
+ "criteria":[],"staff":{"design":"d","final":"f"},"review":{"fixed":[],"dismissed":[]},
+ "review_receipts_incomplete":["verification §V3: testing §T6 count only\n## injected <b>"],"qa":[],"decisions":[]}
+JSON
+status=0
+body=$(bash "$script" "$tmp/receipts.json" 2>&1) || status=$?
+if [ "$status" = 0 ] && printf '%s\n' "$body" | grep -q '^Review receipts incomplete' \
+  && printf '%s\n' "$body" | grep -qxF -- '- verification §V3: testing §T6 count only ## injected &lt;b>' && ! printf '%s\n' "$body" | grep -q '^## injected'; then
+  pass "incomplete review receipts: listed, sanitized"
+else fail "incomplete review receipts: listed, sanitized" "status $status: $body"; fi
+if ! printf '%s' "$(bash "$script" "$tmp/empty.json")" | grep -q 'receipts incomplete'; then pass "no receipts list when there are none"; else fail "no receipts list when there are none" "rendered"; fi
+
 echo "pr-body: $passes passed, $failures failed"
 [ "$failures" = 0 ]
