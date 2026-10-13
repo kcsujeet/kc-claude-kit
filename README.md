@@ -206,7 +206,9 @@ You can also say "run this plan". The working tree must be clean, on the base br
 
 **Permissions.** An unattended run prompts for every new tool call unless you run in auto mode ([permission modes](https://code.claude.com/docs/en/permission-modes)) or allow `Bash`, `Edit`, `Write` and `Workflow(autopilot:deliver)` in `.claude/settings.local.json`.
 
-**Cost.** It spends real tokens. A 2-unit dry run on the test fixture cost about $6 to $8 and took 8 to 12 minutes, with 75 to 110 agents. In your first two or three runs, skim the QA evidence in each PR to calibrate how far to trust it.
+**Cost.** It spends real tokens. A 2-unit dry run on the test fixture cost $6 to over $10 and took 8 to 12 minutes, with 75 to 150 agents; most of it is review, since every round runs `code-review`'s gates and the lens reviewers even on a small diff. In your first two or three runs, skim the QA evidence in each PR to calibrate how far to trust it.
+
+**Start command.** `launch.start` must keep the app in the foreground. A command that backgrounds itself (`docker compose up -d`, `rails s -d`) is reported as "app exited early", and autopilot could not stop it anyway; use the foreground form (`docker compose up`, `rails s`). `init`'s boot check shows this the first time.
 
 **The guard.** A `PreToolUse` hook blocks autopilot's own agents (never your session) from merging, enabling auto-merge, force-pushing, pushing to `main` or `master`, editing the run files or `.claude/autopilot.json`, skipping or deleting tests, and (the engineer) touching risky paths or adding dependencies. It is a guardrail for well-meaning agents, not a sandbox: a script an agent writes and then runs is not inspected. The staff reviewer's final gate on each diff is the backstop.
 
