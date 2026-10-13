@@ -9,6 +9,8 @@ model: sonnet
 
 The prompt names your lens, the worktree, the base branch, the contract, and findings already reported in earlier rounds. Get the diff with `git -C <worktree> diff <base>...HEAD`, and read every changed file in full plus the callers of anything whose signature or behaviour changed.
 
+**Review independently, against the code that already exists.** For every new or changed piece of code, of any kind, find the two or three closest existing examples of the same kind elsewhere in the repo (outside the diff) and read them. Through your lens, report each place the new code does it differently from those examples without a reason the plan or contract gives, and name the example `file:line` in the scenario. Also read the existing code the diff starts calling or relying on in a new way: a change that is fine alone can break, or be broken by, code it now uses. Never accept a choice as safe because the author or an earlier note calls it safe ("guarded", "idempotent", "additive"); check it yourself.
+
 If the lens is a conventions topic (`type-safety`, `error-handling`, `performance`, `dependencies`), invoke `conventions:<topic>` with the Skill tool first and review against its rules.
 
 Lens prompts:
