@@ -65,7 +65,7 @@ const VERDICT = {
   type: 'object', required: ['criteria', 'confirmed', 'dropped'],
   properties: {
     criteria: { type: 'array', items: { type: 'object', required: ['id', 'passes', 'evidence'], properties: { id: str, passes: { type: 'boolean' }, evidence: str } } },
-    confirmed: { type: 'array', items: { type: 'object', required: ['title', 'steps', 'evidence'], properties: { title: str, steps: strs, evidence: str, persona: str } } },
+    confirmed: { type: 'array', items: { type: 'object', required: ['title', 'steps', 'evidence', 'origin'], properties: { title: str, steps: strs, evidence: str, persona: str, origin: { type: 'string', enum: ['caused', 'pre-existing'] } } } },
     dropped: { type: 'array', items: { type: 'object', required: ['title', 'reason'], properties: { title: str, reason: str } } },
   },
 }
@@ -193,6 +193,8 @@ async function runUnit(unit, baseBranch, progress, parentPr) {
   // Every earlier fix and dismissal, so later rounds do not reverse them without a new scenario.
   const history = []
   const qaLog = Object.fromEntries(personas.map(p => [p.name, { persona: p.name, confirmed: [], evidence: [] }]))
+  // Confirmed bugs the verifier traced to the base branch, outside this unit's criteria.
+  const qaPreexisting = []
   let criteria = []
   let finalRationale = ''
   let prUrl = null
@@ -220,15 +222,20 @@ async function runUnit(unit, baseBranch, progress, parentPr) {
 
     const verdict = await qaStage(ctx)
     criteria = contractResults(unit, verdict.criteria)
+    // Only bugs this unit caused enter the fix loop; an unclassified bug counts as caused.
+    const caused = verdict.confirmed.filter(b => b.origin !== 'pre-existing')
+    for (const bug of verdict.confirmed.filter(b => b.origin === 'pre-existing')) {
+      if (!qaPreexisting.some(p => p.title === bug.title)) qaPreexisting.push({ title: bug.title, steps: bug.steps, evidence: bug.evidence })
+    }
     // Bugs confirmed in any round are what QA caught; the last round is clean by definition.
-    for (const bug of verdict.confirmed) {
+    for (const bug of caused) {
       const persona = bug.persona || 'unattributed'
       const entry = qaLog[persona] || (qaLog[persona] = { persona, confirmed: [], evidence: [] })
       entry.confirmed.push(bug.title)
       entry.evidence.push(bug.evidence)
     }
     const failing = criteria.filter(c => !c.passes).map(c => (c.evidence === NOT_CHECKED ? `${c.id} ${NOT_CHECKED}` : `${c.id} fails: ${c.evidence}`))
-    const bugs = verdict.confirmed.map(b => `${b.title}: ${b.steps.join(' → ')} (evidence ${b.evidence})`)
+    const bugs = caused.map(b => `${b.title}: ${b.steps.join(' → ')} (evidence ${b.evidence})`)
     if (failing.length || bugs.length) { nextRound('qa', [...failing, ...bugs]); continue }
 
     const final = await call(`Final gate.\n${context}\nGet the diff with: git -C ${worktree} diff ${baseBranch}...HEAD\nContract results: ${JSON.stringify(criteria)}\nDecision log: ${JSON.stringify(decisions)}`,
@@ -237,7 +244,7 @@ async function runUnit(unit, baseBranch, progress, parentPr) {
     finalRationale = final.rationale
     note('final gate', 'approve', final.rationale)
 
-    const result = unitResult(unit, progress.rounds, criteria, decision.rationale, finalRationale, reviewLog, Object.values(qaLog), decisions)
+    const result = unitResult(unit, progress.rounds, criteria, decision.rationale, finalRationale, reviewLog, { qa: Object.values(qaLog), preexisting: qaPreexisting }, decisions)
     const ship = await call(`Worktree: ${worktree}\nBranch: ${branch}\nBase: ${baseBranch}\nTitle: ${A.plan.title}: ${unit.title}\nScratch: ${state}\nScripts directory: ${SCRIPTS}\ndry_run: ${A.dry_run}\nparent_pr: ${parentPr || 'none'}\nUnit result counts: ${resultCounts(result)}\nUnit result JSON:\n${JSON.stringify(result)}`,
       { agentType: 'autopilot:shipper', model: WORKERS, schema: SHIP, label: `${tag} ship`, phase: 'Ship' })
     if (!ship) throw new Stop('failed', 'shipper returned nothing')
@@ -428,14 +435,14 @@ async function qaStage({ unit, tag, worktree, state, context, call, ops, note })
 // check that nothing was shortened (it compares them with jq, see shipper.md).
 function resultCounts(result) {
   return JSON.stringify({ criteria: result.criteria.length, decisions: result.decisions.length,
-    fixed: result.review.fixed.length, dismissed: result.review.dismissed.length })
+    fixed: result.review.fixed.length, dismissed: result.review.dismissed.length, qa_preexisting: result.qa_preexisting.length })
 }
 
-function unitResult(unit, rounds, criteria, design, final, review, qa, decisions) {
+function unitResult(unit, rounds, criteria, design, final, review, { qa, preexisting }, decisions) {
   return {
     plan_title: A.plan.title, unit: { id: unit.id, title: unit.title }, rounds,
     criteria: criteria.map(({ id, statement, passes, evidence }) => ({ id, statement, passes, evidence })),
-    staff: { design, final }, review, qa, decisions,
+    staff: { design, final }, review, qa, qa_preexisting: preexisting, decisions,
   }
 }
 

@@ -120,6 +120,35 @@ const tests = {
     assert.deepEqual(newbie.evidence, ['/e/1.png'])
   },
 
+  'a pre-existing QA bug costs no round and lands in result.qa_preexisting': async () => {
+    const bug = { title: 'corrupt count shows NaN', steps: ['set count=abc', 'reload'], evidence: '/e/nan.png', persona: 'newbie', origin: 'pre-existing' }
+    const { byId, calls } = await simulate({
+      answer: (p, { agentType }) => (agentType === 'autopilot:verifier' ? { criteria: [{ id: 'AC1', passes: true, evidence: 'ok' }], confirmed: [bug, bug], dropped: [] } : undefined),
+    })
+    assert.equal(byId.U1.status, 'done')
+    assert.equal(byId.U1.rounds, 0)
+    assert.equal(labelled(calls, 'U1 engineer fix').length, 0)
+    assert.deepEqual(byId.U1.result.qa_preexisting, [{ title: bug.title, steps: bug.steps, evidence: bug.evidence }])
+    assert.deepEqual(byId.U1.result.qa.find(q => q.persona === 'newbie').confirmed, [])
+    assert.match(labelled(calls, 'U1 ship')[0].prompt, /^Unit result counts: .*"qa_preexisting":1\}$/m)
+  },
+
+  'a caused QA bug is fixed while a pre-existing one in the same verdict is only reported': async () => {
+    let verifierCalls = 0
+    const { byId, calls } = await simulate({
+      answer: (p, { agentType }) => {
+        if (agentType !== 'autopilot:verifier' || verifierCalls++ > 0) return undefined
+        return { criteria: [{ id: 'AC1', passes: true, evidence: 'ok' }], dropped: [], confirmed: [
+          { title: 'reset leaves stale view', steps: ['add', 'reset'], evidence: '/e/1.png', persona: 'newbie', origin: 'caused' },
+          { title: 'NaN on corrupt count', steps: ['set abc'], evidence: '/e/2.png', persona: 'newbie', origin: 'pre-existing' }] }
+      },
+    })
+    assert.equal(byId.U1.rounds, 1)
+    const fix = labelled(calls, 'U1 engineer fix')[0].prompt
+    assert.ok(fix.includes('reset leaves stale view') && !fix.includes('NaN on corrupt count'))
+    assert.deepEqual(byId.U1.result.qa_preexisting.map(b => b.title), ['NaN on corrupt count'])
+  },
+
   'checks that never pass stop the unit as blocked:no-converge': async () => {
     const { byId, calls } = await simulate({
       answer: (p, { label }) => (label.endsWith(' checks') ? { exit_code: 1, output: 'FAIL bun test' } : undefined),
@@ -198,7 +227,7 @@ const tests = {
     const prompt = labelled(calls, 'U1 ship')[0].prompt
     const json = JSON.parse(prompt.split('Unit result JSON:\n')[1])
     const counts = JSON.parse(prompt.match(/^Unit result counts: (.*)$/m)[1])
-    assert.deepEqual(counts, { criteria: 1, decisions: json.decisions.length, fixed: 0, dismissed: 1 })
+    assert.deepEqual(counts, { criteria: 1, decisions: json.decisions.length, fixed: 0, dismissed: 1, qa_preexisting: 0 })
     assert.ok(json.decisions.length > 0)
   },
 

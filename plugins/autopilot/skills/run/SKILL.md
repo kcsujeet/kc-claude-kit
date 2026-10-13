@@ -84,7 +84,7 @@ jq -rn --slurpfile r "$run_dir/result.json" --slurpfile u "$run_dir/units.json" 
 ```
  If it ended with an error and no result, write the report from what you have: the error, and every worktree under `<repo>/.claude/worktrees/autopilot-<run_id>-*` kept for the user; skip to the push notification.
 
-Each result unit has `id`, `status` (`done`, `blocked:no-approach`, `blocked:no-converge`, `blocked:plan-conflict`, `blocked:risky`, `blocked:budget`, `skipped`, `failed`), `reason`, `pr_url`, `rounds`, `agents`, `decisions` (`{step, outcome, reason}`), `branch`, `worktree`; `done` units also have `stack` and `result` (with `review.dismissed`). Fields a unit never reached are missing or null.
+Each result unit has `id`, `status` (`done`, `blocked:no-approach`, `blocked:no-converge`, `blocked:plan-conflict`, `blocked:risky`, `blocked:budget`, `skipped`, `failed`), `reason`, `pr_url`, `rounds`, `agents`, `decisions` (`{step, outcome, reason}`), `branch`, `worktree`; `done` units also have `stack` and `result` (with `review.dismissed` and `qa_preexisting`). Fields a unit never reached are missing or null.
 
 - Write `$run_dir/decisions.tsv` (unit, step, outcome, reason) from every unit's `decisions`:
   ```bash
@@ -104,5 +104,6 @@ Each result unit has `id`, `status` (`done`, `blocked:no-approach`, `blocked:no-
      - If the drift check above printed any unit, say its PR body's criteria differ from the contract (name the unit) and that the user should compare the PR with the plan before merging.
   4. For every unit that is not `done`: what was tried (rounds, and the last few `decisions`), and what the user would need to decide, by status: `plan-conflict` the plan or the code must change (quote the reason); `risky` whether the guarded action is allowed (do it by hand or change `risky_paths`); `no-converge` what kept failing (narrow the unit, fix by hand, or raise `limits.max_fix_rounds`); `no-approach` the staff reviewer's reasons (settle the design in the plan's Notes); `budget` split the unit or raise `limits.max_agents_per_unit`; `skipped` resolve the unit it depends on, then re-run; `failed` the infrastructure error to fix. Give its branch and worktree path when it has them.
   5. Dismissed review findings per `done` unit, each with its reason (`result.review.dismissed`), or "none".
-  6. Where to look next: `run_dir`, `decisions.tsv`, and `/workflows` for token usage.
+  6. Bugs QA found that the change did not cause, per `done` unit (`result.qa_preexisting`: title, steps, evidence), or "none". Say they already exist on the base branch and were left alone, so the user can plan a fix.
+  7. Where to look next: `run_dir`, `decisions.tsv`, and `/workflows` for token usage.
 - Send a push notification (PushNotification tool if available; otherwise skip): "<plan title>: N ready PRs, M blocked", where N is the `done` units and M every other unit; in a dry run, "<plan title>: N units done (dry run), M blocked".
