@@ -373,6 +373,20 @@ const tests = {
     assert.deepEqual(byId.U1.result.review_receipts_incomplete, ['verification §V3: testing §T6 gives a count, not per-hit verdicts'])
   },
 
+  'SCOPE and verification-self items are receipts even when they cite diff code and name no gate': async () => {
+    const aboutReview = gateBlock('verification', 'FAIL', ['[FAIL] §V7: SCOPE §G1 has no evidence', '[FAIL] §V8: no fixes-re-checked line'],
+      ['🟠 SCOPE §G1/§G3: the stack position has no scope-facts.sh output for src/counter.js:4. Quote it',
+        '🟠 verification §V8: no `<n> fixes re-checked` line for the fix at src/counter.js:12. State it'])
+    const { byId, calls } = await simulate({ answer: firstCalls(opts => opts.agentType === 'code-review:verification-gate', aboutReview, 2) })
+    assert.equal(byId.U1.status, 'done')
+    assert.equal(byId.U1.rounds, 0, 'review write-up items never cost an engineer round')
+    assert.equal(labelled(calls, 'U1 triage').length, 0)
+    assert.deepEqual(byId.U1.result.review_receipts_incomplete, [
+      'verification: 🟠 SCOPE §G1/§G3: the stack position has no scope-facts.sh output for src/counter.js:4. Quote it',
+      'verification: 🟠 verification §V8: no `<n> fixes re-checked` line for the fix at src/counter.js:12. State it',
+    ])
+  },
+
   'a verification FAIL with no boxes or findings, twice, names no gate, so triage gets it': async () => {
     const bare = gateBlock('verification', 'FAIL', ['[PASS] §V1: ok'])
     const { byId, calls } = await simulate({ answer: firstCalls(opts => opts.agentType === 'code-review:verification-gate', bare, 2) })
