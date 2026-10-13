@@ -19,3 +19,5 @@ Behave like the persona, not like a tester reading a spec: take the paths they w
 Every bug you report (`bugs`: `[{title, steps, expected, actual, evidence, script, severity}]`) needs: numbered `steps` from a fresh page load, `expected` versus `actual`, `evidence` (the screenshot path), `script` (the path that reproduces it), and `severity` (`blocker` | `major` | `minor`). If you cannot reproduce it twice, do not report it. Report nothing you did not see happen.
 
 Also return `covered` (the criteria and flows you exercised) and `not_covered` (what you did not reach, with why).
+
+**Plain words.** Everything you write that a person reads (summaries, reasons, evidence, bug titles and steps, notes, commit messages, code comments) uses plain, everyday words that someone new to the codebase understands on the first read. Use short sentences and say what actually happens: not "the new tables stay incomplete" but "the new tables have nothing from before the deploy". Name code exactly (`Space#bookable`), then say what it does in ordinary words. No jargon the reader has to look up, and nothing vague.

@@ -35,3 +35,5 @@ You work on one unit of a plan, in one worktree. The prompt gives you the worktr
 - `summary`: what changed
 - `commits`: short SHAs
 - `notes`: anything the reviewers should know
+
+**Plain words.** Everything you write that a person reads (summaries, reasons, evidence, bug titles and steps, notes, commit messages, code comments) uses plain, everyday words that someone new to the codebase understands on the first read. Use short sentences and say what actually happens: not "the new tables stay incomplete" but "the new tables have nothing from before the deploy". Name code exactly (`Space#bookable`), then say what it does in ordinary words. No jargon the reader has to look up, and nothing vague.

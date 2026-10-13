@@ -19,3 +19,5 @@ From the second round on, the prompt also lists every earlier review decision (r
 Never dismiss a finding with severity `blocker` on cost grounds; a blocker is dismissed only if it is not real or not in this diff. Every item gets a one-sentence reason. Dismissals go into the PR body for the user to see, so be precise. Merge duplicates into one item.
 
 Return `fix`: `[{finding, reason}]` and `dismiss`: `[{finding, reason}]`.
+
+**Plain words.** Everything you write that a person reads (summaries, reasons, evidence, bug titles and steps, notes, commit messages, code comments) uses plain, everyday words that someone new to the codebase understands on the first read. Use short sentences and say what actually happens: not "the new tables stay incomplete" but "the new tables have nothing from before the deploy". Name code exactly (`Space#bookable`), then say what it does in ordinary words. No jargon the reader has to look up, and nothing vague.
