@@ -22,6 +22,7 @@ git init -q -b main "$repo"
 git -C "$repo" -c user.email=t@t -c user.name=t commit -q --allow-empty -m init
 mkdir -p "$repo/.claude"
 echo '{"checks":["true"]}' > "$repo/.claude/autopilot.json"
+repo_phys=$(cd "$repo" && pwd -P)
 
 status=0
 out=$(bash "$script" create "$repo" r1 U1 main 2>"$tmp/err") || status=$?
@@ -29,7 +30,7 @@ out=$(bash "$script" create "$repo" r1 U1 main 2>"$tmp/err") || status=$?
 path=$(printf '%s' "$out" | jq -r .path 2>/dev/null || true)
 branch=$(printf '%s' "$out" | jq -r .branch 2>/dev/null || true)
 check "branch name" "$branch" [ "$branch" = autopilot/r1/U1 ]
-check "worktree path" "$path" [ "$path" = "$repo/.claude/worktrees/autopilot-r1-U1" ]
+check "worktree path" "$path" [ "$path" = "$repo_phys/.claude/worktrees/autopilot-r1-U1" ]
 head=$(git -C "$path" rev-parse --abbrev-ref HEAD 2>/dev/null || true)
 check "worktree on branch" "HEAD is '$head'" [ "$head" = autopilot/r1/U1 ]
 check "config copied" "missing" [ -f "$path/.claude/autopilot.json" ]
@@ -43,10 +44,12 @@ fi
 
 if [ -d "$path" ]; then
   echo dirty > "$path/new-file.txt"
-  if bash "$script" remove "$repo" "$path" 2>/dev/null; then
-    fail "refuses dirty remove" "removed"
-  else
+  status=0
+  bash "$script" remove "$repo" "$path" 2>"$tmp/err" || status=$?
+  if [ "$status" = 1 ] && grep -qF "has uncommitted changes" "$tmp/err" && [ -d "$path" ]; then
     pass "refuses dirty remove"
+  else
+    fail "refuses dirty remove" "status $status, stderr: $(cat "$tmp/err"), exists: $([ -d "$path" ] && echo yes || echo no)"
   fi
   rm "$path/new-file.txt"
   status=0
@@ -57,6 +60,38 @@ else
   fail "worktree exists for remove checks" "no worktree at '$path'"
 fi
 check "branch kept" "gone" git -C "$repo" show-ref --verify -q refs/heads/autopilot/r1/U1
+
+# Recreate after remove: same branch, earlier commit kept.
+recreated_path=""
+first=$(bash "$script" create "$repo" r3 U3 main 2>/dev/null || true)
+first_path=$(printf '%s' "$first" | jq -r .path 2>/dev/null || true)
+if [ -n "$first_path" ] && [ -d "$first_path" ]; then
+  git -C "$first_path" -c user.email=t@t -c user.name=t commit -q --allow-empty -m work
+  bash "$script" remove "$repo" "$first_path" 2>/dev/null || true
+  status=0
+  second=$(bash "$script" create "$repo" r3 U3 main 2>"$tmp/err") || status=$?
+  recreated_path=$(printf '%s' "$second" | jq -r .path 2>/dev/null || true)
+  if [ "$status" = 0 ] && [ "$recreated_path" = "$first_path" ] \
+     && [ "$(git -C "$recreated_path" rev-parse --abbrev-ref HEAD 2>/dev/null || true)" = autopilot/r3/U3 ] \
+     && [ "$(git -C "$recreated_path" log -1 --format=%s 2>/dev/null || true)" = work ]; then
+    pass "recreate after remove keeps branch and commit"
+  else
+    fail "recreate after remove keeps branch and commit" "status $status: $(cat "$tmp/err")"
+  fi
+else
+  fail "recreate after remove keeps branch and commit" "first create failed"
+fi
+
+# A plain directory at the path is not a worktree: refuse, leave it alone.
+mkdir -p "$repo/.claude/worktrees/autopilot-r2-U2"
+status=0
+bash "$script" create "$repo" r2 U2 main >/dev/null 2>"$tmp/err" || status=$?
+if [ "$status" = 1 ] && grep -qF "exists but is not a worktree of" "$tmp/err" \
+   && [ -d "$repo/.claude/worktrees/autopilot-r2-U2" ]; then
+  pass "refuses plain directory at worktree path"
+else
+  fail "refuses plain directory at worktree path" "status $status, stderr: $(cat "$tmp/err")"
+fi
 
 echo "worktree: $passes passed, $failures failed"
 [ "$failures" = 0 ]
