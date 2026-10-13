@@ -589,7 +589,8 @@ while (pendingUnits.length) {
   for (let i = 0; i < runnable.length; i += LIMITS.max_parallel_units) {
     const wave = runnable.slice(i, i + LIMITS.max_parallel_units)
     const done = await parallel(wave.map(({ unit: u, parent }) => async () => {
-      try { return await deliverUnit(u, parent ? parent.branch : A.base_branch, parent && parent.pr_url) }
+      // A unit with no parent stacks on the base branch's own PR, when the run builds on one.
+      try { return await deliverUnit(u, parent ? parent.branch : A.base_branch, parent ? parent.pr_url : A.base_pr) }
       catch (error) {
         const status = error instanceof Stop ? error.status : 'failed'
         log(`${u.id} ${status}: ${error.message}`)

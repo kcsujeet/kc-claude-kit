@@ -74,10 +74,10 @@ function firstCalls(match, value, times = 1) {
 const isType = type => opts => opts.agentType === `autopilot:${type}`
 const hasLabel = text => opts => opts.label.includes(text)
 
-async function simulate({ units = [unit('U1', 0)], limits = {}, answer = () => undefined, dryRun = false } = {}) {
+async function simulate({ units = [unit('U1', 0)], limits = {}, answer = () => undefined, dryRun = false, base = {} } = {}) {
   const calls = []
   const args = {
-    run_id: 'r1', repo: '/repo', code_review_root: '/cr', run_dir: '/repo/.autopilot/runs/r1', plugin_root: '/plugin', dry_run: dryRun, base_branch: 'main',
+    run_id: 'r1', repo: '/repo', code_review_root: '/cr', run_dir: '/repo/.autopilot/runs/r1', plugin_root: '/plugin', dry_run: dryRun, base_branch: 'main', ...base,
     plan: { title: 'Plan', goal: 'goal', out_of_scope: 'none' }, architecture: 'arch',
     config: {
       launch: { login: null }, review: { extra_agents: [] },
@@ -197,6 +197,17 @@ const tests = {
     assert.match(ship.prompt, /^parent_pr: https:\/\/github\.com\/o\/r\/pull\/U1$/m)
     assert.match(ship.prompt, /^Base: autopilot\/r1\/U1$/m)
     assert.match(calls.find(c => c.label === 'U1 ship').prompt, /^parent_pr: none$/m)
+  },
+
+  'a unit with no parent stacks on the base branch PR': async () => {
+    const { calls } = await simulate({
+      units: [unit('U1', 0), unit('U2', 1, ['U1'])],
+      base: { base_branch: 'feature', base_pr: 'https://github.com/o/r/pull/7' },
+    })
+    const ship = calls.find(c => c.label === 'U1 ship')
+    assert.match(ship.prompt, /^parent_pr: https:\/\/github\.com\/o\/r\/pull\/7$/m)
+    assert.match(ship.prompt, /^Base: feature$/m)
+    assert.match(calls.find(c => c.label === 'U2 ship').prompt, /^parent_pr: https:\/\/github\.com\/o\/r\/pull\/U1$/m)
   },
 
   'CI that keeps failing blocks the unit but keeps its PR url': async () => {

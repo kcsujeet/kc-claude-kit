@@ -1,7 +1,7 @@
 ---
 name: run
 description: Deliver an approved plan end to end as the staff engineer. Validates the plan file, decides the cross-unit approach, writes each unit's contract and QA personas, then starts the deliver workflow, which runs engineer, review, persona QA and verification per unit until clean and opens ready PRs. Reports back once, at the end. Use when the user says "run this plan", "autopilot this", or gives a plan file.
-argument-hint: "<path to plan.md> [--dry-run]"
+argument-hint: "<path to plan.md> [--base <branch>] [--dry-run]"
 model: best
 ---
 
@@ -17,15 +17,16 @@ Shell state does not persist between Bash calls: once a step prints a value (`re
 
 Run every check below even after one fails (skip only a check that needs a value a failed check left unknown, such as `repo` or `base`). If any failed, print every failure together, each with what the user should do, and stop.
 
-- **Arguments.** `$ARGUMENTS` holds a plan path and optionally `--dry-run` (`dry_run` is `true` with it, `false` without). Any other flag: stop and show the argument hint.
+- **Arguments.** `$ARGUMENTS` holds a plan path, optionally `--base <branch>` (build on that branch instead of the default one, for example an open PR the plan continues), and optionally `--dry-run` (`dry_run` is `true` with it, `false` without). Any other flag: stop and show the argument hint.
 - **Repo.** `repo=$(git rev-parse --show-toplevel)`; run every later command from `repo`. Resolve the plan path to an absolute path before changing directory.
 - **Plan.** `bash ${CLAUDE_PLUGIN_ROOT}/scripts/validate-plan.sh <plan>` exits 0. On exit 1, print its problems and point to `${CLAUDE_PLUGIN_ROOT}/skills/run/references/plan-template.md`.
 - **Config.** `.claude/autopilot.json` exists and `bash ${CLAUDE_PLUGIN_ROOT}/scripts/read-config.sh .claude/autopilot.json` exits 0. If the file is missing, tell the user to run `/autopilot:init`; if it is invalid, print its errors. Note `limits.qa_personas.min` and `max` from its output; step 3 needs them.
 - **code-review.** `bash ${CLAUDE_PLUGIN_ROOT}/scripts/plugin-root.sh ${CLAUDE_PLUGIN_ROOT} code-review` exits 0; note the path it prints as `code_review_root` (the workflow runs code-review's gather script and dispatches its gate agents itself). On exit 1, tell the user to install the `code-review` plugin.
 - **Ignored run files.** `git check-ignore -q .autopilot/x && git check-ignore -q .claude/worktrees/x` succeeds; otherwise tell the user to run `/autopilot:init` (it adds them to `.gitignore`).
-- **Base branch.** If the repo has an `origin` remote: `base` is `git symbolic-ref --short refs/remotes/origin/HEAD` minus the `origin/` prefix (if that fails: `git ls-remote --symref origin HEAD | awk '/^ref:/ {sub("refs/heads/", "", $2); print $2}'`, which turns `ref: refs/heads/main<TAB>HEAD` into `main`). With no `origin` remote: only with `--dry-run`, `base` is the current branch (`git branch --show-current`); without `--dry-run`, stop (PRs need a remote).
+- **Base branch.** With `--base <branch>`, `base` is that branch; with an `origin` remote, `git ls-remote --exit-code --heads origin <branch>` must succeed (otherwise tell the user to push it first). Without `--base`: if the repo has an `origin` remote, `base` is `git symbolic-ref --short refs/remotes/origin/HEAD` minus the `origin/` prefix (if that fails: `git ls-remote --symref origin HEAD | awk '/^ref:/ {sub("refs/heads/", "", $2); print $2}'`, which turns `ref: refs/heads/main<TAB>HEAD` into `main`). With no `origin` remote: only with `--dry-run`, `base` is the current branch (`git branch --show-current`); without `--dry-run`, stop (PRs need a remote).
 - **Clean and current.** The current branch is `base`. `git status --porcelain --untracked-files=all` lists nothing except the plan file itself. With an `origin` remote: `git fetch origin <base>`, then `git rev-parse HEAD` equals `git rev-parse origin/<base>` (if not, tell the user to pull or push first).
 - **GitHub.** Unless `--dry-run`, `gh auth status` succeeds.
+- **Base PR.** `base_pr` is the URL of the open PR whose head is `base`: `gh pr list --head <base> --state open --json url -q '.[0].url'` (empty when there is none, when `base` is the default branch, or with `--dry-run` and no remote). Units with no dependency stack on it, so the run's PRs join that PR's stack instead of starting a new one.
 
 ## 2. Decide the cross-unit approach
 
@@ -60,9 +61,9 @@ Then build the workflow arguments from those files, so every field has the type 
 
 ```bash
 jq -n --arg run_id "<run_id>" --arg repo "<repo>" --arg run_dir "<run_dir>" --arg plugin_root "${CLAUDE_PLUGIN_ROOT}" \
-  --arg base_branch "<base>" --arg code_review_root "<code_review_root>" --argjson dry_run <true|false> \
+  --arg base_branch "<base>" --arg base_pr "<base_pr>" --arg code_review_root "<code_review_root>" --argjson dry_run <true|false> \
   --slurpfile plan "$run_dir/plan.json" --slurpfile config "$run_dir/config.json" --slurpfile units "$run_dir/units.json" \
-  '{run_id: $run_id, repo: $repo, run_dir: $run_dir, plugin_root: $plugin_root, dry_run: $dry_run, base_branch: $base_branch, code_review_root: $code_review_root,
+  '{run_id: $run_id, repo: $repo, run_dir: $run_dir, plugin_root: $plugin_root, dry_run: $dry_run, base_branch: $base_branch, base_pr: (if $base_pr == "" then null else $base_pr end), code_review_root: $code_review_root,
     plan: ($plan[0] | {title, goal, out_of_scope}), architecture: $units[0].architecture,
     config: $config[0], units: $units[0].units}' > "$run_dir/args.json"
 ```
@@ -96,7 +97,7 @@ Each result unit has `id`, `status` (`done`, `blocked:no-approach`, `blocked:no-
   1. A heading with the plan title and run id, then one line: how many units are done and how many are not. With `--dry-run`, say no branch was pushed and no PR opened. If `limits.max_parallel_units` in `config.json` is 1, say units ran one at a time because `limits.max_parallel_units` is 1 in `.claude/autopilot.json`; do not give a cause the config does not state.
   2. One line per unit, in plan order: `done` with its PR link (or `dry run, no PR` and its branch), or its status with the reason in one sentence. A blocked unit with a `pr_url` (shipped, then CI failed) also gets that link, marked not ready to merge.
   3. Merging (skip in a dry run). A unit's parent is its highest-numbered dependency. The shipper links a PR into its parent's stack before CI finishes, so a unit that is not `done` but has a `pr_url` (and a `done` parent) has its PR sitting above its parent's PR, in the parent's stack or base-branch chain; its result carries no `stack`, because the workflow records the stack only on success.
-     - Name each stack by its number: its PRs are the `done` units with that `stack` plus their parents down the chain (the bottom unit reports `none`, because it shipped before the stack existed), listed bottom to top with their PR links, plus any not-`done` unit with a `pr_url` whose parent is in it. A stack whose number no `done` unit reports (the not-`done` unit's ship created it) is named by its PRs instead.
+     - Name each stack by its number: its PRs are the `done` units with that `stack` plus their parents down the chain (the bottom unit reports `none`, because it shipped before the stack existed; with a `base_pr`, the stack starts with that PR and the PRs below it, which are not this run's and merge first), listed bottom to top with their PR links, plus any not-`done` unit with a `pr_url` whose parent is in it. A stack whose number no `done` unit reports (the not-`done` unit's ship created it) is named by its PRs instead.
      - If every PR in a stack is `done`, say it merges bottom-up as one operation from GitHub's stack UI (https://docs.github.com/en/pull-requests/how-tos/merge-and-close-pull-requests/merging-stacked-pull-requests).
      - For every not-`done` unit with a `pr_url` whose parent is `done`: say its PR sits above the parent's PR (link both) in the parent's stack or chain and is NOT ready, and tell the user to merge only up to the last `done` PR (the parent): in the stack UI, merging that PR merges everything below it and leaves this one open. Never describe a stack containing a PR that is not `done` as merging in one operation.
      - For each unit whose `stack` starts with `fallback`, its PR is based on its parent's branch: say which PR must merge first and that the next PR retargets when the merged branch is deleted, with the fallback reason.
