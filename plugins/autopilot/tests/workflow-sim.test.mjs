@@ -178,6 +178,22 @@ const tests = {
     assert.match(byId.U1.reason, /push rejected/)
   },
 
+  'the ship prompt carries the unit result counts the shipper checks its file against': async () => {
+    let triaged = false
+    const { calls } = await simulate({
+      answer: (p, { agentType, label }) => {
+        if (label === 'U1 lens security r1') return { findings: [{ location: 'a.js:1', scenario: 'x', severity: 'minor' }] }
+        if (agentType === 'autopilot:triage' && !triaged) { triaged = true; return { fix: [], dismiss: [{ finding: 'a.js:1 x', reason: 'out of scope' }] } }
+        return undefined
+      },
+    })
+    const prompt = labelled(calls, 'U1 ship')[0].prompt
+    const json = JSON.parse(prompt.split('Unit result JSON:\n')[1])
+    const counts = JSON.parse(prompt.match(/^Unit result counts: (.*)$/m)[1])
+    assert.deepEqual(counts, { criteria: 1, decisions: json.decisions.length, fixed: 0, dismissed: 1 })
+    assert.ok(json.decisions.length > 0)
+  },
+
   'ops, shipper, persona and verifier prompts name the scripts directory': async () => {
     const { calls } = await simulate()
     for (const type of ['ops', 'shipper', 'qa-persona', 'verifier']) {
