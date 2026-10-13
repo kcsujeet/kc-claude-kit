@@ -373,10 +373,11 @@ const tests = {
     assert.deepEqual(byId.U1.result.review_receipts_incomplete, ['verification §V3: testing §T6 gives a count, not per-hit verdicts'])
   },
 
-  'a verification FAIL with no boxes or findings names no gate, so triage gets it': async () => {
+  'a verification FAIL with no boxes or findings, twice, names no gate, so triage gets it': async () => {
     const bare = gateBlock('verification', 'FAIL', ['[PASS] §V1: ok'])
-    const { byId, calls } = await simulate({ answer: firstCalls(opts => opts.agentType === 'code-review:verification-gate', bare) })
+    const { byId, calls } = await simulate({ answer: firstCalls(opts => opts.agentType === 'code-review:verification-gate', bare, 2) })
     assert.equal(byId.U1.status, 'done')
+    assert.equal(labelled(calls, 'U1 gate verification retry').length, 1)
     assert.equal(labelled(calls, 'U1 gate verification recheck').length, 0)
     const fails = JSON.parse(labelled(calls, 'U1 triage')[0].prompt.match(/^Gate FAILs: (.*)$/m)[1])
     assert.deepEqual(fails.map(f => [f.location, f.scenario]), [['verification', 'verification FAILED without box details']])
@@ -464,8 +465,16 @@ const tests = {
     assert.match(byId.U1.reason, /code-review gather failed: base not found/)
   },
 
-  'a FAILED gate without FAIL boxes or findings still reaches triage': async () => {
+  'a FAILED gate without FAIL boxes or findings is retried once like a malformed block': async () => {
     const { byId, calls } = await simulate({ answer: firstCalls(opts => opts.agentType === 'code-review:naming-gate', gateBlock('naming', 'FAIL', ['PASS §N1: ok, not in [FAIL] form'])) })
+    assert.equal(byId.U1.status, 'done')
+    assert.equal(labelled(calls, 'U1 gate naming retry').length, 1)
+    assert.ok(byId.U1.decisions.some(d => d.step === 'gate naming' && d.outcome === 'malformed'))
+    assert.equal(labelled(calls, 'U1 triage').length, 0, 'the retry passed, so nothing reaches triage')
+  },
+
+  'a FAILED gate without FAIL boxes or findings twice still reaches triage': async () => {
+    const { byId, calls } = await simulate({ answer: firstCalls(opts => opts.agentType === 'code-review:naming-gate', gateBlock('naming', 'FAIL', ['PASS §N1: ok, not in [FAIL] form']), 2) })
     assert.equal(byId.U1.status, 'done')
     const fails = JSON.parse(labelled(calls, 'U1 triage')[0].prompt.match(/^Gate FAILs: (.*)$/m)[1])
     assert.deepEqual(fails.map(f => f.scenario), ['naming: FAILED without box details'])

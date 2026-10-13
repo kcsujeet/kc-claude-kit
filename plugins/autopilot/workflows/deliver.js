@@ -393,14 +393,18 @@ async function codeReviewGates({ unit, tag, worktree, baseBranch, state, call, n
   const inputs = [`Head SHA: ${prep.head_sha}`, `Diff file: ${prep.diff_file}`, `Changed files: ${prep.changed_files}`, `Repo root: ${worktree}`].join('\n')
 
   // A null or malformed block is retried once (review-code sends a shapeless verdict back); twice fails closed.
+  // A FAIL naming no FAIL box and no finding is malformed too, but a second one
+  // is kept: gateFails/auditItems turn it into a "FAILED without box details" item.
+  const unexplainedFail = p => p.status === 'FAIL' && !p.failBoxes.length && !p.findings.length
   const runGate = async (gate, prompt, pass = '') => {
     let parsed = null
     let text = null
     for (const label of [`gate ${gate}${pass}`, `gate ${gate}${pass} retry`]) {
       text = await call(prompt, { agentType: `code-review:${gate}-gate`, model: WORKERS, label: `${tag} ${label}`, phase: 'Review' })
       parsed = parseGateBlock(text)
-      if (parsed) break
-      note(`gate ${gate}`, 'null', text ? 'verdict block has no STATUS:/BOXES:; retrying once' : 'returned nothing; retrying once')
+      if (parsed && !unexplainedFail(parsed)) break
+      const why = parsed ? 'STATUS: FAIL with no FAIL box or finding' : (text ? 'verdict block has no STATUS:/BOXES:' : 'returned nothing')
+      note(`gate ${gate}`, parsed ? 'malformed' : 'null', `${why}; retrying once`)
     }
     if (!parsed) throw new Stop('failed', `code-review ${gate} gate did not return a verdict block`)
     return { gate, text: text.trim(), ...parsed }
