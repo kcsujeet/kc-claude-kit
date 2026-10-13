@@ -450,18 +450,21 @@ function auditItems(verification, files, worktree) {
   const mentioned = text => GATE_TOPICS.filter(g => new RegExp(`(^|[^\\w-])${g}([^\\w-]|$)`, 'i').test(text))
   const code = []
   const receipts = []
-  // An item naming no gate has nothing to re-run, so triage judges it as code.
-  const sort = (text, location, severity, receiptLike) => {
+  // An item naming no gate has nothing to re-run, so triage judges it as code,
+  // unless it leads with SCOPE or verification: those are about the review's
+  // own write-up, which no engineer change can fix, so they stay receipts.
+  const sort = (text, location, severity, receiptLike, aboutReview = false) => {
     const gates = mentioned(text)
-    if (receiptLike && gates.length) receipts.push({ text, gates })
+    if (receiptLike && (gates.length || aboutReview)) receipts.push({ text, gates })
     else code.push({ location: location || 'verification', scenario: text, severity, lens: 'verification' })
   }
   for (const f of verification.findings) {
     const sev = Object.keys(SEVERITY).find(e => f.startsWith(e))
     const lead = ((sev ? f.slice(sev.length) : f).trim().match(/^(.+?):\s/) || [null, ''])[1]
-    const leadsWithGate = /^scope\b/i.test(lead) || GATE_TOPICS.some(g => new RegExp(`^${g}([^\\w-]|$)`, 'i').test(lead))
+    const aboutReview = /^(scope|verification)\b/i.test(lead)
+    const leadsWithGate = aboutReview || GATE_TOPICS.some(g => new RegExp(`^${g}([^\\w-]|$)`, 'i').test(lead))
     const location = diffLocation(lead, files, worktree)
-    sort(`verification: ${f}`, location || diffLocation(f, files, worktree), sev ? SEVERITY[sev] : 'major', leadsWithGate || !location)
+    sort(`verification: ${f}`, location || diffLocation(f, files, worktree), sev ? SEVERITY[sev] : 'major', leadsWithGate || !location, aboutReview)
   }
   if (!verification.findings.length) {
     const boxes = verification.failBoxes.length ? verification.failBoxes : ['FAILED without box details']
