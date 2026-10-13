@@ -4,13 +4,13 @@ Sujeet's personal Claude Code toolkit for any codebase: portable coding conventi
 
 | Plugin | What it does |
 |---|---|
+| `autopilot` | Plan in, PRs out. `/autopilot:run` takes an approved plan file and the staff-engineer `run` skill (on `best`) splits it into units; each unit goes through engineer, code review and lens reviewers, persona QA in a real browser and an independent verifier until clean, then opens a ready PR. You merge. |
+| `usage-band` | A row of pills above the prompt: the model, the current git branch, how full the context window is, the 5-hour and 7-day rate limits with their reset times, input, output and cache-read tokens, and the session's cost. The context, 5-hour and 7-day percentages turn amber from 70% and red from 90%. |
+| `image-preview` | Thumbnails of the images you paste, above the prompt, instead of bare `[Image #1]` tags: the real picture in Ghostty and kitty, colored cells in other terminals. |
 | `conventions` | The conventions themselves, one skill per topic, each with its authoring rules, its review checklist and the scripts that check them. `/conventions:init` installs the rules into a project. |
 | `code-review` | Reviews a PR, branch or diff with one read-only gate agent per convention topic, and returns a single PASSED or FAILED verdict. Posting to GitHub is a separate skill that only you can run, behind a hook. |
 | `instructions` | Audits a repo's instruction setup and proposes what stays in CLAUDE.md, what becomes a path-scoped rule, a skill, or a hook. |
 | `testing` | Verification workflows: look at the UI before calling it done, and drive a cross-layer change end to end. |
-| `usage-band` | A row of pills above the prompt: the model, the current git branch, how full the context window is, the 5-hour and 7-day rate limits with their reset times, input, output and cache-read tokens, and the session's cost. The context, 5-hour and 7-day percentages turn amber from 70% and red from 90%. |
-| `autopilot` | Plan in, PRs out. `/autopilot:run` takes an approved plan file and the staff-engineer `run` skill (on `best`) splits it into units; each unit goes through engineer, code review and lens reviewers, persona QA in a real browser and an independent verifier until clean, then opens a ready PR. You merge. |
-| `image-preview` | Thumbnails of the images you paste, above the prompt, instead of bare `[Image #1]` tags: the real picture in Ghostty and kitty, colored cells in other terminals. |
 
 ## Contents
 
