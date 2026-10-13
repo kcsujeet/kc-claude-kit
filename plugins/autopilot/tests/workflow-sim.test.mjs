@@ -355,6 +355,15 @@ const tests = {
     assert.deepEqual(byId.U1.result.review_receipts_incomplete, [])
   },
 
+  'code items from the first verification pass survive a clean recheck': async () => {
+    const mixed = gateBlock('verification', 'FAIL', ['[FAIL] §V1: see findings'],
+      ['🟠 counter.js:4: reset writes the literal 0 twice. Show one write', '🟡 naming (counter.js:3): the finding cites no short head SHA. Cite counter.js:3@abc'])
+    const { calls } = await simulate({ answer: firstCalls(opts => opts.agentType === 'code-review:verification-gate', mixed) })
+    assert.deepEqual(calls.filter(c => c.label.endsWith(' recheck')).map(c => c.label), ['U1 gate naming recheck', 'U1 gate verification recheck'])
+    const fails = JSON.parse(labelled(calls, 'U1 triage')[0].prompt.match(/^Gate FAILs: (.*)$/m)[1])
+    assert.deepEqual(fails.map(f => f.location), ['counter.js:4'])
+  },
+
   'receipt-only FAILs left after the recheck are recorded and do not block the unit': async () => {
     const stillFailing = gateBlock('verification', 'FAIL', ['[FAIL] §V3: testing §T6 gives a count, not per-hit verdicts'])
     const { byId, calls } = await simulate({ answer: firstCalls(opts => opts.agentType === 'code-review:verification-gate', stillFailing, 2) })

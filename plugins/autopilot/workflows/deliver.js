@@ -423,7 +423,10 @@ async function codeReviewGates({ unit, tag, worktree, baseBranch, state, call, n
     const rerun = await settle(named.map(gate => () => runGate(gate, `${inputs}\n\nThe verification gate failed your last verdict's receipts:\n${findings}\nReturn a complete verdict block that fixes them.`, ' recheck')))
     phase1 = phase1.map(g => rerun.find(r => r.gate === g.gate) || g)
     verification = await verify(' recheck')
-    audit = auditItems(verification, prep.files || [], worktree)
+    // Code items from the first pass stay: the recheck only re-audits receipts.
+    const second = auditItems(verification, prep.files || [], worktree)
+    const code = [...audit.code, ...second.code.filter(c => !audit.code.some(a => a.scenario === c.scenario))]
+    audit = { code, receipts: second.receipts }
   }
 
   const scope = parseGateBlock(`STATUS: PASS\n${prep.scope}`) || { failBoxes: ['scope block unreadable'], findings: [] }
