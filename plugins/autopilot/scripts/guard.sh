@@ -161,12 +161,14 @@ merge_parts=(
   '(^|[^[:alnum:]_-])pr([[:space:]]+-[^[:space:]]+([[:space:]]+[^-[:space:]][^[:space:]]*)?)*[[:space:]]+merge([[:space:]]|$)'
   'pulls/[^[:space:]]*/merge'                              # REST merge endpoint
   'mergePullRequest|enablePullRequestAutoMerge'            # GraphQL merge and auto-merge
-  # stacked PRs: gh stack merge, with any flags (and their values) between
-  '(^|[^[:alnum:]_-])stack([[:space:]]+-[^[:space:]]+([[:space:]]+[^-[:space:]][^[:space:]]*)?)*[[:space:]]+merge([[:space:]]|$)'
-  'stack[[:space:]]+(.*[[:space:]])?submit([[:space:]].*)?[[:space:]]--au'  # gh stack submit --auto (and abbreviations)
   'stacks/[^[:space:]]*merge'                              # REST: any /stacks/.../merge path
 )
 MERGE=$(alternatives "${merge_parts[@]}")
+
+# gh stack (the built-in stacked-PR command) is denied except read-only
+# subcommands; autopilot agents stack through the REST API instead.
+readonly GH_STACK='(^|[^[:alnum:]_-])gh[[:space:]]+(.*[[:space:]])?stack([[:space:]]|$)'
+readonly GH_STACK_READ_ONLY='^([[:space:]]+(view|list|status|--help|-h))([[:space:]]|$)'
 
 readonly PUSH_WORD='(^|[^[:alnum:]_-])push([[:space:]]|$)'
 bad_push_parts=(
@@ -439,7 +441,7 @@ split_segments() {
 }
 
 check_bash() {
-  local cmd norm base word target next_is_target path_like base_risky=0 base_guarded=0 first
+  local stack_rest cmd norm base word target next_is_target path_like base_risky=0 base_guarded=0 first
   cmd=$(field .tool_input.command)
   [ -n "$cmd" ] || return 0
   read_commands "$cmd"
@@ -448,6 +450,11 @@ check_bash() {
   while IFS= read -r norm; do
 
     if [[ $norm =~ $MERGE ]]; then deny "agents never merge; the user merges"; fi
+
+    if [[ $norm =~ $GH_STACK ]]; then
+      stack_rest=${norm#*stack}
+      [[ $stack_rest =~ $GH_STACK_READ_ONLY ]] || deny "gh stack is limited to view, list and status; stack through the REST API"
+    fi
 
     if [[ $norm =~ $PUSH_WORD ]] && [[ $norm =~ $BAD_PUSH ]]; then
       deny "no force-push and no pushes to main/master"

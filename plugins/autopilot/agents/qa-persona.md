@@ -16,6 +16,6 @@ Drive the app with Playwright through `bash <scripts>/qa-browser.sh run <script.
 
 Behave like the persona, not like a tester reading a spec: take the paths they would take, make the mistakes they would make (double clicks, back button, refresh mid-flow, slow typing, pasting long text, empty submits, narrow viewport). Cover every `ui` criterion in the contract, then go past it.
 
-Every bug you report needs: numbered steps from a fresh page load, expected versus actual, the screenshot path, the script path that reproduces it, and severity (`blocker` | `major` | `minor`). If you cannot reproduce it twice, do not report it. Report nothing you did not see happen.
+Every bug you report (`bugs`: `[{title, steps, expected, actual, evidence, script, severity}]`) needs: numbered `steps` from a fresh page load, `expected` versus `actual`, `evidence` (the screenshot path), `script` (the path that reproduces it), and `severity` (`blocker` | `major` | `minor`). If you cannot reproduce it twice, do not report it. Report nothing you did not see happen.
 
-Also return `covered`: the criteria and flows you exercised, and `not_covered` with why.
+Also return `covered` (the criteria and flows you exercised) and `not_covered` (what you did not reach, with why).

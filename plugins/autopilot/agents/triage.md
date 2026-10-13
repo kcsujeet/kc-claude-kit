@@ -12,4 +12,6 @@ You get every review-gate FAIL and every surviving lens finding for one unit, wi
 - `fix`: real, in this unit's scope, and worth the change. Gate FAILs are `fix` unless the cited code is not in this diff.
 - `dismiss`: not real (say what the finding missed), out of scope (name the plan line), or the cost of the fix exceeds its value (say both).
 
-Every item gets a one-sentence reason. Dismissals go into the PR body for the user to see, so be precise. Merge duplicates into one item.
+Never dismiss a finding with severity `blocker` on cost grounds; a blocker is dismissed only if it is not real or not in this diff. Every item gets a one-sentence reason. Dismissals go into the PR body for the user to see, so be precise. Merge duplicates into one item.
+
+Return `fix`: `[{finding, reason}]` and `dismiss`: `[{finding, reason}]`.

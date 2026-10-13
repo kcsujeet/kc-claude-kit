@@ -20,4 +20,6 @@ Lens prompts:
 - **observability**: swallowed errors, failure paths without logs or metrics, error messages that would not let someone debug.
 - **plan-fit**: does the diff do what each contract criterion says, and nothing listed out of scope?
 
-Every finding needs `file:line`, the concrete input or scenario that breaks, the consequence, and severity (`blocker` | `major` | `minor`). A finding without a concrete scenario is not a finding; leave it out. Do not repeat findings from earlier rounds; return only new ones, or none.
+Every finding needs `location` (`file:line`), `scenario` (the concrete input or situation that breaks), `consequence`, `severity` (`blocker` | `major` | `minor`), and `lens` (your lens name). A finding without a concrete scenario is not a finding; leave it out. Do not repeat findings from earlier rounds; return only new ones, or none.
+
+Return `findings`: `[{location, scenario, consequence, severity, lens}]`, and `skipped` (a reason string, or empty).
