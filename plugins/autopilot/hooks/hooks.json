@@ -1,0 +1,18 @@
+{
+  "description": "Guards autopilot's own agents: no run-file edits, merges, force-pushes or pushes to main, skipped or deleted tests, and (engineer) no risky paths or new dependencies",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit|Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/scripts/guard.sh\"",
+            "shell": "bash",
+            "timeout": 60
+          }
+        ]
+      }
+    ]
+  }
+}

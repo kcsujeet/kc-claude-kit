@@ -1,0 +1,1 @@
+{"launch":{"start":"python3 -m http.server {port} --bind 127.0.0.1","ready":"http://127.0.0.1:{port}/"},"checks":["true"]}

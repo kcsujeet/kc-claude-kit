@@ -1,0 +1,44 @@
+{
+  "title": "Saved replies",
+  "goal": "Agents can save a reply and reuse it.",
+  "criteria": [
+    {
+      "id": "AC1",
+      "statement": "A saved reply appears in the picker after saving."
+    },
+    {
+      "id": "AC2",
+      "statement": "Picking a saved reply inserts its text at the cursor."
+    },
+    {
+      "id": "AC3",
+      "statement": "An empty picker shows \"No saved replies yet\"."
+    }
+  ],
+  "units": [
+    {
+      "id": "U1",
+      "index": 0,
+      "title": "Saved reply storage",
+      "depends_on": [],
+      "covers": [
+        "AC1"
+      ],
+      "scope": "Model, migration and API for saved replies."
+    },
+    {
+      "id": "U2",
+      "index": 1,
+      "title": "Picker UI",
+      "depends_on": [
+        "U1"
+      ],
+      "covers": [
+        "AC2",
+        "AC3"
+      ],
+      "scope": "The picker in the composer."
+    }
+  ],
+  "out_of_scope": "- Sharing replies between users."
+}

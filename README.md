@@ -9,6 +9,7 @@ Sujeet's personal Claude Code toolkit for any codebase: portable coding conventi
 | `instructions` | Audits a repo's instruction setup and proposes what stays in CLAUDE.md, what becomes a path-scoped rule, a skill, or a hook. |
 | `testing` | Verification workflows: look at the UI before calling it done, and drive a cross-layer change end to end. |
 | `usage-band` | A row of pills above the prompt: the model, the current git branch, how full the context window is, the 5-hour and 7-day rate limits with their reset times, input, output and cache-read tokens, and the session's cost. The context, 5-hour and 7-day percentages turn amber from 70% and red from 90%. |
+| `autopilot` | Plan in, PRs out. `/autopilot:run` takes an approved plan file and the staff-engineer `run` skill (on `best`) splits it into units; each unit goes through engineer, code review and lens reviewers, persona QA in a real browser and an independent verifier until clean, then opens a ready PR. You merge. |
 | `image-preview` | Thumbnails of the images you paste, above the prompt, instead of bare `[Image #1]` tags: the real picture in Ghostty and kitty, colored cells in other terminals. |
 
 ## Contents
@@ -16,6 +17,7 @@ Sujeet's personal Claude Code toolkit for any codebase: portable coding conventi
 - [Install](#install)
 - [Writing code: the conventions](#writing-code-the-conventions)
 - [Reviewing code](#reviewing-code)
+- [Delivering a plan with autopilot](#delivering-a-plan-with-autopilot)
 - [Posting review comments to GitHub](#posting-review-comments-to-github)
 - [Adding your repo's own rules](#adding-your-repos-own-rules)
 - [Using the skills in Gemini CLI or Antigravity](#using-the-skills-in-gemini-cli-or-antigravity)
@@ -32,6 +34,7 @@ Add the marketplace, then install the plugins you want:
 /plugin install code-review@kc-claude-kit
 /plugin install instructions@kc-claude-kit
 /plugin install testing@kc-claude-kit
+/plugin install autopilot@kc-claude-kit
 /plugin install usage-band@kc-claude-kit
 /plugin install image-preview@kc-claude-kit
 ```
@@ -58,9 +61,10 @@ Most skills trigger on their own:
 | "audit my CLAUDE.md", "should this be a skill or a rule" | `instructions:audit` |
 | "does this look right" | `testing:verify-ui` |
 | "test this end to end" | `testing:verify-e2e` |
+| "run this plan", "autopilot this" | `autopilot:run` |
 | (the topic comes up) | `conventions:<topic>` |
 
-The exception is `/code-review:post-review`, which only runs when you type it.
+Two skills only run when you type them: `/code-review:post-review` and `/autopilot:init`.
 
 `usage-band` has no skill: once installed, it draws its pills above the prompt in every session.
 
@@ -174,6 +178,39 @@ If a gate agent is unavailable, for example because the `conventions` dependency
 - The gate-status table comes first, listing every gate as PASS, FAIL or N/A, then the findings, then an explicit PASSED or FAILED verdict. One confirmed finding in any gate fails the review.
 - Each finding is one line, citing the file, line and head SHA, then the issue and the fix.
 - No em dashes anywhere in the output: not in the report, the gate verdicts, drafted comments or replies.
+
+## Delivering a plan with autopilot
+
+`autopilot` turns an approved plan into pull requests. Your only touch points are writing (or agreeing) the plan and pressing merge. In between, the staff-engineer `run` skill (on `best`) splits the plan into units and decides the approach, then a workflow takes each unit through an engineer, `code-review`'s gates, lens reviewers, persona QA in a real headless browser and an independent verifier, fixing until clean or giving up with a reason. It depends on `code-review`, `conventions` and `testing`, which install with it.
+
+**Once per repo: `/autopilot:init`.** It checks that `git`, `jq`, `gh`, `node` and `curl` are present, installs a pinned Playwright, works out how to install, boot, seed, log in to and check your app, writes `.claude/autopilot.json`, and proves it by booting the app once and running your checks. Data isolation matters here: units run in parallel, each with its own copy of the app, so they share your database unless the recipe isolates it per unit (a database name or file built from the unit's port). If you cannot isolate it, `init` sets `limits.max_parallel_units` to 1.
+
+**Each plan.** Write it from the template at `plugins/autopilot/skills/run/references/plan-template.md` (goal, numbered acceptance criteria, work units with dependencies), then:
+
+```
+/autopilot:run docs/plans/x.md
+/autopilot:run docs/plans/x.md --dry-run    # everything except pushing and opening PRs
+```
+
+You can also say "run this plan". The working tree must be clean, on the base branch and current with `origin`.
+
+**What comes back**, in one report and one push notification:
+
+- Ready PRs, never merged by agents. Units that depend on each other are linked as GitHub native stacked pull requests, falling back to a chain of PRs each based on its parent's branch when the stack API is unavailable. Screenshots are attached when they make the change clearer.
+- Blocked units, each with the reason (no approach, did not converge, plan conflict, risky path, budget).
+- Bugs QA found that the change did not cause, left alone, so you can plan a fix.
+
+**Models.** Workers run on `sonnet` and the staff roles on `best`, both set in `.claude/autopilot.json` `models` ([model config](https://code.claude.com/docs/en/model-config)). The `run` skill already sets `model: best` for its turn, so the staff engineer runs on the top model whatever your session's `/model` is.
+
+**Size.** A run is bounded by the workflow runtime's cap of 1,000 agents per run ([workflows, Behavior and limits](https://code.claude.com/docs/en/workflows#behavior-and-limits)), and each unit takes up to `limits.max_agents_per_unit` of them, so split very large plans (5 or more units) into several runs.
+
+**Permissions.** An unattended run prompts for every new tool call unless you run in auto mode ([permission modes](https://code.claude.com/docs/en/permission-modes)) or allow `Bash`, `Edit`, `Write` and `Workflow(autopilot:deliver)` in `.claude/settings.local.json`.
+
+**Cost.** It spends real tokens. A 2-unit dry run on the test fixture cost $6 to over $10 and took 8 to 12 minutes, with 75 to 150 agents; most of it is review, since every round runs `code-review`'s gates and the lens reviewers even on a small diff. In your first two or three runs, skim the QA evidence in each PR to calibrate how far to trust it.
+
+**Start command.** `launch.start` must keep the app in the foreground. A command that backgrounds itself (`docker compose up -d`, `rails s -d`) is reported as "app exited early", and autopilot could not stop it anyway; use the foreground form (`docker compose up`, `rails s`). `init`'s boot check shows this the first time.
+
+**The guard.** A `PreToolUse` hook blocks autopilot's own agents (never your session) from merging, enabling auto-merge, force-pushing, pushing to `main` or `master`, editing the run files or `.claude/autopilot.json`, skipping or deleting tests, and (the engineer) touching risky paths or adding dependencies. It is a guardrail for well-meaning agents, not a sandbox: a script an agent writes and then runs is not inspected. The staff reviewer's final gate on each diff is the backstop.
 
 ## Posting review comments to GitHub
 
