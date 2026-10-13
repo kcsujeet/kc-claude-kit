@@ -50,6 +50,8 @@ expect_error "missing criteria"   no-criteria.md 'missing section: ## Acceptance
 expect_error "uncovered criterion" uncovered.md 'AC3 is not covered by any unit'
 expect_error "unknown criterion"  bad-ref.md   'U2 covers unknown criterion AC9'
 expect_error "forward dependency" forward-dep.md 'U1 depends on U2, which is not an earlier unit'
+expect_value "covered multiple deps" multi-dep-chain.md '.units[2].depends_on' '["U1","U2"]'
+expect_error "independent deps"   multi-dep-independent.md 'U3 depends on independent units U1 and U2; make one depend on the other'
 expect_error "missing title"      bad-shape.md 'missing title: a "# <Plan title>" line'
 expect_error "unnumbered criteria" bad-shape.md '## Acceptance criteria has no numbered criteria'
 expect_error "no units"           bad-shape.md '## Work units has no ### U<n>: units'

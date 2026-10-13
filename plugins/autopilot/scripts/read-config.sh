@@ -53,7 +53,7 @@ readonly NORMALIZE='
         max_fix_rounds: ($lim.max_fix_rounds // 4),
         max_parallel_units: ($lim.max_parallel_units // 4),
         qa_personas: { min: ($qa.min // 3), max: ($qa.max // 5) },
-        max_agents_per_unit: ($lim.max_agents_per_unit // 120)
+        max_agents_per_unit: ($lim.max_agents_per_unit // 200)
       },
       models: { workers: ($m.workers // "sonnet"), staff: ($m.staff // "best") }
     }'

@@ -32,6 +32,6 @@ One paragraph: what changes for whom, and why.
 Rules:
 - Criteria are numbered `1.`, `2.` …; they become `AC1`, `AC2` ….
 - Units are `### U<n>: <title>`, numbered from 1 in order.
-- `Depends on:` is `none` or earlier units only (`U1, U2`). Dependent units become stacked PRs.
+- `Depends on:` is `none` or earlier units only (`U1, U2`). Dependent units become stacked PRs. Stacks are linear, so with several dependencies one of them must depend (directly or through others) on all the rest; the unit stacks on that one.
 - `Covers:` lists criteria; every criterion is covered by at least one unit.
 - `## Goal`, `## Acceptance criteria`, `## Work units` and `## Out of scope` are required.

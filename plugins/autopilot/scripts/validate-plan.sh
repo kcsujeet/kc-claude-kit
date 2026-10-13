@@ -54,8 +54,13 @@ parsed=$(printf '%s\n' "$records" | jq -R -s '
       out_of_scope: ($r | map(select(.[0] == "oos") | .[1]) | join("\n"))
     }')
 
+# Stacked PRs are linear, so a unit with several dependencies must have one
+# that (transitively) depends on all the others; the unit stacks on that one.
+# Ancestors are a bounded fixed point, so a dependency cycle cannot hang jq.
 problems=$(printf '%s' "$parsed" | jq -r '
+  def ancestors($m; $id): reduce range(0; $m | length) as $_ ($m[$id] // []; (. + [.[] | ($m[.] // [])[]]) | unique);
   . as $p
+  | ($p.units | map({key: .id, value: .depends_on}) | from_entries) as $deps
   | ($p.criteria | map(.id)) as $ids
   | ($p.units | map(.id)) as $uids
   | [
@@ -66,6 +71,11 @@ problems=$(printf '%s' "$parsed" | jq -r '
       ($p.units | to_entries[] | select(.value.id != "U\(.key + 1)") | "units must be numbered U1, U2, … in order; found \(.value.id)"),
       ($p.units[] | . as $u | .covers[] | select(. as $c | $ids | index($c) | not) | "\($u.id) covers unknown criterion \(.)"),
       ($p.units[] | . as $u | .depends_on[] | select(. as $d | ($uids[0:$u.index] | index($d)) | not) | "\($u.id) depends on \(.), which is not an earlier unit"),
+      ($p.units[] | select(.depends_on | length > 1) | . as $u
+        | select([.depends_on[] as $d | ($u.depends_on - [$d] - ancestors($deps; $d)) | length == 0] | any | not)
+        | [range(0; .depends_on | length) as $i | range($i + 1; .depends_on | length) as $j | [.depends_on[$i], .depends_on[$j]]
+           | select(([.[0]] - ancestors($deps; .[1]) | length) > 0 and ([.[1]] - ancestors($deps; .[0]) | length) > 0)][0]
+        | select(. != null) | "\($u.id) depends on independent units \(.[0]) and \(.[1]); make one depend on the other"),
       ($p.units[] | select(.covers | length == 0) | "\(.id) has no - Covers: line"),
       ($ids[] | select(. as $c | [$p.units[].covers[]] | index($c) | not) | "\(.) is not covered by any unit")
     ] | .[]')

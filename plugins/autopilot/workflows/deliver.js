@@ -68,10 +68,24 @@ const SHIP = { type: 'object', required: ['ci'], properties: { pr_url: { type: [
 // ---------- one unit ----------
 class Stop extends Error { constructor(status, reason) { super(reason); this.status = status } }
 
+const NOT_CHECKED = 'not checked by verifier'
+
 // Bundled scripts print one JSON line last; ops returns stdout and stderr together.
 function lastLineJson(label, output) {
   try { return JSON.parse(output.trim().split('\n').pop()) }
   catch { throw new Stop('failed', `${label} printed no JSON: ${output}`) }
+}
+
+// parallel() turns a throwing thunk into null, which would let a stage that
+// died (budget spent, an agent that never ran) read as clean. settle() keeps
+// each thunk's error and rethrows it, preferring blocked:budget.
+async function settle(thunks) {
+  const out = await parallel(thunks.map(thunk => async () => {
+    try { return { value: await thunk() } } catch (error) { return { error } }
+  }))
+  const errors = out.map(o => (o ? o.error : new Stop('failed', 'a parallel task vanished'))).filter(Boolean)
+  if (errors.length) throw errors.find(e => e.status === 'blocked:budget') || errors[0]
+  return out.map(o => o.value)
 }
 
 // Progress survives a Stop, so the report can show blocked units' rounds and decisions.
@@ -85,17 +99,28 @@ async function runUnit(unit, baseBranch, progress, parentPr) {
   const tag = unit.id
   const decisions = progress.decisions
   const note = (step, outcome, reason) => { decisions.push({ step, outcome, reason }); log(`${tag} ${step}: ${outcome}`) }
-  const call = async (prompt, opts) => {
-    // Checked before counting, so `agents` is the number of calls actually made.
-    if (progress.agents >= LIMITS.max_agents_per_unit) throw new Stop('blocked:budget', `reached ${LIMITS.max_agents_per_unit} agent calls`)
+  // Cleanup (stopping the app) is exempt from the budget so a spent budget never leaves an app running.
+  const call = async (prompt, opts, { cleanup = false } = {}) => {
+    if (!cleanup && progress.agents >= LIMITS.max_agents_per_unit) throw new Stop('blocked:budget', `reached ${LIMITS.max_agents_per_unit} agent calls`)
     progress.agents += 1
     return agent(prompt, opts)
   }
-  const ops = async (label, command, cwd) => {
-    const out = await call(`Run from ${cwd}:\n${command}\nScripts directory: ${SCRIPTS}`, { agentType: 'autopilot:ops', model: WORKERS, effort: 'low', schema: OPS, label: `${tag} ${label}`, phase: 'Build' })
+  const ops = async (label, command, cwd, flags) => {
+    const out = await call(`Run from ${cwd}:\n${command}\nScripts directory: ${SCRIPTS}`,
+      { agentType: 'autopilot:ops', model: WORKERS, effort: 'low', schema: OPS, label: `${tag} ${label}`, phase: 'Build' }, flags)
     if (!out) throw new Stop('failed', `ops ${label} returned nothing`)
     return out
   }
+  // One retry for an agent that returned nothing; the caller decides what a second null means.
+  const retryOnce = async (what, ask) => {
+    const out = await ask(what)
+    if (out) return out
+    note(what, 'null', 'returned nothing; retrying once')
+    return ask(`${what} retry`)
+  }
+
+  const personas = unit.contract.personas
+  if (personas.length < LIMITS.qa_personas.min) throw new Stop('failed', `contract has ${personas.length} personas; qa_personas.min is ${LIMITS.qa_personas.min}`)
 
   const wt = await ops('worktree', `bash ${SCRIPTS}/worktree.sh create ${A.repo} ${A.run_id} ${unit.id} ${baseBranch}`, A.repo)
   if (wt.exit_code !== 0) throw new Stop('failed', `worktree: ${wt.output}`)
@@ -112,6 +137,7 @@ async function runUnit(unit, baseBranch, progress, parentPr) {
     `Checks command: bash ${SCRIPTS}/run-checks.sh ${CONFIG_PATH} ${worktree}`,
     `Scripts directory: ${SCRIPTS}`,
   ].join('\n')
+  const ctx = { unit, tag, worktree, baseBranch, state, context, call, ops, note, retryOnce }
   const engineer = async (mode, extra) => {
     const out = await call(`Mode: ${mode}\n${context}\n${extra || ''}`, { agentType: 'autopilot:engineer', model: WORKERS, schema: ENGINEER, label: `${tag} engineer ${mode}`, phase: mode === 'propose' ? 'Design' : 'Build' })
     if (!out) throw new Stop('failed', `engineer ${mode} returned nothing`)
@@ -120,18 +146,28 @@ async function runUnit(unit, baseBranch, progress, parentPr) {
     return out
   }
 
-  // Design gate: engineer proposes, staff picks; one rework allowed.
+  // Design gate: engineer proposes, staff picks; one rework allowed. A proposal
+  // with no approaches, or a pick of an approach that was not proposed, is a rework.
   let decision = null
   let direction = ''
   for (let attempt = 1; attempt <= 2 && !decision; attempt += 1) {
     const proposal = await engineer('propose', direction && `Staff direction for this proposal: ${direction}`)
-    const verdict = await call(`Design gate.\n${context}\nApproaches: ${JSON.stringify(proposal.approaches)}\nEngineer recommends: ${proposal.recommendation}`,
+    const approaches = proposal.approaches || []
+    if (!approaches.length) {
+      direction = 'Propose 2-3 genuinely different approaches; the last proposal had none.'
+      note('design gate', 'rework', 'engineer returned no approaches')
+      continue
+    }
+    const verdict = await call(`Design gate.\n${context}\nApproaches: ${JSON.stringify(approaches)}\nEngineer recommends: ${proposal.recommendation}`,
       { agentType: 'autopilot:staff-reviewer', model: STAFF, schema: DESIGN, label: `${tag} design gate ${attempt}`, phase: 'Design' })
-    if (verdict && verdict.verdict === 'pick') {
-      decision = { approach: proposal.approaches[verdict.approach_index] || proposal.approaches[0], rationale: verdict.rationale, direction: verdict.direction }
+    const picked = verdict && verdict.verdict === 'pick' ? approaches[verdict.approach_index] : undefined
+    if (picked) {
+      decision = { approach: picked, rationale: verdict.rationale, direction: verdict.direction }
       note('design gate', `approach ${verdict.approach_index}`, verdict.rationale)
     } else {
-      direction = verdict ? verdict.direction : 'no verdict returned'
+      direction = !verdict ? 'no verdict returned'
+        : verdict.verdict === 'pick' ? `${verdict.direction} (staff picked approach ${verdict.approach_index}, which was not proposed)`
+        : verdict.direction
       note('design gate', 'rework', direction)
     }
   }
@@ -141,7 +177,7 @@ async function runUnit(unit, baseBranch, progress, parentPr) {
 
   let pending = null
   let reviewLog = { fixed: [], dismissed: [] }
-  const qaLog = Object.fromEntries(unit.contract.personas.map(p => [p.name, { persona: p.name, confirmed: [], evidence: [] }]))
+  const qaLog = Object.fromEntries(personas.map(p => [p.name, { persona: p.name, confirmed: [], evidence: [] }]))
   let criteria = []
   let finalRationale = ''
   let prUrl = null
@@ -159,13 +195,14 @@ async function runUnit(unit, baseBranch, progress, parentPr) {
     const checks = await ops('checks', `bash ${SCRIPTS}/run-checks.sh ${CONFIG_PATH} ${worktree}`, worktree)
     if (checks.exit_code !== 0) { nextRound('checks', [checks.output]); continue }
 
-    const review = await reviewStage(unit, worktree, baseBranch, context, call)
+    const review = await reviewStage(ctx)
+    if (review.rework) { nextRound('review', review.rework); continue }
     reviewLog.fixed.push(...review.fix.map(f => f.finding))
     reviewLog.dismissed.push(...review.dismiss)
     if (review.fix.length) { nextRound('review', review.fix.map(f => `${f.finding} (${f.reason})`)); continue }
 
-    const verdict = await qaStage(unit, worktree, state, context, call, ops)
-    criteria = verdict.criteria
+    const verdict = await qaStage(ctx)
+    criteria = contractResults(unit, verdict.criteria)
     // Bugs confirmed in any round are what QA caught; the last round is clean by definition.
     for (const bug of verdict.confirmed) {
       const persona = bug.persona || 'unattributed'
@@ -173,7 +210,7 @@ async function runUnit(unit, baseBranch, progress, parentPr) {
       entry.confirmed.push(bug.title)
       entry.evidence.push(bug.evidence)
     }
-    const failing = criteria.filter(c => !c.passes).map(c => `${c.id} fails: ${c.evidence}`)
+    const failing = criteria.filter(c => !c.passes).map(c => (c.evidence === NOT_CHECKED ? `${c.id} ${NOT_CHECKED}` : `${c.id} fails: ${c.evidence}`))
     const bugs = verdict.confirmed.map(b => `${b.title}: ${b.steps.join(' → ')} (evidence ${b.evidence})`)
     if (failing.length || bugs.length) { nextRound('qa', [...failing, ...bugs]); continue }
 
@@ -191,110 +228,158 @@ async function runUnit(unit, baseBranch, progress, parentPr) {
     progress.pr_url = prUrl // a unit blocked later by CI still reports its open PR
     // Only a dry run may finish without a PR or without CI having run.
     if (!A.dry_run && (!prUrl || ship.ci === 'skipped')) throw new Stop('failed', `shipper opened no PR or skipped CI: ${ship.notes || 'no notes'}`)
+    // CI that never finished is infrastructure, not something an engineer round can fix.
+    if (ship.ci === 'fail' && (ship.failures || '').startsWith('CI did not finish')) throw new Stop('failed', ship.failures)
     if (ship.ci === 'fail') { nextRound('ci', [ship.failures || 'CI failed']); continue }
     note('ship', ship.ci, `${prUrl || 'dry run'}; stack ${ship.stack || 'none'}`)
     return { id: unit.id, status: 'done', pr_url: prUrl, stack: ship.stack || 'none', reason: '', result, ...progress }
   }
 }
 
+// Every contract criterion needs the verifier's own entry with passes === true;
+// one the verifier left out fails as "not checked by verifier".
+function contractResults(unit, checked) {
+  const byId = Object.fromEntries(checked.map(c => [c.id, c]))
+  return unit.contract.criteria.map(({ id, statement }) => (byId[id]
+    ? { id, statement, passes: byId[id].passes === true, evidence: byId[id].evidence }
+    : { id, statement, passes: false, evidence: NOT_CHECKED }))
+}
+
 // ---------- review: code-review gates + lenses, skeptics, triage ----------
-async function reviewStage(unit, worktree, baseBranch, context, call) {
-  const tag = unit.id
-  const gates = () => call(
-    `Invoke the code-review:review-code skill on the current HEAD of the repo at ${worktree} against base ${baseBranch}, and run it to completion including its verification gate. Return passed (true only if the overall verdict is PASSED) and fails: one entry per FAIL box with location (file:line), scenario (the box id and evidence), severity "major".`,
-    { model: WORKERS, schema: GATES, label: `${tag} code-review gates`, phase: 'Review' })
+// Returns {fix, dismiss} from triage, or {rework} when the gate verdict must go
+// straight back to the engineer without triage.
+async function reviewStage({ tag, worktree, baseBranch, context, call, note, retryOnce }) {
+  const gates = async () => {
+    const out = await retryOnce('code-review gates', label => call(
+      `Invoke the code-review:review-code skill on the current HEAD of the repo at ${worktree} against base ${baseBranch}, and run it to completion including its verification gate. Return passed (true only if the overall verdict is PASSED) and fails: one entry per FAIL box with location (file:line), scenario (the box id and evidence), severity "major".`,
+      { model: WORKERS, schema: GATES, label: `${tag} ${label}`, phase: 'Review' }))
+    if (!out) throw new Stop('failed', 'code-review gates did not run')
+    return out
+  }
   const lenses = [...LENSES.map(lens => ({ lens, agentType: 'autopilot:lens-reviewer' })),
     ...CFG.review.extra_agents.map(type => ({ lens: type, agentType: type }))]
   const lensUntilDry = async ({ lens, agentType }) => {
     const found = []
     for (let round = 1; round <= 3; round += 1) {
-      const out = await call(`Lens: ${lens}\n${context}\nBase: ${baseBranch}\nAlready reported (do not repeat): ${JSON.stringify(found.map(f => f.location + ' ' + f.scenario))}`,
-        { agentType, model: WORKERS, schema: FINDINGS, label: `${tag} lens ${lens} r${round}`, phase: 'Review' })
-      if (out && out.skipped) log(`${tag} lens ${lens} skipped: ${out.skipped}`)
-      const fresh = out ? out.findings.filter(f => f.location && f.scenario) : []
+      const out = await retryOnce(`lens ${lens} r${round}`, label => call(
+        `Lens: ${lens}\n${context}\nBase: ${baseBranch}\nAlready reported (do not repeat): ${JSON.stringify(found.map(f => f.location + ' ' + f.scenario))}`,
+        { agentType, model: WORKERS, schema: FINDINGS, label: `${tag} ${label}`, phase: 'Review' }))
+      if (!out) throw new Stop('failed', `lens ${lens} did not run`)
+      if (out.skipped) note(`lens ${lens}`, 'skipped', out.skipped)
+      const fresh = out.findings.filter(f => f.location && f.scenario)
       if (!fresh.length) break
       found.push(...fresh.map(f => ({ ...f, lens })))
     }
     return found
   }
-  const [gateResult, ...lensResults] = await parallel([gates, ...lenses.map(l => () => lensUntilDry(l))])
-  const gateFail = scenario => [{ location: '-', scenario, severity: 'major' }]
-  const gateFails = !gateResult ? gateFail('code-review gates returned nothing')
-    : !gateResult.passed && !gateResult.fails.length ? gateFail('code-review verdict FAILED with no FAIL boxes returned')
-    : gateResult.fails
-  const lensFindings = lensResults.filter(Boolean).flat()
+  const [gateResult, ...lensResults] = await settle([gates, ...lenses.map(l => () => lensUntilDry(l))])
+  if (!gateResult.passed && !gateResult.fails.length) return { rework: ['code-review reported FAILED without box details'] }
+  const lensFindings = lensResults.flat()
 
+  // Skeptics guard against plausible-but-wrong serious findings; minor ones go straight to triage.
+  const serious = f => f.severity === 'blocker' || f.severity === 'major'
   const survives = async finding => {
-    const votes = await parallel([1, 2].map(n => () => call(
+    const votes = await settle([1, 2].map(n => () => call(
       `Try to refute this review finding. Read the code at ${worktree}. Return refuted=false only if you confirm the scenario really breaks; otherwise refuted=true with the reason.\nFinding: ${JSON.stringify(finding)}`,
       { model: WORKERS, schema: REFUTE, label: `${tag} skeptic ${n} ${finding.location}`, phase: 'Review' })))
+    if (votes.some(v => !v)) note(`skeptic ${finding.location}`, 'null', 'a skeptic returned nothing; counted as not refuted')
     return votes.filter(v => v && v.refuted).length < 2 ? finding : null
   }
-  const kept = (await parallel(lensFindings.map(f => () => survives(f)))).filter(Boolean)
-  if (!gateFails.length && !kept.length) return { fix: [], dismiss: [] }
+  const judged = await settle(lensFindings.filter(serious).map(f => () => survives(f)))
+  const kept = [...judged.filter(Boolean), ...lensFindings.filter(f => !serious(f))]
+  if (!gateResult.fails.length && !kept.length) return { fix: [], dismiss: [] }
 
-  const triage = await call(`Triage these findings for ${worktree}.\nGate FAILs: ${JSON.stringify(gateFails)}\nLens findings: ${JSON.stringify(kept)}`,
+  const triage = await call(`Triage these findings for ${worktree}.\nGate FAILs: ${JSON.stringify(gateResult.fails)}\nLens findings: ${JSON.stringify(kept)}`,
     { agentType: 'autopilot:triage', model: WORKERS, schema: TRIAGE, label: `${tag} triage`, phase: 'Review' })
-  return triage || { fix: [...gateFails, ...kept].map(f => ({ finding: `${f.location} ${f.scenario}`, reason: 'triage returned nothing' })), dismiss: [] }
+  return triage || { fix: [...gateResult.fails, ...kept].map(f => ({ finding: `${f.location} ${f.scenario}`, reason: 'triage returned nothing' })), dismiss: [] }
 }
 
 // ---------- QA: boot, personas in parallel, verifier, stop ----------
-async function qaStage(unit, worktree, state, context, call, ops) {
-  const tag = unit.id
-  const boot = await ops('boot app', `bash ${SCRIPTS}/boot-app.sh ${CONFIG_PATH} ${worktree} ${unit.index} ${state}`, worktree)
-  if (boot.exit_code !== 0) throw new Stop('failed', `app did not boot: ${boot.output}`)
-  const { url } = lastLineJson('boot app', boot.output)
-  const login = CFG.launch.login ? `Login: ${JSON.stringify(CFG.launch.login)} (credentials are in those env vars)` : 'No login needed.'
+async function qaStage({ unit, tag, worktree, state, context, call, ops, note }) {
+  const personas = unit.contract.personas
   try {
-    const reports = await parallel(unit.contract.personas.map((persona, n) => () => call(
+    const boot = await ops('boot app', `bash ${SCRIPTS}/boot-app.sh ${CONFIG_PATH} ${worktree} ${unit.index} ${state}`, worktree)
+    if (boot.exit_code !== 0) throw new Stop('failed', `app did not boot: ${boot.output}`)
+    const { url } = lastLineJson('boot app', boot.output)
+    const login = CFG.launch.login ? `Login: ${JSON.stringify(CFG.launch.login)} (credentials are in those env vars)` : 'No login needed.'
+    const reports = await settle(personas.map((persona, n) => () => call(
       `Persona: ${JSON.stringify(persona)}\nApp: ${url}\n${login}\nEvidence directory: ${state}/qa/${n}\n${context}`,
       { agentType: 'autopilot:qa-persona', model: WORKERS, schema: QA, label: `${tag} qa ${persona.name}`, phase: 'QA' })))
-    const qa = reports.map((r, n) => ({ persona: unit.contract.personas[n].name, bugs: r ? r.bugs : [], not_covered: r ? (r.not_covered || []) : ['agent returned nothing'] }))
+    reports.forEach((r, n) => { if (!r) note(`qa ${personas[n].name}`, 'null', 'persona returned nothing') })
+    const reported = reports.filter(Boolean).length
+    if (reported < LIMITS.qa_personas.min) throw new Stop('failed', `only ${reported} personas reported`)
+    const qa = reports.map((r, n) => ({ persona: personas[n].name, bugs: r ? r.bugs : [], not_covered: r ? (r.not_covered || []) : ['agent returned nothing'] }))
     const verdict = await call(`App: ${url}\n${login}\nEvidence directory: ${state}/verify\n${context}\nContract with checks: ${JSON.stringify(unit.contract.criteria)}\nQA reports: ${JSON.stringify(qa)}`,
       { agentType: 'autopilot:verifier', model: WORKERS, schema: VERDICT, label: `${tag} verifier`, phase: 'QA' })
-    if (!verdict) throw new Stop('failed', 'verifier returned nothing')
-    return { criteria: verdict.criteria, confirmed: verdict.confirmed }
+    if (!verdict) {
+      note('verifier', 'null', 'returned nothing')
+      throw new Stop('failed', 'verifier returned nothing')
+    }
+    return verdict
   } finally {
-    await ops('stop app', `bash ${SCRIPTS}/stop-app.sh ${state} ${unit.index}`, worktree)
+    try {
+      const stopped = await ops('stop app', `bash ${SCRIPTS}/stop-app.sh ${state} ${unit.index}`, worktree, { cleanup: true })
+      if (stopped.exit_code !== 0) note('stop app', `exit ${stopped.exit_code}`, stopped.output)
+    } catch (error) { note('stop app', 'failed', error.message) }
   }
 }
 
 function unitResult(unit, rounds, criteria, design, final, review, qa, decisions) {
-  const statements = Object.fromEntries(unit.contract.criteria.map(c => [c.id, c.statement]))
   return {
     plan_title: A.plan.title, unit: { id: unit.id, title: unit.title }, rounds,
-    criteria: criteria.map(c => ({ id: c.id, statement: statements[c.id] || '', passes: c.passes, evidence: c.evidence })),
+    criteria: criteria.map(({ id, statement, passes, evidence }) => ({ id, statement, passes, evidence })),
     staff: { design, final }, review, qa, decisions,
   }
 }
 
 // ---------- run: dependency waves ----------
+const UNITS = Object.fromEntries(A.units.map(u => [u.id, u]))
+const ancestors = id => {
+  const seen = new Set()
+  const visit = d => { if (seen.has(d)) return; seen.add(d); (UNITS[d] ? UNITS[d].depends_on : []).forEach(visit) }
+  ;(UNITS[id] ? UNITS[id].depends_on : []).forEach(visit)
+  return seen
+}
+// Stacks are linear: a unit stacks on the dependency that transitively depends
+// on all its other dependencies; with none, the plan is in conflict.
+function stackParent(u) {
+  if (!u.depends_on.length) return { parent: null }
+  const covering = u.depends_on.find(d => u.depends_on.every(o => o === d || ancestors(d).has(o)))
+  if (covering) return { parent: covering }
+  for (const [i, a] of u.depends_on.entries()) {
+    for (const b of u.depends_on.slice(i + 1)) {
+      if (!ancestors(a).has(b) && !ancestors(b).has(a)) return { conflict: `depends on independent units ${a} and ${b}; make one depend on the other` }
+    }
+  }
+  return { conflict: `no dependency of ${u.id} covers the others` }
+}
+
 const results = {}
 const pendingUnits = [...A.units]
+const notStarted = (u, status, reason) => ({ id: u.id, status, reason, rounds: 0, agents: 0, pr_url: null })
 while (pendingUnits.length) {
   const ready = pendingUnits.filter(u => u.depends_on.every(d => results[d]))
   if (!ready.length) break
   for (const u of ready) pendingUnits.splice(pendingUnits.indexOf(u), 1)
   const runnable = []
   for (const u of ready) {
+    const stack = stackParent(u)
     const blockedDep = u.depends_on.find(d => results[d].status !== 'done')
-    if (blockedDep) results[u.id] = { id: u.id, status: 'skipped', reason: `depends on ${blockedDep} (${results[blockedDep].status})`, rounds: 0, agents: 0, pr_url: null }
-    else runnable.push(u)
+    if (stack.conflict) results[u.id] = notStarted(u, 'blocked:plan-conflict', stack.conflict)
+    else if (blockedDep) results[u.id] = notStarted(u, 'skipped', `depends on ${blockedDep} (${results[blockedDep].status})`)
+    else runnable.push({ unit: u, parent: stack.parent && results[stack.parent] })
   }
-  // Stacked PRs: a unit with dependencies branches from its last dependency's branch.
-  const base = u => (u.depends_on.length ? results[u.depends_on[u.depends_on.length - 1]].branch : A.base_branch)
   for (let i = 0; i < runnable.length; i += LIMITS.max_parallel_units) {
     const wave = runnable.slice(i, i + LIMITS.max_parallel_units)
-    const done = await parallel(wave.map(u => async () => {
-      const parent = u.depends_on.length ? results[u.depends_on[u.depends_on.length - 1]] : null
-      try { return await deliverUnit(u, base(u), parent && parent.pr_url) }
+    const done = await parallel(wave.map(({ unit: u, parent }) => async () => {
+      try { return await deliverUnit(u, parent ? parent.branch : A.base_branch, parent && parent.pr_url) }
       catch (error) {
         const status = error instanceof Stop ? error.status : 'failed'
         log(`${u.id} ${status}: ${error.message}`)
         return { id: u.id, status, reason: error.message, pr_url: null, ...(error.progress || { rounds: 0, agents: 0, decisions: [] }) }
       }
     }))
-    done.forEach((r, n) => { results[wave[n].id] = r || { id: wave[n].id, status: 'failed', reason: 'unit returned nothing', rounds: 0, agents: 0, pr_url: null } })
+    done.forEach((r, n) => { results[wave[n].unit.id] = r || notStarted(wave[n].unit, 'failed', 'unit returned nothing') })
   }
 }
-return { units: A.units.map(u => results[u.id] || { id: u.id, status: 'skipped', reason: 'dependency never ran', rounds: 0, agents: 0, pr_url: null }) }
+return { units: A.units.map(u => results[u.id] || notStarted(u, 'skipped', 'dependency never ran')) }

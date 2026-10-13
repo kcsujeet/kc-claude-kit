@@ -36,6 +36,7 @@ expect_error() {
 }
 
 expect_value "defaults: fix rounds"     valid-min.json  '.limits.max_fix_rounds' '4'
+expect_value "defaults: per-unit cap"   valid-min.json  '.limits.max_agents_per_unit' '200'
 expect_value "defaults: ports"          valid-min.json  '.launch.ports'          '{"base":4100,"per_unit":10}'
 expect_value "defaults: models"         valid-min.json  '.models'                '{"workers":"sonnet","staff":"best"}'
 expect_value "defaults: login is null"  valid-min.json  '.launch.login'          'null'

@@ -45,12 +45,26 @@ function defaultAnswer(prompt, { agentType, label }) {
   throw new Error(`no scripted answer for ${label}`)
 }
 
-function unit(id, index, dependsOn = []) {
+const criterion = id => ({ id, statement: `${id} holds.`, check: { kind: 'test', how: 'bun test' } })
+const persona = name => ({ name, goals: 'g', behaviour: 'b' })
+
+function unit(id, index, dependsOn = [], contract = {}) {
   return {
     id, index, title: `Unit ${id}`, scope: 'scope', depends_on: dependsOn,
-    contract: { criteria: [{ id: 'AC1', statement: 'It works.', check: { kind: 'test', how: 'bun test' } }], personas: [{ name: 'newbie', goals: 'g', behaviour: 'b' }] },
+    contract: { criteria: [criterion('AC1')], personas: [persona('newbie')], ...contract },
   }
 }
+
+const labelled = (calls, label) => calls.filter(c => c.label === label)
+const passing = ids => ({ criteria: ids.map(id => ({ id, passes: true, evidence: 'ok' })), confirmed: [], dropped: [] })
+// Answers the first `times` calls matching `match` with `value` (a function is
+// called, so it can throw), then falls back to the defaults.
+function firstCalls(match, value, times = 1) {
+  let seen = 0
+  return (prompt, opts) => (match(opts) && seen++ < times ? (typeof value === 'function' ? value() : value) : undefined)
+}
+const isType = type => opts => opts.agentType === `autopilot:${type}`
+const hasLabel = text => opts => opts.label.includes(text)
 
 async function simulate({ units = [unit('U1', 0)], limits = {}, answer = () => undefined } = {}) {
   const calls = []
@@ -59,7 +73,7 @@ async function simulate({ units = [unit('U1', 0)], limits = {}, answer = () => u
     plan: { title: 'Plan', goal: 'goal', out_of_scope: 'none' }, architecture: 'arch',
     config: {
       launch: { login: null }, review: { extra_agents: [] },
-      limits: { max_fix_rounds: 2, max_parallel_units: 2, max_agents_per_unit: 120, ...limits },
+      limits: { max_fix_rounds: 2, max_parallel_units: 2, max_agents_per_unit: 120, qa_personas: { min: 1, max: 5 }, ...limits },
       models: { workers: 'sonnet', staff: 'best' },
     },
     units,
@@ -164,21 +178,218 @@ const tests = {
     assert.match(byId.U1.reason, /push rejected/)
   },
 
-  'a FAILED code-review verdict without FAIL boxes still goes to triage': async () => {
-    let gateCalls = 0
-    const { byId, calls } = await simulate({
-      answer: (p, { label }) => (label.includes('code-review gates') && gateCalls++ === 0 ? { passed: false, fails: [] } : undefined),
-    })
-    assert.ok(calls.some(c => c.label === 'U1 triage'))
-    assert.equal(byId.U1.status, 'done')
-  },
-
   'ops, shipper, persona and verifier prompts name the scripts directory': async () => {
     const { calls } = await simulate()
     for (const type of ['ops', 'shipper', 'qa-persona', 'verifier']) {
       for (const c of calls.filter(x => x.agentType === `autopilot:${type}`)) assert.match(c.prompt, /^Scripts directory: \/plugin\/scripts$/m, c.label)
     }
     for (const type of ['qa-persona', 'verifier']) assert.match(calls.find(c => c.agentType === `autopilot:${type}`).prompt, /^Evidence directory: \//m)
+  },
+
+  // ---- verifier evidence against the contract ----
+  'a failing criterion goes back to the engineer with its evidence': async () => {
+    const { byId, calls } = await simulate({
+      answer: firstCalls(isType('verifier'), { criteria: [{ id: 'AC1', passes: false, evidence: 'got 500' }], confirmed: [], dropped: [] }),
+    })
+    assert.equal(byId.U1.status, 'done')
+    assert.equal(byId.U1.rounds, 1)
+    assert.match(labelled(calls, 'U1 engineer fix')[0].prompt, /^- AC1 fails: got 500$/m)
+  },
+
+  'a criterion the verifier leaves out fails as not checked': async () => {
+    const { byId, calls } = await simulate({
+      units: [unit('U1', 0, [], { criteria: [criterion('AC1'), criterion('AC2')] })],
+      answer: (p, opts) => (isType('verifier')(opts) ? passing(['AC1']) : undefined),
+    })
+    assert.equal(byId.U1.status, 'blocked:no-converge')
+    assert.match(byId.U1.reason, /AC2 not checked by verifier/)
+    assert.match(labelled(calls, 'U1 engineer fix')[0].prompt, /^- AC2 not checked by verifier$/m)
+  },
+
+  'only passes === true counts as passing': async () => {
+    const { byId } = await simulate({
+      answer: firstCalls(isType('verifier'), { criteria: [{ id: 'AC1', passes: 'yes', evidence: 'looked fine' }], confirmed: [], dropped: [] }),
+    })
+    assert.equal(byId.U1.rounds, 1)
+  },
+
+  'the PR result lists exactly the contract criteria': async () => {
+    const { byId } = await simulate({
+      units: [unit('U1', 0, [], { criteria: [criterion('AC1'), criterion('AC2')] })],
+      answer: (p, opts) => (isType('verifier')(opts) ? passing(['AC9', 'AC2', 'AC1']) : undefined),
+    })
+    assert.equal(byId.U1.status, 'done')
+    assert.deepEqual(byId.U1.result.criteria.map(c => [c.id, c.statement, c.passes]), [['AC1', 'AC1 holds.', true], ['AC2', 'AC2 holds.', true]])
+  },
+
+  'a verifier that returns nothing fails the unit and still stops the app': async () => {
+    const { byId, calls } = await simulate({ answer: firstCalls(isType('verifier'), null) })
+    assert.equal(byId.U1.status, 'failed')
+    assert.equal(labelled(calls, 'U1 stop app').length, 1)
+    assert.ok(byId.U1.decisions.some(d => d.step === 'verifier' && d.outcome === 'null'))
+  },
+
+  'a verifier that throws fails the unit and still stops the app': async () => {
+    const { byId, calls } = await simulate({ answer: firstCalls(isType('verifier'), () => { throw new Error('agent crashed') }) })
+    assert.equal(byId.U1.status, 'failed')
+    assert.equal(labelled(calls, 'U1 stop app').length, 1)
+  },
+
+  // ---- code-review gates ----
+  'code-review gates that return nothing once are retried': async () => {
+    const { byId, calls } = await simulate({ answer: firstCalls(hasLabel('code-review gates'), null) })
+    assert.equal(byId.U1.status, 'done')
+    assert.equal(labelled(calls, 'U1 code-review gates retry').length, 1)
+    assert.ok(byId.U1.decisions.some(d => d.step === 'code-review gates' && d.outcome === 'null'))
+  },
+
+  'code-review gates that return nothing twice fail the unit': async () => {
+    const { byId, calls } = await simulate({ answer: firstCalls(hasLabel('code-review gates'), null, 2) })
+    assert.equal(byId.U1.status, 'failed')
+    assert.equal(byId.U1.reason, 'code-review gates did not run')
+    assert.equal(labelled(calls, 'U1 triage').length, 0)
+  },
+
+  'a FAILED code-review verdict without FAIL boxes is a round, never triaged': async () => {
+    const { byId, calls } = await simulate({ answer: firstCalls(hasLabel('code-review gates'), { passed: false, fails: [] }) })
+    assert.equal(byId.U1.status, 'done')
+    assert.equal(byId.U1.rounds, 1)
+    assert.equal(labelled(calls, 'U1 triage').length, 0)
+    assert.match(labelled(calls, 'U1 engineer fix')[0].prompt, /^- code-review reported FAILED without box details$/m)
+  },
+
+  // ---- lenses and personas ----
+  'a lens that returns nothing once is retried': async () => {
+    const { byId, calls } = await simulate({ answer: firstCalls(hasLabel('lens security r1'), null) })
+    assert.equal(byId.U1.status, 'done')
+    assert.equal(labelled(calls, 'U1 lens security r1 retry').length, 1)
+  },
+
+  'a lens that returns nothing twice fails the unit': async () => {
+    const { byId } = await simulate({ answer: firstCalls(hasLabel('lens security r1'), null, 2) })
+    assert.equal(byId.U1.status, 'failed')
+    assert.equal(byId.U1.reason, 'lens security did not run')
+  },
+
+  'a lens skip is recorded in the decision log': async () => {
+    const { byId } = await simulate({ answer: firstCalls(hasLabel('lens accessibility'), { findings: [], skipped: 'no UI files' }) })
+    assert.ok(byId.U1.decisions.some(d => d.step === 'lens accessibility' && d.outcome === 'skipped' && d.reason === 'no UI files'))
+  },
+
+  'fewer persona reports than qa_personas.min fail the unit': async () => {
+    const { byId, calls } = await simulate({
+      units: [unit('U1', 0, [], { personas: [persona('newbie'), persona('expert')] })],
+      limits: { qa_personas: { min: 2, max: 5 } },
+      answer: firstCalls(hasLabel('qa expert'), null),
+    })
+    assert.equal(byId.U1.status, 'failed')
+    assert.equal(byId.U1.reason, 'only 1 personas reported')
+    assert.ok(byId.U1.decisions.some(d => d.step === 'qa expert' && d.outcome === 'null'))
+    assert.equal(labelled(calls, 'U1 stop app').length, 1)
+  },
+
+  'a contract with fewer personas than qa_personas.min fails before any agent runs': async () => {
+    const { byId, calls } = await simulate({ limits: { qa_personas: { min: 3, max: 5 } } })
+    assert.equal(byId.U1.status, 'failed')
+    assert.equal(calls.length, 0)
+  },
+
+  'minor lens findings skip the skeptics; serious ones get two': async () => {
+    const found = (severity, where) => ({ findings: [{ location: where, scenario: 's', consequence: 'c', severity, lens: 'data' }] })
+    const minor = firstCalls(hasLabel('lens data r1'), found('minor', 'a.ts:1'))
+    const major = firstCalls(hasLabel('lens security r1'), found('major', 'b.ts:2'))
+    const { byId, calls } = await simulate({ answer: (p, o) => minor(p, o) ?? major(p, o) })
+    assert.equal(byId.U1.status, 'done')
+    assert.equal(calls.filter(c => c.label.includes('skeptic') && c.label.endsWith('a.ts:1')).length, 0)
+    assert.equal(calls.filter(c => c.label.includes('skeptic') && c.label.endsWith('b.ts:2')).length, 2)
+    const triage = labelled(calls, 'U1 triage')[0].prompt
+    assert.ok(triage.includes('a.ts:1') && triage.includes('b.ts:2'))
+  },
+
+  // ---- app cleanup ----
+  'a spent budget still stops the app': async () => {
+    // 18 calls reach boot: worktree, propose, design, build, checks, gates, 11 lenses, boot.
+    const { byId, calls } = await simulate({ limits: { max_agents_per_unit: 18 } })
+    assert.equal(byId.U1.status, 'blocked:budget')
+    assert.equal(labelled(calls, 'U1 stop app').length, 1)
+  },
+
+  'boot output without JSON fails the unit and still stops the app': async () => {
+    const { byId, calls } = await simulate({ answer: firstCalls(hasLabel('boot app'), { exit_code: 0, output: 'starting…' }) })
+    assert.equal(byId.U1.status, 'failed')
+    assert.match(byId.U1.reason, /boot app printed no JSON/)
+    assert.equal(labelled(calls, 'U1 stop app').length, 1)
+  },
+
+  'a stop-app failure is recorded': async () => {
+    const { byId } = await simulate({ answer: firstCalls(hasLabel('stop app'), { exit_code: 1, output: 'kill: no such process' }) })
+    assert.equal(byId.U1.status, 'done')
+    assert.ok(byId.U1.decisions.some(d => d.step === 'stop app' && d.outcome === 'exit 1'))
+  },
+
+  // ---- design gate ----
+  'a pick of an approach that was not proposed is a rework': async () => {
+    const { byId, calls } = await simulate({ answer: firstCalls(hasLabel('design gate'), { verdict: 'pick', approach_index: 4, rationale: 'r', direction: 'd' }) })
+    assert.equal(byId.U1.status, 'done')
+    assert.equal(labelled(calls, 'U1 engineer propose').length, 2)
+    assert.match(labelled(calls, 'U1 engineer propose')[1].prompt, /approach 4, which was not proposed/)
+  },
+
+  'a proposal with no approaches is a rework without asking staff': async () => {
+    const { byId, calls } = await simulate({ answer: firstCalls(hasLabel('engineer propose'), { status: 'proposal', approaches: [], summary: 's' }) })
+    assert.equal(byId.U1.status, 'done')
+    assert.equal(labelled(calls, 'U1 design gate 1').length, 0)
+    assert.equal(labelled(calls, 'U1 design gate 2').length, 1)
+  },
+
+  // ---- shipping ----
+  'CI that did not finish fails the unit without an engineer round': async () => {
+    const { byId, calls } = await simulate({
+      answer: firstCalls(isType('shipper'), { pr_url: 'https://github.com/o/r/pull/1', stack: 'none', ci: 'fail', failures: 'CI did not finish: pending' }),
+    })
+    assert.equal(byId.U1.status, 'failed')
+    assert.match(byId.U1.reason, /^CI did not finish/)
+    assert.equal(labelled(calls, 'U1 engineer fix').length, 0)
+  },
+
+  // ---- dependencies and waves ----
+  'a unit with several dependencies stacks on the one covering the others': async () => {
+    const { byId, calls } = await simulate({ units: [unit('U1', 0), unit('U2', 1, ['U1']), unit('U3', 2, ['U1', 'U2'])] })
+    assert.equal(byId.U3.status, 'done')
+    assert.match(labelled(calls, 'U3 worktree')[0].prompt, / U3 autopilot\/r1\/U2$/m)
+    assert.match(labelled(calls, 'U3 ship')[0].prompt, /^parent_pr: https:\/\/github\.com\/o\/r\/pull\/U2$/m)
+  },
+
+  'a unit depending on independent units is a plan conflict': async () => {
+    const { byId, calls } = await simulate({ units: [unit('U1', 0), unit('U2', 1), unit('U3', 2, ['U1', 'U2']), unit('U4', 3, ['U3'])] })
+    assert.equal(byId.U3.status, 'blocked:plan-conflict')
+    assert.equal(byId.U3.reason, 'depends on independent units U1 and U2; make one depend on the other')
+    assert.equal(byId.U4.status, 'skipped')
+    assert.ok(!calls.some(c => c.label.startsWith('U3') || c.label.startsWith('U4')))
+  },
+
+  'two children of one parent both stack on it': async () => {
+    const { byId, calls } = await simulate({ units: [unit('U1', 0), unit('U2', 1, ['U1']), unit('U3', 2, ['U1'])] })
+    for (const id of ['U2', 'U3']) {
+      assert.equal(byId[id].status, 'done')
+      assert.match(labelled(calls, `${id} worktree`)[0].prompt, / autopilot\/r1\/U1$/m)
+      assert.match(labelled(calls, `${id} ship`)[0].prompt, /^parent_pr: https:\/\/github\.com\/o\/r\/pull\/U1$/m)
+    }
+  },
+
+  'max_parallel_units=1 runs independent units one after the other': async () => {
+    const { byId, calls } = await simulate({ units: [unit('U1', 0), unit('U2', 1)], limits: { max_parallel_units: 1 } })
+    assert.equal(byId.U2.status, 'done')
+    const lastU1 = calls.map(c => unitOf(c.label)).lastIndexOf('U1')
+    const firstU2 = calls.map(c => unitOf(c.label)).indexOf('U2')
+    assert.ok(lastU1 < firstU2, `U2 started at call ${firstU2} before U1 finished at ${lastU1}`)
+  },
+
+  'max_parallel_units=2 runs independent units together': async () => {
+    const { calls } = await simulate({ units: [unit('U1', 0), unit('U2', 1)] })
+    const lastU1 = calls.map(c => unitOf(c.label)).lastIndexOf('U1')
+    const firstU2 = calls.map(c => unitOf(c.label)).indexOf('U2')
+    assert.ok(firstU2 < lastU1)
   },
 }
 
