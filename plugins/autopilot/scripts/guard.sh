@@ -161,6 +161,10 @@ merge_parts=(
   '(^|[^[:alnum:]_-])pr([[:space:]]+-[^[:space:]]+([[:space:]]+[^-[:space:]][^[:space:]]*)?)*[[:space:]]+merge([[:space:]]|$)'
   'pulls/[^[:space:]]*/merge'                              # REST merge endpoint
   'mergePullRequest|enablePullRequestAutoMerge'            # GraphQL merge and auto-merge
+  # stacked PRs: gh stack merge, with any flags (and their values) between
+  '(^|[^[:alnum:]_-])stack([[:space:]]+-[^[:space:]]+([[:space:]]+[^-[:space:]][^[:space:]]*)?)*[[:space:]]+merge([[:space:]]|$)'
+  'stack[[:space:]]+(.*[[:space:]])?submit([[:space:]].*)?[[:space:]]--au'  # gh stack submit --auto (and abbreviations)
+  'stacks/[^[:space:]]*merge'                              # REST: any /stacks/.../merge path
 )
 MERGE=$(alternatives "${merge_parts[@]}")
 
