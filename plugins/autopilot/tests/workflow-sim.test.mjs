@@ -359,6 +359,39 @@ const tests = {
     assert.match(labelled(calls, 'U1 engineer fix')[0].prompt, /^- code-review reported FAILED without box details$/m)
   },
 
+  // ---- decision history across rounds ----
+  'a round-2 finding that reverses a round-1 fix is dismissed with the history in view': async () => {
+    let triageCalls = 0
+    let lensCalls = 0
+    const { byId, calls } = await simulate({
+      answer: (p, { agentType, label }) => {
+        if (label === 'U1 lens plan-fit r1') {
+          lensCalls += 1
+          return lensCalls === 1
+            ? { findings: [{ location: 'counter.js:1', scenario: "'count' literal repeated three times", severity: 'minor' }] }
+            : { findings: [{ location: 'counter.js:1', scenario: 'COUNT_KEY constant is beyond the plan scope; inline it', severity: 'minor' }] }
+        }
+        if (agentType !== 'autopilot:triage') return undefined
+        triageCalls += 1
+        if (triageCalls === 1) return { fix: [{ finding: "counter.js:1 'count' literal repeated three times", reason: 'DRY: extract COUNT_KEY' }], dismiss: [] }
+        const history = p.match(/^Earlier review decisions .*?: (\[.*\])$/m)
+        assert.ok(history, 'round-2 triage gets the decision history')
+        assert.deepEqual(JSON.parse(history[1]), [{ round: 1, decision: 'fixed', finding: "counter.js:1 'count' literal repeated three times", reason: 'DRY: extract COUNT_KEY' }])
+        assert.match(p, /reverses round N decision without new scenario/)
+        return { fix: [], dismiss: [{ finding: 'counter.js:1 COUNT_KEY constant is beyond the plan scope; inline it', reason: 'reverses round 1 decision without new scenario' }] }
+      },
+    })
+    assert.equal(byId.U1.status, 'done')
+    assert.equal(byId.U1.rounds, 1, 'the reversal costs no second round')
+    assert.deepEqual(byId.U1.result.review.dismissed.map(d => d.reason), ['reverses round 1 decision without new scenario'])
+    const [first, second] = labelled(calls, 'U1 lens plan-fit r1')
+    assert.ok(!/Earlier review decisions/.test(first.prompt), 'round 1 has no history')
+    assert.match(second.prompt, /Earlier review decisions .*'count' literal repeated three times/)
+    const verification = calls.filter(c => c.agentType === 'code-review:verification-gate')
+    assert.ok(!/Re-review/.test(verification[0].prompt))
+    assert.match(verification[1].prompt, /Re-review\. Earlier review decisions/)
+  },
+
   // ---- lenses and personas ----
   'a lens that returns nothing once is retried': async () => {
     const { byId, calls } = await simulate({ answer: firstCalls(hasLabel('lens security r1'), null) })

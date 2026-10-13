@@ -183,6 +183,8 @@ async function runUnit(unit, baseBranch, progress, parentPr) {
 
   let pending = null
   let reviewLog = { fixed: [], dismissed: [] }
+  // Every earlier fix and dismissal, so later rounds do not reverse them without a new scenario.
+  const history = []
   const qaLog = Object.fromEntries(personas.map(p => [p.name, { persona: p.name, confirmed: [], evidence: [] }]))
   let criteria = []
   let finalRationale = ''
@@ -201,10 +203,12 @@ async function runUnit(unit, baseBranch, progress, parentPr) {
     const checks = await ops('checks', `bash ${SCRIPTS}/run-checks.sh ${CONFIG_PATH} ${worktree}`, worktree)
     if (checks.exit_code !== 0) { nextRound('checks', [checks.output]); continue }
 
-    const review = await reviewStage({ ...ctx, reviewRound: progress.rounds + 1 })
+    const review = await reviewStage({ ...ctx, history, reviewRound: progress.rounds + 1 })
     if (review.rework) { nextRound('review', review.rework); continue }
     reviewLog.fixed.push(...review.fix.map(f => f.finding))
     reviewLog.dismissed.push(...review.dismiss)
+    history.push(...review.fix.map(f => ({ round: progress.rounds + 1, decision: 'fixed', finding: f.finding, reason: f.reason })),
+      ...review.dismiss.map(f => ({ round: progress.rounds + 1, decision: 'dismissed', finding: f.finding, reason: f.reason })))
     if (review.fix.length) { nextRound('review', review.fix.map(f => `${f.finding} (${f.reason})`)); continue }
 
     const verdict = await qaStage(ctx)
@@ -254,15 +258,18 @@ function contractResults(unit, checked) {
 // ---------- review: code-review gates + lenses, skeptics, triage ----------
 // Returns {fix, dismiss} from triage, or {rework} when the gate verdict must go
 // straight back to the engineer without triage.
-async function reviewStage({ unit, tag, worktree, baseBranch, state, context, call, note, retryOnce, reviewRound }) {
-  const gates = () => codeReviewGates({ unit, tag, worktree, baseBranch, state, call, note, retryOnce, reviewRound })
+async function reviewStage({ unit, tag, worktree, baseBranch, state, context, call, note, retryOnce, history, reviewRound }) {
+  const earlier = history.length
+    ? `Earlier review decisions (do not re-raise or reverse one unless you give a new concrete scenario it did not consider): ${JSON.stringify(history)}`
+    : ''
+  const gates = () => codeReviewGates({ unit, tag, worktree, baseBranch, state, call, note, retryOnce, earlier, reviewRound })
   const lenses = [...LENSES.map(lens => ({ lens, agentType: 'autopilot:lens-reviewer' })),
     ...CFG.review.extra_agents.map(type => ({ lens: type, agentType: type }))]
   const lensUntilDry = async ({ lens, agentType }) => {
     const found = []
     for (let round = 1; round <= 3; round += 1) {
       const out = await retryOnce(`lens ${lens} r${round}`, label => call(
-        `Lens: ${lens}\n${context}\nBase: ${baseBranch}\nAlready reported (do not repeat): ${JSON.stringify(found.map(f => f.location + ' ' + f.scenario))}`,
+        `Lens: ${lens}\n${context}\nBase: ${baseBranch}\nAlready reported (do not repeat): ${JSON.stringify(found.map(f => f.location + ' ' + f.scenario))}${earlier && `\n${earlier}`}`,
         { agentType, model: WORKERS, schema: FINDINGS, label: `${tag} ${label}`, phase: 'Review' }))
       if (!out) throw new Stop('failed', `lens ${lens} did not run`)
       if (out.skipped) note(`lens ${lens}`, 'skipped', out.skipped)
@@ -289,7 +296,7 @@ async function reviewStage({ unit, tag, worktree, baseBranch, state, context, ca
   const kept = [...judged.filter(Boolean), ...lensFindings.filter(f => !serious(f))]
   if (!gateResult.fails.length && !kept.length) return { fix: [], dismiss: [] }
 
-  const triage = await call(`Triage these findings for ${worktree}.\nGate FAILs: ${JSON.stringify(gateResult.fails)}\nLens findings: ${JSON.stringify(kept)}`,
+  const triage = await call(`Triage these findings for ${worktree}.\nGate FAILs: ${JSON.stringify(gateResult.fails)}\nLens findings: ${JSON.stringify(kept)}${earlier && `\n${earlier}\nDismiss an item that only reverses an earlier decision, with reason "reverses round N decision without new scenario" (N from that decision).`}`,
     { agentType: 'autopilot:triage', model: WORKERS, schema: TRIAGE, label: `${tag} triage`, phase: 'Review' })
   return triage || { fix: [...gateResult.fails, ...kept].map(f => ({ finding: `${f.location} ${f.scenario}`, reason: 'triage returned nothing' })), dismiss: [] }
 }
@@ -340,7 +347,7 @@ function gateFails(gate, parsed) {
   return parsed.failBoxes.map(b => ({ location: locationOf(b) || gate, scenario: `${gate} ${b}`, severity: 'major', lens: gate }))
 }
 
-async function codeReviewGates({ unit, tag, worktree, baseBranch, state, call, note, retryOnce, reviewRound }) {
+async function codeReviewGates({ unit, tag, worktree, baseBranch, state, call, note, retryOnce, earlier, reviewRound }) {
   if (!CR()) throw new Stop('failed', 'code_review_root missing from the workflow args')
   const outDir = `${state}/review/r${reviewRound}`
   const prep = await retryOnce('review prep', label => call(
@@ -369,7 +376,8 @@ async function codeReviewGates({ unit, tag, worktree, baseBranch, state, call, n
   const phase1 = await settle(GATE_TOPICS.map(gate => () => runGate(gate, inputs)))
   const verification = await runGate('verification', [
     inputs, `Phase-1 gate verdict blocks, verbatim:\n\n${phase1.map(g => g.text).join('\n\n')}`, prep.scope,
-  ].join('\n\n'))
+    earlier && `Re-review. ${earlier}`,
+  ].filter(Boolean).join('\n\n'))
 
   const scope = parseGateBlock(`STATUS: PASS\n${prep.scope}`) || { failBoxes: ['scope block unreadable'], findings: [] }
   const all = [...phase1, verification]
