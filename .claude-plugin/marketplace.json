@@ -37,6 +37,11 @@
       "name": "image-preview",
       "source": "./plugins/image-preview",
       "description": "Thumbnails of the images you paste, above the prompt, in any terminal; reads the real file behind a copied Finder icon"
+    },
+    {
+      "name": "autopilot",
+      "source": "./plugins/autopilot",
+      "description": "Plan in, PRs out: engineer, reviewer and persona-QA agents loop on each unit of an approved plan until it is clean"
     }
   ]
 }

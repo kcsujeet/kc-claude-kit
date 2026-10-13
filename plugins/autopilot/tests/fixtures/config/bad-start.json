@@ -1,0 +1,1 @@
+{"launch":{"start":"bun run dev","ready":"http://localhost/"},"checks":["true"]}

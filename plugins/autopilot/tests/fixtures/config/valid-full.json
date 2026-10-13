@@ -1,0 +1,4 @@
+{"launch":{"install":"bun install","start":"bun run dev --port {port}","ready":"http://localhost:{port}/health","seed":"bun run db:seed","ready_timeout_s":60,"ports":{"base":5000,"per_unit":5},"login":{"url":"/login","user_env":"AUTOPILOT_QA_USER","password_env":"AUTOPILOT_QA_PASSWORD"}},
+ "checks":["bun run lint","bun test"],"risky_paths":["db/migrate/**"],"review":{"extra_agents":["event-temple-ruby:rails-security"]},
+ "limits":{"max_fix_rounds":3,"max_parallel_units":2,"qa_personas":{"min":3,"max":4},"max_agents_per_unit":80},
+ "models":{"workers":"sonnet","staff":"opus"}}
