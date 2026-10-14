@@ -210,7 +210,7 @@ The run's evidence (criteria checks, review decisions, QA results) stays in `.au
 
 **Permissions.** An unattended run prompts for every new tool call unless you run in auto mode ([permission modes](https://code.claude.com/docs/en/permission-modes)) or allow `Bash`, `Edit`, `Write` and `Workflow(autopilot:deliver)` in `.claude/settings.local.json`.
 
-**Cost.** It spends real tokens. A 2-unit dry run on the test fixture cost $6 to over $10 and took 8 to 12 minutes, with 75 to 150 agents; most of it is review, since every round runs `code-review`'s gates and the lens reviewers even on a small diff. In your first two or three runs, skim the QA evidence in the run directory to calibrate how far to trust it.
+**Cost.** It spends real tokens. A 2-unit dry run on the test fixture cost $6 to over $10 and took 8 to 12 minutes, with 75 to 150 agents; most of it is review. To keep it down, a re-review after fixes looks only at the fix commits, with the checks that found something plus correctness, testing and security, and one full review runs before QA. Checks with no file they apply to (React, accessibility, type-safety, dependencies) start no agent, two skeptics judge all serious findings of a round together, and minor findings alone never start a fix round. In your first two or three runs, skim the QA evidence in the run directory to calibrate how far to trust it.
 
 **Start command.** `launch.start` must keep the app in the foreground. A command that backgrounds itself (`docker compose up -d`, `rails s -d`) is reported as "app exited early", and autopilot could not stop it anyway; use the foreground form (`docker compose up`, `rails s`). `init`'s boot check shows this the first time.
 
