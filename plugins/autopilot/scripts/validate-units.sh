@@ -7,7 +7,9 @@
 #   - criteria ids are exactly the unit's covers, statements copied verbatim;
 #   - every check has kind test|ui|data and a non-empty how;
 #   - personas: limits.qa_personas.min..max, each with name, goals and
-#     behaviour, names unique (the workflow keys QA results by name).
+#     behaviour, names unique (the workflow keys QA results by name);
+#   - contract.branch is a plain branch name, unique across units, and
+#     contract.pr_title is non-empty (both in the repo's own convention).
 #
 # Usage: validate-units.sh <units.json> <config.json> <plan.json>
 #   units.json  {"architecture": "...", "units": [plan unit + "contract"]}
@@ -46,7 +48,9 @@ readonly PROBLEMS='
       (if ($min | type) != "number" or ($max | type) != "number" then "config has no limits.qa_personas min and max; pass read-config.sh output" else empty end),
       (if ($u | type) == "object" and ($u.units | type) == "array" then
         ($u.units | map(select(type == "object"))) as $units
-        | (if ($u.units | ids) != ($planUnits | ids)
+        | (if ($units | map(.contract.branch? // empty) | (unique | length) != length)
+            then "contract.branch must differ between units" else empty end),
+          (if ($u.units | ids) != ($planUnits | ids)
             then "unit ids must be \($planUnits | ids) (the plan'"'"'s, in order); got \($u.units | ids)" else empty end),
           ($units[] | . as $unit
             | ($planUnits | map(select(.id == $unit.id))[0]) as $p
@@ -72,7 +76,11 @@ readonly PROBLEMS='
                       | select((.value | type) != "object" or ([.value.name, .value.goals, .value.behaviour] | all(nonempty) | not))
                       | "\($unit.id) persona \(.key + 1) needs non-empty name, goals and behaviour"),
                     (if ($personas | map(if type == "object" then .name else null end) | unique | length) != ($personas | length)
-                      then "\($unit.id) persona names must be unique" else empty end)
+                      then "\($unit.id) persona names must be unique" else empty end),
+                    (if ($unit.contract.branch | type) != "string" or ($unit.contract.branch | test("^[A-Za-z0-9][A-Za-z0-9._/-]*$") | not)
+                      then "\($unit.id) contract.branch must be a branch name in the repo'"'"'s convention (letters, digits, . _ / -)" else empty end),
+                    (if ($unit.contract.pr_title | nonempty | not)
+                      then "\($unit.id) contract.pr_title must be a non-empty title in the repo'"'"'s convention" else empty end)
                 end))
       else empty end)
     ] | .[]'

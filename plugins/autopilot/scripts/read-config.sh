@@ -82,6 +82,7 @@ readonly PROBLEMS='
   [
     (if (.launch.start | type) == "string" and (.launch.start | contains("{port}")) then empty else "launch.start must contain {port}" end),
     (if (.launch.ready | type) == "string" and (.launch.ready | contains("{port}")) then empty else "launch.ready must contain {port}" end),
+    (if (.launch.ready | type) == "string" and (.launch.ready | test("^https?://(localhost|127\\.0\\.0\\.1|\\[::1\\]|[^/:]+\\.localhost)(:|/|$)")) then empty else "launch.ready must be a local URL (localhost, 127.0.0.1, [::1] or *.localhost)" end),
     (if (.checks | strs) and (.checks | length) > 0 then empty else "checks must be a non-empty array of commands" end),
     (if (.risky_paths | strs) then empty else "risky_paths must be an array of globs" end),
     (if (.review.extra_agents | strs) then empty else "review.extra_agents must be an array of agent types" end),

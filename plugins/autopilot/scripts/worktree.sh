@@ -3,14 +3,15 @@
 # Git worktrees: https://git-scm.com/docs/git-worktree
 #
 # Usage:
-#   worktree.sh create <repo> <run-id> <unit-id> <base-ref>
-#     → {"path": "...", "branch": "autopilot/<run-id>/<unit-id>"}
+#   worktree.sh create <repo> <run-id> <unit-id> <base-ref> <branch>
+#     → {"path": "...", "branch": "<branch>"}
+#     The branch name follows the repo's convention; /autopilot:run picks it.
 #     Idempotent: a registered worktree at the path is reused. An existing
 #     branch is checked out (not recreated) so a removed unit keeps its
 #     commits. Copies <repo>/.claude/autopilot.json into it when missing.
 #   worktree.sh remove <repo> <path>   (keeps the branch)
 #     Refuses when the worktree has uncommitted changes, ignoring the
-#     copied autopilot.json.
+#     copied autopilot.json and untracked symlinks.
 # Exit: 0 ok; 1 refused (uncommitted changes, or a plain directory sits at
 # the path); other non-zero = git error (git's own status); 2 jq missing.
 set -euo pipefail
@@ -24,10 +25,9 @@ is_worktree() {
 }
 
 create() {
-  local repo=$1 run_id=$2 unit_id=$3 base_ref=$4 path branch
+  local repo=$1 run_id=$2 unit_id=$3 base_ref=$4 branch=${5:?usage: worktree.sh create <repo> <run-id> <unit-id> <base-ref> <branch>} path
   repo=$(cd "$repo" && pwd -P)
   path="$repo/.claude/worktrees/autopilot-$run_id-$unit_id"
-  branch="autopilot/$run_id/$unit_id"
   if ! is_worktree "$repo" "$path"; then
     if [ -e "$path" ]; then
       echo "worktree: $path exists but is not a worktree of $repo" >&2
@@ -49,7 +49,13 @@ create() {
 
 remove() {
   local repo=$1 path=$2
-  if [ -n "$(git -C "$path" status --porcelain -- . ':!.claude/autopilot.json')" ]; then
+  # Untracked symlinks (a linked node_modules, say) hold no work, so they do not count.
+  local changes
+  changes=$(git -C "$path" status --porcelain -- . ':!.claude/autopilot.json' | while IFS= read -r line; do
+    if [ "${line:0:3}" = '?? ' ] && [ -L "$path/${line:3}" ]; then continue; fi
+    printf '%s\n' "$line"
+  done)
+  if [ -n "$changes" ]; then
     echo "worktree: $path has uncommitted changes" >&2
     exit 1
   fi

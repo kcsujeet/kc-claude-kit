@@ -204,6 +204,8 @@ You can also say "run this plan". The working tree must be clean, on the base br
 
 **Size.** A run is bounded by the workflow runtime's cap of 1,000 agents per run ([workflows, Behavior and limits](https://code.claude.com/docs/en/workflows#behavior-and-limits)), and each unit takes up to `limits.max_agents_per_unit` of them, so split very large plans (5 or more units) into several runs.
 
+**Local only.** Every unit runs its app on this machine, on localhost, against your local dev database and services. QA creates and deletes data, so the recipe never points at staging, production or any shared environment, and `read-config.sh` rejects a `launch.ready` URL that is not local.
+
 **Permissions.** An unattended run prompts for every new tool call unless you run in auto mode ([permission modes](https://code.claude.com/docs/en/permission-modes)) or allow `Bash`, `Edit`, `Write` and `Workflow(autopilot:deliver)` in `.claude/settings.local.json`.
 
 **Cost.** It spends real tokens. A 2-unit dry run on the test fixture cost $6 to over $10 and took 8 to 12 minutes, with 75 to 150 agents; most of it is review, since every round runs `code-review`'s gates and the lens reviewers even on a small diff. In your first two or three runs, skim the QA evidence in each PR to calibrate how far to trust it.
