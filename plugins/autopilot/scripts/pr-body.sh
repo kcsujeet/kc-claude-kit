@@ -1,20 +1,25 @@
 #!/usr/bin/env bash
-# Renders a unit's PR body from the unit result JSON the shipper agent writes.
-# Usage: pr-body.sh <unit-result.json>
-# Output: PR body markdown on stdout. Missing or empty lists render as
+# Renders a unit's autopilot report from the unit result JSON the shipper agent
+# writes, as one collapsed <details> block that goes under the PR's own
+# description (the shipper writes that from the repo's PR template).
+# Usage: pr-body.sh <unit-result.json> [<worktree path>]
+#   With a worktree path, "<worktree path>/" is cut from every string, so the
+#   report names files relative to the repo, never by a local absolute path.
+# Output: report markdown on stdout. Missing or empty lists render as
 #   "- none" / "- no confirmed bugs"; the "Review receipts incomplete" list
 #   (review_receipts_incomplete) and the "Found by QA, not caused by this
 #   change" section (qa_preexisting) appear only when they have entries.
 # Exit: 0 ok; 2 jq missing; jq's own status on bad input.
 set -euo pipefail
 command -v jq >/dev/null 2>&1 || { echo "autopilot: jq is required" >&2; exit 2; }
-jq -r '
-  def clean: tostring | gsub("[\r\n]+"; " ") | gsub("<"; "&lt;");
+jq -r --arg wt "${2:+${2%/}/}" '
+  def strip_wt: if $wt == "" then . else split($wt) | join("") end;
+  def clean: tostring | strip_wt | gsub("[\r\n]+"; " ") | gsub("<"; "&lt;");
   def cell: clean | gsub("\\|"; "\\|");
   def bullets(xs; empty_text): if (xs | length) == 0 then "- " + empty_text else (xs | map("- " + clean) | join("\n")) end;
   def plural(n; word): "\(n) \(word)\(if n == 1 then "" else "s" end)";
-  "## \(.plan_title | clean): \(.unit.id | clean) \(.unit.title | clean)\n",
-  "Delivered by autopilot in \(plural(.rounds; "fix round")). Every criterion below was checked by the verifier, not the author.\n",
+  "<details><summary>Autopilot report: \(.unit.id | clean) \(.unit.title | clean)</summary>\n",
+  "Plan: \(.plan_title | clean). Delivered by autopilot in \(plural(.rounds; "fix round")). Every criterion below was checked by the verifier, not the author.\n",
   "### Acceptance criteria\n",
   "| Criterion | Result | Evidence |",
   "|---|---|---|",
@@ -45,5 +50,6 @@ jq -r '
   "| Step | Outcome | Reason |",
   "|---|---|---|",
   ((.decisions // [])[] | "| \(.step | cell) | \(.outcome | cell) | \(.reason | cell) |"),
+  "\n</details>",
   "\n</details>"
 ' "$1"

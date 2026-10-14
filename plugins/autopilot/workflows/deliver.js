@@ -25,7 +25,7 @@ const CONFIG_PATH = `${A.run_dir}/config.json`
 // review-code's phase-1 gates (plugins/code-review/skills/review-code/SKILL.md, Step 2):
 // all ten every round; a gate that does not apply returns PASS (N/A) itself.
 const GATE_TOPICS = ['naming', 'clarity', 'structure', 'simplicity', 'datetime', 'react', 'i18n', 'testing', 'correctness', 'project-conventions']
-const LENSES = ['security', 'data', 'compatibility', 'concurrency', 'accessibility', 'observability', 'plan-fit',
+const LENSES = ['security', 'data', 'compatibility', 'concurrency', 'accessibility', 'observability', 'plan-fit', 'readability',
   'type-safety', 'error-handling', 'performance', 'dependencies']
 
 // ---------- schemas ----------
@@ -61,9 +61,9 @@ const TRIAGE = {
     dismiss: { type: 'array', items: { type: 'object', required: ['finding', 'reason'], properties: { finding: str, reason: str } } } },
 }
 const QA = {
-  type: 'object', required: ['bugs', 'covered'],
+  type: 'object', required: ['bugs', 'covered', 'ran'],
   properties: { bugs: { type: 'array', items: { type: 'object', required: ['title', 'steps', 'expected', 'actual', 'evidence', 'script', 'severity'],
-    properties: { title: str, steps: strs, expected: str, actual: str, evidence: str, script: str, severity: str } } }, covered: strs, not_covered: strs },
+    properties: { title: str, steps: strs, expected: str, actual: str, evidence: str, script: str, severity: str } } }, covered: strs, not_covered: strs, ran: strs },
 }
 const VERDICT = {
   type: 'object', required: ['criteria', 'confirmed', 'dropped'],
@@ -514,7 +514,11 @@ async function qaStage({ unit, tag, worktree, state, context, call, ops, note })
     const reports = await settle(personas.map((persona, n) => () => call(
       `Persona: ${JSON.stringify(persona)}\nApp: ${url}\n${login}\nEvidence directory: ${state}/qa/${n}\n${context}`,
       { agentType: 'autopilot:qa-persona', model: WORKERS, schema: QA, label: `${tag} qa ${persona.name}`, phase: 'QA' })))
-    reports.forEach((r, n) => { if (!r) note(`qa ${personas[n].name}`, 'null', 'persona returned nothing') })
+    // A persona that saved nothing it ran did not really run; it counts as no report.
+    reports.forEach((r, n) => {
+      if (!r) note(`qa ${personas[n].name}`, 'null', 'persona returned nothing')
+      else if (!(r.ran || []).length) { note(`qa ${personas[n].name}`, 'no evidence', 'persona saved nothing it ran; not counted'); reports[n] = null }
+    })
     const reported = reports.filter(Boolean).length
     if (reported < LIMITS.qa_personas.min) throw new Stop('failed', `only ${reported} personas reported`)
     const qa = reports.map((r, n) => ({ persona: personas[n].name, bugs: r ? r.bugs : [], not_covered: r ? (r.not_covered || []) : ['agent returned nothing'] }))
@@ -589,7 +593,8 @@ while (pendingUnits.length) {
   for (let i = 0; i < runnable.length; i += LIMITS.max_parallel_units) {
     const wave = runnable.slice(i, i + LIMITS.max_parallel_units)
     const done = await parallel(wave.map(({ unit: u, parent }) => async () => {
-      try { return await deliverUnit(u, parent ? parent.branch : A.base_branch, parent && parent.pr_url) }
+      // A unit with no parent stacks on the base branch's own PR, when the run builds on one.
+      try { return await deliverUnit(u, parent ? parent.branch : A.base_branch, parent ? parent.pr_url : A.base_pr) }
       catch (error) {
         const status = error instanceof Stop ? error.status : 'failed'
         log(`${u.id} ${status}: ${error.message}`)

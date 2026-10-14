@@ -44,7 +44,7 @@ function defaultAnswer(prompt, { agentType, label }) {
   }
   if (agentType === 'autopilot:lens-reviewer') return { findings: [], skipped: '' }
   if (agentType === 'autopilot:triage') return { fix: [], dismiss: [] }
-  if (agentType === 'autopilot:qa-persona') return { bugs: [], covered: ['AC1'], not_covered: [] }
+  if (agentType === 'autopilot:qa-persona') return { bugs: [], covered: ['AC1'], not_covered: [], ran: ['qa/0/probe.sh'] }
   if (agentType === 'autopilot:verifier') return { criteria: [{ id: 'AC1', passes: true, evidence: 'test ok' }], confirmed: [], dropped: [] }
   if (agentType === 'autopilot:shipper') return { pr_url: `https://github.com/o/r/pull/${unit}`, body: `/s/${unit}/pr-body.md`, stack: 'none', ci: 'pass', failures: '', notes: '' }
   if (agentType && agentType.startsWith('code-review:')) return gateBlock(agentType.slice(12, -5), 'PASS')
@@ -74,10 +74,10 @@ function firstCalls(match, value, times = 1) {
 const isType = type => opts => opts.agentType === `autopilot:${type}`
 const hasLabel = text => opts => opts.label.includes(text)
 
-async function simulate({ units = [unit('U1', 0)], limits = {}, answer = () => undefined, dryRun = false } = {}) {
+async function simulate({ units = [unit('U1', 0)], limits = {}, answer = () => undefined, dryRun = false, base = {} } = {}) {
   const calls = []
   const args = {
-    run_id: 'r1', repo: '/repo', code_review_root: '/cr', run_dir: '/repo/.autopilot/runs/r1', plugin_root: '/plugin', dry_run: dryRun, base_branch: 'main',
+    run_id: 'r1', repo: '/repo', code_review_root: '/cr', run_dir: '/repo/.autopilot/runs/r1', plugin_root: '/plugin', dry_run: dryRun, base_branch: 'main', ...base,
     plan: { title: 'Plan', goal: 'goal', out_of_scope: 'none' }, architecture: 'arch',
     config: {
       launch: { login: null }, review: { extra_agents: [] },
@@ -197,6 +197,17 @@ const tests = {
     assert.match(ship.prompt, /^parent_pr: https:\/\/github\.com\/o\/r\/pull\/U1$/m)
     assert.match(ship.prompt, /^Base: autopilot\/r1\/U1$/m)
     assert.match(calls.find(c => c.label === 'U1 ship').prompt, /^parent_pr: none$/m)
+  },
+
+  'a unit with no parent stacks on the base branch PR': async () => {
+    const { calls } = await simulate({
+      units: [unit('U1', 0), unit('U2', 1, ['U1'])],
+      base: { base_branch: 'feature', base_pr: 'https://github.com/o/r/pull/7' },
+    })
+    const ship = calls.find(c => c.label === 'U1 ship')
+    assert.match(ship.prompt, /^parent_pr: https:\/\/github\.com\/o\/r\/pull\/7$/m)
+    assert.match(ship.prompt, /^Base: feature$/m)
+    assert.match(calls.find(c => c.label === 'U2 ship').prompt, /^parent_pr: https:\/\/github\.com\/o\/r\/pull\/U1$/m)
   },
 
   'CI that keeps failing blocks the unit but keeps its PR url': async () => {
@@ -645,6 +656,17 @@ const tests = {
   'a lens skip is recorded in the decision log': async () => {
     const { byId } = await simulate({ answer: firstCalls(hasLabel('lens accessibility'), { findings: [], skipped: 'no UI files' }) })
     assert.ok(byId.U1.decisions.some(d => d.step === 'lens accessibility' && d.outcome === 'skipped' && d.reason === 'no UI files'))
+  },
+
+  'a persona that saved no evidence does not count as a report': async () => {
+    const { byId } = await simulate({
+      units: [unit('U1', 0, [], { personas: [persona('newbie'), persona('expert')] })],
+      limits: { qa_personas: { min: 2, max: 5 } },
+      answer: firstCalls(hasLabel('qa expert'), { bugs: [], covered: ['AC1'], not_covered: [], ran: [] }),
+    })
+    assert.equal(byId.U1.status, 'failed')
+    assert.equal(byId.U1.reason, 'only 1 personas reported')
+    assert.ok(byId.U1.decisions.some(d => d.step === 'qa expert' && d.outcome === 'no evidence'))
   },
 
   'fewer persona reports than qa_personas.min fail the unit': async () => {

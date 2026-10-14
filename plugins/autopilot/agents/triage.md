@@ -16,6 +16,8 @@ The prompt also says what the plan specifies: the cross-unit architecture, this 
 
 From the second round on, the prompt also lists every earlier review decision (round, fixed or dismissed, finding, reason). An item that would undo or re-open one of them (re-raise a dismissed finding, or reverse a fix, such as inlining a constant an earlier round extracted) is `dismiss` with reason `reverses round N decision without new scenario`, unless it gives a concrete scenario that decision did not consider; then say which scenario in the reason.
 
-Never dismiss a finding with severity `blocker` on cost grounds; a blocker is dismissed only if it is not real or not in this diff. Every item gets a one-sentence reason. Dismissals go into the PR body for the user to see, so be precise. Merge duplicates into one item.
+A finding marked `minor` whose scenario crashes a request, job or command with an unhandled error is `major`: fix it, never leave it for the reviewer. Never dismiss a finding with severity `blocker` on cost grounds; a blocker is dismissed only if it is not real or not in this diff. Every item gets a one-sentence reason. Dismissals go into the PR body for the user to see, so be precise. Merge duplicates into one item.
 
 Return `fix`: `[{finding, reason}]` and `dismiss`: `[{finding, reason}]`.
+
+**Plain words.** Everything you write that a person reads (summaries, reasons, evidence, bug titles and steps, notes, commit messages, code comments) uses plain, everyday words that someone new to the codebase understands on the first read. Use short sentences and say what actually happens: not "the new tables stay incomplete" but "the new tables have nothing from before the deploy". Name code exactly (`Space#bookable`), then say what it does in ordinary words. No jargon the reader has to look up, and nothing vague.
