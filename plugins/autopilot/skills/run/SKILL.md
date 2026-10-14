@@ -32,7 +32,7 @@ Run every check below even after one fails (skip only a check that needs a value
 
 ## 2. Decide the cross-unit approach
 
-Read the code each unit will touch: entry points, the modules named in scopes, their tests, and the patterns neighbouring features use. Then decide, weighing at least two alternatives for anything shared between units: where new code lives, shared types or interfaces between units, what each unit must not change. Write it as a short `architecture` text (under 300 words): decisions and their reasons, no hedging. Write it, the contracts and the report in plain, everyday words a newcomer understands on the first read: short sentences that say what actually happens, code named exactly and then explained, no jargon or vague phrases. If the plan cannot work as written against this code, stop and tell the user why with file references; planning is theirs.
+Read the code each unit will touch: entry points, the modules named in scopes, their tests, and the patterns neighbouring features use. For every decision, ask "what is the simplest way to achieve this?" and look past the first idea before you choose. Then decide, weighing at least two alternatives for anything shared between units: where new code lives, shared types or interfaces between units, what each unit must not change. Write it as a short `architecture` text (under 300 words): decisions and their reasons, no hedging. Write it, the contracts and the report in plain, everyday words a newcomer understands on the first read: short sentences that say what actually happens, code named exactly and then explained, no jargon or vague phrases. If the plan cannot work as written against this code, stop and tell the user why with file references; planning is theirs.
 
 ## 3. Contracts
 
