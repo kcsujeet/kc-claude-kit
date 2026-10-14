@@ -15,8 +15,8 @@
     {"name": "power user", "goals": "reuse ten replies an hour", "behaviour": "keyboard only, pastes long text, opens the picker repeatedly"},
     {"name": "careless user", "goals": "get it done", "behaviour": "submits empty, refreshes mid-flow, uses back"}
   ],
-  "branch": "ENG-1234-saved-replies-picker",
-  "pr_title": "ENG-1234 Saved replies picker"
+  "branch": "<branch name in the repo's convention>",
+  "pr_title": "<PR title in the repo's convention>"
 }
 ```
 
