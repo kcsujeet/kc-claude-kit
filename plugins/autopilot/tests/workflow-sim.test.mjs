@@ -130,7 +130,6 @@ const tests = {
     assert.equal(labelled(calls, 'U1 engineer fix').length, 0)
     assert.deepEqual(byId.U1.result.qa_preexisting, [{ title: bug.title, steps: bug.steps, evidence: bug.evidence }])
     assert.deepEqual(byId.U1.result.qa.find(q => q.persona === 'newbie').confirmed, [])
-    assert.match(labelled(calls, 'U1 ship')[0].prompt, /^Unit result counts: .*"qa_preexisting":1,"review_receipts_incomplete":0\}$/m)
   },
 
   'a caused QA bug is fixed while a pre-existing one in the same verdict is only reported': async () => {
@@ -235,20 +234,13 @@ const tests = {
     assert.match(byId.U1.reason, /push rejected/)
   },
 
-  'the ship prompt carries the unit result counts the shipper checks its file against': async () => {
-    let triaged = false
+  'the ship prompt carries only the deferred minor items, never the run result': async () => {
     const { calls } = await simulate({
-      answer: (p, { agentType, label }) => {
-        if (label === 'U1 lens security r1') return { findings: [{ location: 'a.js:1', scenario: 'x', severity: 'minor' }] }
-        if (agentType === 'autopilot:triage' && !triaged) { triaged = true; return { fix: [], dismiss: [{ finding: 'a.js:1 x', reason: 'out of scope' }] } }
-        return undefined
-      },
+      answer: (p, { label }) => (label === 'U1 lens security r1' ? { findings: [{ location: 'a.js:1', scenario: 'tiny', severity: 'minor' }] } : undefined),
     })
     const prompt = labelled(calls, 'U1 ship')[0].prompt
-    const json = JSON.parse(prompt.split('Unit result JSON:\n')[1])
-    const counts = JSON.parse(prompt.match(/^Unit result counts: (.*)$/m)[1])
-    assert.deepEqual(counts, { criteria: 1, decisions: json.decisions.length, fixed: 0, dismissed: 1, qa_preexisting: 0, review_receipts_incomplete: 0 })
-    assert.ok(json.decisions.length > 0)
+    assert.match(prompt, /^Deferred minor items: \[.*\]$/m)
+    assert.doesNotMatch(prompt, /Unit result|"criteria"|"decisions"/)
   },
 
   'ops, shipper, persona and verifier prompts name the scripts directory': async () => {

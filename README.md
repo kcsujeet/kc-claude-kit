@@ -200,6 +200,8 @@ You can also say "run this plan". The working tree must be clean, on the base br
 - Blocked units, each with the reason (no approach, did not converge, plan conflict, risky path, budget).
 - Bugs QA found that the change did not cause, left alone, so you can plan a fix.
 
+The run's evidence (criteria checks, review decisions, QA results) stays in `.autopilot/runs/<id>/` for the staff engineer to verify. PR descriptions carry only what a reviewer needs, in the repo's own template.
+
 **Models.** Workers run on `sonnet` and the staff roles on `best`, both set in `.claude/autopilot.json` `models` ([model config](https://code.claude.com/docs/en/model-config)). The `run` skill already sets `model: best` for its turn, so the staff engineer runs on the top model whatever your session's `/model` is.
 
 **Size.** A run is bounded by the workflow runtime's cap of 1,000 agents per run ([workflows, Behavior and limits](https://code.claude.com/docs/en/workflows#behavior-and-limits)), and each unit takes up to `limits.max_agents_per_unit` of them, so split very large plans (5 or more units) into several runs.
@@ -208,7 +210,7 @@ You can also say "run this plan". The working tree must be clean, on the base br
 
 **Permissions.** An unattended run prompts for every new tool call unless you run in auto mode ([permission modes](https://code.claude.com/docs/en/permission-modes)) or allow `Bash`, `Edit`, `Write` and `Workflow(autopilot:deliver)` in `.claude/settings.local.json`.
 
-**Cost.** It spends real tokens. A 2-unit dry run on the test fixture cost $6 to over $10 and took 8 to 12 minutes, with 75 to 150 agents; most of it is review, since every round runs `code-review`'s gates and the lens reviewers even on a small diff. In your first two or three runs, skim the QA evidence in each PR to calibrate how far to trust it.
+**Cost.** It spends real tokens. A 2-unit dry run on the test fixture cost $6 to over $10 and took 8 to 12 minutes, with 75 to 150 agents; most of it is review, since every round runs `code-review`'s gates and the lens reviewers even on a small diff. In your first two or three runs, skim the QA evidence in the run directory to calibrate how far to trust it.
 
 **Start command.** `launch.start` must keep the app in the foreground. A command that backgrounds itself (`docker compose up -d`, `rails s -d`) is reported as "app exited early", and autopilot could not stop it anyway; use the foreground form (`docker compose up`, `rails s`). `init`'s boot check shows this the first time.
 

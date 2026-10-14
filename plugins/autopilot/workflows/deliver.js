@@ -254,10 +254,10 @@ async function runUnit(unit, baseBranch, progress, parentPr) {
     note('final gate', 'approve', final.rationale)
 
     const result = unitResult(unit, progress.rounds, criteria, decision.rationale, finalRationale, reviewLog, { qa: Object.values(qaLog), preexisting: qaPreexisting, receipts: reviewReceipts }, decisions)
-    const ship = await call(`Worktree: ${worktree}\nBranch: ${branch}\nBase: ${baseBranch}\nTitle: ${unit.contract.pr_title}\nScratch: ${state}\nScripts directory: ${SCRIPTS}\ndry_run: ${A.dry_run}\nparent_pr: ${parentPr || 'none'}\nUnit result counts: ${resultCounts(result)}\nUnit result JSON:\n${JSON.stringify(result)}`,
+    const ship = await call(`Worktree: ${worktree}\nBranch: ${branch}\nBase: ${baseBranch}\nTitle: ${unit.contract.pr_title}\nScratch: ${state}\nScripts directory: ${SCRIPTS}\ndry_run: ${A.dry_run}\nparent_pr: ${parentPr || 'none'}\nDeferred minor items: ${JSON.stringify(result.review.deferred_minor)}`,
       { agentType: 'autopilot:shipper', model: WORKERS, schema: SHIP, label: `${tag} ship`, phase: 'Ship' })
     if (!ship) throw new Stop('failed', 'shipper returned nothing')
-    // Even a dry run must leave unit-result.json and the rendered PR body behind.
+    // Even a dry run must leave the PR body behind.
     if (!ship.body) throw new Stop('failed', `shipper rendered no PR body: ${ship.notes || 'no notes'}`)
     prUrl = ship.pr_url
     progress.pr_url = prUrl // a unit blocked later by CI still reports its open PR
@@ -539,14 +539,6 @@ async function qaStage({ unit, tag, worktree, state, context, call, ops, note })
       if (stopped.exit_code !== 0) note('stop app', `exit ${stopped.exit_code}`, stopped.output)
     } catch (error) { note('stop app', 'failed', error.message) }
   }
-}
-
-// The shipper retypes the result into unit-result.json; these counts let it
-// check that nothing was shortened (it compares them with jq, see shipper.md).
-function resultCounts(result) {
-  return JSON.stringify({ criteria: result.criteria.length, decisions: result.decisions.length,
-    fixed: result.review.fixed.length, dismissed: result.review.dismissed.length, qa_preexisting: result.qa_preexisting.length,
-    review_receipts_incomplete: result.review_receipts_incomplete.length })
 }
 
 function unitResult(unit, rounds, criteria, design, final, review, { qa, preexisting, receipts }, decisions) {
