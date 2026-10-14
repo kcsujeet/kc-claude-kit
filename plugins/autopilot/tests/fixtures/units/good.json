@@ -6,39 +6,92 @@
       "index": 0,
       "title": "Saved reply storage",
       "depends_on": [],
-      "covers": ["AC1"],
+      "covers": [
+        "AC1"
+      ],
       "scope": "Model, migration and API for saved replies.",
       "contract": {
         "criteria": [
-          {"id": "AC1", "statement": "A saved reply appears in the picker after saving.",
-           "check": {"kind": "data", "how": "POST /api/replies then GET /api/replies and read the new reply back"}}
+          {
+            "id": "AC1",
+            "statement": "A saved reply appears in the picker after saving.",
+            "check": {
+              "kind": "data",
+              "how": "POST /api/replies then GET /api/replies and read the new reply back"
+            }
+          }
         ],
         "personas": [
-          {"name": "API client in a hurry", "goals": "save replies by script", "behaviour": "sends the same POST twice, omits optional fields"},
-          {"name": "malformed caller", "goals": "get a reply stored", "behaviour": "sends empty bodies, huge text, wrong content type"},
-          {"name": "concurrent writer", "goals": "save from two tabs", "behaviour": "fires parallel POSTs and reads straight after"}
-        ]
+          {
+            "name": "API client in a hurry",
+            "goals": "save replies by script",
+            "behaviour": "sends the same POST twice, omits optional fields"
+          },
+          {
+            "name": "malformed caller",
+            "goals": "get a reply stored",
+            "behaviour": "sends empty bodies, huge text, wrong content type"
+          },
+          {
+            "name": "concurrent writer",
+            "goals": "save from two tabs",
+            "behaviour": "fires parallel POSTs and reads straight after"
+          }
+        ],
+        "branch": "ENG-1-saved-replies-1",
+        "pr_title": "ENG-1 Saved replies part 1"
       }
     },
     {
       "id": "U2",
       "index": 1,
       "title": "Picker UI",
-      "depends_on": ["U1"],
-      "covers": ["AC2", "AC3"],
+      "depends_on": [
+        "U1"
+      ],
+      "covers": [
+        "AC2",
+        "AC3"
+      ],
       "scope": "The picker in the composer.",
       "contract": {
         "criteria": [
-          {"id": "AC2", "statement": "Picking a saved reply inserts its text at the cursor.",
-           "check": {"kind": "test", "how": "composer test: picking a reply inserts its text at the caret position"}},
-          {"id": "AC3", "statement": "An empty picker shows \"No saved replies yet\".",
-           "check": {"kind": "ui", "how": "log in as a user with no replies, open the composer picker, read the empty state"}}
+          {
+            "id": "AC2",
+            "statement": "Picking a saved reply inserts its text at the cursor.",
+            "check": {
+              "kind": "test",
+              "how": "composer test: picking a reply inserts its text at the caret position"
+            }
+          },
+          {
+            "id": "AC3",
+            "statement": "An empty picker shows \"No saved replies yet\".",
+            "check": {
+              "kind": "ui",
+              "how": "log in as a user with no replies, open the composer picker, read the empty state"
+            }
+          }
         ],
         "personas": [
-          {"name": "first-time agent on a slow laptop", "goals": "send a reply fast", "behaviour": "double-clicks, uses the mouse, narrow window"},
-          {"name": "power user", "goals": "reuse ten replies an hour", "behaviour": "keyboard only, pastes long text, opens the picker repeatedly"},
-          {"name": "careless user", "goals": "get it done", "behaviour": "submits empty, refreshes mid-flow, uses back"}
-        ]
+          {
+            "name": "first-time agent on a slow laptop",
+            "goals": "send a reply fast",
+            "behaviour": "double-clicks, uses the mouse, narrow window"
+          },
+          {
+            "name": "power user",
+            "goals": "reuse ten replies an hour",
+            "behaviour": "keyboard only, pastes long text, opens the picker repeatedly"
+          },
+          {
+            "name": "careless user",
+            "goals": "get it done",
+            "behaviour": "submits empty, refreshes mid-flow, uses back"
+          }
+        ],
+        "branch": "ENG-1-saved-replies-2",
+        "pr_title": "ENG-1 Saved replies part 2"
       }
     }
   ]

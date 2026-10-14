@@ -14,7 +14,9 @@
     {"name": "first-time agent on a slow laptop", "goals": "send a reply fast", "behaviour": "double-clicks, uses the mouse, narrow window"},
     {"name": "power user", "goals": "reuse ten replies an hour", "behaviour": "keyboard only, pastes long text, opens the picker repeatedly"},
     {"name": "careless user", "goals": "get it done", "behaviour": "submits empty, refreshes mid-flow, uses back"}
-  ]
+  ],
+  "branch": "ENG-1234-saved-replies-picker",
+  "pr_title": "ENG-1234 Saved replies picker"
 }
 ```
 
@@ -24,6 +26,7 @@
 Rules `scripts/validate-units.sh` enforces (it is the authority; the deliver workflow trusts its result):
 - `criteria` ids are exactly the unit's `covers` ids, once each; each `statement` is the plan's text, character for character.
 - Every `check` has `kind` `test`, `ui` or `data` and a non-empty `how`. `how` names the concrete thing: the test file and case, the flow with its starting state, or the stored value and how to read it.
+- `branch` is a plain branch name (letters, digits, `.`, `_`, `/`, `-`), different for every unit, and `pr_title` is non-empty. Both follow the repo's own convention: its docs first, else the shape of its recent merged PRs. Never a name the kit makes up.
 - `personas` count is between `limits.qa_personas.min` and `max`; each has non-empty `name`, `goals` and `behaviour`; names are unique within the unit.
 
 ## units.json

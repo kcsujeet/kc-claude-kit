@@ -72,6 +72,10 @@ expect_error "empty check how"          "$(mutate how '.units[1].contract.criter
 expect_error "no check"                 "$(mutate no-check 'del(.units[0].contract.criteria[0].check)')" "U1 AC1 check.kind must be test, ui or data"
 expect_error "too few personas"         "$(mutate few '.units[0].contract.personas |= .[0:2]')" "U1 has 2 personas; limits.qa_personas allows 3 to 5"
 expect_error "too many personas"        "$(mutate many '.units[0].contract.personas += [range(3) | {name: "p\(.)", goals: "g", behaviour: "b"}]')" "U1 has 6 personas; limits.qa_personas allows 3 to 5"
+expect_error "no branch"                "$(mutate no-branch 'del(.units[0].contract.branch)')" "U1 contract.branch must be a branch name"
+expect_error "branch with spaces"       "$(mutate bad-branch '.units[0].contract.branch = "my branch"')" "U1 contract.branch must be a branch name"
+expect_error "same branch twice"        "$(mutate dup-branch '.units[1].contract.branch = .units[0].contract.branch')" "contract.branch must differ between units"
+expect_error "no PR title"              "$(mutate no-title '.units[1].contract.pr_title = " "')" "U2 contract.pr_title must be a non-empty title"
 expect_error "persona field empty"      "$(mutate persona-empty '.units[1].contract.personas[2].behaviour = ""')" "U2 persona 3 needs non-empty name, goals and behaviour"
 expect_error "persona names repeat"     "$(mutate persona-dup '.units[1].contract.personas[1].name = "careless user"')" "U2 persona names must be unique"
 

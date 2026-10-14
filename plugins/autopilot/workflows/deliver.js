@@ -139,7 +139,7 @@ async function runUnit(unit, baseBranch, progress, parentPr) {
   const personas = unit.contract.personas
   if (personas.length < LIMITS.qa_personas.min) throw new Stop('failed', `contract has ${personas.length} personas; qa_personas.min is ${LIMITS.qa_personas.min}`)
 
-  const wt = await ops('worktree', `bash ${SCRIPTS}/worktree.sh create ${A.repo} ${A.run_id} ${unit.id} ${baseBranch}`, A.repo)
+  const wt = await ops('worktree', `bash ${SCRIPTS}/worktree.sh create ${A.repo} ${A.run_id} ${unit.id} ${baseBranch} ${unit.contract.branch}`, A.repo)
   if (wt.exit_code !== 0) throw new Stop('failed', `worktree: ${wt.output}`)
   const { path: worktree, branch } = lastLineJson('worktree', wt.output)
   progress.worktree = worktree
@@ -254,7 +254,7 @@ async function runUnit(unit, baseBranch, progress, parentPr) {
     note('final gate', 'approve', final.rationale)
 
     const result = unitResult(unit, progress.rounds, criteria, decision.rationale, finalRationale, reviewLog, { qa: Object.values(qaLog), preexisting: qaPreexisting, receipts: reviewReceipts }, decisions)
-    const ship = await call(`Worktree: ${worktree}\nBranch: ${branch}\nBase: ${baseBranch}\nTitle: ${A.plan.title}: ${unit.title}\nScratch: ${state}\nScripts directory: ${SCRIPTS}\ndry_run: ${A.dry_run}\nparent_pr: ${parentPr || 'none'}\nUnit result counts: ${resultCounts(result)}\nUnit result JSON:\n${JSON.stringify(result)}`,
+    const ship = await call(`Worktree: ${worktree}\nBranch: ${branch}\nBase: ${baseBranch}\nTitle: ${unit.contract.pr_title}\nScratch: ${state}\nScripts directory: ${SCRIPTS}\ndry_run: ${A.dry_run}\nparent_pr: ${parentPr || 'none'}\nUnit result counts: ${resultCounts(result)}\nUnit result JSON:\n${JSON.stringify(result)}`,
       { agentType: 'autopilot:shipper', model: WORKERS, schema: SHIP, label: `${tag} ship`, phase: 'Ship' })
     if (!ship) throw new Stop('failed', 'shipper returned nothing')
     // Even a dry run must leave unit-result.json and the rendered PR body behind.

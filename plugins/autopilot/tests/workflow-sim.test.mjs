@@ -28,7 +28,7 @@ const GATE_TOPICS = ['naming', 'clarity', 'structure', 'simplicity', 'datetime',
 function defaultAnswer(prompt, { agentType, label }) {
   const unit = unitOf(label)
   if (agentType === 'autopilot:ops') {
-    if (label.endsWith('worktree')) return { exit_code: 0, output: JSON.stringify({ path: `/wt/${unit}`, branch: `autopilot/r1/${unit}` }) }
+    if (label.endsWith('worktree')) return { exit_code: 0, output: JSON.stringify({ path: `/wt/${unit}`, branch: `ENG-1-unit-${unit}` }) }
     if (label.endsWith('boot app')) return { exit_code: 0, output: JSON.stringify({ url: 'http://localhost:4100/', port: 4100, log: '/l' }) }
     return { exit_code: 0, output: 'checks: 1/1 passed' }
   }
@@ -59,7 +59,7 @@ const persona = name => ({ name, goals: 'g', behaviour: 'b' })
 function unit(id, index, dependsOn = [], contract = {}) {
   return {
     id, index, title: `Unit ${id}`, scope: 'scope', depends_on: dependsOn,
-    contract: { criteria: [criterion('AC1')], personas: [persona('newbie')], ...contract },
+    contract: { criteria: [criterion('AC1')], personas: [persona('newbie')], branch: `ENG-1-unit-${id}`, pr_title: `ENG-1 Unit ${id}`, ...contract },
   }
 }
 
@@ -192,10 +192,10 @@ const tests = {
     assert.equal(byId.U1.status, 'done')
     assert.equal(byId.U2.status, 'done')
     const worktree = calls.find(c => c.label === 'U2 worktree')
-    assert.match(worktree.prompt, /worktree\.sh create \/repo r1 U2 autopilot\/r1\/U1$/m)
+    assert.match(worktree.prompt, /worktree\.sh create \/repo r1 U2 ENG-1-unit-U1 ENG-1-unit-U2$/m)
     const ship = calls.find(c => c.label === 'U2 ship')
     assert.match(ship.prompt, /^parent_pr: https:\/\/github\.com\/o\/r\/pull\/U1$/m)
-    assert.match(ship.prompt, /^Base: autopilot\/r1\/U1$/m)
+    assert.match(ship.prompt, /^Base: ENG-1-unit-U1$/m)
     assert.match(calls.find(c => c.label === 'U1 ship').prompt, /^parent_pr: none$/m)
   },
 
@@ -760,7 +760,7 @@ const tests = {
   'a unit with several dependencies stacks on the one covering the others': async () => {
     const { byId, calls } = await simulate({ units: [unit('U1', 0), unit('U2', 1, ['U1']), unit('U3', 2, ['U1', 'U2'])] })
     assert.equal(byId.U3.status, 'done')
-    assert.match(labelled(calls, 'U3 worktree')[0].prompt, / U3 autopilot\/r1\/U2$/m)
+    assert.match(labelled(calls, 'U3 worktree')[0].prompt, / U3 ENG-1-unit-U2 ENG-1-unit-U3$/m)
     assert.match(labelled(calls, 'U3 ship')[0].prompt, /^parent_pr: https:\/\/github\.com\/o\/r\/pull\/U2$/m)
   },
 
@@ -776,7 +776,7 @@ const tests = {
     const { byId, calls } = await simulate({ units: [unit('U1', 0), unit('U2', 1, ['U1']), unit('U3', 2, ['U1'])] })
     for (const id of ['U2', 'U3']) {
       assert.equal(byId[id].status, 'done')
-      assert.match(labelled(calls, `${id} worktree`)[0].prompt, / autopilot\/r1\/U1$/m)
+      assert.match(labelled(calls, `${id} worktree`)[0].prompt, new RegExp(` ENG-1-unit-U1 ENG-1-unit-${id}$`, 'm'))
       assert.match(labelled(calls, `${id} ship`)[0].prompt, /^parent_pr: https:\/\/github\.com\/o\/r\/pull\/U1$/m)
     }
   },

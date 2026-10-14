@@ -3,8 +3,9 @@
 # Git worktrees: https://git-scm.com/docs/git-worktree
 #
 # Usage:
-#   worktree.sh create <repo> <run-id> <unit-id> <base-ref>
-#     → {"path": "...", "branch": "autopilot/<run-id>/<unit-id>"}
+#   worktree.sh create <repo> <run-id> <unit-id> <base-ref> <branch>
+#     → {"path": "...", "branch": "<branch>"}
+#     The branch name follows the repo's convention; /autopilot:run picks it.
 #     Idempotent: a registered worktree at the path is reused. An existing
 #     branch is checked out (not recreated) so a removed unit keeps its
 #     commits. Copies <repo>/.claude/autopilot.json into it when missing.
@@ -24,10 +25,9 @@ is_worktree() {
 }
 
 create() {
-  local repo=$1 run_id=$2 unit_id=$3 base_ref=$4 path branch
+  local repo=$1 run_id=$2 unit_id=$3 base_ref=$4 branch=${5:?usage: worktree.sh create <repo> <run-id> <unit-id> <base-ref> <branch>} path
   repo=$(cd "$repo" && pwd -P)
   path="$repo/.claude/worktrees/autopilot-$run_id-$unit_id"
-  branch="autopilot/$run_id/$unit_id"
   if ! is_worktree "$repo" "$path"; then
     if [ -e "$path" ]; then
       echo "worktree: $path exists but is not a worktree of $repo" >&2
