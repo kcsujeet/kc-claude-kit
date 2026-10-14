@@ -455,9 +455,9 @@ async function codeReviewGates({ unit, tag, worktree, baseBranch, state, call, n
 // lead naming a gate or the SCOPE block is receipt-only; a lead citing a file
 // in the diff is code. A finding with neither, and every FAIL box when there
 // are no findings, is receipt-only and names the gates its text mentions.
-// Verification boxes that audit only the review's write-up (citations, receipts,
-// docs, SCOPE, re-check counts). §V5 and §V6 can mean a defect is still open.
-const RECEIPT_BOX = /^§V[123478]\b/
+// Every verification box audits the review's write-up (citations, receipts, docs,
+// SCOPE, re-check evidence); a code defect is re-raised by the gate that owns it.
+const ABOUT_REVIEW = /§V\d|\b(orchestrator|scope|verification)\b/i
 
 function auditItems(verification, files, worktree) {
   if (!(verification.status === 'FAIL' || verification.findings.length)) return { code: [], receipts: [] }
@@ -465,7 +465,7 @@ function auditItems(verification, files, worktree) {
   const code = []
   const receipts = []
   // An item naming no gate has nothing to re-run, so triage judges it as code,
-  // unless it leads with SCOPE, verification or a receipt box: those are about the review's
+  // unless its lead names SCOPE, verification, the orchestrator or a §V box: those are about the review's
   // own write-up, which no engineer change can fix, so they stay receipts.
   const sort = (text, location, severity, receiptLike, aboutReview = false) => {
     const gates = mentioned(text)
@@ -475,7 +475,7 @@ function auditItems(verification, files, worktree) {
   for (const f of verification.findings) {
     const sev = Object.keys(SEVERITY).find(e => f.startsWith(e))
     const lead = ((sev ? f.slice(sev.length) : f).trim().match(/^(.+?):\s/) || [null, ''])[1]
-    const aboutReview = /^(scope|verification)\b/i.test(lead) || RECEIPT_BOX.test(lead)
+    const aboutReview = ABOUT_REVIEW.test(lead)
     const leadsWithGate = aboutReview || GATE_TOPICS.some(g => new RegExp(`^${g}([^\\w-]|$)`, 'i').test(lead))
     const location = diffLocation(lead, files, worktree)
     sort(`verification: ${f}`, location || diffLocation(f, files, worktree), sev ? SEVERITY[sev] : 'major', leadsWithGate || !location, aboutReview)

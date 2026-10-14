@@ -388,7 +388,8 @@ const tests = {
     const aboutReview = gateBlock('verification', 'FAIL', ['[FAIL] §V7: SCOPE §G1 has no evidence', '[FAIL] §V8: no fixes-re-checked line'],
       ['🟠 SCOPE §G1/§G3: the stack position has no scope-facts.sh output for src/counter.js:4. Quote it',
         '🟠 verification §V8: no `<n> fixes re-checked` line for the fix at src/counter.js:12. State it',
-        '🟠 §V1: the finding at src/counter.js:12 lacks the short head SHA. Re-cite it'])
+        '🟠 §V1: the finding at src/counter.js:12 lacks the short head SHA. Re-cite it',
+        '🟠 orchestrator re-review (§V5): the round 1 fix at src/counter.js:12 is not listed at head. List it'])
     const { byId, calls } = await simulate({ answer: firstCalls(opts => opts.agentType === 'code-review:verification-gate', aboutReview, 2) })
     assert.equal(byId.U1.status, 'done')
     assert.equal(byId.U1.rounds, 0, 'review write-up items never cost an engineer round')
@@ -397,6 +398,7 @@ const tests = {
       'verification: 🟠 SCOPE §G1/§G3: the stack position has no scope-facts.sh output for src/counter.js:4. Quote it',
       'verification: 🟠 verification §V8: no `<n> fixes re-checked` line for the fix at src/counter.js:12. State it',
       'verification: 🟠 §V1: the finding at src/counter.js:12 lacks the short head SHA. Re-cite it',
+      'verification: 🟠 orchestrator re-review (§V5): the round 1 fix at src/counter.js:12 is not listed at head. List it',
     ])
   },
 
