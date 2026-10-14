@@ -202,6 +202,8 @@ You can also say "run this plan". The working tree must be clean, on the base br
 
 The run's evidence (criteria checks, review decisions, QA results) stays in `.autopilot/runs/<id>/` for the staff engineer to verify. PR descriptions carry only what a reviewer needs, in the repo's own template.
 
+**Parallel units.** Units that do not depend on each other run side by side, up to `limits.max_parallel_units`, each with its own app, data and test database through `launch.unit_env` (per-unit `KEY=value` pairs with `{port}` and `{index}`, set up by `/autopilot:init`). Before it starts, `/autopilot:run` checks that every `Depends on` in the plan is real, because a chain of dependencies runs one unit at a time.
+
 **Models.** Workers run on `sonnet` and the staff roles on `best`, both set in `.claude/autopilot.json` `models` ([model config](https://code.claude.com/docs/en/model-config)). The `run` skill already sets `model: best` for its turn, so the staff engineer runs on the top model whatever your session's `/model` is.
 
 **Size.** A run is bounded by the workflow runtime's cap of 1,000 agents per run ([workflows, Behavior and limits](https://code.claude.com/docs/en/workflows#behavior-and-limits)), and each unit takes up to `limits.max_agents_per_unit` of them, so split very large plans (5 or more units) into several runs.

@@ -46,6 +46,8 @@ expect_value "keeps: per-unit cap"      valid-full.json '.limits.max_agents_per_
 expect_error "rejects start without {port}" bad-start.json  'launch.start must contain {port}'
 expect_error "rejects ready without {port}" bad-start.json  'launch.ready must contain {port}'
 expect_error "rejects a remote ready URL"   remote-ready.json 'launch.ready must be a local URL'
+expect_value "defaults: unit_env empty"  valid-min.json  '.launch.unit_env'       '""'
+expect_error "rejects unit_env with spaces" unit-env-spaces.json 'launch.unit_env must be space-separated KEY=value pairs'
 expect_error "rejects empty checks"         bad-checks.json 'checks must be a non-empty array'
 expect_error "rejects non-JSON"             not-json.json   'not valid JSON'
 expect_error "rejects missing file"         missing.json    'not found'

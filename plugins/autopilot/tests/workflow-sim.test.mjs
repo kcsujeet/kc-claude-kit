@@ -75,7 +75,7 @@ const isType = type => opts => opts.agentType === `autopilot:${type}`
 const hasLabel = text => opts => opts.label.includes(text)
 const isTypeGate = gate => opts => opts.agentType === `code-review:${gate}-gate`
 
-async function simulate({ units = [unit('U1', 0)], limits = {}, answer = () => undefined, dryRun = false, base = {} } = {}) {
+async function simulate({ units = [unit('U1', 0)], limits = {}, answer = () => undefined, dryRun = false, base = {}, config = {} } = {}) {
   const calls = []
   const args = {
     run_id: 'r1', repo: '/repo', code_review_root: '/cr', run_dir: '/repo/.autopilot/runs/r1', plugin_root: '/plugin', dry_run: dryRun, base_branch: 'main', ...base,
@@ -84,6 +84,7 @@ async function simulate({ units = [unit('U1', 0)], limits = {}, answer = () => u
       launch: { login: null }, review: { extra_agents: [] },
       limits: { max_fix_rounds: 2, max_parallel_units: 2, max_agents_per_unit: 120, qa_personas: { min: 1, max: 5 }, ...limits },
       models: { workers: 'sonnet', staff: 'best' },
+      ...config,
     },
     units,
   }
@@ -743,6 +744,18 @@ const tests = {
     assert.equal(calls.filter(c => c.agentType === 'code-review:react-gate').length, 0)
     const verification = calls.find(c => c.agentType === 'code-review:verification-gate')
     assert.ok(verification.prompt.includes('GATE: react\nSTATUS: PASS (N/A)'))
+  },
+
+  'launch.unit_env prefixes the checks and reaches every agent with its port and index': async () => {
+    const { byId, calls } = await simulate({
+      units: [unit('U1', 0), unit('U2', 1)],
+      answer: (p, o) => (o.agentType === 'autopilot:verifier' ? passing(['AC1']) : undefined),
+      config: { launch: { login: null, unit_env: 'DATABASE_URL=db_{port} TEST_ENV_NUMBER={index}', ports: { base: 4100, per_unit: 10 } } },
+    })
+    assert.equal(byId.U2.status, 'done')
+    assert.match(labelled(calls, 'U2 checks')[0].prompt, /^env DATABASE_URL=db_4110 TEST_ENV_NUMBER=1 bash \/plugin\/scripts\/run-checks\.sh /m)
+    assert.match(labelled(calls, 'U2 engineer build')[0].prompt, /^Unit environment: .*`env DATABASE_URL=db_4110 TEST_ENV_NUMBER=1`/m)
+    assert.match(calls.find(c => c.label.startsWith('U1 ') && c.agentType === 'autopilot:verifier').prompt, /env DATABASE_URL=db_4100 TEST_ENV_NUMBER=0/)
   },
 
   // ---- app cleanup ----

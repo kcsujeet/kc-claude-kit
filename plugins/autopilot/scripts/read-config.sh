@@ -42,6 +42,7 @@ readonly NORMALIZE='
         start: $l.start,
         ready: $l.ready,
         seed: ($l.seed // ""),
+        unit_env: ($l.unit_env // ""),
         ready_timeout_s: ($l.ready_timeout_s // 120),
         ports: { base: ($p.base // 4100), per_unit: ($p.per_unit // 10) },
         login: ($l.login // null)
@@ -88,6 +89,7 @@ readonly PROBLEMS='
     (if (.review.extra_agents | strs) then empty else "review.extra_agents must be an array of agent types" end),
     (if (.launch.ports.base | posint) and (.launch.ports.per_unit | posint) then empty else "launch.ports.base and per_unit must be positive integers" end),
     (if (.launch.ready_timeout_s | posint) then empty else "launch.ready_timeout_s must be a positive integer" end),
+    (if (.launch.unit_env | type) == "string" and (.launch.unit_env | test("^\\s*([A-Za-z_][A-Za-z0-9_]*=\\S*(\\s+|$))*$")) then empty else "launch.unit_env must be space-separated KEY=value pairs with no spaces in a value" end),
     (if (.limits | [.max_fix_rounds, .max_parallel_units, .qa_personas.min, .qa_personas.max, .max_agents_per_unit] | all(.[]; posint)) then empty else "limits must be positive integers" end),
     (if .limits.qa_personas.min <= .limits.qa_personas.max then empty else "limits.qa_personas.min must be <= max" end)
   ] | .[]'

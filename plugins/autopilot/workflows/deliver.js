@@ -161,15 +161,21 @@ async function runUnit(unit, baseBranch, progress, parentPr) {
   progress.worktree = worktree
   progress.branch = branch
   const state = `${A.run_dir}/${unit.id}`
+  // This unit's own databases and services (launch.unit_env); every app or test command uses them.
+  const unitEnv = (CFG.launch.unit_env || '').trim()
+    .replaceAll('{port}', () => String(CFG.launch.ports.base + CFG.launch.ports.per_unit * unit.index))
+    .replaceAll('{index}', String(unit.index))
+  const envPrefix = unitEnv ? `env ${unitEnv} ` : ''
   const context = [
     `Worktree: ${worktree}`, `Branch: ${branch} (base ${baseBranch})`,
     `Plan: ${A.plan.title}. Goal: ${A.plan.goal}`, `Out of scope: ${A.plan.out_of_scope}`,
     `Cross-unit architecture (decided by the staff engineer): ${A.architecture}`,
     `Unit ${unit.id}: ${unit.title}. Scope: ${unit.scope}`,
     `Contract: ${JSON.stringify(unit.contract.criteria)}`,
-    `Checks command: bash ${SCRIPTS}/run-checks.sh ${CONFIG_PATH} ${worktree}`,
+    `Checks command: ${envPrefix}bash ${SCRIPTS}/run-checks.sh ${CONFIG_PATH} ${worktree}`,
+    unitEnv && `Unit environment: start every command that runs the app, its tests or its database tools with \`env ${unitEnv}\`, so this unit uses its own databases and never another unit's.`,
     `Scripts directory: ${SCRIPTS}`,
-  ].join('\n')
+  ].filter(Boolean).join('\n')
   const ctx = { unit, tag, worktree, baseBranch, state, context, call, ops, note, retryOnce }
   const engineer = async (mode, extra) => {
     const out = await call(`Mode: ${mode}\n${context}\n${extra || ''}`, { agentType: 'autopilot:engineer', model: WORKERS, schema: ENGINEER, label: `${tag} engineer ${mode}`, phase: mode === 'propose' ? 'Design' : 'Build' })
@@ -235,7 +241,7 @@ async function runUnit(unit, baseBranch, progress, parentPr) {
     if (pending) await engineer('fix', `Fix these (${pending.kind}):\n- ${pending.items.join('\n- ')}`)
     pending = null
 
-    const checks = await ops('checks', `bash ${SCRIPTS}/run-checks.sh ${CONFIG_PATH} ${worktree}`, worktree)
+    const checks = await ops('checks', `${envPrefix}bash ${SCRIPTS}/run-checks.sh ${CONFIG_PATH} ${worktree}`, worktree)
     if (checks.exit_code !== 0) { nextRound('checks', [checks.output]); continue }
 
     const review = await reviewStage({ ...ctx, history, reviewRound: progress.rounds + 1, focus })
