@@ -1,6 +1,6 @@
 ---
 name: structure
-description: "Code placement and module-shape conventions for TypeScript, JavaScript and other source files: one responsibility per unit, co-location and promotion, flattened single-file folders, no barrels, no dead wrappers, lookup objects over switch and nested if, named exports, JSDoc on exports, string enums for serialized discriminators, breaking changes, misplaced modules, public exports, what a module exports, one component per file, and routes-only `app/` folders. Use when writing or reviewing code that adds, moves or exports a file, function, hook or type, or that branches on a discriminator."
+description: "Code placement and module-shape conventions for TypeScript, JavaScript and other source files: one responsibility per unit, co-location and promotion, flattened single-file folders, no barrels, no dead wrappers, lookup objects over switch and nested if, named exports, JSDoc on exports, string enums for serialized discriminators, breaking changes, misplaced modules, public exports, what a module exports, one component per file, routes-only `app/` folders, and code shaped for reuse (mixins, concerns, higher-order functions, shared hooks) that only one unit uses. Use when writing or reviewing code that adds, moves or exports a file, function, hook or type, or that branches on a discriminator."
 user-invocable: false
 paths:
   - "**/*.{ts,tsx,js,jsx,mjs,cjs,rb,py,swift,go,java,kt,php,cs,rs}"
@@ -25,6 +25,7 @@ paths:
   - §S14. New code acts on its home's subject
   - §S15. One exported component per file
   - §S16. `app/` holds routes only
+  - §S17. Shared only when it is shared
 - Sweeps
 
 ## Rules
@@ -37,6 +38,7 @@ Where code lives is part of its contract. A path promises something about what i
 - No barrel re-export files. Import the module path directly, which also keeps tree shaking working. A barrel for a single component is fine.
 - Named exports on new files, declared inline (`export const foo = ...`), not collected in a trailing export block.
 - Delete dead wrappers in every shape: async-await passthrough, destructure-and-reconstruct, single-use alias, identity transform, a Promise wrapped around a Promise, a hook returning another hook's values unchanged, a wrapper whose only addition is an `onSuccess` every caller could pass itself.
+- Code built or placed for reuse (a mixin, concern, trait or protocol extension; a higher-order function, or a hook or helper module in a shared folder) earns that shape only when two or more units use it today. With one user it goes back next to that user, or, when that user would then break a simplicity or structure rule, into the repo's existing kind of unit for that logic.
 - A module exports the thing it is named for plus its own surface (its props, argument and return types). An unrelated export, such as a domain enum in a hook file, moves to where its consumers are; a type only this module uses stays.
 - New code acts on its home's subject. A method added to the order module creates, reads or changes orders; one that only prices a cart belongs with the cart.
 - One exported component per file. Its hooks and helpers move to their own files, and a subcomponent with one consumer stays private in that consumer's file.
@@ -81,6 +83,7 @@ The structure gate agent ticks every box below against the diff. A box is FAIL i
 - [ ] §S13 A module exports what it is named for: for every changed module (hooks, components, utils, constants, types, api modules), every export gets a verdict of `own-surface` (the named thing plus its props, argument and return types, or a one-off local constant) or `misplaced` (a domain enum or wire value in a hook file, a pure helper in a types file, a domain type in a utils file). Only `misplaced` is a finding, and it names the destination by §S2. A locally used type or constant flagged only for living in the file is itself a FAIL, so each verdict states the scope test's answer. **Enumerate**: list every export per changed module. (N/A: no export added or changed)
 - [ ] §S14 New code belongs where it is put: for every new member (a method on a module, a hook, a type, a constant, a file), the name of its home and the members already there were read, and the new code acts on that same subject. Code that only borrows the home's inputs or helpers without acting on its subject FAILS, and the finding names where it belongs. Matching a backend route that is itself misplaced is not a pass; flag both. (N/A: no new member added)
 - [ ] §S15 One exported component per file: no new or changed component file exports more than one component (**enumerate**: count the exported components in every changed component file, one verdict per file with its count). Its other exports (hooks, helpers, shared style constants) move out to their own files, placed by §S2 and §S11, a subcomponent with one consumer stays private in that consumer's file, and no new file only wraps one value or element. (N/A: no changed file exports a component)
+- [ ] §S17 Shared only when it is shared: code built or placed for reuse (a mixin, concern, trait or protocol extension in class-based code; a higher-order function, or a hook or helper module in a shared folder, in functional code) that only one unit uses today is flagged. **Enumerate**: for each such piece the diff adds, name its users (grep). With one user it moves back next to that user (same file or a file beside it), or, when that user would then break a simplicity or structure rule, into the kind of unit the repo already uses for that logic, near its user and called from it; with no such kind in the repo, the finding says to ask first. Inherently-shared-layer code under §S2's role override is exempt. (N/A: the diff adds no mixin, concern, trait, protocol extension, higher-order function, or shared-folder hook or helper)
 - [ ] §S16 `app/` holds routes only: every new file under the routing layer (`app/`, or the repo's equivalent) is a route file the framework reads by name, a test for one, a route-level action, or the app's own entry, provider or router; a component, hook, util or constant there FAILS, even beside existing ones, since precedent is not an exemption. **Enumerate**: list every new file under it with a verdict. (N/A: no new file under the routing layer)
 
 ## Review detail
@@ -125,7 +128,7 @@ New code should follow the target repo's existing layout — grep for where simi
   - Tightly coupled to one consumer subtree, used only by those consumers, with no realistic external consumer → co-locate at the subtree's shared root, even across sibling subfolders. This is the primary signal on its own. A dependency that only exists inside that subtree (e.g. the helper reads a context/provider mounted only within those consumers) *reinforces* the call but isn't required — sole-use plus tight coupling is enough.
   - Genuinely cross-boundary, or plausibly reusable standalone → promote. If the helper is consumed by the shared data/resource layer, or by consumers in another feature/domain, move it to that feature's shared subfolder or the app-global shared location.
 - **For a view-bound helper, promotion is YAGNI-gated — pull it out when a real external consumer appears, not before.** Don't relocate a presentation/formatting helper to a shared location on the *speculation* that something might reuse it. Ask "is anything outside this subtree consuming it *today*?" — if no, it stays co-located regardless of consumer count.
-- **Role overrides YAGNI for inherently-shared-layer code.** A unit whose *role* is the shared data/resource layer belongs in the shared location from day one, even with a single current consumer. Its home is dictated by architecture, not by counting consumers — it is by definition the reusable seam other code composes against, so co-locating it next to today's one caller and waiting is wrong. YAGNI gates *view-local* helpers; it does not demote data-layer code out of its layer.
+- **Role overrides YAGNI for inherently-shared-layer code.** A unit whose *role* is the shared data/resource layer belongs in the shared location from day one, even with a single current consumer. This is also the one exception to §S17. Its home is dictated by architecture, not by counting consumers — it is by definition the reusable seam other code composes against, so co-locating it next to today's one caller and waiting is wrong. YAGNI gates *view-local* helpers; it does not demote data-layer code out of its layer.
 
 **Worked example (promotion within a feature).** A hook `useRequestPriceSummary`, defined inside one subview's folder, is consumed by two sibling components in that same subview — no promotion needed, it stays. Once a third consumer appears in an unrelated subview of the same feature, promote it to the feature's own shared hooks location — not all the way to the app-global shared location. This is promotion to the nearest sensible shared root, not a jump to the top.
 
@@ -446,3 +449,32 @@ Save the diff under review to a file (`gh pr diff <num> > /tmp/review.diff`, or 
   ```bash
   bash "${CLAUDE_PLUGIN_ROOT}/skills/structure/scripts/misplaced-modules.sh" <diff-file>
   ```
+
+### §S17. Shared only when it is shared
+
+Code built or placed for reuse is only worth that shape when two or more units use it today. In class-based code that is a mixin, concern, trait or protocol extension. In functional code it is a higher-order function, or a hook or helper module in a shared folder. With one user it is not shared code: it hides that unit's behaviour somewhere a reader will not look, and splits one unit across two places.
+
+Keep it with its one user, in the same file or a file beside it, as long as that user still passes the simplicity and structure rules. When it would not (§S1: more than one responsibility; or simply too long to read), move the logic into the kind of unit this repo already uses for that sort of code, near its user, and call it from there: a service object, a plain function in its own file, a hook. Find that kind by reading how the codebase handles similar logic. If the repo has none, ask before inventing one.
+
+```ruby
+# FAIL: a concern only BookingEngine includes; its callbacks live in another file
+module SetsUpFirstEngine
+  extend ActiveSupport::Concern
+  included { after_create :link_members, if: :first_in_org? }
+end
+
+# PASS: the model keeps the callback and calls the repo's existing kind of unit
+class BookingEngine < ApplicationRecord
+  after_create -> { BookingEngines::Setup.link_members(self) }, if: :first_in_org?
+end
+```
+
+```ts
+// FAIL: a higher-order component in shared/ that wraps exactly one page
+export const withInvoiceTotals = (Page) => (props) => <Page {...props} totals={useTotals(props.id)} />
+
+// PASS: the one page calls the hook itself
+const InvoicePage = ({ id }) => { const totals = useTotals(id); ... }
+```
+
+The exception is code whose role is the shared data or resource layer (§S2's role override): it belongs in its shared layer even with one user today.
