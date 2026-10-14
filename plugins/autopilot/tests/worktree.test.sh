@@ -52,10 +52,11 @@ if [ -d "$path" ]; then
     fail "refuses dirty remove" "status $status, stderr: $(cat "$tmp/err"), exists: $([ -d "$path" ] && echo yes || echo no)"
   fi
   rm "$path/new-file.txt"
+  ln -s "$tmp" "$path/node_modules"
   status=0
   bash "$script" remove "$repo" "$path" 2>"$tmp/err" || status=$?
   [ "$status" = 0 ] || fail "clean remove exits 0" "status $status: $(cat "$tmp/err")"
-  check "clean remove" "still there" [ ! -d "$path" ]
+  check "clean remove, untracked symlink ignored" "still there" [ ! -d "$path" ]
 else
   fail "worktree exists for remove checks" "no worktree at '$path'"
 fi

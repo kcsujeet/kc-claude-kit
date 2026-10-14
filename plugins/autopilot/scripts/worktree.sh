@@ -10,7 +10,7 @@
 #     commits. Copies <repo>/.claude/autopilot.json into it when missing.
 #   worktree.sh remove <repo> <path>   (keeps the branch)
 #     Refuses when the worktree has uncommitted changes, ignoring the
-#     copied autopilot.json.
+#     copied autopilot.json and untracked symlinks.
 # Exit: 0 ok; 1 refused (uncommitted changes, or a plain directory sits at
 # the path); other non-zero = git error (git's own status); 2 jq missing.
 set -euo pipefail
@@ -49,7 +49,13 @@ create() {
 
 remove() {
   local repo=$1 path=$2
-  if [ -n "$(git -C "$path" status --porcelain -- . ':!.claude/autopilot.json')" ]; then
+  # Untracked symlinks (a linked node_modules, say) hold no work, so they do not count.
+  local changes
+  changes=$(git -C "$path" status --porcelain -- . ':!.claude/autopilot.json' | while IFS= read -r line; do
+    case $line in '?? '*) [ -L "$path/${line#?? }" ] && continue ;; esac
+    printf '%s\n' "$line"
+  done)
+  if [ -n "$changes" ]; then
     echo "worktree: $path has uncommitted changes" >&2
     exit 1
   fi
