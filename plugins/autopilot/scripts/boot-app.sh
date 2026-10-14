@@ -30,9 +30,9 @@ seed=$(cfg .launch.seed)
 start=$(sub "$(cfg .launch.start)")
 ready=$(sub "$(cfg .launch.ready)")
 timeout_s=$(cfg .launch.ready_timeout_s)
-# read-config.sh allows only KEY=value pairs without spaces, so splitting is safe.
-# shellcheck disable=SC2206
-unit_env=($(sub "$(cfg '.launch.unit_env // ""')") PORT=$port)
+# read-config.sh allows only KEY=value pairs without spaces, so splitting on spaces is safe.
+read -r -a unit_env <<<"$(sub "$(cfg '.launch.unit_env // ""')")"
+unit_env+=("PORT=$port")
 
 # A server already answering would make a failed start look ready.
 if curl -fsS --max-time 2 -o /dev/null "$ready" 2>/dev/null; then
