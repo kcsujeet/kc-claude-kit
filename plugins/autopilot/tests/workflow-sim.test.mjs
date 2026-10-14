@@ -701,8 +701,8 @@ const tests = {
 
   // ---- app cleanup ----
   'a spent budget still stops the app': async () => {
-    // 29 calls reach boot: worktree, propose, design, build, checks, review prep, 10 gates, verification, 11 lenses, boot.
-    const { byId, calls } = await simulate({ limits: { max_agents_per_unit: 29 } })
+    // 30 calls reach boot: worktree, propose, design, build, checks, review prep, 10 gates, verification, 13 lenses, boot.
+    const { byId, calls } = await simulate({ limits: { max_agents_per_unit: 30 } })
     assert.equal(byId.U1.status, 'blocked:budget')
     assert.equal(labelled(calls, 'U1 stop app').length, 1)
   },
