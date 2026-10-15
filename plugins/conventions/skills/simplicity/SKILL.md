@@ -24,6 +24,7 @@ paths:
   - §P11. A helper earns its place by the knowledge it carries
   - §P12. Defaults carry the everyday case
   - §P13. A new pattern needs precedent, or the developer's OK
+  - §P14. A caller the convention misses passes the value, not a smarter guess
 
 ## Rules
 
@@ -39,6 +40,7 @@ The simplest code that does the job is the easiest to read, change and delete. E
 - A prop added to a shared component for one caller's case makes every other caller carry it. Let that caller own or compose the behavior instead.
 - Defaults carry the everyday case, and a caller overrides only what differs. No variant per scenario (`WidgetWithIcon`, `useWidgetsForToday`, `formatPriceShort`, `mockOrderWithOwner`): give the base unit a default and let the one caller pass a prop, argument or override.
 - A new pattern or technique follows 2 places in the repo that already do it. When nothing does, ask the developer before introducing it.
+- When a shared unit works a value out by convention (a field name from another name, a path from an id) and one caller doesn't fit, that caller passes the value through an optional override. The guessing logic doesn't grow special cases.
 
 ## Review checklist
 
@@ -57,6 +59,7 @@ The simplicity gate agent ticks every box against the diff. A box is FAIL if any
 - [ ] §P11 A helper earns its place: every new or proposed helper (util, hook, small component) carries knowledge its callers should not hold (an API call, a data format or conversion, a domain rule, several steps) or is used in many places. A helper around one plain expression FAILS even with two callers, and so does a finding that proposes one. (N/A: no helper added or proposed)
 - [ ] §P12 Defaults carry the everyday case: no new variant per scenario of a component, hook, util, fixture or test helper when the base unit could hold the common data or behavior with a default and the one differing caller could pass a prop, argument or override. A caller that depends on something being absent says so in its own override. (N/A: no new variant or scenario helper)
 - [ ] §P13 A new pattern has precedent: every new abstraction or technique in the diff (a hook wrapping a hook, a new option on a shared hook or type, a new way of holding UI state, a new layout helper) cites 2 places in the repo that already do it, and follows them. A file with a similar name is not precedent, and neither is an option a shared type declares but no caller passes. With no precedent, the finding is a `question` to the author (in a self-review, ask the developer before writing it). (N/A: nothing new in kind in the diff)
+- [ ] §P14 A value a shared unit derives by convention (a name built from another name, a default read from a string pattern) is not made cleverer for one caller it gets wrong (pluralization rules, another regex, a special case); that caller passes the value through an optional override, and every other caller keeps the old default. (N/A: no derived value changed or worked around in the diff)
 
 ## Review detail
 
@@ -265,6 +268,14 @@ When moving data into a shared default breaks some callers, they were silently r
 
 1. **Look first.** Name the pattern, grep for how the repo already does the job, and cite 2 hits. Files with similar *names* are not precedent; the *pattern* is. An option a shared type declares but no caller passes is not precedent either.
 2. **Nothing found? Ask before building.** A pattern nobody has used yet is the developer's decision. In a self-review, stop and ask, with what you found and what you would propose. In a review, raise it as a `question`. Do not introduce it and explain it afterwards.
+
+### §P14. A caller the convention misses passes the value, not a smarter guess
+
+A shared unit that works a value out by convention is right for most callers and wrong for a few. Making the guess cleverer for one of them (a pluralization rule, a second regex, a special-cased name) changes the result for every caller, needs each one checked, and still misses the next odd name. An optional override is one line, changes nothing for anyone else, and says exactly what the caller needs.
+
+Example: `FormAutocomplete` (eventtemple-frontend `packages/ui/src/components/forms/FormAutocomplete/FormAutocomplete.tsx`) keeps picked records at `name` with `_ids` turned into `s`, so `tax_ids` lands at `taxs`. Teaching it that `x` takes `es` also moved `space_tax_ids`. The fix was a `fieldName` prop, which the line item form sets to `taxes`.
+
+This is not §P10's single-caller prop: the caller cannot own the behavior, because the shared unit is the one writing to the wrong place.
 
 ## Sweeps
 
