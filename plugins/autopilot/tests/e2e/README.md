@@ -23,7 +23,7 @@ Pass when all hold:
 - Every unit's decision log shows a design gate and a final gate by the staff reviewer.
 - Each unit ran the code-review gates and the lens reviewers (visible in `/workflows`).
 - U2's verifier evidence for AC2 is a screenshot after a reload showing 0.
-- Both `unit-result.json` and `pr-body.md` exist under `.autopilot/runs/<id>/U*/`, and no push or PR happened.
+- `pr-body.md` exists under `.autopilot/runs/<id>/U*/`, and no push or PR happened.
 
 Negative check, on a fresh fixture (repeat step 1 into a new directory): before step 3, edit `docs/plans/reset.md` so U1's scope line (the line under `- Covers: AC3`) reads exactly ``Call the existing `reset(storage)` in counter.js from a test.`` Leave the edit uncommitted (the run allows the plan file to be dirty). counter.js has no `reset`. The staff engineer reads the code before starting the workflow (`skills/run/SKILL.md` step 2), so it should stop there. Pass when either holds:
 - The run stops before the workflow (no `.autopilot/runs/` directory, plan unedited), quoting the plan's scope line and the code (counter.js exports only `load` and `add`), and tells the user what to decide: change the plan, or add `reset` to the code first. (Seen on 2026-10-12.)

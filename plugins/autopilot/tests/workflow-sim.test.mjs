@@ -21,7 +21,7 @@ const SCOPE_PASS = 'SCOPE:\n- [N/A] §G1: local diff\n- [PASS] §G2: diff matche
 function gateBlock(gate, status, boxes = [`[${status === 'FAIL' ? 'FAIL' : 'PASS'}] §X1: a.ts:3 checked`], findings = []) {
   return [`GATE: ${gate}`, `STATUS: ${status}`, 'BOXES:', ...boxes.map(b => `- ${b}`), 'FINDINGS:', ...findings.map(f => `- ${f}`)].join('\n')
 }
-const GATE_TOPICS = ['naming', 'clarity', 'structure', 'simplicity', 'datetime', 'react', 'i18n', 'testing', 'correctness', 'project-conventions']
+const GATE_TOPICS = ['naming', 'clarity', 'structure', 'simplicity', 'datetime', 'react', 'rails', 'i18n', 'testing', 'correctness', 'project-conventions']
 
 // Answers every agent with a clean, passing result; a scenario overrides by
 // returning something other than undefined.
@@ -49,7 +49,7 @@ function defaultAnswer(prompt, { agentType, label }) {
   if (agentType === 'autopilot:shipper') return { pr_url: `https://github.com/o/r/pull/${unit}`, body: `/s/${unit}/pr-body.md`, stack: 'none', ci: 'pass', failures: '', notes: '' }
   if (agentType && agentType.startsWith('code-review:')) return gateBlock(agentType.slice(12, -5), 'PASS')
   if (agentType === 'autopilot:review-prep') return { exit_code: 0, output: 'HEAD_SHA=abc', head_sha: 'abc', diff_file: '/s/review.diff', changed_files: '/s/changed-files.txt', files: ['counter.js', 'a.ts'], scope: SCOPE_PASS }
-  if (agentType === 'autopilot:skeptic') return { refuted: false, reason: 'reproduces' }
+  if (agentType === 'autopilot:skeptic') return { verdicts: [] }
   throw new Error(`no scripted answer for ${label}`)
 }
 
@@ -73,16 +73,18 @@ function firstCalls(match, value, times = 1) {
 }
 const isType = type => opts => opts.agentType === `autopilot:${type}`
 const hasLabel = text => opts => opts.label.includes(text)
+const isTypeGate = gate => opts => opts.agentType === `code-review:${gate}-gate`
 
-async function simulate({ units = [unit('U1', 0)], limits = {}, answer = () => undefined, dryRun = false, base = {} } = {}) {
+async function simulate({ units = [unit('U1', 0)], limits = {}, answer = () => undefined, dryRun = false, base = {}, config = {} } = {}) {
   const calls = []
   const args = {
     run_id: 'r1', repo: '/repo', code_review_root: '/cr', run_dir: '/repo/.autopilot/runs/r1', plugin_root: '/plugin', dry_run: dryRun, base_branch: 'main', ...base,
     plan: { title: 'Plan', goal: 'goal', out_of_scope: 'none' }, architecture: 'arch',
     config: {
-      launch: { login: null }, review: { extra_agents: [] },
+      launch: { login: null }, review: { extra_agents: [], skills: [] },
       limits: { max_fix_rounds: 2, max_parallel_units: 2, max_agents_per_unit: 120, qa_personas: { min: 1, max: 5 }, ...limits },
       models: { workers: 'sonnet', staff: 'best' },
+      ...config,
     },
     units,
   }
@@ -130,7 +132,6 @@ const tests = {
     assert.equal(labelled(calls, 'U1 engineer fix').length, 0)
     assert.deepEqual(byId.U1.result.qa_preexisting, [{ title: bug.title, steps: bug.steps, evidence: bug.evidence }])
     assert.deepEqual(byId.U1.result.qa.find(q => q.persona === 'newbie').confirmed, [])
-    assert.match(labelled(calls, 'U1 ship')[0].prompt, /^Unit result counts: .*"qa_preexisting":1,"review_receipts_incomplete":0\}$/m)
   },
 
   'a caused QA bug is fixed while a pre-existing one in the same verdict is only reported': async () => {
@@ -235,20 +236,13 @@ const tests = {
     assert.match(byId.U1.reason, /push rejected/)
   },
 
-  'the ship prompt carries the unit result counts the shipper checks its file against': async () => {
-    let triaged = false
+  'the ship prompt carries only the deferred minor items, never the run result': async () => {
     const { calls } = await simulate({
-      answer: (p, { agentType, label }) => {
-        if (label === 'U1 lens security r1') return { findings: [{ location: 'a.js:1', scenario: 'x', severity: 'minor' }] }
-        if (agentType === 'autopilot:triage' && !triaged) { triaged = true; return { fix: [], dismiss: [{ finding: 'a.js:1 x', reason: 'out of scope' }] } }
-        return undefined
-      },
+      answer: (p, { label }) => (label === 'U1 lens security r1' ? { findings: [{ location: 'a.js:1', scenario: 'tiny', severity: 'minor' }] } : undefined),
     })
     const prompt = labelled(calls, 'U1 ship')[0].prompt
-    const json = JSON.parse(prompt.split('Unit result JSON:\n')[1])
-    const counts = JSON.parse(prompt.match(/^Unit result counts: (.*)$/m)[1])
-    assert.deepEqual(counts, { criteria: 1, decisions: json.decisions.length, fixed: 0, dismissed: 1, qa_preexisting: 0, review_receipts_incomplete: 0 })
-    assert.ok(json.decisions.length > 0)
+    assert.match(prompt, /^Deferred minor items: \[.*\]$/m)
+    assert.doesNotMatch(prompt, /Unit result|"criteria"|"decisions"/)
   },
 
   'ops, shipper, persona and verifier prompts name the scripts directory': async () => {
@@ -315,7 +309,8 @@ const tests = {
     const prep = labelled(calls, 'U1 review prep')[0]
     assert.match(prep.prompt, /cd \/wt\/U1 && bash \/cr\/scripts\/gather-review\.sh --branch main --out-dir \/repo\/\.autopilot\/runs\/r1\/U1\/review\/r1$/m)
     const gateCalls = calls.filter(c => c.agentType && c.agentType.startsWith('code-review:'))
-    assert.deepEqual(gateCalls.map(c => c.agentType), [...GATE_TOPICS, 'verification'].map(g => `code-review:${g}-gate`))
+    // react and rails have no .jsx/.tsx or Ruby file in the diff, so they get their N/A block without an agent.
+    assert.deepEqual(gateCalls.map(c => c.agentType), [...GATE_TOPICS.filter(g => g !== 'react' && g !== 'rails'), 'verification'].map(g => `code-review:${g}-gate`))
     for (const c of gateCalls) {
       for (const input of ['Head SHA: abc', 'Diff file: /s/review.diff', 'Changed files: /s/changed-files.txt', 'Repo root: /wt/U1']) assert.ok(c.prompt.includes(input), `${c.label} lacks ${input}`)
     }
@@ -331,13 +326,13 @@ const tests = {
       answer: (p, { agentType }) => {
         if (agentType !== 'code-review:naming-gate' || failed) return undefined
         failed = true
-        return gateBlock('naming', 'FAIL', ['[FAIL] §N2: counter.js:4 `x` is opaque'], ['🟡 counter.js:4: `x` is opaque. Rename `nextCount`'])
+        return gateBlock('naming', 'FAIL', ['[FAIL] §N2: counter.js:4 `x` is opaque'], ['🟠 counter.js:4: `x` is opaque. Rename `nextCount`'])
       },
     })
     assert.equal(byId.U1.status, 'done')
     const triage = labelled(calls, 'U1 triage')[0].prompt
     const fails = JSON.parse(triage.match(/^Gate FAILs: (.*)$/m)[1])
-    assert.deepEqual(fails, [{ location: 'counter.js:4', scenario: 'naming: 🟡 counter.js:4: `x` is opaque. Rename `nextCount`', severity: 'minor', lens: 'naming' }])
+    assert.deepEqual(fails, [{ location: 'counter.js:4', scenario: 'naming: 🟠 counter.js:4: `x` is opaque. Rename `nextCount`', severity: 'major', lens: 'naming' }])
   },
 
   'a verification finding citing code in the diff goes to triage, which may not dismiss it as format': async () => {
@@ -537,7 +532,7 @@ const tests = {
         if (agentType === 'autopilot:verifier') return passing(['AC1', 'AC2'])
         if (agentType === 'code-review:naming-gate' && !failed) {
           failed = true
-          return gateBlock('naming', 'FAIL', ['[FAIL] §N5: counter.js:3 bare verb'], ['🟡 counter.js:3: `reset` is a bare verb. Rename `resetCount`'])
+          return gateBlock('naming', 'FAIL', ['[FAIL] §N5: counter.js:3 bare verb'], ['🟠 counter.js:3: `reset` is a bare verb. Rename `resetCount`'])
         }
         if (agentType === 'autopilot:triage') {
           assert.match(p, /^Plan specifies .*"specified by plan"/m)
@@ -554,7 +549,7 @@ const tests = {
     assert.equal(labelled(calls, 'U1 triage').length, 1)
   },
 
-  'after two review rounds a minor gate finding is deferred to the PR instead of costing a round': async () => {
+  'a review with only minor findings lists them in the PR and costs no round': async () => {
     const nit = gateBlock('clarity', 'FAIL', ['[FAIL] §C3: counter.js:3 comment restates code'], ['🟡 counter.js:3: the comment restates the code. Delete it'])
     const { byId, calls } = await simulate({
       limits: { max_fix_rounds: 4 },
@@ -565,8 +560,8 @@ const tests = {
       },
     })
     assert.equal(byId.U1.status, 'done')
-    assert.equal(byId.U1.rounds, 2, 'minor findings cost only the first two review rounds')
-    assert.equal(labelled(calls, 'U1 triage').length, 2)
+    assert.equal(byId.U1.rounds, 0, 'minor findings never start a round on their own')
+    assert.equal(labelled(calls, 'U1 triage').length, 0)
     assert.deepEqual(byId.U1.result.review.deferred_minor, ['counter.js:3 clarity: 🟡 counter.js:3: the comment restates the code. Delete it'])
   },
 
@@ -591,9 +586,10 @@ const tests = {
       answer: (p, { agentType, label }) => {
         if (label === 'U1 lens plan-fit r1') {
           lensCalls += 1
+          if (lensCalls > 2) return { findings: [] }
           return lensCalls === 1
-            ? { findings: [{ location: 'counter.js:1', scenario: "'count' literal repeated three times", severity: 'minor' }] }
-            : { findings: [{ location: 'counter.js:1', scenario: 'COUNT_KEY constant is beyond the plan scope; inline it', severity: 'minor' }] }
+            ? { findings: [{ location: 'counter.js:1', scenario: "'count' literal repeated three times", severity: 'major' }] }
+            : { findings: [{ location: 'counter.js:1', scenario: 'COUNT_KEY constant is beyond the plan scope; inline it', severity: 'major' }] }
         }
         if (agentType !== 'autopilot:triage') return undefined
         triageCalls += 1
@@ -658,8 +654,8 @@ const tests = {
   },
 
   'a lens skip is recorded in the decision log': async () => {
-    const { byId } = await simulate({ answer: firstCalls(hasLabel('lens accessibility'), { findings: [], skipped: 'no UI files' }) })
-    assert.ok(byId.U1.decisions.some(d => d.step === 'lens accessibility' && d.outcome === 'skipped' && d.reason === 'no UI files'))
+    const { byId } = await simulate({ answer: firstCalls(hasLabel('lens data'), { findings: [], skipped: 'no data changes' }) })
+    assert.ok(byId.U1.decisions.some(d => d.step === 'lens data' && d.outcome === 'skipped' && d.reason === 'no data changes'))
   },
 
   'a persona that saved no evidence does not count as a report': async () => {
@@ -691,16 +687,85 @@ const tests = {
     assert.equal(calls.length, 0)
   },
 
-  'minor lens findings skip the skeptics; serious ones get two': async () => {
+  'two skeptics judge every serious lens finding at once; minor ones skip them': async () => {
     const found = (severity, where) => ({ findings: [{ location: where, scenario: 's', consequence: 'c', severity, lens: 'data' }] })
     const minor = firstCalls(hasLabel('lens data r1'), found('minor', 'a.ts:1'))
     const major = firstCalls(hasLabel('lens security r1'), found('major', 'b.ts:2'))
     const { byId, calls } = await simulate({ answer: (p, o) => minor(p, o) ?? major(p, o) })
     assert.equal(byId.U1.status, 'done')
-    assert.equal(calls.filter(c => c.label.includes('skeptic') && c.label.endsWith('a.ts:1')).length, 0)
-    assert.equal(calls.filter(c => c.label.includes('skeptic') && c.label.endsWith('b.ts:2')).length, 2)
+    const skeptics = calls.filter(c => c.agentType === 'autopilot:skeptic')
+    assert.deepEqual(skeptics.map(c => c.label), ['U1 skeptic 1', 'U1 skeptic 2'])
+    assert.ok(skeptics.every(c => c.prompt.includes('b.ts:2') && !c.prompt.includes('a.ts:1')))
     const triage = labelled(calls, 'U1 triage')[0].prompt
     assert.ok(triage.includes('a.ts:1') && triage.includes('b.ts:2'))
+  },
+
+  'a finding refuted by both skeptics is dropped; one refutation keeps it': async () => {
+    const found = { findings: [{ location: 'b.ts:2', scenario: 's', severity: 'major' }, { location: 'c.ts:3', scenario: 't', severity: 'major' }] }
+    const lens = firstCalls(hasLabel('lens security r1'), found)
+    const { calls } = await simulate({
+      answer: (p, o) => lens(p, o) ?? (o.agentType === 'autopilot:skeptic'
+        ? { verdicts: [{ index: 0, refuted: true, reason: 'guarded' }, { index: 1, refuted: o.label.endsWith('1'), reason: 'maybe' }] }
+        : undefined),
+    })
+    const triage = labelled(calls, 'U1 triage')[0].prompt
+    assert.ok(!triage.includes('b.ts:2') && triage.includes('c.ts:3'))
+  },
+
+  'after review fixes only the fix is re-reviewed, by the checks that found something, then once in full': async () => {
+    const lens = firstCalls(hasLabel('lens data r1'), { findings: [{ location: 'a.ts:1', scenario: 's', severity: 'major' }] })
+    const naming = firstCalls(isTypeGate('naming'), gateBlock('naming', 'FAIL', ['[FAIL] §N2: a.ts:1 opaque'], ['🟠 a.ts:1: opaque name']))
+    let triaged = false
+    const { byId, calls } = await simulate({
+      limits: { max_fix_rounds: 4 },
+      answer: (p, o) => lens(p, o) ?? naming(p, o) ?? (o.agentType === 'autopilot:triage' && !triaged
+        ? (triaged = true, { fix: [{ finding: 'a.ts:1 s', reason: 'real' }, { finding: 'a.ts:1 opaque name', reason: 'real' }], dismiss: [] })
+        : undefined),
+    })
+    assert.equal(byId.U1.status, 'done')
+    assert.equal(byId.U1.rounds, 1)
+    const preps = labelled(calls, 'U1 review prep').map(c => c.prompt.match(/--branch (\S+)/)[1])
+    assert.deepEqual(preps, ['main', 'abc', 'main'], 'full, fix only, full')
+    const prepIndex = labelled(calls, 'U1 review prep').map(c => calls.indexOf(c))
+    const between = calls.slice(prepIndex[1], prepIndex[2])
+    const gates = between.filter(c => c.agentType && c.agentType.startsWith('code-review:') && !c.label.includes('verification')).map(c => c.agentType)
+    assert.deepEqual(gates.sort(), ['code-review:correctness-gate', 'code-review:naming-gate', 'code-review:testing-gate'])
+    const lenses = between.filter(c => c.agentType === 'autopilot:lens-reviewer').map(c => c.label)
+    assert.deepEqual(lenses.sort(), ['U1 lens data r1', 'U1 lens security r1'], 'each lens asked once on the fix')
+  },
+
+  'a lens or gate with no file it applies to starts no agent': async () => {
+    const { byId, calls } = await simulate({ answer: (p, o) => (o.agentType === 'autopilot:review-prep' ? { ...defaultAnswer(p, o), files: ['app/models/a.rb'] } : undefined) })
+    assert.equal(byId.U1.status, 'done')
+    for (const lens of ['accessibility', 'type-safety', 'dependencies']) {
+      assert.equal(calls.filter(c => c.label.startsWith(`U1 lens ${lens} `)).length, 0, lens)
+      assert.ok(byId.U1.decisions.some(d => d.step === `lens ${lens}` && d.outcome === 'skipped'), lens)
+    }
+    assert.equal(calls.filter(c => c.agentType === 'code-review:react-gate').length, 0)
+    assert.equal(calls.filter(c => c.agentType === 'code-review:rails-gate').length, 1, 'a Ruby diff gets the rails gate')
+    const verification = calls.find(c => c.agentType === 'code-review:verification-gate')
+    assert.ok(verification.prompt.includes('GATE: react\nSTATUS: PASS (N/A)'))
+  },
+
+  'launch.unit_env prefixes the checks and reaches every agent with its port and index': async () => {
+    const { byId, calls } = await simulate({
+      units: [unit('U1', 0), unit('U2', 1)],
+      answer: (p, o) => (o.agentType === 'autopilot:verifier' ? passing(['AC1']) : undefined),
+      config: { launch: { login: null, unit_env: 'DATABASE_URL=db_{port} TEST_ENV_NUMBER={index}', ports: { base: 4100, per_unit: 10 } } },
+    })
+    assert.equal(byId.U2.status, 'done')
+    assert.match(labelled(calls, 'U2 checks')[0].prompt, /^env DATABASE_URL=db_4110 TEST_ENV_NUMBER=1 bash \/plugin\/scripts\/run-checks\.sh /m)
+    assert.match(labelled(calls, 'U2 engineer build')[0].prompt, /^Unit environment: .*`env DATABASE_URL=db_4110 TEST_ENV_NUMBER=1`/m)
+    assert.match(calls.find(c => c.label.startsWith('U1 ') && c.agentType === 'autopilot:verifier').prompt, /env DATABASE_URL=db_4100 TEST_ENV_NUMBER=0/)
+  },
+
+  "the repo's own review skills run as lenses on every full review": async () => {
+    const { byId, calls } = await simulate({ config: { review: { extra_agents: [], skills: ['review-be-code'] } } })
+    assert.equal(byId.U1.status, 'done')
+    const skillLens = calls.filter(c => c.label.startsWith('U1 lens skill:review-be-code'))
+    assert.equal(skillLens.length, 1)
+    assert.equal(skillLens[0].agentType, 'autopilot:lens-reviewer')
+    assert.match(skillLens[0].prompt, /^Lens: skill:review-be-code$/m)
   },
 
   // ---- app cleanup ----

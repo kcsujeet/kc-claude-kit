@@ -1,0 +1,1 @@
+{"launch":{"start":"bin/dev -p {port}","ready":"http://localhost:{port}/","unit_env":"DATABASE_URL=a b"},"checks":["true"]}

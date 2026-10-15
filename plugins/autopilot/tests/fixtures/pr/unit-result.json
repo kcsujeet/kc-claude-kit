@@ -1,7 +1,0 @@
-{"plan_title":"Saved replies","unit":{"id":"U2","title":"Picker UI"},"rounds":2,
- "criteria":[{"id":"AC2","statement":"Picking a saved reply inserts its text at the cursor.","passes":true,"evidence":"composer.test.tsx: inserts at cursor"},
-             {"id":"AC3","statement":"An empty picker shows \"No saved replies yet\".","passes":true,"evidence":"screenshot qa/empty.png"}],
- "staff":{"design":"Reuse the existing Popover; no new state library.","final":"Proportionate: 3 files, follows the composer pattern."},
- "review":{"fixed":["picker.tsx:42 missing key on list items"],"dismissed":[{"finding":"extract a hook for 4 lines","reason":"used once; extraction adds indirection"}]},
- "qa":[{"persona":"first-time agent on a slow laptop","confirmed":["double-click inserted twice"],"evidence":["qa/double-click.png"]}],
- "decisions":[{"step":"design gate","outcome":"approach 2","reason":"matches composer"},{"step":"round 1 qa","outcome":"1 bug","reason":"double insert"}]}
