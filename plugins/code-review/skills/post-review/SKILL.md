@@ -17,7 +17,7 @@ Before producing the first draft, paste this checklist in chat with each box exp
 - [ ] Format: label on its own line; no em dashes; no `§X` / `§<name>` / internal-rule-number citations in any draft; no praise openers (`Good catch`, `Good call`, `Fair`, `Real bug`, `Nice find`); no `(blocking)` decoration.
 - [ ] Clear ask: by the end of the second sentence the reader knows what would change. Opening with the problem is fine (it is how people talk); a paragraph of rationale before the ask is not. Every `suggestion` gives a brief reason (one clause or sentence) inside the three-sentence budget; other labels add rationale only when needed.
 - [ ] One topic per draft: a multi-bullet draft (three sub-points in one comment) means either split into separate threads or pick the single strongest framing.
-- [ ] Replies to feedback on OUR OWN PR are one sentence unless a listed exception applies (see "Replying to feedback on your own PR"). A reply that declines explains gently and leaves the door open; it never opens with the decision ("I'd rather", "Keeping it"). No restating the reviewer's point, no explaining why they were right, no precedent for a change they already asked for.
+- [ ] Replies to feedback on OUR OWN PR are one sentence unless a listed exception applies (see "Replying to feedback on your own PR"). A reply that declines sounds like a person talking, humble and plain: a soft "I think we need this" is fine, a ruling ("I'd rather", "Keeping it") is not, and so is a stock close or emoji ("if that's okay", 🙂). No restating the reviewer's point, no explaining why they were right, no precedent for a change they already asked for.
 - [ ] Courtesy, in the user's own voice: plainly say what is hard or wrong, then what would help, the way a person would say it out loud. There is no stock opener: not "Could we", not "Worth", not "Would be better", not any phrase used as a formula. Read the drafts side by side; if two open or are built the same way, rewrite one. Ask a question only when it is a real question. No bare command as the opener (`Drop`, `Rename`, `Move`, `Use`, etc.). Politeness is non-negotiable; brevity does not excuse curtness, and the label (`issue` / `chore` / `suggestion`) already signals the weight.
 - [ ] Plain words: no press-release or trailer phrasing (`demonstrably`, `a real fix`, `worth shipping on its own`, `well-scoped`, `robust`, `elegant`). Read each draft aloud; if it sounds like an announcement, rewrite it as the plain statement (`fixes the bug`, `this breaks when X`).
 - [ ] Simple words, checked not felt: reread each draft as its author would. No hard or technical words, no sentence over about 25 words, and the author never has to open the code to follow it (see "Tone rules").
@@ -124,7 +124,7 @@ In rough order of frequency for review findings:
 - No accusations or assumptions about the author's process. Describe the technical issue directly.
 - **No praise / emphasis openers when accepting feedback.** Drop "Good catch", "Good call", "Fair point", "Real bug", "Nice find". They read as performative agreement. State the action: "Switched both keys to `.filled` (...). Done in <sha>." If the change is non-obvious enough to warrant context, give it after the fact (one line, neutral) without leading with praise.
 - **Default to short replies. Long is fine when the situation calls for it.** When accepting feedback and the fix is straightforward, the ideal reply is one sentence: `Addressed in <sha>.` or `Done in <sha>.` Skip restating the suggestion or itemising what changed when the linked commit makes both obvious. Go long only when the reply needs to (a) explain a subtle tradeoff, (b) push back on the suggestion with technical reasoning, (c) clarify a non-obvious decision that lives in the commit. Brevity is the default; verbosity has to earn its place.
-- **Very polite and down to earth, always.** Write the way you'd talk to a teammate you like: warm, humble, plain. No phrasing that sounds like a ruling ("Declining", "Rejecting", "Not doing this", "I'd rather", "Keeping it as is"), even when the code stays the same. A friendly close ("if that's okay", "happy to change it if you'd prefer", a 🙂) is welcome where it fits.
+- **Very polite and down to earth, always.** Write the way you'd talk to a teammate you like: warm, humble, plain. No phrasing that sounds like a ruling ("Declining", "Rejecting", "Not doing this", "I'd rather", "Keeping it as is"), even when the code stays the same. Sound human, not polite by formula: no stock closes or emoji ("if that's okay", "happy to change it if you'd prefer", 🙂). A soft first-person line like "I think we need this lock here." is how a person says it; use it where it fits, not on every reply.
 - **Politeness throughout, regardless of length.** Soft framing applies equally to one-line replies and multi-paragraph ones. "Addressed in <sha>" is polite; "Yep, fixed" is curt. Don't sacrifice tone for terseness.
 - No attribution footers ("Generated with Claude Code", thumbs reactions, etc.).
 - **Translation/locale findings must show a concrete before/after example, not just describe the rule.** A comment that says "this should be an ICU plural in the shared strings file" leaves the author guessing at the exact shape. Include the corrected key (with the full ICU plural value) and the updated call site, in fenced blocks. Mirror an existing key the codebase already has so the shape is unambiguous. See the worked example below.
@@ -288,16 +288,21 @@ Fixed in <sha>.
 2. What you did **differs** from what was asked, so the reviewer would be surprised by the diff.
 3. You **also changed something adjacent** the reviewer did not raise, so they know to look at it.
 
-**Declining stays warm.** When you are not making the change (exception 1), explain gently first, then say you'd like to keep it, and leave the door open. Don't lead with the decision.
+**Declining sounds human.** When you are not making the change (exception 1), say it the way you would to a teammate: humbly, then the reason in plain words. No ruling, and no stock close tacked on. "I think" is not a new formula either; the goal is sounding like a person, not a phrase on every reply.
 
 Bad, reads as a ruling:
 ```
 I'd rather keep it, since the old version crashes when the record is missing.
 ```
 
-Good, explains first and asks:
+Bad, polite by formula:
 ```
-They look the same, but the old version still runs the second check when the record is missing, so it crashes. The spec covers that case, so I'll keep this one if that's okay 🙂
+The old version crashes when the record is missing, so I'll keep this one if that's okay 🙂
+```
+
+Good, humble and plain:
+```
+I think we need this lock here. Without the lock, a guest could start paying on this engine right after the check, and the destroy would quietly delete their checkout too. The lock makes their checkout wait and then fail cleanly.
 ```
 
 **Never earns a sentence:** restating the suggestion back (they wrote it, they know); explaining why the reviewer was right; citing precedent for a change they already asked for; listing what changed when the linked commit shows it; naming the call-site count or file list for a mechanical rename.
@@ -318,8 +323,8 @@ Fixed in <sha>, now "X". Also fixed `otherKey` below it, which was in the wrong 
 
 ```
 **Post-draft audit (replies):**
-1. <comment id> | sentences: 1 | full SHA, unbackticked ✓ | stance explicit ✓ | no em dashes ✓ | no restatement ✓ | exception used: none
-2. <comment id> | sentences: 2 | full SHA, unbackticked ✓ | stance explicit ✓ | no em dashes ✓ | no restatement ✓ | exception used: (3) adjacent change
+1. <comment id> | sentences: 1 | full SHA, unbackticked ✓ | stance explicit ✓ | no em dashes ✓ | no restatement ✓ | sounds human, no stock phrase ✓ | exception used: none
+2. <comment id> | sentences: 2 | full SHA, unbackticked ✓ | stance explicit ✓ | no em dashes ✓ | no restatement ✓ | sounds human, no stock phrase ✓ | exception used: (3) adjacent change
 ```
 
 Any reply over one sentence with `exception used: none` is a rewrite before you show it, not after the user asks you to shorten it.
