@@ -47,6 +47,8 @@ expect_error "rejects start without {port}" bad-start.json  'launch.start must c
 expect_error "rejects ready without {port}" bad-start.json  'launch.ready must contain {port}'
 expect_error "rejects a remote ready URL"   remote-ready.json 'launch.ready must be a local URL'
 expect_value "defaults: unit_env empty"  valid-min.json  '.launch.unit_env'       '""'
+expect_value "defaults: review skills"   valid-min.json  '.review.skills'         '[]'
+expect_error "rejects review skills as a string" review-skills-string.json 'review.skills must be an array of skill names'
 expect_error "rejects unit_env with spaces" unit-env-spaces.json 'launch.unit_env must be space-separated KEY=value pairs'
 expect_error "rejects empty checks"         bad-checks.json 'checks must be a non-empty array'
 expect_error "rejects non-JSON"             not-json.json   'not valid JSON'

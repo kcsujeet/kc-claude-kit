@@ -21,7 +21,7 @@ const SCOPE_PASS = 'SCOPE:\n- [N/A] §G1: local diff\n- [PASS] §G2: diff matche
 function gateBlock(gate, status, boxes = [`[${status === 'FAIL' ? 'FAIL' : 'PASS'}] §X1: a.ts:3 checked`], findings = []) {
   return [`GATE: ${gate}`, `STATUS: ${status}`, 'BOXES:', ...boxes.map(b => `- ${b}`), 'FINDINGS:', ...findings.map(f => `- ${f}`)].join('\n')
 }
-const GATE_TOPICS = ['naming', 'clarity', 'structure', 'simplicity', 'datetime', 'react', 'i18n', 'testing', 'correctness', 'project-conventions']
+const GATE_TOPICS = ['naming', 'clarity', 'structure', 'simplicity', 'datetime', 'react', 'rails', 'i18n', 'testing', 'correctness', 'project-conventions']
 
 // Answers every agent with a clean, passing result; a scenario overrides by
 // returning something other than undefined.
@@ -81,7 +81,7 @@ async function simulate({ units = [unit('U1', 0)], limits = {}, answer = () => u
     run_id: 'r1', repo: '/repo', code_review_root: '/cr', run_dir: '/repo/.autopilot/runs/r1', plugin_root: '/plugin', dry_run: dryRun, base_branch: 'main', ...base,
     plan: { title: 'Plan', goal: 'goal', out_of_scope: 'none' }, architecture: 'arch',
     config: {
-      launch: { login: null }, review: { extra_agents: [] },
+      launch: { login: null }, review: { extra_agents: [], skills: [] },
       limits: { max_fix_rounds: 2, max_parallel_units: 2, max_agents_per_unit: 120, qa_personas: { min: 1, max: 5 }, ...limits },
       models: { workers: 'sonnet', staff: 'best' },
       ...config,
@@ -309,8 +309,8 @@ const tests = {
     const prep = labelled(calls, 'U1 review prep')[0]
     assert.match(prep.prompt, /cd \/wt\/U1 && bash \/cr\/scripts\/gather-review\.sh --branch main --out-dir \/repo\/\.autopilot\/runs\/r1\/U1\/review\/r1$/m)
     const gateCalls = calls.filter(c => c.agentType && c.agentType.startsWith('code-review:'))
-    // react has no .jsx/.tsx file in the diff, so it gets its N/A block without an agent.
-    assert.deepEqual(gateCalls.map(c => c.agentType), [...GATE_TOPICS.filter(g => g !== 'react'), 'verification'].map(g => `code-review:${g}-gate`))
+    // react and rails have no .jsx/.tsx or Ruby file in the diff, so they get their N/A block without an agent.
+    assert.deepEqual(gateCalls.map(c => c.agentType), [...GATE_TOPICS.filter(g => g !== 'react' && g !== 'rails'), 'verification'].map(g => `code-review:${g}-gate`))
     for (const c of gateCalls) {
       for (const input of ['Head SHA: abc', 'Diff file: /s/review.diff', 'Changed files: /s/changed-files.txt', 'Repo root: /wt/U1']) assert.ok(c.prompt.includes(input), `${c.label} lacks ${input}`)
     }
@@ -742,6 +742,7 @@ const tests = {
       assert.ok(byId.U1.decisions.some(d => d.step === `lens ${lens}` && d.outcome === 'skipped'), lens)
     }
     assert.equal(calls.filter(c => c.agentType === 'code-review:react-gate').length, 0)
+    assert.equal(calls.filter(c => c.agentType === 'code-review:rails-gate').length, 1, 'a Ruby diff gets the rails gate')
     const verification = calls.find(c => c.agentType === 'code-review:verification-gate')
     assert.ok(verification.prompt.includes('GATE: react\nSTATUS: PASS (N/A)'))
   },
@@ -756,6 +757,15 @@ const tests = {
     assert.match(labelled(calls, 'U2 checks')[0].prompt, /^env DATABASE_URL=db_4110 TEST_ENV_NUMBER=1 bash \/plugin\/scripts\/run-checks\.sh /m)
     assert.match(labelled(calls, 'U2 engineer build')[0].prompt, /^Unit environment: .*`env DATABASE_URL=db_4110 TEST_ENV_NUMBER=1`/m)
     assert.match(calls.find(c => c.label.startsWith('U1 ') && c.agentType === 'autopilot:verifier').prompt, /env DATABASE_URL=db_4100 TEST_ENV_NUMBER=0/)
+  },
+
+  "the repo's own review skills run as lenses on every full review": async () => {
+    const { byId, calls } = await simulate({ config: { review: { extra_agents: [], skills: ['review-be-code'] } } })
+    assert.equal(byId.U1.status, 'done')
+    const skillLens = calls.filter(c => c.label.startsWith('U1 lens skill:review-be-code'))
+    assert.equal(skillLens.length, 1)
+    assert.equal(skillLens[0].agentType, 'autopilot:lens-reviewer')
+    assert.match(skillLens[0].prompt, /^Lens: skill:review-be-code$/m)
   },
 
   // ---- app cleanup ----

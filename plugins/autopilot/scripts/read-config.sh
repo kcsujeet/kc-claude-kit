@@ -49,7 +49,7 @@ readonly NORMALIZE='
       },
       checks: $c.checks,
       risky_paths: ($c.risky_paths // []),
-      review: { extra_agents: ($r.extra_agents // []) },
+      review: { extra_agents: ($r.extra_agents // []), skills: ($r.skills // []) },
       limits: {
         max_fix_rounds: ($lim.max_fix_rounds // 4),
         max_parallel_units: ($lim.max_parallel_units // 4),
@@ -87,6 +87,7 @@ readonly PROBLEMS='
     (if (.checks | strs) and (.checks | length) > 0 then empty else "checks must be a non-empty array of commands" end),
     (if (.risky_paths | strs) then empty else "risky_paths must be an array of globs" end),
     (if (.review.extra_agents | strs) then empty else "review.extra_agents must be an array of agent types" end),
+    (if (.review.skills | strs) then empty else "review.skills must be an array of skill names" end),
     (if (.launch.ports.base | posint) and (.launch.ports.per_unit | posint) then empty else "launch.ports.base and per_unit must be positive integers" end),
     (if (.launch.ready_timeout_s | posint) then empty else "launch.ready_timeout_s must be a positive integer" end),
     (if (.launch.unit_env | type) == "string" and (.launch.unit_env | test("^\\s*([A-Za-z_][A-Za-z0-9_]*=\\S*(\\s+|$))*$")) then empty else "launch.unit_env must be space-separated KEY=value pairs with no spaces in a value" end),

@@ -23,6 +23,7 @@ Run from the repo root. Create a scratch directory once and reuse it for every s
    - `checks`: non-empty array of shell commands, run from the repo root.
    - `risky_paths`: array of globs.
    - `review.extra_agents`: array of extra reviewer agent types (default empty).
+   - `review.skills`: the repo's own code-review skills (default empty). Look for them in the repo's `.claude/skills/` and the user's skills whose names or descriptions say they review this repo's code (for example `review-be-code`), and for a `.claude/review-conventions.md`, which the project-conventions gate reads by itself. Show the user what you found and record the skills they confirm: each runs on every review round beside the kit's gates, so the repo's own rules are graded too.
    - `limits`: `max_fix_rounds` 4, `max_parallel_units` 4, `qa_personas` `{min: 3, max: 5}`, `max_agents_per_unit` 200.
    - `models`: `workers` `"sonnet"`, `staff` `"best"`.
 

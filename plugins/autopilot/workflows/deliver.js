@@ -25,13 +25,14 @@ const CONFIG_PATH = `${A.run_dir}/config.json`
 // review-code's phase-1 gates (plugins/code-review/skills/review-code/SKILL.md, Step 2).
 // A full review runs all ten; a gate with no file it applies to (APPLIES) gets
 // its PASS (N/A) block without an agent.
-const GATE_TOPICS = ['naming', 'clarity', 'structure', 'simplicity', 'datetime', 'react', 'i18n', 'testing', 'correctness', 'project-conventions']
+const GATE_TOPICS = ['naming', 'clarity', 'structure', 'simplicity', 'datetime', 'react', 'rails', 'i18n', 'testing', 'correctness', 'project-conventions']
 const LENSES = ['security', 'data', 'compatibility', 'concurrency', 'accessibility', 'observability', 'plan-fit', 'readability', 'simplicity',
   'type-safety', 'error-handling', 'performance', 'dependencies']
 // The files a gate or lens can apply to. One with no such file in the diff is
 // skipped without starting an agent; every other check always applies.
 const APPLIES = {
   react: f => /\.(jsx|tsx)$/.test(f),
+  rails: f => /\.(rb|rake)$|(^|\/)Gemfile(\.lock)?$|(^|\/)db\//.test(f),
   accessibility: f => /\.(jsx|tsx|vue|svelte|html?|erb|haml|slim|css|scss)$/.test(f),
   'type-safety': f => /\.(ts|tsx|mts|cts|swift|kt|kts|rs|go|cs|java)$/.test(f),
   dependencies: f => /(^|\/)(package(-lock)?\.json|pnpm-(lock|workspace)\.yaml|yarn\.lock|bun\.lockb?|Gemfile(\.lock)?|[^/]+\.(gemspec|podspec)|requirements[^/]*\.txt|pyproject\.toml|poetry\.lock|go\.(mod|sum)|Cargo\.(toml|lock)|Podfile(\.lock)?|Package\.(swift|resolved))$/.test(f),
@@ -327,7 +328,11 @@ async function reviewStage({ unit, tag, worktree, baseBranch, state, context, ca
   const lensNames = LENSES.filter(l => inFocus(l, ALWAYS_LENSES, focus ? focus.lenses : []))
   for (const name of [...gateTopics, ...lensNames].filter(n => !applies(n, files))) note(`${GATE_TOPICS.includes(name) ? 'gate' : 'lens'} ${name}`, 'skipped', 'no file it applies to in the diff')
   const gates = () => codeReviewGates({ unit, tag, worktree, reviewBase, call, note, earlier, prep, files, gateTopics, focus })
+  // The repo's own review skills run beside the kit's gates, as lenses, every full review and
+  // again on the fix when they found something.
+  const repoSkills = CFG.review.skills.map(skill => `skill:${skill}`).filter(lens => !focus || focus.lenses.includes(lens))
   const lenses = [...lensNames.filter(l => applies(l, files)).map(lens => ({ lens, agentType: 'autopilot:lens-reviewer' })),
+    ...repoSkills.map(lens => ({ lens, agentType: 'autopilot:lens-reviewer' })),
     ...(focus ? [] : CFG.review.extra_agents.map(type => ({ lens: type, agentType: type })))]
   const focusNote = focus ? `\nRe-review of the fix only: review the changes since ${focus.base} (git -C ${worktree} diff ${focus.base}...HEAD).` : ''
   // A full review asks each lens until it runs dry; a re-review of the fix asks once.
@@ -374,7 +379,7 @@ async function reviewStage({ unit, tag, worktree, baseBranch, state, context, ca
   const toTriage = deferMinor ? kept.filter(f => !minor(f)) : kept
   const headSha = prep.head_sha
   // The checks whose findings the fix answers; the re-review of the fix runs them again.
-  const topics = { gates: [...new Set(fails.map(f => f.lens).filter(l => GATE_TOPICS.includes(l)))], lenses: [...new Set(toTriage.map(f => f.lens).filter(l => LENSES.includes(l)))] }
+  const topics = { gates: [...new Set(fails.map(f => f.lens).filter(l => GATE_TOPICS.includes(l)))], lenses: [...new Set(toTriage.map(f => f.lens).filter(l => LENSES.includes(l) || l.startsWith('skill:')))] }
   if (!fails.length && !toTriage.length) return { fix: [], dismiss: [], receipts, deferred, headSha, topics }
 
   const triage = await call(`Triage these findings for ${worktree}.\n${planSpecs(unit)}\nGate FAILs: ${JSON.stringify(fails)}\nLens findings: ${JSON.stringify(toTriage)}${fails.some(f => f.lens === 'verification') ? '\nItems with lens "verification" cite code in this diff: never dismiss one as a format or citation issue.' : ''}${earlier && `\n${earlier}\nDismiss an item that only reverses an earlier decision, with reason "reverses round N decision without new scenario" (N from that decision).`}`,

@@ -109,6 +109,7 @@ Each convention topic is one skill. It holds the rules to write against and the 
 | `simplicity` | source files | DRY, YAGNI and KISS; look for what already exists before hand-rolling it |
 | `datetime` | source files | No hand-rolled date math, ISO 8601 with offset, truncation accounting, timezone and clock as settings |
 | `react` | components, hooks, api | Components own their container, reads and writes in separate hooks, cache-patch before invalidate, form is the source of truth |
+| `rails` | Ruby, rake, Gemfile, `db/` | Copy siblings of the same kind, one check in one place, locks before checks, N+1s that preloading does not fix, GETs never write, backfills that know every writer, honest Rails specs |
 | `i18n` | source and locale files | Source locale only, grep before adding a key, ICU plurals for countable nouns, never concatenate translations |
 | `testing` | source files | Failing test first, never skip a test to reach green, cover the unhappy paths, exact assertions on observable behavior, gates tested both ways |
 | `correctness` | source files | Empty, null, zero and boundary inputs; operators and conditions checked for off-by-one and inversion; current dependency arrays and closures; no cast hiding a real mismatch; no regression of a fixed bug |
@@ -164,6 +165,7 @@ Two rules keep findings honest:
 | correctness | `code-review:correctness-gate` | every diff | Logic bugs, edge cases (empty, null, zero, boundary, timezone), data matching its declared type at a boundary, no regression of a bug the repo already fixed |
 | datetime | `code-review:datetime-gate` | diff touches date/time logic | No hand-rolled date math, ISO 8601 with offset, truncation, timezone as an input |
 | react | `code-review:react-gate` | diff has React/JSX UI code | Bulletproof-react structure, keys, data-fetching hooks, forms, render cost |
+| rails | `code-review:rails-gate` | diff touches Ruby, rake, Gemfile or `db/` | Sibling shape, Rails conventions, layers, races, N+1s, request risks, backfills, Rails specs |
 | i18n | `code-review:i18n-gate` | diff touches locale files | Per-key audit table, dedup, ICU plurals, no concatenated translations |
 | testing | `code-review:testing-gate` | diff changes behavior or tests | New behavior tested, no class-name assertions, exact assertions, gates tested both ways |
 | project conventions | `code-review:project-conventions-gate` | repo has `.claude/review-conventions.md` | Every rule in the repo's own conventions file; repo rules that override a built-in box are listed |
