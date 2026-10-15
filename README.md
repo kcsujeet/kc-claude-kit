@@ -64,7 +64,7 @@ Most skills trigger on their own:
 | "run this plan", "autopilot this" | `autopilot:run` |
 | (the topic comes up) | `conventions:<topic>` |
 
-Two skills only run when you type them: `/code-review:post-review` and `/autopilot:init`.
+One skill only runs when you type it: `/autopilot:init`. `/code-review:post-review` also loads on its own whenever Claude drafts a PR comment or reply, so drafts follow its rules; posting still needs your explicit go-ahead.
 
 `usage-band` has no skill: once installed, it draws its pills above the prompt in every session.
 
@@ -222,7 +222,7 @@ The run's evidence (criteria checks, review decisions, QA results) stays in `.au
 
 ## Posting review comments to GitHub
 
-The review never posts; its output stays in chat. To turn findings into PR comments, run `/code-review:post-review` yourself (it sets `disable-model-invocation: true`, so the model cannot start it). It:
+The review never posts; its output stays in chat. To turn findings into PR comments, run `/code-review:post-review`. Claude also loads it on its own before drafting any PR comment or reply, so drafts are never written from memory; posting still waits for your explicit signal and the approval token. It:
 
 1. Drafts the comments in Conventional Comments format, giving every `suggestion` a brief reason.
 2. Runs the drafts through `build-comment-payloads.sh`, which rejects any comment whose file or line is not in the diff.

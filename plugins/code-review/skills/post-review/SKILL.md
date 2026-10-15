@@ -1,12 +1,11 @@
 ---
 name: post-review
-description: Drafts review findings as Conventional Comments PR comments and posts them to GitHub only after the user's explicit, fresh post signal. Covers the pre-draft and post-draft audits, tone and length budgets, replies to feedback on your own PR, and the GitHub API posting shapes. Invoked by the user as /code-review:post-review.
-disable-model-invocation: true
+description: Drafts review findings as Conventional Comments PR comments, and replies to reviewers' feedback on your own PR, and posts them to GitHub only after the user's explicit, fresh post signal. Covers the pre-draft and post-draft audits, tone and length budgets, replies, and the GitHub API posting shapes. Use before writing ANY PR comment or reply, even a one-line "Done in <sha>", and never draft one from memory. Also invoked as /code-review:post-review.
 ---
 
 # Drafting and posting PR comments
 
-The user invokes this skill to draft, post, or convert review findings (usually from the `review-code` skill) into PR comments. Switch from the terse chat format to the [Conventional Comments](https://conventionalcomments.org/) format. The labels make it immediately clear to the author whether something is blocking, a nit, or just a thought, and they keep the tone consistent.
+Load this skill before drafting any PR comment or reply, including replies to reviewers on your own PR: the rules below are the user's own voice, and drafts written from memory drift from it. Use it to draft, post, or convert review findings (usually from the `review-code` skill) into PR comments. Switch from the terse chat format to the [Conventional Comments](https://conventionalcomments.org/) format. The labels make it immediately clear to the author whether something is blocking, a nit, or just a thought, and they keep the tone consistent.
 
 ## Before drafting (mandatory; visible to the user)
 
@@ -413,7 +412,7 @@ Those printed commands are what the user approves. Show them with the drafts, an
 **Choose the posting shape from the top-level body, not from severity:**
 
 1. **No top-level body** (the usual case): post each comment individually to `POST /repos/{owner}/{repo}/pulls/{pull_number}/comments`. No review wrapper, no body to invent.
-2. **A body that says something no inline says:** post one review to `POST /repos/{owner}/{repo}/pulls/{pull_number}/reviews`, with that body and the comments inside it. Use `"event": "COMMENT"` unless the user asked to request changes (`"REQUEST_CHANGES"`). The docs mark `body` as "Required when using REQUEST_CHANGES or COMMENT for the event parameter", so a review with no real body is not an option: fall back to shape 1.
+2. **A body that says something no inline says:** post one review to `POST /repos/{owner}/{repo}/pulls/{pull_number}/reviews`, with that body and the comments inside it. The event is `"COMMENT"`. Never offer `"REQUEST_CHANGES"` or `"APPROVE"`; use one only when the user asks for it. The docs mark `body` as "Required when using REQUEST_CHANGES or COMMENT for the event parameter", so a review with no real body is not an option: fall back to shape 1.
 3. **A note with no line to anchor to** (the PR is stacked, or should be split) and no inline comments: `KC_REVIEW_POST_APPROVED=1 gh pr comment <NUM> --body-file <file>`.
 
 **Shape 1, one request per comment.** This is the builder's output: one payload file and one printed command per draft. `body`, `commit_id`, and `path` are required. `line` is the diff line the comment applies to (the last line of a range); `side` is `RIGHT` for added or unchanged lines and `LEFT` for deletions. A multi-line comment adds `start_line` and `start_side`; a single-line comment omits them.
@@ -451,6 +450,14 @@ KC_REVIEW_POST_APPROVED=1 gh api repos/{owner}/{repo}/pulls/<NUM>/reviews -X POS
   ]
 }
 ```
+
+**A reply in a review thread** (answering a reviewer, usually on your own PR) goes to the thread's first comment, one request per reply. Write each reply body to a file and post it:
+
+```bash
+KC_REVIEW_POST_APPROVED=1 gh api repos/{owner}/{repo}/pulls/<NUM>/comments/<FIRST_COMMENT_ID>/replies -X POST -F body=@/tmp/reply-<id>.md
+```
+
+**Comments into the user's own pending review** (one they started in the GitHub UI): add each with GraphQL `addPullRequestReviewThread` using the review's `node_id`, then submit it with `POST /repos/{owner}/{repo}/pulls/<NUM>/reviews/<REVIEW_ID>/events` and `event=COMMENT`. Both writes carry the approval token.
 
 To edit a posted comment in place, find its ID via `gh api repos/{owner}/{repo}/pulls/<NUM>/comments` then PATCH:
 
