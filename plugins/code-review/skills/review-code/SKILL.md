@@ -65,11 +65,11 @@ If a script fails, relay its message; fall back to the equivalent `gh`/`git` com
 
 ### Step 2: dispatch the gate agents in two phases (mandatory: ALL gates, EVERY round)
 
-Dispatch each gate with the Agent tool, `subagent_type` set to the agent name below. Phase 1 runs in parallel: issue all ten Agent calls in a single message. Phase 2 (verification) runs only after every phase-1 agent has returned, because it audits their returned verdict blocks rather than re-deriving findings.
+Dispatch each gate with the Agent tool, `subagent_type` set to the agent name below. Phase 1 runs in parallel: issue all eleven Agent calls in a single message. Phase 2 (verification) runs only after every phase-1 agent has returned, because it audits their returned verdict blocks rather than re-deriving findings.
 
 Each topic gate preloads its `conventions:<topic>` skill, so it already holds that topic's `## Review checklist`, `## Review detail` and `## Sweeps`. You do not paste rules into the prompt.
 
-**Phase 1: dispatch these ten in parallel.**
+**Phase 1: dispatch these eleven in parallel.**
 
 | Gate | Agent (`subagent_type`) | Dispatch note |
 |------|-------------------------|---------------|
@@ -79,6 +79,7 @@ Each topic gate preloads its `conventions:<topic>` skill, so it already holds th
 | simplicity | `code-review:simplicity-gate` | always |
 | datetime | `code-review:datetime-gate` | agent returns PASS (N/A) if no date/time logic in diff |
 | react | `code-review:react-gate` | agent returns PASS (N/A) if no React/JSX UI code in diff |
+| rails | `code-review:rails-gate` | agent returns PASS (N/A) if no Ruby, rake, Gemfile or `db/` change in diff |
 | i18n | `code-review:i18n-gate` | agent returns PASS (N/A) if no locale files in diff |
 | testing | `code-review:testing-gate` | agent returns PASS (N/A) if the diff changes no behavior and touches no test file |
 | correctness | `code-review:correctness-gate` | always |
@@ -167,6 +168,7 @@ Report directly in chat. No file output. **Be terse.** The reader is the user, n
 | simplicity | ... |
 | datetime | ... |
 | react | ... |
+| rails | ... |
 | i18n | ... |
 | testing | ... |
 | correctness | ... |
@@ -247,6 +249,7 @@ This skill is in active iteration. When the user gives feedback ("you missed X",
    - Reuse / DRY / not-reinventing existing primitives → `plugins/conventions/skills/simplicity/SKILL.md`
    - Dates, times, timezones, locale-dependent formatting → `plugins/conventions/skills/datetime/SKILL.md`
    - React/data-fetching/forms/component-structure conventions → `plugins/conventions/skills/react/SKILL.md`
+   - Rails models, layers, queries and N+1s, request risks, backfills, Rails specs → `plugins/conventions/skills/rails/SKILL.md`
    - Translations / locale keys → `plugins/conventions/skills/i18n/SKILL.md`
    - Test coverage, assertions, test setup, test placement → `plugins/conventions/skills/testing/SKILL.md`
    - Logic bugs, edge cases, data-shape mismatches, regressions of fixed bugs → `plugins/conventions/skills/correctness/SKILL.md`

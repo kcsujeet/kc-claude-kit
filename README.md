@@ -64,7 +64,7 @@ Most skills trigger on their own:
 | "run this plan", "autopilot this" | `autopilot:run` |
 | (the topic comes up) | `conventions:<topic>` |
 
-Two skills only run when you type them: `/code-review:post-review` and `/autopilot:init`.
+One skill only runs when you type it: `/autopilot:init`. `/code-review:post-review` also loads on its own whenever Claude drafts a PR comment or reply, so drafts follow its rules; posting still needs your explicit go-ahead.
 
 `usage-band` has no skill: once installed, it draws its pills above the prompt in every session.
 
@@ -109,6 +109,7 @@ Each convention topic is one skill. It holds the rules to write against and the 
 | `simplicity` | source files | DRY, YAGNI and KISS; look for what already exists before hand-rolling it |
 | `datetime` | source files | No hand-rolled date math, ISO 8601 with offset, truncation accounting, timezone and clock as settings |
 | `react` | components, hooks, api | Components own their container, reads and writes in separate hooks, cache-patch before invalidate, form is the source of truth |
+| `rails` | Ruby, rake, Gemfile, `db/` | Copy siblings of the same kind, one check in one place, locks before checks, N+1s that preloading does not fix, GETs never write, backfills that know every writer, honest Rails specs |
 | `i18n` | source and locale files | Source locale only, grep before adding a key, ICU plurals for countable nouns, never concatenate translations |
 | `testing` | source files | Failing test first, never skip a test to reach green, cover the unhappy paths, exact assertions on observable behavior, gates tested both ways |
 | `correctness` | source files | Empty, null, zero and boundary inputs; operators and conditions checked for off-by-one and inversion; current dependency arrays and closures; no cast hiding a real mismatch; no regression of a fixed bug |
@@ -164,6 +165,7 @@ Two rules keep findings honest:
 | correctness | `code-review:correctness-gate` | every diff | Logic bugs, edge cases (empty, null, zero, boundary, timezone), data matching its declared type at a boundary, no regression of a bug the repo already fixed |
 | datetime | `code-review:datetime-gate` | diff touches date/time logic | No hand-rolled date math, ISO 8601 with offset, truncation, timezone as an input |
 | react | `code-review:react-gate` | diff has React/JSX UI code | Bulletproof-react structure, keys, data-fetching hooks, forms, render cost |
+| rails | `code-review:rails-gate` | diff touches Ruby, rake, Gemfile or `db/` | Sibling shape, Rails conventions, layers, races, N+1s, request risks, backfills, Rails specs |
 | i18n | `code-review:i18n-gate` | diff touches locale files | Per-key audit table, dedup, ICU plurals, no concatenated translations |
 | testing | `code-review:testing-gate` | diff changes behavior or tests | New behavior tested, no class-name assertions, exact assertions, gates tested both ways |
 | project conventions | `code-review:project-conventions-gate` | repo has `.claude/review-conventions.md` | Every rule in the repo's own conventions file; repo rules that override a built-in box are listed |
@@ -200,6 +202,10 @@ You can also say "run this plan". The working tree must be clean, on the base br
 - Blocked units, each with the reason (no approach, did not converge, plan conflict, risky path, budget).
 - Bugs QA found that the change did not cause, left alone, so you can plan a fix.
 
+The run's evidence (criteria checks, review decisions, QA results) stays in `.autopilot/runs/<id>/` for the staff engineer to verify. PR descriptions carry only what a reviewer needs, in the repo's own template.
+
+**Parallel units.** Units that do not depend on each other run side by side, up to `limits.max_parallel_units`, each with its own app, data and test database through `launch.unit_env` (per-unit `KEY=value` pairs with `{port}` and `{index}`, set up by `/autopilot:init`). Before it starts, `/autopilot:run` checks that every `Depends on` in the plan is real, because a chain of dependencies runs one unit at a time.
+
 **Models.** Workers run on `sonnet` and the staff roles on `best`, both set in `.claude/autopilot.json` `models` ([model config](https://code.claude.com/docs/en/model-config)). The `run` skill already sets `model: best` for its turn, so the staff engineer runs on the top model whatever your session's `/model` is.
 
 **Size.** A run is bounded by the workflow runtime's cap of 1,000 agents per run ([workflows, Behavior and limits](https://code.claude.com/docs/en/workflows#behavior-and-limits)), and each unit takes up to `limits.max_agents_per_unit` of them, so split very large plans (5 or more units) into several runs.
@@ -208,7 +214,7 @@ You can also say "run this plan". The working tree must be clean, on the base br
 
 **Permissions.** An unattended run prompts for every new tool call unless you run in auto mode ([permission modes](https://code.claude.com/docs/en/permission-modes)) or allow `Bash`, `Edit`, `Write` and `Workflow(autopilot:deliver)` in `.claude/settings.local.json`.
 
-**Cost.** It spends real tokens. A 2-unit dry run on the test fixture cost $6 to over $10 and took 8 to 12 minutes, with 75 to 150 agents; most of it is review, since every round runs `code-review`'s gates and the lens reviewers even on a small diff. In your first two or three runs, skim the QA evidence in each PR to calibrate how far to trust it.
+**Cost.** It spends real tokens. A 2-unit dry run on the test fixture cost $6 to over $10 and took 8 to 12 minutes, with 75 to 150 agents; most of it is review. To keep it down, a re-review after fixes looks only at the fix commits, with the checks that found something plus correctness, testing and security, and one full review runs before QA. Checks with no file they apply to (React, accessibility, type-safety, dependencies) start no agent, two skeptics judge all serious findings of a round together, and minor findings alone never start a fix round. In your first two or three runs, skim the QA evidence in the run directory to calibrate how far to trust it.
 
 **Start command.** `launch.start` must keep the app in the foreground. A command that backgrounds itself (`docker compose up -d`, `rails s -d`) is reported as "app exited early", and autopilot could not stop it anyway; use the foreground form (`docker compose up`, `rails s`). `init`'s boot check shows this the first time.
 
@@ -216,7 +222,7 @@ You can also say "run this plan". The working tree must be clean, on the base br
 
 ## Posting review comments to GitHub
 
-The review never posts; its output stays in chat. To turn findings into PR comments, run `/code-review:post-review` yourself (it sets `disable-model-invocation: true`, so the model cannot start it). It:
+The review never posts; its output stays in chat. To turn findings into PR comments, run `/code-review:post-review`. Claude also loads it on its own before drafting any PR comment or reply, so drafts are never written from memory; posting still waits for your explicit signal and the approval token. It:
 
 1. Drafts the comments in Conventional Comments format, giving every `suggestion` a brief reason.
 2. Runs the drafts through `build-comment-payloads.sh`, which rejects any comment whose file or line is not in the diff.

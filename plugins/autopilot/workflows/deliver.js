@@ -14,19 +14,33 @@ export const meta = {
 const A = args
 const CFG = A.config
 const LIMITS = CFG.limits
-// Review rounds in which minor findings still cost an engineer fix round. After them, each fix
-// adds new code for the gates to nit, so a large unit would never run dry; minor findings are
-// listed in the PR instead.
+// Review rounds in which minor findings may ride along with a serious one. A round with only
+// minor findings never starts a fix; after these rounds each fix adds new code for the gates to
+// nit, so a large unit would never run dry, and minor findings are listed in the PR instead.
 const MINOR_FIX_ROUNDS = 2
 const WORKERS = CFG.models.workers
 const STAFF = CFG.models.staff
 const SCRIPTS = `${A.plugin_root}/scripts`
 const CONFIG_PATH = `${A.run_dir}/config.json`
-// review-code's phase-1 gates (plugins/code-review/skills/review-code/SKILL.md, Step 2):
-// all ten every round; a gate that does not apply returns PASS (N/A) itself.
-const GATE_TOPICS = ['naming', 'clarity', 'structure', 'simplicity', 'datetime', 'react', 'i18n', 'testing', 'correctness', 'project-conventions']
+// review-code's phase-1 gates (plugins/code-review/skills/review-code/SKILL.md, Step 2).
+// A full review runs all ten; a gate with no file it applies to (APPLIES) gets
+// its PASS (N/A) block without an agent.
+const GATE_TOPICS = ['naming', 'clarity', 'structure', 'simplicity', 'datetime', 'react', 'rails', 'i18n', 'testing', 'correctness', 'project-conventions']
 const LENSES = ['security', 'data', 'compatibility', 'concurrency', 'accessibility', 'observability', 'plan-fit', 'readability', 'simplicity',
   'type-safety', 'error-handling', 'performance', 'dependencies']
+// The files a gate or lens can apply to. One with no such file in the diff is
+// skipped without starting an agent; every other check always applies.
+const APPLIES = {
+  react: f => /\.(jsx|tsx)$/.test(f),
+  rails: f => /\.(rb|rake)$|(^|\/)Gemfile(\.lock)?$|(^|\/)db\//.test(f),
+  accessibility: f => /\.(jsx|tsx|vue|svelte|html?|erb|haml|slim|css|scss)$/.test(f),
+  'type-safety': f => /\.(ts|tsx|mts|cts|swift|kt|kts|rs|go|cs|java)$/.test(f),
+  dependencies: f => /(^|\/)(package(-lock)?\.json|pnpm-(lock|workspace)\.yaml|yarn\.lock|bun\.lockb?|Gemfile(\.lock)?|[^/]+\.(gemspec|podspec)|requirements[^/]*\.txt|pyproject\.toml|poetry\.lock|go\.(mod|sum)|Cargo\.(toml|lock)|Podfile(\.lock)?|Package\.(swift|resolved))$/.test(f),
+}
+const applies = (check, files) => !APPLIES[check] || files.some(APPLIES[check])
+// A re-review of only the fix still runs these, whatever the last round found.
+const ALWAYS_GATES = ['correctness', 'testing']
+const ALWAYS_LENSES = ['security']
 
 // ---------- schemas ----------
 const str = { type: 'string' }
@@ -54,7 +68,10 @@ const PREP = {
   type: 'object', required: ['exit_code', 'head_sha', 'diff_file', 'changed_files', 'files', 'scope'],
   properties: { exit_code: { type: 'number' }, output: str, head_sha: str, diff_file: str, changed_files: str, files: strs, scope: str },
 }
-const REFUTE = { type: 'object', required: ['refuted', 'reason'], properties: { refuted: { type: 'boolean' }, reason: str } }
+const REFUTES = {
+  type: 'object', required: ['verdicts'],
+  properties: { verdicts: { type: 'array', items: { type: 'object', required: ['index', 'refuted', 'reason'], properties: { index: { type: 'number' }, refuted: { type: 'boolean' }, reason: str } } } },
+}
 const TRIAGE = {
   type: 'object', required: ['fix', 'dismiss'],
   properties: { fix: { type: 'array', items: { type: 'object', required: ['finding', 'reason'], properties: { finding: str, reason: str } } },
@@ -145,15 +162,21 @@ async function runUnit(unit, baseBranch, progress, parentPr) {
   progress.worktree = worktree
   progress.branch = branch
   const state = `${A.run_dir}/${unit.id}`
+  // This unit's own databases and services (launch.unit_env); every app or test command uses them.
+  const unitEnv = (CFG.launch.unit_env || '').trim()
+    .replaceAll('{port}', () => String(CFG.launch.ports.base + CFG.launch.ports.per_unit * unit.index))
+    .replaceAll('{index}', String(unit.index))
+  const envPrefix = unitEnv ? `env ${unitEnv} ` : ''
   const context = [
     `Worktree: ${worktree}`, `Branch: ${branch} (base ${baseBranch})`,
     `Plan: ${A.plan.title}. Goal: ${A.plan.goal}`, `Out of scope: ${A.plan.out_of_scope}`,
     `Cross-unit architecture (decided by the staff engineer): ${A.architecture}`,
     `Unit ${unit.id}: ${unit.title}. Scope: ${unit.scope}`,
     `Contract: ${JSON.stringify(unit.contract.criteria)}`,
-    `Checks command: bash ${SCRIPTS}/run-checks.sh ${CONFIG_PATH} ${worktree}`,
+    `Checks command: ${envPrefix}bash ${SCRIPTS}/run-checks.sh ${CONFIG_PATH} ${worktree}`,
+    unitEnv && `Unit environment: start every command that runs the app, its tests or its database tools with \`env ${unitEnv}\`, so this unit uses its own databases and never another unit's.`,
     `Scripts directory: ${SCRIPTS}`,
-  ].join('\n')
+  ].filter(Boolean).join('\n')
   const ctx = { unit, tag, worktree, baseBranch, state, context, call, ops, note, retryOnce }
   const engineer = async (mode, extra) => {
     const out = await call(`Mode: ${mode}\n${context}\n${extra || ''}`, { agentType: 'autopilot:engineer', model: WORKERS, schema: ENGINEER, label: `${tag} engineer ${mode}`, phase: mode === 'propose' ? 'Design' : 'Build' })
@@ -204,7 +227,11 @@ async function runUnit(unit, baseBranch, progress, parentPr) {
   let criteria = []
   let finalRationale = ''
   let prUrl = null
+  // null: review the whole diff. After review fixes: { base, gates, lenses }, a
+  // re-review of only the fix commits, by the checks that found something.
+  let focus = null
   const nextRound = (kind, items) => {
+    if (kind !== 'review' && kind !== 'checks') focus = null
     progress.rounds += 1
     note(`round ${progress.rounds}`, kind, items.slice(0, 3).join('; '))
     if (progress.rounds > LIMITS.max_fix_rounds) throw new Stop('blocked:no-converge', `still failing after ${LIMITS.max_fix_rounds} rounds: ${kind}: ${items.join('; ')}`)
@@ -215,17 +242,23 @@ async function runUnit(unit, baseBranch, progress, parentPr) {
     if (pending) await engineer('fix', `Fix these (${pending.kind}):\n- ${pending.items.join('\n- ')}`)
     pending = null
 
-    const checks = await ops('checks', `bash ${SCRIPTS}/run-checks.sh ${CONFIG_PATH} ${worktree}`, worktree)
+    const checks = await ops('checks', `${envPrefix}bash ${SCRIPTS}/run-checks.sh ${CONFIG_PATH} ${worktree}`, worktree)
     if (checks.exit_code !== 0) { nextRound('checks', [checks.output]); continue }
 
-    const review = await reviewStage({ ...ctx, history, reviewRound: progress.rounds + 1 })
+    const review = await reviewStage({ ...ctx, history, reviewRound: progress.rounds + 1, focus })
     reviewReceipts = review.receipts
     reviewLog.deferred_minor = (review.deferred || []).map(f => `${f.location} ${f.scenario}`)
     reviewLog.fixed.push(...review.fix.map(f => f.finding))
     reviewLog.dismissed.push(...review.dismiss)
     history.push(...review.fix.map(f => ({ round: progress.rounds + 1, decision: 'fixed', finding: f.finding, reason: f.reason })),
       ...review.dismiss.map(f => ({ round: progress.rounds + 1, decision: 'dismissed', finding: f.finding, reason: f.reason })))
-    if (review.fix.length) { nextRound('review', review.fix.map(f => `${f.finding} (${f.reason})`)); continue }
+    if (review.fix.length) {
+      focus = review.headSha ? { base: review.headSha, ...review.topics } : null
+      nextRound('review', review.fix.map(f => `${f.finding} (${f.reason})`))
+      continue
+    }
+    // A clean re-review of the fix is followed by one full review before QA.
+    if (focus) { focus = null; continue }
 
     const verdict = await qaStage(ctx)
     criteria = contractResults(unit, verdict.criteria)
@@ -254,10 +287,10 @@ async function runUnit(unit, baseBranch, progress, parentPr) {
     note('final gate', 'approve', final.rationale)
 
     const result = unitResult(unit, progress.rounds, criteria, decision.rationale, finalRationale, reviewLog, { qa: Object.values(qaLog), preexisting: qaPreexisting, receipts: reviewReceipts }, decisions)
-    const ship = await call(`Worktree: ${worktree}\nBranch: ${branch}\nBase: ${baseBranch}\nTitle: ${unit.contract.pr_title}\nScratch: ${state}\nScripts directory: ${SCRIPTS}\ndry_run: ${A.dry_run}\nparent_pr: ${parentPr || 'none'}\nUnit result counts: ${resultCounts(result)}\nUnit result JSON:\n${JSON.stringify(result)}`,
+    const ship = await call(`Worktree: ${worktree}\nBranch: ${branch}\nBase: ${baseBranch}\nTitle: ${unit.contract.pr_title}\nScratch: ${state}\nScripts directory: ${SCRIPTS}\ndry_run: ${A.dry_run}\nparent_pr: ${parentPr || 'none'}\nDeferred minor items: ${JSON.stringify(result.review.deferred_minor)}`,
       { agentType: 'autopilot:shipper', model: WORKERS, schema: SHIP, label: `${tag} ship`, phase: 'Ship' })
     if (!ship) throw new Stop('failed', 'shipper returned nothing')
-    // Even a dry run must leave unit-result.json and the rendered PR body behind.
+    // Even a dry run must leave the PR body behind.
     if (!ship.body) throw new Stop('failed', `shipper rendered no PR body: ${ship.notes || 'no notes'}`)
     prUrl = ship.pr_url
     progress.pr_url = prUrl // a unit blocked later by CI still reports its open PR
@@ -283,18 +316,32 @@ function contractResults(unit, checked) {
 // ---------- review: code-review gates + lenses, skeptics, triage ----------
 // Returns {fix, dismiss, receipts, deferred}: triage's verdict on every gate FAIL and
 // surviving lens finding, the review's incomplete receipts, and minor findings deferred to the PR.
-async function reviewStage({ unit, tag, worktree, baseBranch, state, context, call, note, retryOnce, history, reviewRound }) {
+async function reviewStage({ unit, tag, worktree, baseBranch, state, context, call, note, retryOnce, history, reviewRound, focus }) {
   const earlier = history.length
     ? `Earlier review decisions (do not re-raise or reverse one unless you give a new concrete scenario it did not consider): ${JSON.stringify(history)}`
     : ''
-  const gates = () => codeReviewGates({ unit, tag, worktree, baseBranch, state, call, note, retryOnce, earlier, reviewRound })
-  const lenses = [...LENSES.map(lens => ({ lens, agentType: 'autopilot:lens-reviewer' })),
-    ...CFG.review.extra_agents.map(type => ({ lens: type, agentType: type }))]
+  const reviewBase = focus ? focus.base : baseBranch
+  const prep = await reviewPrep({ unit, tag, worktree, reviewBase, state, call, retryOnce, reviewRound, partial: !!focus })
+  const files = prep.files || []
+  const inFocus = (name, always, picked) => !focus || always.includes(name) || picked.includes(name)
+  const gateTopics = GATE_TOPICS.filter(g => inFocus(g, ALWAYS_GATES, focus ? focus.gates : []))
+  const lensNames = LENSES.filter(l => inFocus(l, ALWAYS_LENSES, focus ? focus.lenses : []))
+  for (const name of [...gateTopics, ...lensNames].filter(n => !applies(n, files))) note(`${GATE_TOPICS.includes(name) ? 'gate' : 'lens'} ${name}`, 'skipped', 'no file it applies to in the diff')
+  const gates = () => codeReviewGates({ unit, tag, worktree, reviewBase, call, note, earlier, prep, files, gateTopics, focus })
+  // The repo's own review skills run beside the kit's gates, as lenses, every full review and
+  // again on the fix when they found something.
+  const repoSkills = CFG.review.skills.map(skill => `skill:${skill}`).filter(lens => !focus || focus.lenses.includes(lens))
+  const lenses = [...lensNames.filter(l => applies(l, files)).map(lens => ({ lens, agentType: 'autopilot:lens-reviewer' })),
+    ...repoSkills.map(lens => ({ lens, agentType: 'autopilot:lens-reviewer' })),
+    ...(focus ? [] : CFG.review.extra_agents.map(type => ({ lens: type, agentType: type })))]
+  const focusNote = focus ? `\nRe-review of the fix only: review the changes since ${focus.base} (git -C ${worktree} diff ${focus.base}...HEAD).` : ''
+  // A full review asks each lens until it runs dry; a re-review of the fix asks once.
+  const passes = focus ? 1 : 3
   const lensUntilDry = async ({ lens, agentType }) => {
     const found = []
-    for (let round = 1; round <= 3; round += 1) {
+    for (let round = 1; round <= passes; round += 1) {
       const out = await retryOnce(`lens ${lens} r${round}`, label => call(
-        `Lens: ${lens}\n${context}\nBase: ${baseBranch}\nAlready reported (do not repeat): ${JSON.stringify(found.map(f => f.location + ' ' + f.scenario))}${earlier && `\n${earlier}`}`,
+        `Lens: ${lens}\n${context}\nBase: ${baseBranch}${focusNote}\nAlready reported (do not repeat): ${JSON.stringify(found.map(f => f.location + ' ' + f.scenario))}${earlier && `\n${earlier}`}`,
         { agentType, model: WORKERS, schema: FINDINGS, label: `${tag} ${label}`, phase: 'Review' }))
       if (!out) throw new Stop('failed', `lens ${lens} did not run`)
       if (out.skipped) note(`lens ${lens}`, 'skipped', out.skipped)
@@ -307,28 +354,37 @@ async function reviewStage({ unit, tag, worktree, baseBranch, state, context, ca
   const [gateResult, ...lensResults] = await settle([gates, ...lenses.map(l => () => lensUntilDry(l))])
   const lensFindings = lensResults.flat()
 
-  // Skeptics guard against plausible-but-wrong serious findings; minor ones go straight to triage.
+  // Two skeptics, each judging every serious lens finding at once, guard against
+  // plausible-but-wrong ones; a finding is dropped only when both refute it.
+  // Minor findings go straight to triage.
   const serious = f => f.severity === 'blocker' || f.severity === 'major'
-  const survives = async finding => {
+  const toJudge = lensFindings.filter(serious)
+  let judged = toJudge
+  if (toJudge.length) {
     const votes = await settle([1, 2].map(n => () => call(
-      `Try to refute this review finding. Read the code at ${worktree}. Return refuted=false only if you confirm the scenario really breaks; otherwise refuted=true with the reason.\nFinding: ${JSON.stringify(finding)}`,
-      { agentType: 'autopilot:skeptic', model: WORKERS, schema: REFUTE, label: `${tag} skeptic ${n} ${finding.location}`, phase: 'Review' })))
-    if (votes.some(v => !v)) note(`skeptic ${finding.location}`, 'null', 'a skeptic returned nothing; counted as not refuted')
-    return votes.filter(v => v && v.refuted).length < 2 ? finding : null
+      `Try to refute each of these review findings. Read the code at ${worktree}. For each, return refuted=false only if you confirm the scenario really breaks; otherwise refuted=true with the reason.\nFindings: ${JSON.stringify(toJudge.map((f, index) => ({ index, ...f })))}`,
+      { agentType: 'autopilot:skeptic', model: WORKERS, schema: REFUTES, label: `${tag} skeptic ${n}`, phase: 'Review' })))
+    if (votes.some(v => !v)) note('skeptics', 'null', 'a skeptic returned nothing; its votes count as not refuted')
+    const refutations = index => votes.filter(v => v && v.verdicts.some(x => x.index === index && x.refuted)).length
+    judged = toJudge.filter((f, index) => refutations(index) < 2)
   }
-  const judged = await settle(lensFindings.filter(serious).map(f => () => survives(f)))
-  const kept = [...judged.filter(Boolean), ...lensFindings.filter(f => !serious(f))]
+  const kept = [...judged, ...lensFindings.filter(f => !serious(f))]
   const receipts = gateResult.receiptsIncomplete
-  const deferMinor = reviewRound > MINOR_FIX_ROUNDS
   const minor = f => f.severity === 'minor'
+  // Minor findings never start a fix round on their own; they ride along with a
+  // serious one in the first review rounds, and are listed in the PR otherwise.
+  const deferMinor = reviewRound > MINOR_FIX_ROUNDS || [...gateResult.fails, ...kept].every(minor)
   const deferred = deferMinor ? [...gateResult.fails, ...kept].filter(minor) : []
   const fails = deferMinor ? gateResult.fails.filter(f => !minor(f)) : gateResult.fails
   const toTriage = deferMinor ? kept.filter(f => !minor(f)) : kept
-  if (!fails.length && !toTriage.length) return { fix: [], dismiss: [], receipts, deferred }
+  const headSha = prep.head_sha
+  // The checks whose findings the fix answers; the re-review of the fix runs them again.
+  const topics = { gates: [...new Set(fails.map(f => f.lens).filter(l => GATE_TOPICS.includes(l)))], lenses: [...new Set(toTriage.map(f => f.lens).filter(l => LENSES.includes(l) || l.startsWith('skill:')))] }
+  if (!fails.length && !toTriage.length) return { fix: [], dismiss: [], receipts, deferred, headSha, topics }
 
   const triage = await call(`Triage these findings for ${worktree}.\n${planSpecs(unit)}\nGate FAILs: ${JSON.stringify(fails)}\nLens findings: ${JSON.stringify(toTriage)}${fails.some(f => f.lens === 'verification') ? '\nItems with lens "verification" cite code in this diff: never dismiss one as a format or citation issue.' : ''}${earlier && `\n${earlier}\nDismiss an item that only reverses an earlier decision, with reason "reverses round N decision without new scenario" (N from that decision).`}`,
     { agentType: 'autopilot:triage', model: WORKERS, schema: TRIAGE, label: `${tag} triage`, phase: 'Review' })
-  return { ...(triage || { fix: [...fails, ...toTriage].map(f => ({ finding: `${f.location} ${f.scenario}`, reason: 'triage returned nothing' })), dismiss: [] }), receipts, deferred }
+  return { ...(triage || { fix: [...fails, ...toTriage].map(f => ({ finding: `${f.location} ${f.scenario}`, reason: 'triage returned nothing' })), dismiss: [] }), receipts, deferred, headSha, topics }
 }
 
 // What the plan fixes for this unit: names, signatures and files there are
@@ -389,17 +445,21 @@ function gateFails(gate, parsed) {
   return [{ location: gate, scenario: `${gate}: FAILED without box details`, severity: 'major', lens: gate }]
 }
 
-async function codeReviewGates({ unit, tag, worktree, baseBranch, state, call, note, retryOnce, earlier, reviewRound }) {
+async function reviewPrep({ unit, tag, worktree, reviewBase, state, call, retryOnce, reviewRound, partial }) {
   if (!CR()) throw new Stop('failed', 'code_review_root missing from the workflow args')
-  const outDir = `${state}/review/r${reviewRound}`
+  const outDir = `${state}/review/r${reviewRound}${partial ? '-fix' : ''}`
   const prep = await retryOnce('review prep', label => call(
     `You are review-code's orchestrator for Step 1 only (read ${CR()}/skills/review-code/SKILL.md, "Step 1: gather context" and "Scope checks").\n` +
-    `1. Run exactly: cd ${worktree} && bash ${CR()}/scripts/gather-review.sh --branch ${baseBranch} --out-dir ${outDir}\n` +
+    `1. Run exactly: cd ${worktree} && bash ${CR()}/scripts/gather-review.sh --branch ${reviewBase} --out-dir ${outDir}\n` +
     `2. Read the diff it saved in full (in offset/limit chunks if it is 35KB or more), and write the SCOPE: block for this local branch, one box per line in the BOXES: shape, each with evidence or its N/A reason: §G1 (N/A: local diff), §G2 against the stated purpose "${unit.title}: ${unit.scope}", §G3 (N/A: no linked issue), §G4.\n` +
     `Return exit_code (gather-review.sh's), output (its stdout and stderr), head_sha, diff_file and changed_files (HEAD_SHA, DIFF_FILE, CHANGED_FILES from its meta.env), files (the paths listed in CHANGED_FILES), and scope (the whole SCOPE: block starting with "SCOPE:").`,
     { agentType: 'autopilot:review-prep', model: WORKERS, effort: 'low', schema: PREP, label: `${tag} ${label}`, phase: 'Review' }))
   if (!prep) throw new Stop('failed', 'code-review prep did not run')
   if (prep.exit_code !== 0) throw new Stop('failed', `code-review gather failed: ${prep.output || ''}`)
+  return prep
+}
+
+async function codeReviewGates({ unit, tag, worktree, reviewBase, call, note, earlier, prep, files, gateTopics, focus }) {
   const inputs = [`Head SHA: ${prep.head_sha}`, `Diff file: ${prep.diff_file}`, `Changed files: ${prep.changed_files}`, `Repo root: ${worktree}`].join('\n')
 
   // A null or malformed block is retried once (review-code sends a shapeless verdict back); twice fails closed.
@@ -419,9 +479,15 @@ async function codeReviewGates({ unit, tag, worktree, baseBranch, state, call, n
     if (!parsed) throw new Stop('failed', `code-review ${gate} gate did not return a verdict block`)
     return { gate, text: text.trim(), ...parsed }
   }
-  let phase1 = await settle(GATE_TOPICS.map(gate => () => runGate(gate, inputs)))
+  // A gate with no file it applies to gets the N/A block it would return itself.
+  const notApplicable = gate => {
+    const text = `GATE: ${gate}\nSTATUS: PASS (N/A)\nBOXES:\n- [N/A] no file this gate applies to in the diff\nFINDINGS:\n- none`
+    return { gate, text, ...parseGateBlock(text) }
+  }
+  let phase1 = await settle(gateTopics.map(gate => () => (applies(gate, files) ? runGate(gate, inputs) : notApplicable(gate))))
   const verify = pass => runGate('verification', [
     inputs, `Phase-1 gate verdict blocks, verbatim:\n\n${phase1.map(g => g.text).join('\n\n')}`, prep.scope,
+    focus && `Re-review of the fix only (the diff is ${focus.base}...HEAD). Only these gates ran: ${gateTopics.join(', ')}.`,
     earlier && `Re-review. ${earlier}`,
   ].filter(Boolean).join('\n\n'), pass)
   const failed = g => g.status === 'FAIL' || g.findings.length > 0
@@ -432,7 +498,7 @@ async function codeReviewGates({ unit, tag, worktree, baseBranch, state, call, n
   let verification = await verify('')
   let audit = auditItems(verification, prep.files || [], worktree)
   if (audit.receipts.length) {
-    const named = GATE_TOPICS.filter(g => audit.receipts.some(r => r.gates.includes(g)))
+    const named = gateTopics.filter(g => applies(g, files) && audit.receipts.some(r => r.gates.includes(g)))
     const findings = audit.receipts.map(r => `- ${r.text}`).join('\n')
     const rerun = await settle(named.map(gate => () => runGate(gate, `${inputs}\n\nThe verification gate failed your last verdict's receipts:\n${findings}\nReturn a complete verdict block that fixes them.`, ' recheck')))
     phase1 = phase1.map(g => rerun.find(r => r.gate === g.gate) || g)
@@ -539,14 +605,6 @@ async function qaStage({ unit, tag, worktree, state, context, call, ops, note })
       if (stopped.exit_code !== 0) note('stop app', `exit ${stopped.exit_code}`, stopped.output)
     } catch (error) { note('stop app', 'failed', error.message) }
   }
-}
-
-// The shipper retypes the result into unit-result.json; these counts let it
-// check that nothing was shortened (it compares them with jq, see shipper.md).
-function resultCounts(result) {
-  return JSON.stringify({ criteria: result.criteria.length, decisions: result.decisions.length,
-    fixed: result.review.fixed.length, dismissed: result.review.dismissed.length, qa_preexisting: result.qa_preexisting.length,
-    review_receipts_incomplete: result.review_receipts_incomplete.length })
 }
 
 function unitResult(unit, rounds, criteria, design, final, review, { qa, preexisting, receipts }, decisions) {

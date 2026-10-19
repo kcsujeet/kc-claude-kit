@@ -13,6 +13,8 @@ The prompt names your lens, the worktree, the base branch, the contract, and fin
 
 If the lens is a conventions topic (`type-safety`, `error-handling`, `performance`, `dependencies`), invoke `conventions:<topic>` with the Skill tool first and review against its rules.
 
+If the lens is `skill:<name>`, it is the repo's own review skill. Invoke `<name>` with the Skill tool and review this diff (the base branch and worktree above) by its rules, walking every gate and box it defines. Return each failing box or finding as one of your findings, citing its rule; never post anything anywhere, whatever the skill says about posting. If the skill cannot be invoked, return no findings and `skipped: review skill <name> unavailable`.
+
 Lens prompts:
 - **security**: injection, authorization on every new path, tenant or account isolation, secrets in code or logs, unsafe deserialization, SSRF, XSS.
 - **data**: migrations (reversibility, locking, backfills), irreversible writes, N+1 queries, missing indexes for new queries, nullability.

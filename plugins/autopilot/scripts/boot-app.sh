@@ -3,7 +3,9 @@
 #
 # Usage: boot-app.sh <config.json> <worktree> <unit-index> <state-dir>
 # Input: normalized config from read-config.sh (launch.install, seed, start,
-#        ready, ready_timeout_s, ports.base, ports.per_unit).
+#        ready, ready_timeout_s, ports.base, ports.per_unit, unit_env).
+# launch.unit_env (KEY=value pairs, {port} and {index} substituted) is set for
+# install, seed and start, so each unit uses its own databases.
 # Output: {"url": "...", "port": N, "log": "..."} on stdout.
 # Exit: 0 ready; 1 the port already serves the ready URL before start (a
 #       stale server), install/seed failed, the app exited before ready, or
@@ -20,13 +22,17 @@ cfg() { jq -r "$1" "$config"; }
 
 port=$(( $(cfg .launch.ports.base) + $(cfg .launch.ports.per_unit) * index ))
 port_token='{port}'
-sub() { printf '%s' "${1//"$port_token"/$port}"; }
+index_token='{index}'
+sub() { local s=${1//"$port_token"/$port}; printf '%s' "${s//"$index_token"/$index}"; }
 log="$state/app-$index.log"
 install=$(cfg .launch.install)
 seed=$(cfg .launch.seed)
 start=$(sub "$(cfg .launch.start)")
 ready=$(sub "$(cfg .launch.ready)")
 timeout_s=$(cfg .launch.ready_timeout_s)
+# read-config.sh allows only KEY=value pairs without spaces, so splitting on spaces is safe.
+read -r -a unit_env <<<"$(sub "$(cfg '.launch.unit_env // ""')")"
+unit_env+=("PORT=$port")
 
 # A server already answering would make a failed start look ready.
 if curl -fsS --max-time 2 -o /dev/null "$ready" 2>/dev/null; then
@@ -35,15 +41,15 @@ if curl -fsS --max-time 2 -o /dev/null "$ready" 2>/dev/null; then
 fi
 
 if [ -n "$install" ] && [ ! -f "$state/installed-$index" ]; then
-  (cd "$worktree" && bash -c "$install") >>"$log" 2>&1 || { echo "install failed; see $log" >&2; tail -n 40 "$log" >&2; exit 1; }
+  (cd "$worktree" && env "${unit_env[@]}" bash -c "$install") >>"$log" 2>&1 || { echo "install failed; see $log" >&2; tail -n 40 "$log" >&2; exit 1; }
   touch "$state/installed-$index"
 fi
 if [ -n "$seed" ]; then
-  (cd "$worktree" && PORT=$port bash -c "$seed") >>"$log" 2>&1 || { echo "seed failed; see $log" >&2; tail -n 40 "$log" >&2; exit 1; }
+  (cd "$worktree" && env "${unit_env[@]}" bash -c "$seed") >>"$log" 2>&1 || { echo "seed failed; see $log" >&2; tail -n 40 "$log" >&2; exit 1; }
 fi
 
 set -m
-(cd "$worktree" && PORT=$port exec bash -c "$start") >>"$log" 2>&1 &
+(cd "$worktree" && exec env "${unit_env[@]}" bash -c "$start") >>"$log" 2>&1 &
 pid=$!
 set +m
 # ps finds nothing when the start already exited; the loop reports that.

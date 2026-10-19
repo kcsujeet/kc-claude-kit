@@ -15,7 +15,7 @@ fail() { echo "FAIL $1"; echo "     $2"; failures=$((failures + 1)); }
 mkdir -p "$tmp/wt" "$tmp/state"
 echo hello > "$tmp/wt/index.html"
 cat > "$tmp/config.json" <<'JSON'
-{"launch":{"install":"touch installed.txt","start":"python3 -m http.server {port} --bind 127.0.0.1","ready":"http://127.0.0.1:{port}/","seed":"","ready_timeout_s":20,"ports":{"base":4700,"per_unit":10},"login":null},"checks":["true"]}
+{"launch":{"install":"touch installed.txt","start":"python3 -m http.server {port} --bind 127.0.0.1","ready":"http://127.0.0.1:{port}/","seed":"printf '%s %s' \"$APP_DB\" \"$TEST_ENV_NUMBER\" > unit-env.txt","unit_env":"APP_DB=app_{port} TEST_ENV_NUMBER={index}","ready_timeout_s":20,"ports":{"base":4700,"per_unit":10},"login":null},"checks":["true"]}
 JSON
 
 out=$(bash "$scripts/boot-app.sh" "$tmp/config.json" "$tmp/wt" 3 "$tmp/state" 2>/dev/null) || out='{}'
@@ -23,6 +23,7 @@ url=$(printf '%s' "$out" | jq -r '.url // "none"') || url="<jq failed>"
 if [ "$url" = "http://127.0.0.1:4730/" ]; then pass "port from index"; else fail "port from index" "$url"; fi
 if curl -fsS "$url" 2>/dev/null | grep -q hello; then pass "app serves"; else fail "app serves" "no hello"; fi
 if [ -f "$tmp/wt/installed.txt" ]; then pass "install ran in worktree"; else fail "install ran in worktree" "missing"; fi
+if [ "$(cat "$tmp/wt/unit-env.txt" 2>/dev/null)" = "app_4730 3" ]; then pass "unit_env reaches seed with port and index"; else fail "unit_env reaches seed with port and index" "$(cat "$tmp/wt/unit-env.txt" 2>/dev/null || echo missing)"; fi
 
 bash "$scripts/stop-app.sh" "$tmp/state" 3 || true
 sleep 1
