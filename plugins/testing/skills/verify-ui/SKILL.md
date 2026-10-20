@@ -33,7 +33,7 @@ Before opening the app, walk the design (mockup, prototype, spec) and write down
 - every option of a choice that changes the layout (visibility, type, mode, plan)
 - every role or permission that sees the screen differently
 - with and without each optional piece of data (no items, one item, many)
-- every drawer, dialog, menu and confirmation the screen opens, with its exact wording
+- every drawer, dialog, menu and confirmation the screen opens, with its exact wording, in each state of filling it in: empty, one item picked, several picked, and editing an existing item (what appears after a pick is where drawers differ most)
 
 Then put the app in each state and diff it against the design: which sections, fields, columns and actions appear, in which states, and what they do. Each difference in structure or behaviour is a finding, unless the ticket or the product owner decided otherwise; name that decision when you skip one.
 
@@ -97,7 +97,9 @@ If nothing is available and you genuinely cannot see the UI, say that plainly an
 Do not report a UI change verified until every box is ticked:
 
 - [ ] Every surface the diff reaches is listed, including other consumers of shared components.
+- [ ] When the work spans several branches or pull requests, the list covers every screen any of them changes, not only the one being worked on now.
 - [ ] If a design exists, the state matrix is written from it, covering every switch in both positions, every layout-changing option, every role, empty/one/many, and every drawer and dialog.
+- [ ] Every drawer and dialog was opened and filled in: empty, one item picked, several picked, and editing an existing item.
 - [ ] The app was put in every state of the matrix and compared to the design section by section, not only the state you happened to land in.
 - [ ] Every new or changed component was measured against its siblings on the same screen (title, subtitle, field labels, spacing).
 - [ ] Each finding is about structure or behaviour; cosmetic differences where the app has an existing pattern (titles, labels, casing, icons) follow the app.
