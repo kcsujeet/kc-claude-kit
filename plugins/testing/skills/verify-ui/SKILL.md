@@ -35,7 +35,9 @@ Before opening the app, walk the design (mockup, prototype, spec) and write down
 - with and without each optional piece of data (no items, one item, many)
 - every drawer, dialog, menu and confirmation the screen opens, with its exact wording
 
-Then put the app in each state and diff it against the design: which sections, fields, columns, buttons and text appear, in what order, with what copy. Each difference is a finding, unless the ticket or the product owner decided otherwise; name that decision when you skip one.
+Then put the app in each state and diff it against the design: which sections, fields, columns and actions appear, in which states, and what they do. Each difference in structure or behaviour is a finding, unless the ticket or the product owner decided otherwise; name that decision when you skip one.
+
+A design is not a pixel spec for things the app already has a pattern for. Titles, button labels, casing, icons, chips and wording follow the app's existing patterns so the product stays consistent; a difference there is not a finding unless the design introduces something the app has no pattern for.
 
 ### Step 2 — get real data in front of it
 
@@ -95,6 +97,7 @@ Do not report a UI change verified until every box is ticked:
 - [ ] Every surface the diff reaches is listed, including other consumers of shared components.
 - [ ] If a design exists, the state matrix is written from it, covering every switch in both positions, every layout-changing option, every role, empty/one/many, and every drawer and dialog.
 - [ ] The app was put in every state of the matrix and compared to the design section by section, not only the state you happened to land in.
+- [ ] Each finding is about structure or behaviour; cosmetic differences where the app has an existing pattern (titles, labels, casing, icons) follow the app.
 - [ ] Loading, empty and error states were each seen.
 - [ ] Narrow viewport, the other theme and a keyboard pass were done, or the report says why not.
 - [ ] The report lists each state checked, each finding with the state that produces it, and what was not checked.
