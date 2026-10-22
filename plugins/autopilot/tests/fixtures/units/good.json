@@ -1,5 +1,5 @@
 {
-  "architecture": "Saved replies live in a new replies module next to the composer; U1 owns the API, U2 consumes it.",
+  "architecture": "Design review: callers are the composer only; replies follow the snippets module (src/snippets). Saved replies live in a new replies module next to the composer; U1 owns the API, U2 consumes it.",
   "units": [
     {
       "id": "U1",
@@ -38,8 +38,8 @@
             "behaviour": "fires parallel POSTs and reads straight after"
           }
         ],
-        "branch": "ENG-1-saved-replies-1",
-        "pr_title": "ENG-1 Saved replies part 1"
+        "branch": "ABC-1-saved-replies-1",
+        "pr_title": "ABC-1 Saved replies part 1"
       }
     },
     {
@@ -90,8 +90,8 @@
             "behaviour": "submits empty, refreshes mid-flow, uses back"
           }
         ],
-        "branch": "ENG-1-saved-replies-2",
-        "pr_title": "ENG-1 Saved replies part 2"
+        "branch": "ABC-1-saved-replies-2",
+        "pr_title": "ABC-1 Saved replies part 2"
       }
     }
   ]

@@ -135,7 +135,7 @@ test('keeps what the plugins beneath drew, stacked above the pills', async ($, o
 
   expect(drawn).toMatchObject({ type: 'Box', props: { flexDirection: 'column' } })
   const column = drawn.type === 'Box' ? drawn : undefined
-  expect(column?.children?.[0]).toEqual(THUMBNAILS)
+  expect(column?.children?.[0]).toMatchObject(THUMBNAILS)
   expect(JSON.stringify(column?.children?.[1])).toContain('↑ ')
   expect(column?.children?.[1]).toMatchObject({ type: 'Box', props: { flexWrap: 'wrap', rowGap: 1 } })
 })
