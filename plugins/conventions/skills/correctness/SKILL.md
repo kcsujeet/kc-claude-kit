@@ -21,6 +21,7 @@ paths:
   - §B6. A new reference does not close a load cycle
   - §B7. A count uses the same filter as its list
   - §B8. When a value's meaning changes, every reader changes
+  - §B9. A claim about a value comes from all its writers
 - Sweeps
 
 ## Rules
@@ -36,6 +37,7 @@ Code that reads well and is wrong is still wrong. Walk every change for the bugs
 - When a change adds a reference from one module or class to another, follow the references back and check that they do not close a loop. Inside a loop, code that runs when a module is defined (a subclass copying its parent's fields, a registration, class-level configuration) can run before what it needs exists, and fail with no error. Use the lazy form of the reference when the library has one.
 - A count, total or summary of a list uses the same filter as the list: what the list hides (archived, deleted, inactive items) the count leaves out too.
 - When a change alters what a value means (a route parameter or field now holds a different kind of id, a setting now applies per item), find every reader of that value and check each one still gets what it expects.
+- Before saying what a value holds ("this column is always blank", the cause of a flaky test), find every writer of it: the class body, every module or concern it includes and their callbacks, factories and seed code. A claim read off the visible class alone is a guess.
 
 Detection criteria and per-box review failure modes live in the `## Review checklist` of the `correctness` skill (`conventions:correctness`), with the detail under its `## Review detail`. These rules are the statement of the convention; that checklist is how a diff gets graded against it.
 
@@ -51,6 +53,7 @@ The correctness gate agent ticks every box against the diff. A box is FAIL if an
 - [ ] §B6 A new reference does not close a load cycle: for each reference the diff adds from one module or class to another (an import, a require, a constant, a serializer or association that names another class), the evidence follows that class's own references back and states whether they lead to the first one. When they close a loop and any module in it does work at definition time (inheritance that copies the parent's declarations, a registry, class-level configuration, a decorator), the box FAILS unless the reference is lazy (a block, a proc, a string name or a deferred import that resolves on first use). A cycle with no definition-time work is clarity §C14. (N/A: the diff adds no reference between modules)
 - [ ] §B7 A count uses the same filter as its list: every count, total or summary the diff adds or changes is computed with the same conditions as the list it summarises (soft-deleted, archived, inactive, other-tenant rows excluded alike), and the evidence names both queries. (N/A: the diff adds or changes no count, total or summary)
 - [ ] §B8 When a value's meaning changes, every reader changes: when the diff changes what a value holds (a route parameter, field or prop now carries a different kind of id or a narrower or wider scope), the evidence lists every reader of that value found by grep, including ones the diff does not touch, and states for each that it still gets what it expects. (N/A: no value changes meaning)
+- [ ] §B9 A claim about a value's contents, in a comment, a commit message or a test's reasoning ("positions are blank", "this is the only writer"), was checked against every writer: the class body, each included module or concern and its callbacks, factories and seeds. One that read only the visible class body FAILS. (N/A: the diff states nothing about what a value holds)
 
 **Point, do not double-report.** A removed export or a changed shared prop shape is structure §S10. A cast asserting a type the value does not have, as syntax, is clarity §C17. Duplicated markup, dead imports, or props threaded through and never read after a refactor are simplicity §P9. A locale formatter with no explicit time zone is datetime §D7. When a bug and one of those boxes describe the same line, report it once, under the closer fit, and name the other box in the evidence.
 
