@@ -49,6 +49,7 @@ Placement is covered by the `structure` skill, which defers to bulletproof-react
 - Prefer `mutate` with callbacks over `mutateAsync` with `await` when the resolved value only drives a side effect.
 - A request's method matches its effect: a read uses GET unless its input cannot fit in a query string.
 - A cache patch or invalidation targets the narrowest key that shows the change.
+- A query key includes every context its response depends on that isn't in its params (the current tenant, the signed-in user, the locale). A write that adds a record or changes a field a list filters on refetches filtered lists rather than patching them, and refetches counts and totals derived from what it changed.
 - A write hook touches only its own resource. Another resource's writes live in that resource's hook, and the caller composes the two.
 - A read hook wires up every option it accepts. Accepting an option and ignoring it is dead surface.
 
@@ -96,6 +97,7 @@ The react gate agent ticks every box against the diff. A box is FAIL if any matc
 - [ ] §R25 Each form watch (and each piece of field state) lives in the smallest component that renders from it; a child reads shared form values through the form context instead of the parent watching them and passing them down. A watch in the form or its setup hook FAILS unless that component renders from the value too. (N/A: no watch or field state added in a form)
 - [ ] §R26 A form that edits an existing record seeds the related record its inputs render from (`owner_id` and `owner`), not just the id, and no picker gets a label prop hand-built from a record the form already holds. (N/A: no form editing an existing record)
 - [ ] §R27 A read hook accepts the repo's standard read-hook options (extended with its own fields, not a re-declared subset) and wires every option it accepts; an accepted option the hook never reads FAILS. (N/A: no read hook added or edited)
+- [ ] §R28 Cached data follows its context and its filters: every new or changed query key includes each context its response depends on that isn't in its params (the current tenant or workspace sent in a header or read from a store, the signed-in user, the locale), through the repo's helper for context keys when one exists. A write that adds a record, or changes a field a list filters on, refetches filtered lists instead of patching them, and also refetches queries that derive from what it changed (counts, totals, badges). (N/A: no query key, cache patch or write added or changed)
 
 ## Review detail
 
@@ -310,7 +312,7 @@ export const WidgetInput = ({ label, ref }: WidgetInputProps) => { /* ... */ }
 
 ### Section 3 — Data fetching
 
-The detail for §R11-§R13, §R21-§R23 and §R27 is in `${CLAUDE_PLUGIN_ROOT}/skills/react/references/data-fetching.md`. Read it in full before grading any of them.
+The detail for §R11-§R13, §R21-§R23, §R27 and §R28 is in `${CLAUDE_PLUGIN_ROOT}/skills/react/references/data-fetching.md`. Read it in full before grading any of them.
 
 ---
 

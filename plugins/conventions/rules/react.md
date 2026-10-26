@@ -32,6 +32,7 @@ Placement is covered by the `structure` skill, which defers to bulletproof-react
 - Prefer `mutate` with callbacks over `mutateAsync` with `await` when the resolved value only drives a side effect.
 - A request's method matches its effect: a read uses GET unless its input cannot fit in a query string.
 - A cache patch or invalidation targets the narrowest key that shows the change.
+- A query key includes every context its response depends on that isn't in its params (the current tenant, the signed-in user, the locale). A write that adds a record or changes a field a list filters on refetches filtered lists rather than patching them, and refetches counts and totals derived from what it changed.
 - A write hook touches only its own resource. Another resource's writes live in that resource's hook, and the caller composes the two.
 - A read hook wires up every option it accepts. Accepting an option and ignoring it is dead surface.
 

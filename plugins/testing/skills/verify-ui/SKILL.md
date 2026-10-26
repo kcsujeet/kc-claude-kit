@@ -62,6 +62,20 @@ For each surface, look at every state it can be in, not only the populated one:
 
 A missing empty state and a missing loading state are the two most commonly shipped omissions, because the developer's data is always already there.
 
+### Step 3b — walk the flows around the change
+
+Each state above can look right while the path into it is broken. QA by a person finds these first, because a person moves between screens and keeps going. Walk them on every surface the change reaches:
+
+- **Switch context mid-page.** Change the current tenant, workspace or account while on each changed page. Every panel follows, with no reload; a record that belongs to the previous context shows a clear not-found, not a blank or half-loaded page.
+- **Go where the write shows up.** After each create, edit, archive or delete, visit every other screen that shows something derived from it (a list, a count, a badge, a picker on another page) without reloading, and check it changed, and that it didn't appear where its filters exclude it.
+- **Use the records real data holds.** Include records the new screens can no longer create: blank optional fields, old links, defaults from before a migration. Then try the new actions next to them (create one more, link, delete).
+- **Do each interaction twice.** Search, pick, search again, pick again; add, remove, add; open, close, reopen. State that survives one pass often breaks on the second.
+- **Clear every field you can edit, and save.** Expect a message on the field, or a sensible default, never a generic error.
+- **Read every confirmation against what happens.** After confirming, check the result matches the words: "remove" that deletes, or "delete" that only unlinks, is a finding.
+- **See signed-in state everywhere it shows.** Sign in from each entry point, then check every surface that shows who is signed in, and what a signed-in person should and shouldn't see.
+- **Fill it past the screen.** Make a list or page taller than the viewport and check the background, footer and scrolling hold.
+- **Start from a fresh record.** Create the thing through the UI and take it through the whole flow it exists for. When a result looks wrong, check the inputs before calling it a bug: a total of zero explains a skipped payment.
+
 ### Step 4 — vary the environment
 
 - **Narrow and wide viewport.** The narrow one is where things break; check it first.
@@ -107,5 +121,12 @@ Do not report a UI change verified until every box is ticked:
 - [ ] Every pointer to another screen ("managed in X", a read-only value with a link) was followed: the destination has the field, it saves, the first screen shows the new value without a reload, and the destination matches the design's version. Every read-only value has a screen that edits it, or the report names it as a bug.
 - [ ] Each finding is about structure or behaviour; cosmetic differences where the app has an existing pattern (titles, labels, casing, icons) follow the app.
 - [ ] Loading, empty and error states were each seen.
+- [ ] Each changed page was re-checked after switching the current tenant or workspace on it, with no reload.
+- [ ] After each write, every other screen showing data derived from it (lists, counts, badges, pickers) was visited without a reload, including filtered ones it must not appear in.
+- [ ] Records in states the new UI can't create (blank optional fields, old links, pre-migration defaults) were used next to the new actions.
+- [ ] Each interaction was done twice in a row (search and pick twice; add, remove, add).
+- [ ] Every editable field was cleared and saved, and every confirmation's words were checked against what actually happened.
+- [ ] Signed-in state was checked on every surface that shows it, after signing in from each entry point.
+- [ ] A list or page was filled past the viewport, and a record created fresh through the UI was taken through its whole flow.
 - [ ] Narrow viewport, the other theme and a keyboard pass were done, or the report says why not.
 - [ ] The report lists each state checked, each finding with the state that produces it, and what was not checked.
