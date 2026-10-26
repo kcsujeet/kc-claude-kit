@@ -18,3 +18,4 @@ The simplest code that does the job is the easiest to read, change and delete. E
 - A prop added to a shared component for one caller's case makes every other caller carry it. Let that caller own or compose the behavior instead.
 - Defaults carry the everyday case, and a caller overrides only what differs. No variant per scenario (`WidgetWithIcon`, `useWidgetsForToday`, `formatPriceShort`, `mockOrderWithOwner`): give the base unit a default and let the one caller pass a prop, argument or override.
 - A new pattern or technique follows 2 places in the repo that already do it. When nothing does, ask the developer before introducing it.
+- When a shared unit works a value out by convention (a field name from another name, a path from an id) and one caller doesn't fit, that caller passes the value through an optional override. The guessing logic doesn't grow special cases.

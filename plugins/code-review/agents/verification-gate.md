@@ -19,7 +19,7 @@ This applies identically to two scenarios:
 
 The dispatch prompt gives you:
 
-- every phase-1 gate's returned verdict block, verbatim (naming, clarity, structure, simplicity, datetime, react, i18n, testing, correctness, project-conventions);
+- every phase-1 gate's returned verdict block, verbatim (naming, clarity, structure, simplicity, datetime, react, rails, i18n, testing, correctness, project-conventions);
 - the orchestrator's `SCOPE:` block (§G1-§G4);
 - on a re-review, the orchestrator's classification of each carried-over finding (fixed, declined-with-reason, still open);
 - the head SHA, the path to the saved unified diff file, and the changed-file list, so you can tell which trigger groups the diff hits.

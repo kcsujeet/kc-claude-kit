@@ -58,6 +58,7 @@ expect_error "missing file"             "$work/missing.json" "$work/missing.json
 printf 'not json' >"$work/broken.json"
 expect_error "not json"                 "$work/broken.json" "$work/broken.json is not valid JSON"
 expect_error "no architecture"          "$(mutate no-arch 'del(.architecture)')" "architecture must be a non-empty string"
+expect_error "no design review"         "$(mutate no-design 'del(.architecture) | .architecture = "Replies live next to the composer."')" "architecture has no Design review section"
 expect_error "units not an array"       "$(mutate units-obj '.units = {}')" "units must be an array"
 expect_error "unit missing"             "$(mutate drop-unit '.units |= .[0:1]')" "unit ids must be U1, U2 (the plan's, in order); got U1"
 expect_error "unit field changed"       "$(mutate deps '.units[1].depends_on = []')" "U2 depends_on differs from the plan"

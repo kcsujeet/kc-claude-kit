@@ -44,6 +44,7 @@ readonly PROBLEMS='
   | [
       (if ($u | type) != "object" then "units.json must be a JSON object" else empty end),
       (if ($u | type) == "object" and ($u.architecture | nonempty | not) then "architecture must be a non-empty string" else empty end),
+      (if ($u | type) == "object" and ($u.architecture | nonempty) and ($u.architecture | test("Design review") | not) then "architecture has no Design review section (see run step 2)" else empty end),
       (if ($u | type) == "object" and ($u.units | type) != "array" then "units must be an array" else empty end),
       (if ($min | type) != "number" or ($max | type) != "number" then "config has no limits.qa_personas min and max; pass read-config.sh output" else empty end),
       (if ($u | type) == "object" and ($u.units | type) == "array" then
