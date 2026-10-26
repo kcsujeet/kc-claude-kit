@@ -47,6 +47,7 @@ A Rails app almost never needs a new shape. It already has dozens of controllers
 - `includes` / `preload` only fixes readers that walk loaded rows in Ruby. A method that chains a scope or aggregates (`assoc.where(...).sum`, `.count`, `.exists?`, `.pluck`) still queries once per record; it needs a bulk pass over the whole set.
 - A bulk pass is installed at a seam every caller goes through (the serializer or render entry point), not called from the one route that was slow, and is named for what it does, not for its first caller.
 - Every computed serializer attribute (a method, not a column) is checked for a per-record query, including one that calls another computed attribute.
+- A serializer exposes its own model's attributes. Data that belongs to another model reaches the client through a relationship the client includes, never as that model's attributes copied onto this serializer.
 - A response the client only counts returns a count, not a serialized collection.
 - No plain `@x ||=` memo on a value that depends on time or a window; it freezes silently.
 
@@ -84,6 +85,7 @@ The rails gate ticks every box against the diff. A box is FAIL if any matching c
 - [ ] §RL4a Per-record reads: every added `sum|count|average|minimum|maximum|any?|exists?|pluck` reached per record is classified (walks loaded rows vs queries); a querying one has a bulk pass. (N/A: none added)
 - [ ] §RL4b A bulk pass sits at a seam every caller passes and is named for what it does; callers that still miss it are named. (N/A: no bulk pass)
 - [ ] §RL4c Every added or touched computed serializer attribute was checked for per-record queries. (N/A: no serializer touched)
+- [ ] §RL4d Every added serializer attribute belongs to the serializer's own model. An attribute whose value is read from another model (`object.store.currency`, a computed attribute that delegates to an associated record) FAILS: expose it on that model's serializer and have the client include the relationship. When the association is missing from the client's path, add the relationship, not the attribute. (N/A: no serializer attribute added)
 - [ ] §RL4d No time-dependent `@x ||=` memo; an endpoint whose client only counts returns a count. (N/A: none added)
 - [ ] §RL5a No unbounded work in a request; a cap has a clear message, or the work moves to a job. (N/A: nothing unbounded added)
 - [ ] §RL5b No GET or HEAD writes: every read path added or touched saves, creates and enqueues nothing. (N/A: no read path)
@@ -143,6 +145,8 @@ Preloading does nothing for a reader that chains a scope onto the association: `
 Install the bulk pass where every caller passes, typically the method that renders records for the API, and ask which callers still miss it. A pass called only from `#index` leaves `create`, `update` and `show` still querying per record. Note that records reached through nested includes may skip the seam.
 
 A computed serializer attribute that calls another computed attribute doubles the cost. Measure before claiming: state query counts and timings produced in the session, with the environment named.
+
+**§RL4d. Another model's data comes through a relationship.** Copying an associated record's fields onto a serializer (`attribute :currency do |order| order.store.currency end`) works once and then spreads: the next screen needs one more field, the same values appear in two serializers that drift, and the client can no longer tell which record a value belongs to or cache it once. Expose the value on its own model's serializer, add the relationship if it is missing (`belongs_to :store`), and have the client include it (`?include=store`). When a field must stay hidden from some callers, gate it on that model's serializer, not by copying a safe subset elsewhere.
 
 ### §RL5. Request-shaped risks
 
