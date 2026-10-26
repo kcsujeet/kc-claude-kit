@@ -12,6 +12,7 @@ So look at it. Once, deliberately, before saying it is done.
 ## Hard rules
 
 - **Never report a UI change complete without having seen it.** "The tests pass" is not the same claim and must not be presented as one.
+- **The browser check is not optional.** It is part of fixing a UI bug, the same as the code change: never offer it as a choice or a follow-up ("QA first, or post as is?"), and never tell a tester or reviewer something is fixed before you have seen it fixed. If the dev servers are down, start them; if a sign-in only the user can do stands in the way, ask for it, and until then nothing is called fixed.
 - **Report what you did and what you saw**, screen by screen. Not "verified the layout" but "narrow viewport, dark mode: the invoice total wraps under the button".
 - **Keep the failure.** If a state renders wrong, that is the finding. Do not adjust the data until it looks fine and then call it passing.
 - **Realistic data or nothing.** `Lorem ipsum`, `Test User`, and a three-row list prove only that the happy path with short strings works. Production has 400 rows, names with diacritics, and a description that runs four lines.
@@ -132,4 +133,5 @@ Do not report a UI change verified until every box is ticked:
 - [ ] A list or page was filled past the viewport, and a record created fresh through the UI was taken through its whole flow.
 - [ ] Every reported layout defect was traced through its ancestors in code and reproduced at the content size the report shows, before it was fixed or left open.
 - [ ] Narrow viewport, the other theme and a keyboard pass were done, or the report says why not.
+- [ ] Every UI fix was seen fixed in a browser before it was reported done or anyone was told it is fixed.
 - [ ] The report lists each state checked, each finding with the state that produces it, and what was not checked.
