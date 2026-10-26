@@ -19,6 +19,7 @@ So look at it. Once, deliberately, before saying it is done.
 - **Spot checks are not QA.** Opening the screen you just changed and seeing that it renders is a smoke test. QA walks every state the screen can be in, the way a QA engineer works through a test plan, and does that every time, not only when asked.
 - **When there is a design, the design is the test plan.** Walk it state by state and compare the app to it. "It renders" and "it matches the design" are different claims.
 - **A moved field is two screens.** When a screen stops editing a value and points elsewhere ("managed in product settings", a read-only value with a link), follow the pointer: open the destination, confirm the field is there and saves, and that the first screen shows the new value without a reload. Compare the destination with the design's version of it too. A pointer to a screen that cannot edit the value is a bug, and so is a read-only value that no screen edits.
+- **Look at the shipped screen, not a stand-in.** A story, fixture page or test harness is not the app. Check the change where users see it, with its real configuration, and treat a probe as evidence only after it has been shown it can fail (see `testing:verify-e2e`).
 
 ## Workflow
 

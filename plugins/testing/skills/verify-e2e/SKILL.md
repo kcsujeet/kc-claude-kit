@@ -17,6 +17,11 @@ This is not about writing a browser test suite. Driving the thing as a human is 
 - **Report the steps you took and what you saw at each one.** Enough that someone can repeat it without asking you how.
 - **Say what you could not exercise.** No credentials, no sandbox, no way to trigger the webhook: name it rather than leaving a silent hole.
 - **Spot checks are not QA.** Running the one path you just built is a smoke test. Walk every state the flow can be in, every time. When there is a design, its states are the test plan: build the state matrix the `verify-ui` skill describes and walk each state end to end.
+- **Run it in what users get, not in your test setup.** A test harness, fixture page or storybook loads small, clean data under near-default settings. The shipped app (its demo, its staging build, the configuration a consumer actually runs) combines every option, dense data, scroll containers and real defaults. A bug that needs that combination passes every harness test, and so does correct behaviour that a person meeting those defaults reads as broken. A feature is verified only once it has run there.
+- **"It loads with no errors" is not "it works".** A smoke check that never clicks, drags, types or saves proves only that the page renders. Exercise the interaction the change is about.
+- **A probe counts only after it has been shown it can both fail and pass.** Run it first where the behaviour is known to work. A target scrolled out of its container, covered by a sticky header, or a drag that ends outside the drop area all read as "nothing happened", and none of them is a bug. Confirm the target is under the pointer (`document.elementFromPoint`) before trusting the result.
+
+Example: a library shipped a release whose headline feature was resizing items by dragging an edge. It had passed 19 harness specs, two QA rounds, a regression check against the previous version and a smoke test of an example app; none had dragged an edge in the project's public demo. On release day the owner tried it there and nothing would resize. The feature worked: the demo enables a business-hours setting that refuses drops on closed cells, release day was a Sunday, and every item a person reaches for first was refused with nothing but a not-allowed cursor. No one had seen the feature through the demo's defaults, so no one had seen that. The first investigation then reported a bug that did not exist, because its probes pressed handles scrolled out of view or under a sticky header. Checked properly, the same drag did nothing with the setting on and resized with it off.
 
 ## Workflow
 
@@ -26,7 +31,7 @@ Write down the layers the change touches, in order, from the interaction to the 
 
 ### Step 2 — get a system running
 
-Bring up whatever the flow needs, with seed data that resembles production. Note which parts are real and which are stubbed, because a flow verified against a stubbed payment provider is verified against a stub, and the report should say so.
+Bring up the system users actually run (the app, its demo or a staging build, with its default configuration), not only the test harness, and with seed data that resembles production. Note which parts are real and which are stubbed, because a flow verified against a stubbed payment provider is verified against a stub, and the report should say so.
 
 ### Step 2b — list the states
 

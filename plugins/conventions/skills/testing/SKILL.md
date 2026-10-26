@@ -38,6 +38,7 @@ The loop is not a formality at the end. A change is not done until it is green.
 - Cover the unhappy paths deliberately: the empty collection, the expired token, the duplicate submit, the interrupted write. The happy path is the one that already works.
 - When a bug is fixed, the regression test comes with it in the same change, and it must fail without the fix.
 - A form or request that saves user input is tested for every state that behaves differently (at least clearing a saved value), asserting the request body that goes out, not only that the save succeeded.
+- When the end-to-end suite runs in a harness or fixture app, each headline user-facing feature also gets at least one test that drives the shipped app (its demo or default configuration, with its seed data). A suite that only ever sees clean fixtures cannot catch a bug that needs the real combination of settings and data.
 
 Detection criteria and per-box review failure modes live in the `## Review checklist` of the `testing` skill (`conventions:testing`), with the detail under its `## Review detail`. These rules are the statement of the convention; that checklist is how a diff gets graded against it.
 
