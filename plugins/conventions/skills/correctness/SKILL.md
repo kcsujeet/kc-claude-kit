@@ -22,6 +22,7 @@ paths:
   - §B7. A count uses the same filter as its list
   - §B8. When a value's meaning changes, every reader changes
   - §B9. A claim about a value comes from all its writers
+  - §B10. A fix covers its whole class
 - Sweeps
 
 ## Rules
@@ -37,6 +38,7 @@ Code that reads well and is wrong is still wrong. Walk every change for the bugs
 - When a change adds a reference from one module or class to another, follow the references back and check that they do not close a loop. Inside a loop, code that runs when a module is defined (a subclass copying its parent's fields, a registration, class-level configuration) can run before what it needs exists, and fail with no error. Use the lazy form of the reference when the library has one.
 - A count, total or summary of a list uses the same filter as the list: what the list hides (archived, deleted, inactive items) the count leaves out too.
 - When a change alters what a value means (a route parameter or field now holds a different kind of id, a setting now applies per item), find every reader of that value and check each one still gets what it expects.
+- A bug fix covers every instance of its cause, not only the one that was reported. Once the cause is known, grep the repo, tests included, for the same pattern (the same query, call or assumption) and fix or list each hit; code written alongside the original, on the same day or in a sibling branch, is the first place to look.
 - Before saying what a value holds ("this column is always blank", the cause of a flaky test), find every writer of it: the class body, every module or concern it includes and their callbacks, factories and seed code. A claim read off the visible class alone is a guess.
 
 Detection criteria and per-box review failure modes live in the `## Review checklist` of the `correctness` skill (`conventions:correctness`), with the detail under its `## Review detail`. These rules are the statement of the convention; that checklist is how a diff gets graded against it.
@@ -54,6 +56,7 @@ The correctness gate agent ticks every box against the diff. A box is FAIL if an
 - [ ] §B7 A count uses the same filter as its list: every count, total or summary the diff adds or changes is computed with the same conditions as the list it summarises (soft-deleted, archived, inactive, other-tenant rows excluded alike), and the evidence names both queries. (N/A: the diff adds or changes no count, total or summary)
 - [ ] §B8 When a value's meaning changes, every reader changes: when the diff changes what a value holds (a route parameter, field or prop now carries a different kind of id or a narrower or wider scope), the evidence lists every reader of that value found by grep, including ones the diff does not touch, and states for each that it still gets what it expects. (N/A: no value changes meaning)
 - [ ] §B9 A claim about a value's contents, in a comment, a commit message or a test's reasoning ("positions are blank", "this is the only writer"), was checked against every writer: the class body, each included module or concern and its callbacks, factories and seeds. One that read only the visible class body FAILS. (N/A: the diff states nothing about what a value holds)
+- [ ] §B10 A fix covers its whole class: when the diff fixes a bug, the evidence names its cause as a searchable pattern, the grep that was run for it across code and tests, and a verdict per hit (fixed here, safe and why, or listed for follow-up). A fix with no such sweep FAILS. (N/A: the diff fixes no bug)
 
 **Point, do not double-report.** A removed export or a changed shared prop shape is structure §S10. A cast asserting a type the value does not have, as syntax, is clarity §C17. Duplicated markup, dead imports, or props threaded through and never read after a refactor are simplicity §P9. A locale formatter with no explicit time zone is datetime §D7. When a bug and one of those boxes describe the same line, report it once, under the closer fit, and name the other box in the evidence.
 
@@ -130,6 +133,10 @@ A change that makes a value mean something new (a storefront's page now takes th
 ### §B9. A claim about a value comes from all its writers
 
 A class body rarely shows every write. An included module can set a field in a `before_create` callback, a factory or seed can fill it, and a database default can apply on insert. A spec once blamed a flaky tie on a `position` column "always blank", read off the model and its factory; an included ordering concern numbered positions within each parent group, so rows from two groups both sat at position 0, and the real cause was that tie. Grep for the field's name across the model's included modules, the callbacks they register, factories, seeds and migrations before writing down what it holds.
+
+### §B10. A fix covers its whole class
+
+A bug report names one symptom; the cause usually has siblings. A flaky ordering was fixed in the job that picked a row, while a test written the same day picked its expected row with the same tied query and stayed flaky for weeks. The fix's own description named the cause, so the sweep was one grep away. Write the cause as a pattern (`stages.first` over a per-group position), grep for it in code and tests, and give each hit a verdict in the PR. When diagnosing a later failure, read the earlier fix's description first (§B4): it may already explain the cause.
 
 ## Sweeps
 
