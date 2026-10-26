@@ -47,6 +47,7 @@ A Rails app almost never needs a new shape. It already has dozens of controllers
 - `includes` / `preload` only fixes readers that walk loaded rows in Ruby. A method that chains a scope or aggregates (`assoc.where(...).sum`, `.count`, `.exists?`, `.pluck`) still queries once per record; it needs a bulk pass over the whole set.
 - A bulk pass is installed at a seam every caller goes through (the serializer or render entry point), not called from the one route that was slow, and is named for what it does, not for its first caller.
 - Every computed serializer attribute (a method, not a column) is checked for a per-record query, including one that calls another computed attribute.
+- Serializer and view params carry the data (the signed-in customer, the current shop), not a flag worked out from it for one consumer; the consumer that needs it decides.
 - The client asks for what it needs; the server doesn't hand it everything. A serializer exposes its own model's attributes, and another model's data reaches the client only through a relationship the client chooses to include, never as that model's attributes copied onto this serializer or sent by default.
 - A response the client only counts returns a count, not a serialized collection.
 - No plain `@x ||=` memo on a value that depends on time or a window; it freezes silently.
@@ -86,6 +87,7 @@ The rails gate ticks every box against the diff. A box is FAIL if any matching c
 - [ ] §RL4b A bulk pass sits at a seam every caller passes and is named for what it does; callers that still miss it are named. (N/A: no bulk pass)
 - [ ] §RL4c Every added or touched computed serializer attribute was checked for per-record queries. (N/A: no serializer touched)
 - [ ] §RL4d The client asks for what it needs: every added serializer attribute belongs to the serializer's own model, and no relationship is loaded or sent unless the client includes it. An attribute whose value is read from another model (`object.store.currency`, a computed attribute that delegates to an associated record) FAILS: expose it on that model's serializer and have the client include the relationship. When the association is missing from the client's path, add the relationship, not the attribute. (N/A: no serializer attribute added)
+- [ ] §RL4e Params handed to a serializer or view carry data, not a decision precomputed for one consumer (`signed_in: customer.present?`): pass the record and let the attribute that needs it check it. (N/A: no serializer or view params added)
 - [ ] §RL4d No time-dependent `@x ||=` memo; an endpoint whose client only counts returns a count. (N/A: none added)
 - [ ] §RL5a No unbounded work in a request; a cap has a clear message, or the work moves to a job. (N/A: nothing unbounded added)
 - [ ] §RL5b No GET or HEAD writes: every read path added or touched saves, creates and enqueues nothing. (N/A: no read path)

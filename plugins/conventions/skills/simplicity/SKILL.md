@@ -24,6 +24,7 @@ paths:
   - §P11. A helper earns its place by the knowledge it carries
   - §P12. Defaults carry the everyday case
   - §P13. A new pattern needs precedent, or the developer's OK
+  - §P14. Handle the states the data can be in, not the ones a comment says it once was
   - §P14. A caller the convention misses passes the value, not a smarter guess
 
 ## Rules
@@ -41,6 +42,7 @@ The simplest code that does the job is the easiest to read, change and delete. E
 - Defaults carry the everyday case, and a caller overrides only what differs. No variant per scenario (`WidgetWithIcon`, `useWidgetsForToday`, `formatPriceShort`, `mockOrderWithOwner`): give the base unit a default and let the one caller pass a prop, argument or override.
 - A new pattern or technique follows 2 places in the repo that already do it. When nothing does, ask the developer before introducing it.
 - When a shared unit works a value out by convention (a field name from another name, a path from an id) and one caller doesn't fit, that caller passes the value through an optional override. The guessing logic doesn't grow special cases.
+- A branch for a data state (a field that may be blank, a record that may be missing, an old shape) is written only after checking the state can still occur. Create-time defaults, validations and backfills that already ran may have ruled it out; a comment saying it exists is not evidence.
 
 ## Review checklist
 
@@ -59,6 +61,7 @@ The simplicity gate agent ticks every box against the diff. A box is FAIL if any
 - [ ] §P11 A helper earns its place: every new or proposed helper (util, hook, small component) carries knowledge its callers should not hold (an API call, a data format or conversion, a domain rule, several steps) or is used in many places. A helper around one plain expression FAILS even with two callers, and so does a finding that proposes one. So does a helper whose body is one call to an existing function or built-in on a field of its argument (`toWidgetId = (widget) => toNumber(widget.id)`): the called function already holds the knowledge, and a comment calling it a conversion doesn't change that. The evidence shows how the repo writes the same expression elsewhere. (N/A: no helper added or proposed)
 - [ ] §P12 Defaults carry the everyday case: no new variant per scenario of a component, hook, util, fixture or test helper when the base unit could hold the common data or behavior with a default and the one differing caller could pass a prop, argument or override. A caller that depends on something being absent says so in its own override. (N/A: no new variant or scenario helper)
 - [ ] §P13 A new pattern has precedent: every new abstraction or technique in the diff (a hook wrapping a hook, a new option on a shared hook or type, a new way of holding UI state, a new layout helper) cites 2 places in the repo that already do it, and follows them. A file with a similar name is not precedent, and neither is an option a shared type declares but no caller passes. With no precedent, the finding is a `question` to the author (in a self-review, ask the developer before writing it). (N/A: nothing new in kind in the diff)
+- [ ] §P14 Every new branch, fallback or exception for a data state (blank, missing, legacy shape) cites evidence that the state can still occur: the writer that can still produce it, or a data query. A state that create-time defaults, validations or a completed backfill rule out FAILS; handle it in the backfill or the validation instead. (N/A: no new branch for a data state)
 - [ ] §P14 A value a shared unit derives by convention (a name built from another name, a default read from a string pattern) is not made cleverer for one caller it gets wrong (pluralization rules, another regex, a special case); that caller passes the value through an optional override, and every other caller keeps the old default. (N/A: no derived value changed or worked around in the diff)
 
 ## Review detail
@@ -288,6 +291,11 @@ A shared unit that works a value out by convention is right for most callers and
 Example: a shared form autocomplete keeps picked records at `name` with `_ids` turned into `s`, so `tax_ids` lands at `taxs`. Teaching it that `x` takes `es` would also move every other `x_ids` field in the app. The fix was a `fieldName` prop, which the one form that needed it sets to `taxes`.
 
 This is not §P10's single-caller prop: the caller cannot own the behavior, because the shared unit is the one writing to the wrong place.
+
+
+### §P14. Handle the states the data can be in, not the ones a comment says it once was
+
+Old comments outlive the data they describe: "the first store may have no name of its own" stays in the code after a backfill names every store and creation starts naming new ones. Code that trusts the comment grows a special case (a name may stay blank, but only if it was blank before) that guards a state nothing can produce any more, and every reader has to learn it. Before writing such a branch, find what could still produce the state: the create path, the update path, an import, a job. If none can, and a backfill has run, enforce the rule plainly (required, validated) and leave the old state to the backfill. If one still can, say which.
 
 ## Sweeps
 
