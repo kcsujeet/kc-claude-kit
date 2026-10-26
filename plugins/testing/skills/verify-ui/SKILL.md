@@ -19,6 +19,7 @@ So look at it. Once, deliberately, before saying it is done.
 - **Spot checks are not QA.** Opening the screen you just changed and seeing that it renders is a smoke test. QA walks every state the screen can be in, the way a QA engineer works through a test plan, and does that every time, not only when asked.
 - **When there is a design, the design is the test plan.** Walk it state by state and compare the app to it. "It renders" and "it matches the design" are different claims.
 - **A moved field is two screens.** When a screen stops editing a value and points elsewhere ("managed in product settings", a read-only value with a link), follow the pointer: open the destination, confirm the field is there and saves, and that the first screen shows the new value without a reload. Compare the destination with the design's version of it too. A pointer to a screen that cannot edit the value is a bug, and so is a read-only value that no screen edits.
+- **Trace a layout bug before parking it.** A reported layout defect (a gap, a bar, content past its background) is read in code first: the element's styles, then every ancestor up to the root layout (display, fixed sizes, overflow, backgrounds). "Needs a look in the browser" is not a status; reproduce it there with the same content size the report shows.
 - **Look at the shipped screen, not a stand-in.** A story, fixture page or test harness is not the app. Check the change where users see it, with its real configuration, and treat a probe as evidence only after it has been shown it can fail (see `testing:verify-e2e`).
 
 ## Workflow
@@ -95,6 +96,7 @@ Scan each capture for these, by name, rather than glancing at it:
 - numbers that fail to line up in a column
 - an image with no dimensions causing layout shift
 - contrast that fails in one theme but not the other
+- a background or border that stops before the content does (scroll to the very end of the page)
 
 ### Step 6 — report
 
@@ -128,5 +130,6 @@ Do not report a UI change verified until every box is ticked:
 - [ ] Every editable field was cleared and saved, and every confirmation's words were checked against what actually happened.
 - [ ] Signed-in state was checked on every surface that shows it, after signing in from each entry point.
 - [ ] A list or page was filled past the viewport, and a record created fresh through the UI was taken through its whole flow.
+- [ ] Every reported layout defect was traced through its ancestors in code and reproduced at the content size the report shows, before it was fixed or left open.
 - [ ] Narrow viewport, the other theme and a keyboard pass were done, or the report says why not.
 - [ ] The report lists each state checked, each finding with the state that produces it, and what was not checked.

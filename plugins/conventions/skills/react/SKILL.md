@@ -40,6 +40,7 @@ Placement is covered by the `structure` skill, which defers to bulletproof-react
 - Without React Compiler, a `useMemo` or `useCallback` has to hit: empty dependencies mean a module constant, and a dependency that changes every render (an inline object, array or function) means the memo never does. Pass stable references to memoized children.
 - A block of markup past about thirty lines that reads as its own unit is a named component, and a wrapper element that only repeats its parent's styling is deleted.
 - On React 19 and later, `ref` is a plain prop. Do not add `forwardRef`, and never declare `ref` in the props of a component that is also wrapped in `forwardRef`.
+- A `min-height` or `min-width` on a flex item is set knowing its parent: an explicit minimum replaces the default `min-*: auto`, so inside a fixed-size flex parent the item shrinks to that minimum and its content spills past its own background. Check the parent's display and size, and keep the item from shrinking (`flex-shrink: 0`) when its content can outgrow the minimum.
 
 ### Data access
 
@@ -98,6 +99,7 @@ The react gate agent ticks every box against the diff. A box is FAIL if any matc
 - [ ] §R26 A form that edits an existing record seeds the related record its inputs render from (`owner_id` and `owner`), not just the id, and no picker gets a label prop hand-built from a record the form already holds. (N/A: no form editing an existing record)
 - [ ] §R27 A read hook accepts the repo's standard read-hook options (extended with its own fields, not a re-declared subset) and wires every option it accepts; an accepted option the hook never reads FAILS. (N/A: no read hook added or edited)
 - [ ] §R28 Cached data follows its context and its filters: every new or changed query key includes each context its response depends on that isn't in its params (the current tenant or workspace sent in a header or read from a store, the signed-in user, the locale), through the repo's helper for context keys when one exists. A write that adds a record, or changes a field a list filters on, refetches filtered lists instead of patching them, and also refetches queries that derive from what it changed (counts, totals, badges). (N/A: no query key, cache patch or write added or changed)
+- [ ] §R29 A new or changed `min-height`/`min-width` (or `minHeight`/`minWidth`) on an element was checked against its parent: when the parent is a flex container with a fixed size, the element either cannot shrink (`flex-shrink: 0`) or its content can never outgrow the minimum, and the finding names the parent and its size. **Enumerate**: grep the diff for `min-height`, `min-width`, `minHeight`, `minWidth`, one verdict per hit. (N/A: `grepped min sizing: 0 hits`)
 
 ## Review detail
 
@@ -418,6 +420,20 @@ A change to sizing or layout that looks right on a wide screen can collapse on a
 - Put the numbers in the finding ("7 columns at 375 px leave 41 px per cell after padding").
 
 The recurring failure is removing a `min-width`/`min-height` floor without a responsive fallback (a different layout, horizontal scroll, or fewer columns below a breakpoint): the floor was what kept the narrow case readable. When a browser is available, the testing plugin's `verify-ui` skill drives this check against the real screen.
+
+#### §R29. A minimum size on a flex item
+
+A flex item's default minimum is `auto`: it never shrinks below its content. Setting `min-height: 100vh` (or any explicit minimum) replaces that default. Inside a flex parent with a fixed size, such as a `body` that is a column flex container at `height: 100%` and scrolls itself, the item now shrinks to exactly the minimum, and anything taller runs past its background onto the parent's. It looks right with short content and breaks only when content outgrows the screen.
+
+```tsx
+// Bad: under a fixed-height flex column, the page stops at one screen and a long list overflows it
+<Stack sx={{ bgcolor: 'background.paper', minHeight: '100vh' }}>
+
+// Good: at least one screen tall, under any parent, and it grows with its content
+<Stack sx={{ bgcolor: 'background.paper', minHeight: '100vh', flexShrink: 0 }}>
+```
+
+`flex-grow: 1` also fills the screen, but only under a flex parent, which is the parent assumption the components rule forbids. Check the case with content longer than the container (§R19 checks the narrow one).
 
 ## Sweeps
 
