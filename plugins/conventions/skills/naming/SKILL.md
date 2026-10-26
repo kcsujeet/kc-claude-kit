@@ -23,6 +23,7 @@ paths:
   - §N8. A new file follows its siblings
   - §N9. A name says what kind of thing it is and what it belongs to
   - §N10. Parts of one unit keep its prefix and end with their kind
+  - §N11. A name follows what its subject became
   - §N2 evidence requirement: enumerate boolean chains by grep, do not eyeball
 - Sweeps
 
@@ -44,6 +45,7 @@ A name is read far more often than it is written, and a wrong one survives refac
 - A file name identifies the file without its path. Tabs, search results and stack traces show it bare, so `header.tsx` deep in a feature folder is `widget-list-header.tsx`, and no two files share a basename unless the framework requires it.
 - Before naming a new file, look at 2-3 existing files of the same kind and follow their naming pattern and location. Sibling precedent never excuses a generic or colliding basename: the subject still goes in the name.
 
+- When a change alters what a thing is (one becomes many, a page becomes a list with a page per record, a setting moves onto each item), the names that describe the old shape are wrong now, even though the diff never touched them. Route segments, folders, files, exports, API paths, query keys and translation keys get the name the repo gives that new shape, or the change says why one has to wait (a public URL that needs a redirect first).
 Detection criteria and per-box review failure modes live in the `## Review checklist` of the `naming` skill (`conventions:naming`), with the detail under its `## Review detail`. These rules are the statement of the convention; that checklist is how a diff gets graded against it.
 
 ## Review checklist
@@ -60,10 +62,11 @@ The naming gate agent ticks every box against the diff. A box is FAIL if any mat
 - [ ] §N8 Sibling comparison recorded: for every new file, the evidence names 2-3 existing files of the same kind (a hook, a component, a types file, a test) and the new file follows their naming pattern (casing, suffix, how the subject is carried) and sits where files of its kind sit, or the evidence says why it cannot. A new file with no named siblings FAILS by default. Siblings with generic basenames do not excuse §N7. (N/A: no new file)
 - [ ] §N9 Kind and owner read at the import site: every new or renamed export, read with no folder path, lets a reader guess both what kind of thing it is (data hook, form-state hook, component, util, constant, type) and what it belongs to (which form, table, feature). A wrong guess on either FAILS: a hook that only fills one form's fields named like a data hook, a co-located hook carrying the name of a shared data layer, a one-table helper named like an app-wide util. **Enumerate**: every new or renamed export gets a verdict. (N/A: no new or renamed export)
 - [ ] §N10 Parts of one unit keep its prefix AND end with their kind: sibling pieces of `WidgetPanel` are `WidgetPanelSyncSection`, `WidgetPanelRow`. Keeping the prefix but dropping the kind (`WidgetPanelSync`) FAILS, and so does keeping the kind but dropping the prefix (`WidgetSyncSection`). (N/A: no new file or export in a family of sibling parts)
+- [ ] §N11 A name follows what its subject became: when the diff changes what an existing thing is or holds (one becomes many, a single settings page becomes a list with a page per record, a per-account setting becomes per-item), the evidence lists every name that still describes the old shape (route segments, folders, files, exports, API paths, query keys, translation keys, including ones the diff does not touch) and compares each with 2-3 siblings that already have the new shape. A name that no longer matches FAILS unless the diff renames it or states why the rename has to wait (for example a public URL that needs a redirect first). (N/A: the diff changes no existing thing's cardinality or kind)
 
 ## Review detail
 
-Identifier-naming rules for the diff under review. Covers ten independent failure modes: type-shaped names on behavior-bearing values, undecoded inline boolean chains, repeated domain checks that should be a named `isX`, names that are dishonest about what the code actually does, names that only read well beside their declaration, noun-phrase names on functions, file names that need their path to mean anything, new files that ignore their siblings, names that hide their kind or owner, and family parts that drop their prefix or kind.
+Identifier-naming rules for the diff under review. Covers eleven independent failure modes: type-shaped names on behavior-bearing values, undecoded inline boolean chains, repeated domain checks that should be a named `isX`, names that are dishonest about what the code actually does, names that only read well beside their declaration, noun-phrase names on functions, file names that need their path to mean anything, new files that ignore their siblings, names that hide their kind or owner, family parts that drop their prefix or kind, and names left describing what their subject used to be.
 
 ### §N1. Names should describe the *role*, not the *type*
 
@@ -354,6 +357,12 @@ For each new or renamed export, ask: from the name alone, would a reader guess b
 ### §N10. Parts of one unit keep its prefix and end with their kind
 
 The parts of a `WidgetPanel` named `WidgetPanelSummary`, `WidgetPanelSync` and `WidgetPanelSettings` share the right prefix, but with no kind, `WidgetPanelSync` reads like a separate panel for syncing. `WidgetPanelSyncSection` says what it is. Renaming them to `WidgetSyncSection` swaps one problem for another: the kind is back, but nothing ties the file to its panel. Keep both halves, so each name reads right on its own at the import site.
+
+### §N11. A name follows what its subject became
+
+Names are chosen for what a thing is when it is first written. When a later change alters that (a shop's one storefront becomes many, a single settings page becomes a list with a page per record), the code that changed gets new names and the names around it stay as they were: the route still says `settings/storefront`, the folder `storefront/`, the query key `storefront`, while every other list in settings reads `settings/products` and `settings/orders`. Nothing in the diff is wrong line by line, so line-level review passes it, and the mismatch then ships in URLs and file paths that are expensive to change later.
+
+**How to check.** When the diff changes how many of something there are, or what kind of thing it is, list the names that still describe the old shape: route segments, folder and file names, exported names, API paths, query keys and translation keys. For each one, find 2-3 siblings that already have the new shape and compare. Report a name that no longer matches, even when the diff never touched it. When the rename has to wait (a public URL needs a redirect, another team's code calls the path), say so in the finding; the box passes once that reason is stated.
 
 ### §N2 evidence requirement: enumerate boolean chains by grep, do not eyeball
 
