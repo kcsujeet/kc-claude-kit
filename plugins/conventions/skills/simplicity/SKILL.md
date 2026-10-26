@@ -56,7 +56,7 @@ The simplicity gate agent ticks every box against the diff. A box is FAIL if any
 - [ ] §P8 Mirror claims are diffed: wherever the PR or the review says a new member mirrors, follows, or matches an existing sibling, the two signatures are set side by side in the evidence; an unjustified difference between siblings is a finding. (N/A: no new member beside an existing sibling, and no such claim)
 - [ ] §P9 No refactor leftovers: no markup or block left duplicated by an incomplete refactor, no import nothing uses, no prop or param threaded through and never read, no commented-out code. (N/A: none in the diff)
 - [ ] §P10 A prop or option added to a shared component or shared helper for a single caller's case is questioned: could the caller own it, or compose the shared piece instead? (N/A: no shared component or helper signature changed)
-- [ ] §P11 A helper earns its place: every new or proposed helper (util, hook, small component) carries knowledge its callers should not hold (an API call, a data format or conversion, a domain rule, several steps) or is used in many places. A helper around one plain expression FAILS even with two callers, and so does a finding that proposes one. (N/A: no helper added or proposed)
+- [ ] §P11 A helper earns its place: every new or proposed helper (util, hook, small component) carries knowledge its callers should not hold (an API call, a data format or conversion, a domain rule, several steps) or is used in many places. A helper around one plain expression FAILS even with two callers, and so does a finding that proposes one. So does a helper whose body is one call to an existing function or built-in on a field of its argument (`toWidgetId = (widget) => toNumber(widget.id)`): the called function already holds the knowledge, and a comment calling it a conversion doesn't change that. The evidence shows how the repo writes the same expression elsewhere. (N/A: no helper added or proposed)
 - [ ] §P12 Defaults carry the everyday case: no new variant per scenario of a component, hook, util, fixture or test helper when the base unit could hold the common data or behavior with a default and the one differing caller could pass a prop, argument or override. A caller that depends on something being absent says so in its own override. (N/A: no new variant or scenario helper)
 - [ ] §P13 A new pattern has precedent: every new abstraction or technique in the diff (a hook wrapping a hook, a new option on a shared hook or type, a new way of holding UI state, a new layout helper) cites 2 places in the repo that already do it, and follows them. A file with a similar name is not precedent, and neither is an option a shared type declares but no caller passes. With no precedent, the finding is a `question` to the author (in a self-review, ask the developer before writing it). (N/A: nothing new in kind in the diff)
 - [ ] §P14 A value a shared unit derives by convention (a name built from another name, a default read from a string pattern) is not made cleverer for one caller it gets wrong (pluralization rules, another regex, a special case); that caller passes the value through an optional override, and every other caller keeps the old default. (N/A: no derived value changed or worked around in the diff)
@@ -241,6 +241,18 @@ const widget = widgets.find((item) => item.id === widgetId)
 // Earns a helper even with one caller: it holds a format the call site should not know
 const toWidgetSlug = (name: string) => name.trim().toLowerCase().replace(/\s+/g, '-')
 ```
+
+A conversion earns a helper only when the helper is where the conversion lives. When the body is one call to something that already exists, applied to a field of the argument, the knowledge is in the function being called and the helper adds only a name, and a new import at every call site:
+
+```ts
+// Flag: the conversion is toNumber's; this only renames it
+const toWidgetId = (widget: Pick<Widget, 'id'>) => toNumber(widget.id)
+
+// Prefer: write it where it's used, the way the rest of the repo does
+selectedIds.includes(Number(widget.id))
+```
+
+Before accepting one, grep how the repo already writes the same expression. When most call sites write it inline, so does this one.
 
 A finding that proposes a helper for a plain expression is itself a miss, under any gate. The naming skill's §N3 applies the same test to repeated predicates, and clarity §C12 to helpers that only restate their body.
 
