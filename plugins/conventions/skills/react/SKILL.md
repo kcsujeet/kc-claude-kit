@@ -40,15 +40,18 @@ Placement is covered by the `structure` skill, which defers to bulletproof-react
 - Without React Compiler, a `useMemo` or `useCallback` has to hit: empty dependencies mean a module constant, and a dependency that changes every render (an inline object, array or function) means the memo never does. Pass stable references to memoized children.
 - A block of markup past about thirty lines that reads as its own unit is a named component, and a wrapper element that only repeats its parent's styling is deleted.
 - On React 19 and later, `ref` is a plain prop. Do not add `forwardRef`, and never declare `ref` in the props of a component that is also wrapped in `forwardRef`.
+- A `min-height` or `min-width` on a flex item is set knowing its parent: an explicit minimum replaces the default `min-*: auto`, so inside a fixed-size flex parent the item shrinks to that minimum and its content spills past its own background. Check the parent's display and size, and keep the item from shrinking (`flex-shrink: 0`) when its content can outgrow the minimum.
 
 ### Data access
 
 - Reads and writes live in separate hooks. A component contains no raw `fetch`, no `axios`, no direct `useQuery` or `useMutation` call; grep how the sibling features do it and follow that.
 - The fetch lives with the actual consumer. A page does not duplicate a fetch its child already owns, especially with different params, and nothing fetches a whole list to derive one boolean.
+- Every read asks the server for exactly what the screen shows: its narrowing goes into the request, the way sibling reads send theirs. Fetching wider and filtering in code, or fetching again to resolve ids whose records the response already carries, is the fallback only when the server cannot filter.
 - After a write, patch the cache first, then update surgically, and invalidate only as a last resort.
 - Prefer `mutate` with callbacks over `mutateAsync` with `await` when the resolved value only drives a side effect.
 - A request's method matches its effect: a read uses GET unless its input cannot fit in a query string.
 - A cache patch or invalidation targets the narrowest key that shows the change.
+- A query key includes every context its response depends on that isn't in its params (the current tenant, the signed-in user, the locale). A write that adds a record or changes a field a list filters on refetches filtered lists rather than patching them, and refetches counts and totals derived from what it changed.
 - A write hook touches only its own resource. Another resource's writes live in that resource's hook, and the caller composes the two.
 - A read hook wires up every option it accepts. Accepting an option and ignoring it is dead surface.
 
@@ -56,6 +59,7 @@ Placement is covered by the `structure` skill, which defers to bulletproof-react
 
 - The form is the single source of truth. No `useState` shadowing a value the form already holds.
 - A form-state hook returns form plumbing only (the methods, submit and discard, saving state). One field's fetching, watching and lookup state live in that field's component.
+- A form that shows only part of a set field (in a store's context, that store's links) seeds that part and sends the rest back unchanged.
 - Each form watch lives in the smallest component that renders from it; a child reads shared form values itself rather than taking them as props.
 - A form that edits a record seeds the related record its inputs render from, not just the id.
 - Check the validation library's own API before hand-rolling a check, a regex, or a coercion. Most of them already exist there.
@@ -96,6 +100,10 @@ The react gate agent ticks every box against the diff. A box is FAIL if any matc
 - [ ] §R25 Each form watch (and each piece of field state) lives in the smallest component that renders from it; a child reads shared form values through the form context instead of the parent watching them and passing them down. A watch in the form or its setup hook FAILS unless that component renders from the value too. (N/A: no watch or field state added in a form)
 - [ ] §R26 A form that edits an existing record seeds the related record its inputs render from (`owner_id` and `owner`), not just the id, and no picker gets a label prop hand-built from a record the form already holds. (N/A: no form editing an existing record)
 - [ ] §R27 A read hook accepts the repo's standard read-hook options (extended with its own fields, not a re-declared subset) and wires every option it accepts; an accepted option the hook never reads FAILS. (N/A: no read hook added or edited)
+- [ ] §R28 Cached data follows its context and its filters: every new or changed query key includes each context its response depends on that isn't in its params (the current tenant or workspace sent in a header or read from a store, the signed-in user, the locale), through the repo's helper for context keys when one exists. A write that adds a record, or changes a field a list filters on, refetches filtered lists instead of patching them, and also refetches queries that derive from what it changed (counts, totals, badges). (N/A: no query key, cache patch or write added or changed)
+- [ ] §R29 A new or changed `min-height`/`min-width` (or `minHeight`/`minWidth`) on an element was checked against its parent: when the parent is a flex container with a fixed size, the element either cannot shrink (`flex-shrink: 0`) or its content can never outgrow the minimum, and the finding names the parent and its size. **Enumerate**: grep the diff for `min-height`, `min-width`, `minHeight`, `minWidth`, one verdict per hit. (N/A: `grepped min sizing: 0 hits`)
+- [ ] §R30 A read asks the server for what the screen shows: for every fetch the diff adds or changes (a list, table, picker, search, count, or a lookup of related records), its narrowing (a status, a parent, a visibility, the current user's scope) goes into the request the server answers, the way 2 cited sibling reads send theirs, and a related record the screen names comes from the response that already carries it (§R26). A response filtered in code (`data.filter(...)` where the server could have narrowed) FAILS, and so does a second fetch to look up records the first response already carries, unless a comment says why the server can't. (N/A: no fetch added or changed)
+- [ ] §R31 A form that shows part of a set keeps the rest: when the screen's context limits which entries of a set field the form shows (one store's links on a store page), the form seeds only those, and on submit it sends back every hidden entry unchanged. Rendering entries it can't name (a bare id) FAILS, and so does dropping them. (N/A: no set field limited by context)
 
 ## Review detail
 
@@ -310,13 +318,13 @@ export const WidgetInput = ({ label, ref }: WidgetInputProps) => { /* ... */ }
 
 ### Section 3 — Data fetching
 
-The detail for §R11-§R13, §R21-§R23 and §R27 is in `${CLAUDE_PLUGIN_ROOT}/skills/react/references/data-fetching.md`. Read it in full before grading any of them.
+The detail for §R11-§R13, §R21-§R23, §R27, §R28 and §R30 is in `${CLAUDE_PLUGIN_ROOT}/skills/react/references/data-fetching.md`. Read it in full before grading any of them.
 
 ---
 
 ### Section 4 — Forms
 
-The detail for §R14 and §R24-§R26 is in `${CLAUDE_PLUGIN_ROOT}/skills/react/references/forms.md`. Read it in full before grading any of them.
+The detail for §R14, §R24-§R26 and §R31 is in `${CLAUDE_PLUGIN_ROOT}/skills/react/references/forms.md`. Read it in full before grading any of them.
 
 ---
 
@@ -416,6 +424,20 @@ A change to sizing or layout that looks right on a wide screen can collapse on a
 - Put the numbers in the finding ("7 columns at 375 px leave 41 px per cell after padding").
 
 The recurring failure is removing a `min-width`/`min-height` floor without a responsive fallback (a different layout, horizontal scroll, or fewer columns below a breakpoint): the floor was what kept the narrow case readable. When a browser is available, the testing plugin's `verify-ui` skill drives this check against the real screen.
+
+#### §R29. A minimum size on a flex item
+
+A flex item's default minimum is `auto`: it never shrinks below its content. Setting `min-height: 100vh` (or any explicit minimum) replaces that default. Inside a flex parent with a fixed size, such as a `body` that is a column flex container at `height: 100%` and scrolls itself, the item now shrinks to exactly the minimum, and anything taller runs past its background onto the parent's. It looks right with short content and breaks only when content outgrows the screen.
+
+```tsx
+// Bad: under a fixed-height flex column, the page stops at one screen and a long list overflows it
+<Stack sx={{ bgcolor: 'background.paper', minHeight: '100vh' }}>
+
+// Good: at least one screen tall, under any parent, and it grows with its content
+<Stack sx={{ bgcolor: 'background.paper', minHeight: '100vh', flexShrink: 0 }}>
+```
+
+`flex-grow: 1` also fills the screen, but only under a flex parent, which is the parent assumption the components rule forbids. Check the case with content longer than the container (§R19 checks the narrow one).
 
 ## Sweeps
 

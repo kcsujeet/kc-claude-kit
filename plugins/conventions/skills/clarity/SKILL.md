@@ -69,7 +69,7 @@ The clarity gate agent ticks every box against the diff. A box is FAIL if any ma
 - [ ] §C11 Unhappy-path complexity not tangled into the happy path. (N/A: no error branch with 3+ inline statements)
 - [ ] §C12 No thin-wrapper helper whose name only restates a one-line body (over-extraction); a second caller does not rescue a plain one-expression helper (simplicity §P11). (N/A: no new single-purpose helper in diff)
 - [ ] §C13 An expression (template literal, call argument, JSX prop, or return) that inlines 2+ non-trivial sub-expressions (each a `??`/optional-chain fallback, call, ternary, or cast) extracts them to named locals first. (N/A: no such multi-part expression in diff)
-- [ ] §C14 No circular imports introduced (soft). (N/A: no cross-module import change)
+- [ ] §C14 No circular imports introduced (soft). A cycle through a module that does work at definition time is correctness §B6, which fails. (N/A: no cross-module import change)
 - [ ] §C15 Ternaries: none nested/chained (2+ `?`), long, multi-line once formatted, or with a non-trivial branch (more than a short value/identifier). Applies to value/assignment/returned/arg ternaries too, not just JSX — the branch content is irrelevant, only the shape. Walk every ternary in the diff. A proposed fix respects the remedy limits in §C15 (no `flagA && value` for a value-or-absent prop, no conditionally spread options object). **Enumerate with the `ternaries.sh` sweep, do not eyeball**, labelling every hit single-line or MULTI-LINE; see §C15. (N/A: only when `ternaries.sh` returns 0 hits, stated as `grepped ternaries: 0 hits`)
 - [ ] §C16 Bare numeric literals for dimensions/thresholds/timeouts are named constants with a one-line why, or a design token when the project has a token system; a magic value repeated 2+ times is also a DRY finding. (N/A: no magic literal added)
 - [ ] §C17 No type escape hatches: no `as` cast (including `as unknown as T`) that asserts a type the value does not actually have in order to silence a mismatch; no `any`, explicit or through an untyped boundary; no non-null assertion (`value!`). **Enumerate with the `as-casts.sh`, `any-types.sh` and `non-null-assertions.sh` sweeps, do not eyeball**; see §C17. (N/A: only when all three sweeps return 0 hits, stated as `grepped as-casts: 0 hits`, `grepped any: 0 hits`, `grepped non-null assertions: 0 hits`)
@@ -312,7 +312,7 @@ This is the general form of §C10 (a single 3+-operand fallback chain) and the c
 
 Be alert to circular imports while reading. They are not a hard blocker (TypeScript and bundlers usually tolerate them), but they signal coupling problems and occasionally cause runtime `undefined` issues at module init.
 
-When you spot a likely cycle (file A imports from B, and B imports from A, even transitively through a third file), flag it as a soft suggestion: "this introduces a likely circular import between X and Y — consider extracting the shared piece to a common module." Do not block on it.
+When you spot a likely cycle (file A imports from B, and B imports from A, even transitively through a third file), flag it as a soft suggestion: "this introduces a likely circular import between X and Y — consider extracting the shared piece to a common module." Do not block on it, unless a module in the cycle does work at definition time (a subclass copying its parent's fields, a registry, class-level configuration). That is a silent runtime bug, and correctness §B6 owns it.
 
 You will not catch every cycle by reading — that is fine. Flag the obvious ones; do not go hunting.
 

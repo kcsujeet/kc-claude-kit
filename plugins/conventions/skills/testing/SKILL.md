@@ -20,6 +20,10 @@ paths:
   - §T5. A test sits beside its unit
   - §T6. Exact assertions when the value is known
   - §T7. A submit is tested per state, by its request body
+  - §T8. An output is tested by what it contains
+  - §T9. A test names its expected record
+  - §T10. Time comes from a clock the test can freeze
+  - §T11. A test pins every input its result depends on
 - Sweeps
 
 ## Rules
@@ -38,6 +42,10 @@ The loop is not a formality at the end. A change is not done until it is green.
 - Cover the unhappy paths deliberately: the empty collection, the expired token, the duplicate submit, the interrupted write. The happy path is the one that already works.
 - When a bug is fixed, the regression test comes with it in the same change, and it must fail without the fix.
 - A form or request that saves user input is tested for every state that behaves differently (at least clearing a saved value), asserting the request body that goes out, not only that the save succeeded.
+- A test of an output (a response, a rendered page, an export, a message) asserts what it contains, so an output that comes back empty fails it. A status code, "it rendered" or "no error" passes when every field is missing. Shared test helpers that check responses assert their content too.
+- A test names the record it expects: the one it created, or one picked with an order whose last key is unique. `first` over an order with ties (a position that restarts per group, a timestamp, an unordered query) returns any of the tied rows, so the test passes or fails depending on the database's mood.
+- Code that compares against "now" takes it from the app's clock and passes it in (a bound parameter to SQL), not from the database (`CURRENT_TIMESTAMP`, `NOW()`, `CURRENT_DATE`), and its tests freeze that clock. A database clock can't be frozen, so a test that checks "not due yet" passes or fails by the hour CI happens to run.
+- A test sets every attribute its result depends on, instead of taking the factory's default. A factory that samples values (a random type, a random offset) makes a test that leaves them unset pass or fail by the draw, and the run's seed usually doesn't reproduce it. Read the factory before relying on its defaults.
 - When the end-to-end suite runs in a harness or fixture app, each headline user-facing feature also gets at least one test that drives the shipped app (its demo or default configuration, with its seed data). A suite that only ever sees clean fixtures cannot catch a bug that needs the real combination of settings and data.
 
 Detection criteria and per-box review failure modes live in the `## Review checklist` of the `testing` skill (`conventions:testing`), with the detail under its `## Review detail`. These rules are the statement of the convention; that checklist is how a diff gets graded against it.
@@ -53,10 +61,14 @@ The testing gate agent ticks every box against the diff. A box is FAIL if any ma
 - [ ] §T5 A new or moved test sits beside the unit it covers and is named after it. (N/A: no test file added or moved)
 - [ ] §T6 Assertions are exact when the value is known (`toBe(3)`, `toEqual([0, 25, 50])`), not bounds or truthiness that a wrong value also satisfies (`toBeGreaterThan(0)`, `toBeTruthy()`, `toBeDefined()`). A tolerance is fine where the value is genuinely inexact (floating point, measured geometry), stated as `toBeCloseTo`. **Enumerate with the `loose-assertions.sh` sweep** (see below). (N/A: only when `loose-assertions.sh` returns 0 hits, stated as `grepped loose assertions: 0 hits`)
 - [ ] §T7 A submit is tested per state: each form or request that saves user input has a test for every field state that behaves differently (at least clearing a saved value; see correctness §B5), and each test asserts the request body sent, not only the success path. (N/A: the diff adds or changes no submit of user input)
+- [ ] §T8 Every test of an output the diff adds or changes (a response, a rendered page, an export, a message) asserts at least one value inside it that the change is responsible for, so an empty or field-less output fails the test. A test that asserts only a status code, that something rendered, or that no error was raised FAILS. A shared helper or example that checks responses counts as the test, and is held to the same rule. (N/A: the diff adds or changes no output and no test of one)
+- [ ] §T9 Every expected record in a test is named, not re-derived: it is a record the test created and holds, or a lookup whose order ends on a unique key. A `first`/`last`/`take` (or `[0]` on a query result) over an order that can tie FAILS; the evidence names the ordering columns and why they cannot tie. **Enumerate**: grep the test diff for `.first`, `.last`, `.take` and `[0]` on query results, one verdict per hit. (N/A: `grepped first/last/take: 0 hits`)
+- [ ] §T10 Time-dependent behaviour is tested at a frozen time: each test of code that compares against now (due, overdue, today, expiry, local hour) freezes the clock, and the code reads now from that clock, not from the database. A query the diff adds or changes that uses `CURRENT_TIMESTAMP`, `NOW()` or `CURRENT_DATE` for a comparison a test covers FAILS. **Enumerate**: grep the diff for those three, one verdict per hit. (N/A: `grepped database clock: 0 hits` and no time comparison added)
+- [ ] §T11 Every record a new or changed test builds sets each attribute the code under test branches on; the evidence names the factory and confirms each such attribute is either set in the test or fixed (not sampled) in the factory. A branch-deciding attribute left to a factory that samples it FAILS. (N/A: the diff adds or changes no test that builds records)
 
 ## Review detail
 
-Test rules for the diff under review. Covers seven independent failure modes: behavior shipped without a test, class names asserted as a proxy for behavior, a gate tested from one side only, setup copied between tests instead of named once, a test placed away from its unit, bounds asserted where the exact value is known, and a submit tested only on its happy path.
+Test rules for the diff under review. Covers eight independent failure modes: behavior shipped without a test, class names asserted as a proxy for behavior, a gate tested from one side only, setup copied between tests instead of named once, a test placed away from its unit, bounds asserted where the exact value is known, a submit tested only on its happy path, and an output tested only for its status.
 
 ### §T1. New behavior has a test
 
@@ -166,6 +178,35 @@ expect(screen.getByText('Saved')).toBeVisible()
 await submitWidgetForm({ note: '' })
 expect(lastRequestBody()).toEqual({ name: 'Widget A', note: null })
 ```
+
+### §T8. An output is tested by what it contains
+
+The quietest failures return a good status with nothing in it: a response with no fields, a page that renders its frame and no rows, an export with headers only. A test that checks only the status code, that the page rendered, or that no error was raised stays green through all of them. It proves the request was handled, not that it produced anything.
+
+Each test of an output asserts at least one value the change is responsible for: a field in the response, a row on the page, a line in the file. When the suite checks many endpoints through one shared helper or shared example, that helper is where this lands: have it assert that the record carries its fields (for example that `attributes` is not empty), so every endpoint that uses it is covered at once.
+
+```ts
+// Flag: green even when every field is missing
+const response = await get('/orders/ABC-1')
+expect(response.status).toBe(200)
+
+// Prefer: assert what the caller reads
+expect(response.body.data.attributes).toMatchObject({ number: 'ABC-1', total: 42 })
+```
+
+Pair this with correctness §B6: a load cycle that empties a class's fields fails no status check, only a content check.
+
+### §T9. A test names its expected record
+
+A test that works out its expected value with a query has a second copy of the code's rule, and the two drift. The common form is `scope.first` over an order with ties: a `position` that restarts in each parent group, a `created_at` shared by rows inserted in one statement, or no order at all. The database returns any of the tied rows, and the order can change with the plan, the data volume or a vacuum, so the test flakes. Hold the record the setup created (`let!(:first_stage)`) and assert against it, or order on a unique last key (`reorder(:position, :id)`), the same way the code does.
+
+### §T10. Time comes from a clock the test can freeze
+
+Test helpers that freeze time (`travel_to`, `freeze_time`, fake timers) move the app's clock only. A query that reads the database's own clock ignores them, so a test of "an action dated today and due at 23:59 hasn't fired" fails whenever the suite runs across 23:59 or midnight, a few minutes a day, and passes on every rerun. Bind the app's current time into the query, and freeze it in the test at a time far from any boundary (noon), with a separate test for the boundary itself.
+
+### §T11. A test pins every input its result depends on
+
+Factories often sample values so that tests see variety: a random type, a random count, a random offset. That is fine for attributes the code under test ignores and a trap for the ones it branches on. A test of "due at 03:00, not yet due at 02:00" left the action's offset to the factory; one draw in about fifty picked an offset that fires regardless of time, and the case failed in CI and never locally. The neighbouring examples pinned the offset; the new one copied their shape but not that line. List the attributes the code branches on and set each one in the test.
 
 ## Sweeps
 

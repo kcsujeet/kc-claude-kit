@@ -84,3 +84,37 @@ A gadget request inside `useWidgetActions` hides a gadget write in the widget la
 ## §R27. A read hook wires up every option it accepts
 
 When the repo has a standard argument shape for read hooks (an `enabled` flag, query options such as `onSuccess`, a key override, extra query params), a new read hook accepts that shape, extended with its own fields, rather than re-declaring a subset. And it wires every field it accepts: a hook that takes the standard options but reads only `enabled` advertises an API it does not honour, and a caller's `onSuccess` silently never runs. Accept-and-ignore is dead surface. Compare with 2 sibling read hooks and pass each field through the way they do.
+
+## §R28. Cached data follows its context and its filters
+
+**Context.** A response often depends on more than its params: the current tenant or workspace sent in a request header, the signed-in user, the locale. When the key leaves that out, two contexts share one cache entry. Switching from one store to another with the same params then shows the first store's data until the entry goes stale, and a detail page whose record belongs to the previous store renders whatever the failed request left behind. Put every such context in the key, through the repo's helper for context keys when it has one (grep for how other hooks key by the current tenant), and give a detail page an explicit not-found state for a record outside the current context.
+
+**Filters.** A patch can't tell which filtered lists a record now belongs in. Adding a new order to every cached `['orders', ...]` list puts it into the "shipped only" list too; renaming one pushes it into lists that never held it. After a create, or an update to a field a list filters on, refetch the lists. Patch only the record's own entry, and lists with no filter.
+
+**Derived data.** A write can make another query stale without touching its record: a count of a storefront's products, a total, a badge in a list row. Find every query that derives from what the write changed and refetch it in the same `onSuccess`.
+
+```ts
+// Flag: same key for every store; a create patched into every list, filtered or not
+useQuery({ queryKey: ['orders', params] })
+onSuccess: (order) => addToCache({ record: order, queryKey: ['orders'] })
+
+// Prefer
+useQuery({ queryKey: [...useStoreKey(['orders']), params] })
+onSuccess: () => refetchOrders() // lists, and the storefront counts that include orders
+```
+
+## §R30. A read asks the server for what the screen shows
+
+The server already filters, sorts and scopes. Any read that fetches more than its screen shows and trims it in code (a table keeping the active orders, a dropdown keeping one status, a count taken over a filtered array, a search matched in the browser) pays for rows it throws away and hides the narrowing from the next reader. So does a read that fetches the whole catalog to name the products an order's response already carries. Both break the same way at scale. Grep how sibling reads send their narrowing to the server and do the same, and name related records from the response that carries them (§R26), not from a wider second fetch.
+
+```tsx
+// Flag: fetches everything, filters in code, and fetches again to name related records
+const { data: products } = useProducts()
+const options = products.filter((product) => product.status === status)
+
+// Prefer: the request carries the narrowing; related products come with the order
+const { data: options } = useProducts({ status }) // GET /products?status=active
+```
+
+Filter in code only when the server cannot, and say why in a comment.
+

@@ -12,6 +12,7 @@ So look at it. Once, deliberately, before saying it is done.
 ## Hard rules
 
 - **Never report a UI change complete without having seen it.** "The tests pass" is not the same claim and must not be presented as one.
+- **The browser check is not optional.** It is part of fixing a UI bug, the same as the code change: never offer it as a choice or a follow-up ("QA first, or post as is?"), and never tell a tester or reviewer something is fixed before you have seen it fixed. If the dev servers are down, start them; if a sign-in only the user can do stands in the way, ask for it, and until then nothing is called fixed.
 - **Report what you did and what you saw**, screen by screen. Not "verified the layout" but "narrow viewport, dark mode: the invoice total wraps under the button".
 - **Keep the failure.** If a state renders wrong, that is the finding. Do not adjust the data until it looks fine and then call it passing.
 - **Realistic data or nothing.** `Lorem ipsum`, `Test User`, and a three-row list prove only that the happy path with short strings works. Production has 400 rows, names with diacritics, and a description that runs four lines.
@@ -19,6 +20,7 @@ So look at it. Once, deliberately, before saying it is done.
 - **Spot checks are not QA.** Opening the screen you just changed and seeing that it renders is a smoke test. QA walks every state the screen can be in, the way a QA engineer works through a test plan, and does that every time, not only when asked.
 - **When there is a design, the design is the test plan.** Walk it state by state and compare the app to it. "It renders" and "it matches the design" are different claims.
 - **A moved field is two screens.** When a screen stops editing a value and points elsewhere ("managed in product settings", a read-only value with a link), follow the pointer: open the destination, confirm the field is there and saves, and that the first screen shows the new value without a reload. Compare the destination with the design's version of it too. A pointer to a screen that cannot edit the value is a bug, and so is a read-only value that no screen edits.
+- **Trace a layout bug before parking it.** A reported layout defect (a gap, a bar, content past its background) is read in code first: the element's styles, then every ancestor up to the root layout (display, fixed sizes, overflow, backgrounds). "Needs a look in the browser" is not a status; reproduce it there with the same content size the report shows.
 - **Look at the shipped screen, not a stand-in.** A story, fixture page or test harness is not the app. Check the change where users see it, with its real configuration, and treat a probe as evidence only after it has been shown it can fail (see `testing:verify-e2e`).
 
 ## Workflow
@@ -62,6 +64,20 @@ For each surface, look at every state it can be in, not only the populated one:
 
 A missing empty state and a missing loading state are the two most commonly shipped omissions, because the developer's data is always already there.
 
+### Step 3b — walk the flows around the change
+
+Each state above can look right while the path into it is broken. QA by a person finds these first, because a person moves between screens and keeps going. Walk them on every surface the change reaches:
+
+- **Switch context mid-page.** Change the current tenant, workspace or account while on each changed page. Every panel follows, with no reload; a record that belongs to the previous context shows a clear not-found, not a blank or half-loaded page.
+- **Go where the write shows up.** After each create, edit, archive or delete, visit every other screen that shows something derived from it (a list, a count, a badge, a picker on another page) without reloading, and check it changed, and that it didn't appear where its filters exclude it.
+- **Use the records real data holds.** Include records the new screens can no longer create: blank optional fields, old links, defaults from before a migration. Then try the new actions next to them (create one more, link, delete).
+- **Do each interaction twice.** Search, pick, search again, pick again; add, remove, add; open, close, reopen. State that survives one pass often breaks on the second.
+- **Clear every field you can edit, and save.** Expect a message on the field, or a sensible default, never a generic error.
+- **Read every confirmation against what happens.** After confirming, check the result matches the words: "remove" that deletes, or "delete" that only unlinks, is a finding.
+- **See signed-in state everywhere it shows.** Sign in from each entry point, then check every surface that shows who is signed in, and what a signed-in person should and shouldn't see.
+- **Fill it past the screen.** Make a list or page taller than the viewport and check the background, footer and scrolling hold.
+- **Start from a fresh record.** Create the thing through the UI and take it through the whole flow it exists for. When a result looks wrong, check the inputs before calling it a bug: a total of zero explains a skipped payment.
+
 ### Step 4 — vary the environment
 
 - **Narrow and wide viewport.** The narrow one is where things break; check it first.
@@ -81,6 +97,7 @@ Scan each capture for these, by name, rather than glancing at it:
 - numbers that fail to line up in a column
 - an image with no dimensions causing layout shift
 - contrast that fails in one theme but not the other
+- a background or border that stops before the content does (scroll to the very end of the page)
 
 ### Step 6 — report
 
@@ -107,5 +124,14 @@ Do not report a UI change verified until every box is ticked:
 - [ ] Every pointer to another screen ("managed in X", a read-only value with a link) was followed: the destination has the field, it saves, the first screen shows the new value without a reload, and the destination matches the design's version. Every read-only value has a screen that edits it, or the report names it as a bug.
 - [ ] Each finding is about structure or behaviour; cosmetic differences where the app has an existing pattern (titles, labels, casing, icons) follow the app.
 - [ ] Loading, empty and error states were each seen.
+- [ ] Each changed page was re-checked after switching the current tenant or workspace on it, with no reload.
+- [ ] After each write, every other screen showing data derived from it (lists, counts, badges, pickers) was visited without a reload, including filtered ones it must not appear in.
+- [ ] Records in states the new UI can't create (blank optional fields, old links, pre-migration defaults) were used next to the new actions.
+- [ ] Each interaction was done twice in a row (search and pick twice; add, remove, add).
+- [ ] Every editable field was cleared and saved, and every confirmation's words were checked against what actually happened.
+- [ ] Signed-in state was checked on every surface that shows it, after signing in from each entry point.
+- [ ] A list or page was filled past the viewport, and a record created fresh through the UI was taken through its whole flow.
+- [ ] Every reported layout defect was traced through its ancestors in code and reproduced at the content size the report shows, before it was fixed or left open.
 - [ ] Narrow viewport, the other theme and a keyboard pass were done, or the report says why not.
+- [ ] Every UI fix was seen fixed in a browser before it was reported done or anyone was told it is fixed.
 - [ ] The report lists each state checked, each finding with the state that produces it, and what was not checked.
