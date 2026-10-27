@@ -23,6 +23,8 @@ paths:
   - §B8. When a value's meaning changes, every reader changes
   - §B9. A claim about a value comes from all its writers
   - §B10. A fix covers its whole class
+  - §B11. A client mirror of a server calculation reads the server's inputs
+  - §B12. A list shows only what the viewer can open
 - Sweeps
 
 ## Rules
@@ -57,6 +59,8 @@ The correctness gate agent ticks every box against the diff. A box is FAIL if an
 - [ ] §B8 When a value's meaning changes, every reader changes: when the diff changes what a value holds (a route parameter, field or prop now carries a different kind of id or a narrower or wider scope), the evidence lists every reader of that value found by grep, including ones the diff does not touch, and states for each that it still gets what it expects. (N/A: no value changes meaning)
 - [ ] §B9 A claim about a value's contents, in a comment, a commit message or a test's reasoning ("positions are blank", "this is the only writer"), was checked against every writer: the class body, each included module or concern and its callbacks, factories and seeds. One that read only the visible class body FAILS. (N/A: the diff states nothing about what a value holds)
 - [ ] §B10 A fix covers its whole class: when the diff fixes a bug, the evidence names its cause as a searchable pattern, the grep that was run for it across code and tests, and a verdict per hit (fixed here, safe and why, or listed for follow-up). A fix with no such sweep FAILS. (N/A: the diff fixes no bug)
+- [ ] §B11 A client that mirrors a server calculation (a price, a total, a balance it shows before the server charges it) reads each input from the record the server reads, and the evidence names the server code and the client read side by side. An input read from a different record that holds the same value only some of the time (a copy, a legacy column, a record that can be deleted) FAILS. (N/A: the diff mirrors no server calculation)
+- [ ] §B12 A list shows only what the viewer can open: when each listed item has its own access check (its page turns some viewers away), the list applies the same check, server-side, and the evidence names both. A list gated only as a whole, whose items then refuse the viewer, FAILS. (N/A: no list of items with their own access check)
 
 **Point, do not double-report.** A removed export or a changed shared prop shape is structure §S10. A cast asserting a type the value does not have, as syntax, is clarity §C17. Duplicated markup, dead imports, or props threaded through and never read after a refactor are simplicity §P9. A locale formatter with no explicit time zone is datetime §D7. When a bug and one of those boxes describe the same line, report it once, under the closer fit, and name the other box in the evidence.
 
@@ -137,6 +141,14 @@ A class body rarely shows every write. An included module can set a field in a `
 ### §B10. A fix covers its whole class
 
 A bug report names one symptom; the cause usually has siblings. A flaky ordering was fixed in the job that picked a row, while a test written the same day picked its expected row with the same tied query and stayed flaky for weeks. The fix's own description named the cause, so the sweep was one grep away. Write the cause as a pattern (`stages.first` over a per-group position), grep for it in code and tests, and give each hit a verdict in the PR. When diagnosing a later failure, read the earlier fix's description first (§B4): it may already explain the cause.
+
+### §B11. A client mirror of a server calculation reads the server's inputs
+
+A checkout shows the discounted price before the server charges it, so the client repeats the server's math. When the two read their inputs from different records, they agree only while those records agree. A discount rate moved from each storefront to a shop-wide settings row: the server read the row, the client still read the storefront, and a shop that deleted its last storefront showed full price while the server charged the discounted one, so payment failed. Put the server's read and the client's read side by side, and when a setting moves, move every reader (§B8).
+
+### §B12. A list shows only what the viewer can open
+
+A page that lists items, each behind its own access check, is safe only when the list applies that check too. Gating the list as a whole (any signed-in customer may open it) still shows every item, and the viewer then gets turned away by the ones they can't open, after learning they exist. Filter the list on the server with the same rule the item's page applies, and test it with a viewer who can open some items and not others.
 
 ## Sweeps
 
