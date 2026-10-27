@@ -103,16 +103,16 @@ useQuery({ queryKey: [...useStoreKey(['orders']), params] })
 onSuccess: () => refetchOrders() // lists, and the storefront counts that include orders
 ```
 
-## §R30. A list or picker asks the server for what it shows
+## §R30. A read asks the server for what the screen shows
 
-The server already filters, sorts and scopes. A picker that fetches every product and keeps the active ones in code pays for rows it throws away, and a list row that fetches the whole catalog to look up the products its order already includes runs a second query for data it holds. Both break the same way at scale and both hide the narrowing from the next reader. Grep how sibling pickers send their narrowing to the server and do the same. Render a selected value the current options don't hold from the related record the order's own response carries (§R26), not by widening the fetch.
+The server already filters, sorts and scopes. Any read that fetches more than its screen shows and trims it in code (a table keeping the active orders, a dropdown keeping one status, a count taken over a filtered array, a search matched in the browser) pays for rows it throws away and hides the narrowing from the next reader. So does a read that fetches the whole catalog to name the products an order's response already carries. Both break the same way at scale. Grep how sibling reads send their narrowing to the server and do the same, and name related records from the response that carries them (§R26), not from a wider second fetch.
 
 ```tsx
-// Flag: fetches everything, filters in code, and fetches again to name what's picked
+// Flag: fetches everything, filters in code, and fetches again to name related records
 const { data: products } = useProducts()
 const options = products.filter((product) => product.status === status)
 
-// Prefer: the request carries the narrowing; picked products come with the order
+// Prefer: the request carries the narrowing; related products come with the order
 const { data: options } = useProducts({ status }) // GET /products?status=active
 ```
 
