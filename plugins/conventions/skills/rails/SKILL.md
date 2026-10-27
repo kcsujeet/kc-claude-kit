@@ -86,13 +86,14 @@ The rails gate ticks every box against the diff. A box is FAIL if any matching c
 - [ ] §RL4a Per-record reads: every added `sum|count|average|minimum|maximum|any?|exists?|pluck` reached per record is classified (walks loaded rows vs queries); a querying one has a bulk pass. (N/A: none added)
 - [ ] §RL4b A bulk pass sits at a seam every caller passes and is named for what it does; callers that still miss it are named. (N/A: no bulk pass)
 - [ ] §RL4c Every added or touched computed serializer attribute was checked for per-record queries. (N/A: no serializer touched)
-- [ ] §RL4d The client asks for what it needs: every added serializer attribute belongs to the serializer's own model, and no relationship is loaded or sent unless the client includes it. An attribute whose value is read from another model (`object.store.currency`, a computed attribute that delegates to an associated record) FAILS: expose it on that model's serializer and have the client include the relationship. When the association is missing from the client's path, add the relationship, not the attribute. (N/A: no serializer attribute added)
+- [ ] §RL4d The client asks for what it needs: every added serializer attribute belongs to the serializer's own model, and no relationship is loaded or sent unless the client includes it. An attribute whose value is read from another model (`object.store.currency`, a computed attribute that delegates to an associated record, an association's ids such as `taggings.map(&:tag_id)`) FAILS: expose it on that model's serializer and have the client include the relationship. When the association is missing from the client's path, add the relationship, not the attribute. (N/A: no serializer attribute added)
 - [ ] §RL4e Params handed to a serializer or view carry data, not a decision precomputed for one consumer (`signed_in: customer.present?`): pass the record and let the attribute that needs it check it. (N/A: no serializer or view params added)
 - [ ] §RL4d No time-dependent `@x ||=` memo; an endpoint whose client only counts returns a count. (N/A: none added)
 - [ ] §RL5a No unbounded work in a request; a cap has a clear message, or the work moves to a job. (N/A: nothing unbounded added)
 - [ ] §RL5b No GET or HEAD writes: every read path added or touched saves, creates and enqueues nothing. (N/A: no read path)
 - [ ] §RL5c Every accepted attribute has a defined result for present, `null`, `""` and missing, traced (or run) through coercion, validation and the write. (N/A: no attribute added or its handling unchanged)
 - [ ] §RL5d HTTP verb matches effect. (N/A: no new endpoint)
+- [ ] §RL5e A write that replaces a set of links (`tag_ids = [...]`) checks the caller's access to every id it removes as well as every id it adds, and a spec removes one the caller can't reach. A check over `ids - current_ids` alone FAILS. (N/A: no set-replacing write)
 - [ ] §RL6 Stored values: when the diff renames, merges or retires a stored value or adds a backfill, every box in `references/backfills.md` was walked. (N/A: no enum, status constant, column meaning or backfill changed)
 - [ ] §RL7a N+1 specs use the app's detector over three records, and one covers a route that did not ask for the fix. (N/A: no N+1 fix)
 - [ ] §RL7b A bug-fix spec builds data the way the app writes it. (N/A: not a bug fix)
@@ -148,7 +149,7 @@ Install the bulk pass where every caller passes, typically the method that rende
 
 A computed serializer attribute that calls another computed attribute doubles the cost. Measure before claiming: state query counts and timings produced in the session, with the environment named.
 
-**§RL4d. The client asks for what it needs.** The server serves each record's own fields and the relationships to reach the rest; the client includes the related records it needs, so each screen pays only for what it reads. Copying an associated record's fields onto a serializer (`attribute :currency do |order| order.store.currency end`) works once and then spreads: the next screen needs one more field, the same values appear in two serializers that drift, and the client can no longer tell which record a value belongs to or cache it once. Expose the value on its own model's serializer, add the relationship if it is missing (`belongs_to :store`), and have the client include it (`?include=store`). When a field must stay hidden from some callers, gate it on that model's serializer, not by copying a safe subset elsewhere.
+**§RL4d. The client asks for what it needs.** The server serves each record's own fields and the relationships to reach the rest; the client includes the related records it needs, so each screen pays only for what it reads. Copying an associated record's fields onto a serializer (`attribute :currency do |order| order.store.currency end`) works once and then spreads: the next screen needs one more field, the same values appear in two serializers that drift, and the client can no longer tell which record a value belongs to or cache it once. Expose the value on its own model's serializer, add the relationship if it is missing (`belongs_to :store`), and have the client include it (`?include=store`). When a field must stay hidden from some callers, gate it on that model's serializer, not by copying a safe subset elsewhere. An association's ids as an attribute (`attribute :tag_ids do |post| post.taggings.map(&:tag_id) end`) is the same copy: the relationship already carries the ids, and the attribute needs a preload on every render path or it queries per record.
 
 ### §RL5. Request-shaped risks
 
@@ -157,6 +158,8 @@ Request timeouts usually raise inside the app and render as a 500, so intermitte
 A GET that creates a missing record breaks on read replicas that block writes and under prefetching. Return an unsaved default on read and create on the first write.
 
 Trace every accepted attribute: a PATCH treats a missing key as "no change", type coercion can turn `""` into `nil`, and a numericality validation then rejects `nil`, so "clear this field" may be impossible. Run the validator and model when it is not plain from the code.
+
+A write that replaces a set (`order.storefront_ids = [...]`) removes as well as adds. Authorization that checks only the added ids lets a caller drop links to records they cannot reach, typically from a screen that never showed those links. Check both directions.
 
 ### §RL6. Renaming, retiring or backfilling a stored value
 

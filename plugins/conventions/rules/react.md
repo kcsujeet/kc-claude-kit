@@ -29,6 +29,7 @@ Placement is covered by the `structure` skill, which defers to bulletproof-react
 
 - Reads and writes live in separate hooks. A component contains no raw `fetch`, no `axios`, no direct `useQuery` or `useMutation` call; grep how the sibling features do it and follow that.
 - The fetch lives with the actual consumer. A page does not duplicate a fetch its child already owns, especially with different params, and nothing fetches a whole list to derive one boolean.
+- A list or picker asks the server for exactly what it shows: the caller passes the filter through the query params, as sibling pickers do. Fetching wider and filtering in code, or fetching a list to resolve ids that a record's include already carries, is the fallback only when the server cannot filter.
 - After a write, patch the cache first, then update surgically, and invalidate only as a last resort.
 - Prefer `mutate` with callbacks over `mutateAsync` with `await` when the resolved value only drives a side effect.
 - A request's method matches its effect: a read uses GET unless its input cannot fit in a query string.
@@ -41,6 +42,7 @@ Placement is covered by the `structure` skill, which defers to bulletproof-react
 
 - The form is the single source of truth. No `useState` shadowing a value the form already holds.
 - A form-state hook returns form plumbing only (the methods, submit and discard, saving state). One field's fetching, watching and lookup state live in that field's component.
+- A form that shows only part of a set field (in a store's context, that store's links) seeds that part and sends the rest back unchanged.
 - Each form watch lives in the smallest component that renders from it; a child reads shared form values itself rather than taking them as props.
 - A form that edits a record seeds the related record its inputs render from, not just the id.
 - Check the validation library's own API before hand-rolling a check, a regex, or a coercion. Most of them already exist there.

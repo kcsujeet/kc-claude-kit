@@ -46,6 +46,7 @@ Placement is covered by the `structure` skill, which defers to bulletproof-react
 
 - Reads and writes live in separate hooks. A component contains no raw `fetch`, no `axios`, no direct `useQuery` or `useMutation` call; grep how the sibling features do it and follow that.
 - The fetch lives with the actual consumer. A page does not duplicate a fetch its child already owns, especially with different params, and nothing fetches a whole list to derive one boolean.
+- A list or picker asks the server for exactly what it shows: the caller passes the filter through the query params, as sibling pickers do. Fetching wider and filtering in code, or fetching a list to resolve ids that a record's include already carries, is the fallback only when the server cannot filter.
 - After a write, patch the cache first, then update surgically, and invalidate only as a last resort.
 - Prefer `mutate` with callbacks over `mutateAsync` with `await` when the resolved value only drives a side effect.
 - A request's method matches its effect: a read uses GET unless its input cannot fit in a query string.
@@ -58,6 +59,7 @@ Placement is covered by the `structure` skill, which defers to bulletproof-react
 
 - The form is the single source of truth. No `useState` shadowing a value the form already holds.
 - A form-state hook returns form plumbing only (the methods, submit and discard, saving state). One field's fetching, watching and lookup state live in that field's component.
+- A form that shows only part of a set field (in a store's context, that store's links) seeds that part and sends the rest back unchanged.
 - Each form watch lives in the smallest component that renders from it; a child reads shared form values itself rather than taking them as props.
 - A form that edits a record seeds the related record its inputs render from, not just the id.
 - Check the validation library's own API before hand-rolling a check, a regex, or a coercion. Most of them already exist there.
@@ -100,6 +102,8 @@ The react gate agent ticks every box against the diff. A box is FAIL if any matc
 - [ ] §R27 A read hook accepts the repo's standard read-hook options (extended with its own fields, not a re-declared subset) and wires every option it accepts; an accepted option the hook never reads FAILS. (N/A: no read hook added or edited)
 - [ ] §R28 Cached data follows its context and its filters: every new or changed query key includes each context its response depends on that isn't in its params (the current tenant or workspace sent in a header or read from a store, the signed-in user, the locale), through the repo's helper for context keys when one exists. A write that adds a record, or changes a field a list filters on, refetches filtered lists instead of patching them, and also refetches queries that derive from what it changed (counts, totals, badges). (N/A: no query key, cache patch or write added or changed)
 - [ ] §R29 A new or changed `min-height`/`min-width` (or `minHeight`/`minWidth`) on an element was checked against its parent: when the parent is a flex container with a fixed size, the element either cannot shrink (`flex-shrink: 0`) or its content can never outgrow the minimum, and the finding names the parent and its size. **Enumerate**: grep the diff for `min-height`, `min-width`, `minHeight`, `minWidth`, one verdict per hit. (N/A: `grepped min sizing: 0 hits`)
+- [ ] §R30 A list or picker asks the server for what it shows: its narrowing (a visibility, a parent, a status) goes to the server as a filter in the query params, the way 2 cited sibling pickers pass theirs, and a selected value the options don't hold renders from the record's own include (§R26). A fetch filtered in code (`data.filter(...)` over a response the server could have narrowed) FAILS, and so does a second fetch of a list to look up ids the record's include already carries, unless a comment says why the server can't. (N/A: no list or picker fetch added or changed)
+- [ ] §R31 A form that shows part of a set keeps the rest: when the screen's context limits which entries of a set field the form shows (one store's links on a store page), the form seeds only those, and on submit it sends back every hidden entry unchanged. Rendering entries it can't name (a bare id) FAILS, and so does dropping them. (N/A: no set field limited by context)
 
 ## Review detail
 
@@ -314,13 +318,13 @@ export const WidgetInput = ({ label, ref }: WidgetInputProps) => { /* ... */ }
 
 ### Section 3 — Data fetching
 
-The detail for §R11-§R13, §R21-§R23, §R27 and §R28 is in `${CLAUDE_PLUGIN_ROOT}/skills/react/references/data-fetching.md`. Read it in full before grading any of them.
+The detail for §R11-§R13, §R21-§R23, §R27, §R28 and §R30 is in `${CLAUDE_PLUGIN_ROOT}/skills/react/references/data-fetching.md`. Read it in full before grading any of them.
 
 ---
 
 ### Section 4 — Forms
 
-The detail for §R14 and §R24-§R26 is in `${CLAUDE_PLUGIN_ROOT}/skills/react/references/forms.md`. Read it in full before grading any of them.
+The detail for §R14, §R24-§R26 and §R31 is in `${CLAUDE_PLUGIN_ROOT}/skills/react/references/forms.md`. Read it in full before grading any of them.
 
 ---
 

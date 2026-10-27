@@ -67,3 +67,15 @@ A picker bound to an id field (`owner_id`) usually renders its selected label fr
 - **A label prop hand-built from that same record** (`defaultOption={{ value: widget.owner.id, label: widget.owner.name }}`) is a dead wrapper once the record is seeded.
 
 Read how the repo's picker renders its selection before flagging, and cite it.
+
+## §R31. A form that shows part of a set keeps the rest
+
+An order can belong to several storefronts, and a storefront's page shows only its own. A form there that seeds every link renders the other storefronts' entries as bare ids (it can't name them) and lets the user remove links they can't see. One that seeds only the storefront's links and submits that list silently drops the others, because the write replaces the set. Seed the shown part, keep the hidden part aside, and send it back with the edited part:
+
+```ts
+const [shown, kept] = partition(order.storefronts, (storefront) => storefront.id === currentStorefrontId)
+// defaultValues: shown; on submit: [...edited, ...ids(kept)]
+```
+
+The server still checks removals (rails §RL5e): hiding an entry is not authorization.
+

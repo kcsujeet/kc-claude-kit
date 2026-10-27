@@ -103,3 +103,18 @@ useQuery({ queryKey: [...useStoreKey(['orders']), params] })
 onSuccess: () => refetchOrders() // lists, and the storefront counts that include orders
 ```
 
+## §R30. A list or picker asks the server for what it shows
+
+The server already filters, sorts and scopes. A picker that fetches every product and keeps the active ones in code pays for rows it throws away, and a list row that fetches the whole catalog to look up the products its order already includes runs a second query for data it holds. Both break the same way at scale and both hide the narrowing from the next reader. Grep how sibling pickers take their narrowing (a `queryParams={{ filter }}` the caller passes) and do the same. Render a selected value the current options don't hold from the record's include (§R26), not by widening the fetch.
+
+```tsx
+// Flag: fetches everything, filters in code, and fetches again to name what's picked
+const { data: products } = useProducts()
+const options = products.filter((product) => product.status === status)
+
+// Prefer: the server narrows; picked records come from the order's include
+<ProductPicker name="product_ids" queryParams={{ filter: { status: { eq: status } } }} />
+```
+
+Filter in code only when the server cannot, and say why in a comment.
+
