@@ -21,6 +21,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
+- `conventions` 1.3.0: testing §T11, a test pins every input its result depends on, instead of a factory default that may be sampled. It comes from a new case that left a sampled offset unset and failed about one run in fifty.
 - `conventions` 1.3.0: testing §T10, time comes from a clock the test can freeze: code compared against now binds the app's time instead of reading the database clock, and its tests freeze it. It comes from a scheduled-job spec that failed only when CI ran across 23:59 or midnight.
 - `conventions` 1.3.0: correctness §B10, a fix covers its whole class: the cause is written as a pattern, grepped across code and tests, and every hit gets a verdict. Testing §T9, a test names its expected record (the one it created, or an order ending on a unique key) instead of `first` over an order that can tie. Both come from a flaky ordering fixed in the code while a test written the same day kept the same tied query.
 - `conventions` 1.3.0: correctness §B9, a claim about what a value holds comes from all its writers, included modules and their callbacks among them. It comes from a flaky test blamed on positions being blank, when an included concern numbered them within each group, so two rows tied at the first position.
