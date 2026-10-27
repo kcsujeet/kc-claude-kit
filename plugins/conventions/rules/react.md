@@ -29,7 +29,7 @@ Placement is covered by the `structure` skill, which defers to bulletproof-react
 
 - Reads and writes live in separate hooks. A component contains no raw `fetch`, no `axios`, no direct `useQuery` or `useMutation` call; grep how the sibling features do it and follow that.
 - The fetch lives with the actual consumer. A page does not duplicate a fetch its child already owns, especially with different params, and nothing fetches a whole list to derive one boolean.
-- A list or picker asks the server for exactly what it shows: the caller passes the filter through the query params, as sibling pickers do. Fetching wider and filtering in code, or fetching a list to resolve ids that a record's include already carries, is the fallback only when the server cannot filter.
+- A list or picker asks the server for exactly what it shows: its narrowing goes into the request, the way sibling pickers send theirs. Fetching wider and filtering in code, or fetching a list to resolve ids whose records the response already carries, is the fallback only when the server cannot filter.
 - After a write, patch the cache first, then update surgically, and invalidate only as a last resort.
 - Prefer `mutate` with callbacks over `mutateAsync` with `await` when the resolved value only drives a side effect.
 - A request's method matches its effect: a read uses GET unless its input cannot fit in a query string.

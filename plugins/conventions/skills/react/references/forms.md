@@ -73,8 +73,10 @@ Read how the repo's picker renders its selection before flagging, and cite it.
 An order can belong to several storefronts, and a storefront's page shows only its own. A form there that seeds every link renders the other storefronts' entries as bare ids (it can't name them) and lets the user remove links they can't see. One that seeds only the storefront's links and submits that list silently drops the others, because the write replaces the set. Seed the shown part, keep the hidden part aside, and send it back with the edited part:
 
 ```ts
-const [shown, kept] = partition(order.storefronts, (storefront) => storefront.id === currentStorefrontId)
-// defaultValues: shown; on submit: [...edited, ...ids(kept)]
+const isHere = (storefront) => storefront.id === currentStorefrontId
+const shown = order.storefronts.filter(isHere) // the form's default values
+const kept = order.storefronts.filter((storefront) => !isHere(storefront))
+// on submit: [...editedIds, ...kept.map(({ id }) => id)]
 ```
 
 The server still checks removals (rails §RL5e): hiding an entry is not authorization.
