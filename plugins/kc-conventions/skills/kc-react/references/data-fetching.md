@@ -116,5 +116,5 @@ const options = products.filter((product) => product.status === status)
 const { data: options } = useProducts({ status }) // GET /products?status=active
 ```
 
-Filter in code only when the server cannot, and say why in a comment.
+Filter in code only when the server cannot, and say why in a comment. "Cannot" means the data or the endpoint is out of your hands (a third-party API, a field the server never stores). An endpoint your team owns that simply lacks the filter gets the filter, usually one entry beside the filters it already declares, and the server change ships first so the client never sends a filter the server rejects.
 
