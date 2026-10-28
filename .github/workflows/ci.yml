@@ -11,8 +11,8 @@ on:
         required: true
         type: choice
         options:
-          - code-review
-          - conventions
+          - kc-gates
+          - kc-conventions
 
 permissions:
   contents: read
@@ -49,8 +49,8 @@ jobs:
       # Function-hook plugins carry *.test.ts(x) files run by `claude plugin test`.
       - name: Function-hook plugin tests
         run: |
-          claude plugin test plugins/usage-band
-          claude plugin test plugins/image-preview
+          claude plugin test plugins/kc-usage-band
+          claude plugin test plugins/kc-image-preview
 
   rules-in-sync:
     name: Generated rules match their skills
@@ -58,7 +58,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - name: Check rules/ against skills/
-        run: bash plugins/conventions/scripts/build-rules.sh --check
+        run: bash plugins/kc-conventions/scripts/build-rules.sh --check
 
   scripts:
     name: Shell scripts and their tests
@@ -71,7 +71,7 @@ jobs:
         run: git ls-files -z '*.sh' | xargs -0 --no-run-if-empty shellcheck
 
       - name: Convention sweep fixtures
-        run: bash plugins/conventions/tests/run-sweeps.sh
+        run: bash plugins/kc-conventions/tests/run-sweeps.sh
 
       # Every top-level *.sh in a plugin's tests/ is a runner; helpers and
       # fixtures live in subdirectories. Plugins with no tests are skipped.
@@ -79,7 +79,7 @@ jobs:
         run: |
           shopt -s nullglob
           for runner in plugins/*/tests/*.sh; do
-            if [ "$runner" = plugins/conventions/tests/run-sweeps.sh ]; then
+            if [ "$runner" = plugins/kc-conventions/tests/run-sweeps.sh ]; then
               continue
             fi
             echo "::group::${runner}"
@@ -121,10 +121,10 @@ jobs:
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
       # CI form from https://code.claude.com/docs/en/plugin-evals.
-      # code-review cases load conventions too (plugins: ["../..",
-      # "../../../conventions"]), and the runner only loads plugins inside its
+      # kc-gates cases load kc-conventions too (plugins: ["../..",
+      # "../../../kc-conventions"]), and the runner only loads plugins inside its
       # containment root: the target plugin when the target is a plugin, else
-      # the directory the eval runs against. So code-review runs from the repo
+      # the directory the eval runs against. So kc-gates runs from the repo
       # root with --eval-dir. Its cases also build fixture repos with scaffold
       # scripts, run git through Bash and dispatch gate agents.
       # --allow-tools takes a list, so it stays last among these flags.
@@ -133,8 +133,8 @@ jobs:
         run: |
           target=("plugins/$PLUGIN")
           extra_flags=()
-          if [ "$PLUGIN" = code-review ]; then
-            target=(. --eval-dir plugins/code-review/evals --ablation with-without)
+          if [ "$PLUGIN" = kc-gates ]; then
+            target=(. --eval-dir plugins/kc-gates/evals --ablation with-without)
             extra_flags+=(--scaffold --allow-tools Bash Agent)
           fi
           claude plugin eval "${target[@]}" \

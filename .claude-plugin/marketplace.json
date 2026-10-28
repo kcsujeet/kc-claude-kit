@@ -9,38 +9,38 @@
   },
   "plugins": [
     {
-      "name": "conventions",
-      "source": "./plugins/conventions",
-      "description": "Portable coding conventions as path-scoped rules, installed into a project with /conventions:init"
+      "name": "kc-conventions",
+      "source": "./plugins/kc-conventions",
+      "description": "Portable coding conventions as path-scoped rules, installed into a project with /kc-conventions:kc-init"
     },
     {
-      "name": "code-review",
-      "source": "./plugins/code-review",
+      "name": "kc-gates",
+      "source": "./plugins/kc-gates",
       "description": "Gate-based code review: one gate agent per convention topic, per-box PASS/FAIL verdicts, zero rationalized skips"
     },
     {
-      "name": "instructions",
-      "source": "./plugins/instructions",
+      "name": "kc-instructions",
+      "source": "./plugins/kc-instructions",
       "description": "Audit a repo's Claude Code instruction setup: what stays in CLAUDE.md, what becomes a path-scoped rule, a skill, or a hook"
     },
     {
-      "name": "testing",
-      "source": "./plugins/testing",
+      "name": "kc-verify",
+      "source": "./plugins/kc-verify",
       "description": "Verification workflows: look at the UI before calling it done, with realistic data across states, viewports and themes"
     },
     {
-      "name": "usage-band",
-      "source": "./plugins/usage-band",
+      "name": "kc-usage-band",
+      "source": "./plugins/kc-usage-band",
       "description": "A row of pills above the prompt: model, git branch, context fill, rate limits with reset times, token totals and session cost"
     },
     {
-      "name": "image-preview",
-      "source": "./plugins/image-preview",
+      "name": "kc-image-preview",
+      "source": "./plugins/kc-image-preview",
       "description": "Thumbnails of the images you paste, above the prompt, in any terminal; reads the real file behind a copied Finder icon"
     },
     {
-      "name": "autopilot",
-      "source": "./plugins/autopilot",
+      "name": "kc-autopilot",
+      "source": "./plugins/kc-autopilot",
       "description": "Plan in, PRs out: engineer, reviewer and persona-QA agents loop on each unit of an approved plan until it is clean"
     }
   ]
