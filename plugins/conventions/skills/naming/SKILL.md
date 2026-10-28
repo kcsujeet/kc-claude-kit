@@ -24,6 +24,7 @@ paths:
   - §N9. A name says what kind of thing it is and what it belongs to
   - §N10. Parts of one unit keep its prefix and end with their kind
   - §N11. A name follows what its subject became
+  - §N12. A variant's qualifier is on everything that serves it
   - §N2 evidence requirement: enumerate boolean chains by grep, do not eyeball
 - Sweeps
 
@@ -46,6 +47,7 @@ A name is read far more often than it is written, and a wrong one survives refac
 - Before naming a new file, look at 2-3 existing files of the same kind and follow their naming pattern and location. Sibling precedent never excuses a generic or colliding basename: the subject still goes in the name.
 
 - When a change alters what a thing is (one becomes many, a page becomes a list with a page per record, a setting moves onto each item), the names that describe the old shape are wrong now, even though the diff never touched them. Route segments, folders, files, exports, API paths, query keys and translation keys get the name the repo gives that new shape, or the change says why one has to wait (a public URL that needs a redirect first).
+- When a resource is served in more than one variant (public and admin, signed-in and anonymous, v1 and v2), every unit that serves one variant carries that variant's qualifier the same way: the client or resource, its data hooks, cache keys, path constants and test fixtures. The qualifier sits once, on the container: a public resource's methods are `getStore`, not `getPublicStore`.
 Detection criteria and per-box review failure modes live in the `## Review checklist` of the `naming` skill (`conventions:naming`), with the detail under its `## Review detail`. These rules are the statement of the convention; that checklist is how a diff gets graded against it.
 
 ## Review checklist
@@ -63,10 +65,11 @@ The naming gate agent ticks every box against the diff. A box is FAIL if any mat
 - [ ] §N9 Kind and owner read at the import site: every new or renamed export, read with no folder path, lets a reader guess both what kind of thing it is (data hook, form-state hook, component, util, constant, type) and what it belongs to (which form, table, feature). A wrong guess on either FAILS: a hook that only fills one form's fields named like a data hook, a co-located hook carrying the name of a shared data layer, a one-table helper named like an app-wide util. **Enumerate**: every new or renamed export gets a verdict. (N/A: no new or renamed export)
 - [ ] §N10 Parts of one unit keep its prefix AND end with their kind: sibling pieces of `WidgetPanel` are `WidgetPanelSyncSection`, `WidgetPanelRow`. Keeping the prefix but dropping the kind (`WidgetPanelSync`) FAILS, and so does keeping the kind but dropping the prefix (`WidgetSyncSection`). (N/A: no new file or export in a family of sibling parts)
 - [ ] §N11 A name follows what its subject became: when the diff changes what an existing thing is or holds (one becomes many, a single settings page becomes a list with a page per record, a per-account setting becomes per-item), the evidence lists every name that still describes the old shape (route segments, folders, files, exports, API paths, query keys, translation keys, including ones the diff does not touch) and compares each with 2-3 siblings that already have the new shape. A name that no longer matches FAILS unless the diff renames it or states why the rename has to wait (for example a public URL that needs a redirect first). (N/A: the diff changes no existing thing's cardinality or kind)
+- [ ] §N12 A variant's qualifier is on everything that serves it: for every unit the diff adds, renames or touches that serves one variant of a resource (it calls a public, admin or versioned endpoint), the evidence lists its siblings for that variant and checks the name carries their qualifier: resource, data hooks, cache keys, path constants, fixtures. A unit that calls the variant's endpoint without the qualifier FAILS, and so does a member repeating its container's (`publicStoreResource.getPublicStore`). **Enumerate** every unit in touched files that calls the variant's endpoints, not only the ones the diff added. (N/A: the diff touches no unit that serves a variant)
 
 ## Review detail
 
-Identifier-naming rules for the diff under review. Covers eleven independent failure modes: type-shaped names on behavior-bearing values, undecoded inline boolean chains, repeated domain checks that should be a named `isX`, names that are dishonest about what the code actually does, names that only read well beside their declaration, noun-phrase names on functions, file names that need their path to mean anything, new files that ignore their siblings, names that hide their kind or owner, family parts that drop their prefix or kind, and names left describing what their subject used to be.
+Identifier-naming rules for the diff under review. Covers twelve independent failure modes: type-shaped names on behavior-bearing values, undecoded inline boolean chains, repeated domain checks that should be a named `isX`, names that are dishonest about what the code actually does, names that only read well beside their declaration, noun-phrase names on functions, file names that need their path to mean anything, new files that ignore their siblings, names that hide their kind or owner, family parts that drop their prefix or kind, names left describing what their subject used to be, and units that serve one variant of a resource without its qualifier.
 
 ### §N1. Names should describe the *role*, not the *type*
 
@@ -387,6 +390,14 @@ grepped &&/||: 6 hits
 A group line ("booleans look fine") is insufficient. **Silence is not a pass:** a gate that found none must print `grepped &&/||: 0 hits`, so "no receipt" can never be mistaken for "nothing there." Single-operand JSX guards (`{editMode && <X />}`) pass trivially, but they still get listed — the count is what proves the sweep ran.
 
 When a checklist box cites a convention rather than a hard rule (e.g. what counts as an established helper name in this codebase), grep the target repo for 2–3 existing examples before citing the convention — do not assert a house style from memory.
+
+### §N12. A variant's qualifier is on everything that serves it
+
+A shop's storefront app reads from `/public/stores`, the admin app from `/stores`. The storefront's resource is `usePublicStoreResource`, but its hooks are `useStore` and `useStoreProfile`, its cache key is `STORE`, and its test mock is `mockStoresResponse`. A reader of `useStore` cannot tell it is the anonymous read, and when the admin app's `useStore` sits one import away, the two are easy to confuse. Pick the qualifier the repo already uses for the variant and put it on every unit that serves it: `usePublicStore`, `usePublicStoreProfile`, `PUBLIC_STORE`, `mockPublicStoresResponse`.
+
+Put it once. Inside `usePublicStoreResource`, the methods are `getStore` and `getStores`; `publicStoreResource.getPublicStore` says it twice.
+
+**How to check.** List the endpoints the variant uses, then every unit in the touched files that calls one of them, including units the diff did not change. Each one either carries the qualifier or is a finding. Renaming one member of the family is the moment to rename the rest, or to list them as a follow-up.
 
 ## Sweeps
 

@@ -26,6 +26,7 @@ paths:
   - §P13. A new pattern needs precedent, or the developer's OK
   - §P14. Handle the states the data can be in, not the ones a comment says it once was
   - §P14. A caller the convention misses passes the value, not a smarter guess
+  - §P15. Deferred work is done when its condition is met
 
 ## Rules
 
@@ -43,6 +44,7 @@ The simplest code that does the job is the easiest to read, change and delete. E
 - A new pattern or technique follows 2 places in the repo that already do it. When nothing does, ask the developer before introducing it.
 - When a shared unit works a value out by convention (a field name from another name, a path from an id) and one caller doesn't fit, that caller passes the value through an optional override. The guessing logic doesn't grow special cases.
 - A branch for a data state (a field that may be blank, a record that may be missing, an old shape) is written only after checking the state can still occur. Create-time defaults, validations and backfills that already ran may have ruled it out; a comment saying it exists is not evidence.
+- A marker that defers work until a condition (`TODO: remove once the new page ships`, "phase 2", "after the backfill runs") is acted on in the change that meets the condition: the code it guards goes, with the marker. A multi-step change ends with a sweep of its own markers, and each one left says what it still waits on.
 
 ## Review checklist
 
@@ -63,6 +65,7 @@ The simplicity gate agent ticks every box against the diff. A box is FAIL if any
 - [ ] §P13 A new pattern has precedent: every new abstraction or technique in the diff (a hook wrapping a hook, a new option on a shared hook or type, a new way of holding UI state, a new layout helper) cites 2 places in the repo that already do it, and follows them. A file with a similar name is not precedent, and neither is an option a shared type declares but no caller passes. With no precedent, the finding is a `question` to the author (in a self-review, ask the developer before writing it). (N/A: nothing new in kind in the diff)
 - [ ] §P14 Every new branch, fallback or exception for a data state (blank, missing, legacy shape) cites evidence that the state can still occur: the writer that can still produce it, or a data query. A state that create-time defaults, validations or a completed backfill rule out FAILS; handle it in the backfill or the validation instead. (N/A: no new branch for a data state)
 - [ ] §P14 A value a shared unit derives by convention (a name built from another name, a default read from a string pattern) is not made cleverer for one caller it gets wrong (pluralization rules, another regex, a special case); that caller passes the value through an optional override, and every other caller keeps the old default. (N/A: no derived value changed or worked around in the diff)
+- [ ] §P15 Deferred work is done when its condition is met: grep the repo for the markers of the work this diff finishes (its feature or phase name, `once`, `after`, `remove when`); each one whose condition the diff meets FAILS unless the diff removes the code it guards. Each one left in place states what it still waits on. (N/A: the diff finishes no deferred work)
 
 ## Review detail
 
@@ -296,6 +299,10 @@ This is not §P10's single-caller prop: the caller cannot own the behavior, beca
 ### §P14. Handle the states the data can be in, not the ones a comment says it once was
 
 Old comments outlive the data they describe: "the first store may have no name of its own" stays in the code after a backfill names every store and creation starts naming new ones. Code that trusts the comment grows a special case (a name may stay blank, but only if it was blank before) that guards a state nothing can produce any more, and every reader has to learn it. Before writing such a branch, find what could still produce the state: the create path, the update path, an import, a job. If none can, and a backfill has run, enforce the rule plainly (required, validated) and leave the old state to the backfill. If one still can, say which.
+
+### §P15. Deferred work is done when its condition is met
+
+A change that ships in steps leaves markers behind: `// TODO: drop once the old checkout is gone`, a field kept "until the frontend reads the new one", a column ignored "until the next deploy". They are promises, and they are kept only if the step that meets the condition looks for them. When a step finishes (the old checkout is deleted, the frontend switched), grep for the markers that name it and remove the code they guard in the same change. At the end of the whole effort, sweep every marker it left; one that stays says plainly what it is waiting for (a production run, a deploy), so the next reader knows when it can go.
 
 ## Sweeps
 

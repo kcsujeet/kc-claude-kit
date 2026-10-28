@@ -32,6 +32,7 @@ paths:
   - §C17. Type escape hatches: lying casts, `any`, non-null assertions
   - §C18. Do not suggest removing a readable intermediate
   - §C19. Conditional spreads
+  - §C20. A comment about other code is checked against it
 - Sweeps
 
 ## Rules
@@ -49,6 +50,7 @@ Code that takes three readings costs more than code that took an extra minute to
 - A named intermediate that makes a line readable stays, even when it costs an extra type-narrowing step or evaluates a trivial branch eagerly.
 - Fixing a ternary must not create a new problem: `flagA && value` is not a stand-in for `value | undefined` (it yields `false`), and an options object spread in conditionally is a hidden ternary.
 - No conditional spread: `...(flagA ? { key } : {})`, `...(flagA && { key })`, or an object built conditionally and spread later. Give the key a permanent slot whose value may be `undefined` (`key: value ?? undefined`), after checking that whatever reads the object drops `undefined`.
+- A comment that says something about code elsewhere (which page reads this, who calls it, what an endpoint returns) is checked against that code before it is written.
 
 Detection criteria and per-box review failure modes live in the `## Review checklist` of the `clarity` skill (`conventions:clarity`), with the detail under its `## Review detail`. These rules are the statement of the convention; that checklist is how a diff gets graded against it.
 
@@ -75,10 +77,11 @@ The clarity gate agent ticks every box against the diff. A box is FAIL if any ma
 - [ ] §C17 No type escape hatches: no `as` cast (including `as unknown as T`) that asserts a type the value does not actually have in order to silence a mismatch; no `any`, explicit or through an untyped boundary; no non-null assertion (`value!`). **Enumerate with the `as-casts.sh`, `any-types.sh` and `non-null-assertions.sh` sweeps, do not eyeball**; see §C17. (N/A: only when all three sweeps return 0 hits, stated as `grepped as-casts: 0 hits`, `grepped any: 0 hits`, `grepped non-null assertions: 0 hits`)
 - [ ] §C18 No finding this gate proposes suggests removing a named intermediate that makes an expression readable on the grounds that it looks redundant, costs a type-narrowing step, or eagerly evaluates a trivial branch the ternary will not take. Sibling gates that propose inlining (simplicity §P6, structure §S4) apply the same test. (N/A: no finding proposes removing a named intermediate)
 - [ ] §C19 No conditional spread, of any size and whatever its comment: no `...(flagA ? { key } : {})` or `...(flagA && { key })` inline, and no object built conditionally (`const extra = flagA && { key }`) and spread later into an object or as component props. The fix gives the key or prop a permanent slot set to `undefined` when absent, and the finding confirms the consumer drops `undefined`. **Enumerate with the `conditional-spreads.sh` sweep.** (N/A: only when `conditional-spreads.sh` returns 0 hits, stated as `grepped conditional spreads: 0 hits`)
+- [ ] §C20 Comments about other code are true: every added or edited comment that states another unit's behaviour (a caller, a reader, a response's contents) was checked against that unit, with the unit named in the evidence; a claim the code does not bear out FAILS. **Enumerate** such comments. (N/A: no such comment added or edited)
 
 ## Review detail
 
-Readability rules for the diff under review. None of these are automatically wrong — they are prompts to look harder at new logic. Covers nineteen independent failure modes: guard-clause density, defensive coercion, undeclared field access, redundant casts, tangled side effects, comment hygiene, ordered mutations, magic spreads, inline anonymous types, fallback chains, unhappy-path tangling, thin wrappers, dense sub-expressions, circular imports, ternary shape, magic numbers, type escape hatches (lying casts, `any`, non-null assertions), review suggestions that strip readable intermediates, and conditional spreads.
+Readability rules for the diff under review. None of these are automatically wrong — they are prompts to look harder at new logic. Covers twenty independent failure modes: guard-clause density, defensive coercion, undeclared field access, redundant casts, tangled side effects, comment hygiene, ordered mutations, magic spreads, inline anonymous types, fallback chains, unhappy-path tangling, thin wrappers, dense sub-expressions, circular imports, ternary shape, magic numbers, type escape hatches (lying casts, `any`, non-null assertions), review suggestions that strip readable intermediates, conditional spreads, and comments that misstate other code.
 
 ### §C1. Dense guard clauses without comment
 
@@ -384,6 +387,10 @@ const body = { name, note: note || undefined }
 On a component, `prop={flagA ? value : undefined}`. Before proposing it, check the consumer: a JSON request body drops `undefined` keys (`JSON.stringify` omits them), but `URLSearchParams` and string templates turn `undefined` into the text `"undefined"`, so there the key needs filtering or the spread is doing real work. Name the consumer and what it does with `undefined` in the finding.
 
 **Enumerate by grep, do not eyeball.** Run the `conditional-spreads.sh` sweep (see Sweeps). It over-matches (a spread of a plain call, `...(await loadWidgets())`), and each such hit is dismissed in writing. One line per hit with a verdict, and `grepped conditional spreads: 0 hits` printed explicitly when none are found.
+
+### §C20. A comment about other code is checked against it
+
+A comment that explains why a function exists often names its readers: "the sign-in and no-access pages read this". Written from memory, it sounds right and is easy to get half wrong, and a reader trusts it more than the code because it is plain English. Before writing such a line, grep the readers, the callers or the response it describes and write what is there. When the change touches that other code later, the comment is part of what must stay true.
 
 ## Sweeps
 

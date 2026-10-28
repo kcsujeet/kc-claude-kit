@@ -19,5 +19,6 @@ Code that takes three readings costs more than code that took an extra minute to
 - A named intermediate that makes a line readable stays, even when it costs an extra type-narrowing step or evaluates a trivial branch eagerly.
 - Fixing a ternary must not create a new problem: `flagA && value` is not a stand-in for `value | undefined` (it yields `false`), and an options object spread in conditionally is a hidden ternary.
 - No conditional spread: `...(flagA ? { key } : {})`, `...(flagA && { key })`, or an object built conditionally and spread later. Give the key a permanent slot whose value may be `undefined` (`key: value ?? undefined`), after checking that whatever reads the object drops `undefined`.
+- A comment that says something about code elsewhere (which page reads this, who calls it, what an endpoint returns) is checked against that code before it is written.
 
 Detection criteria and per-box review failure modes live in the `## Review checklist` of the `clarity` skill (`conventions:clarity`), with the detail under its `## Review detail`. These rules are the statement of the convention; that checklist is how a diff gets graded against it.

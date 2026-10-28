@@ -26,6 +26,7 @@ paths:
   - §S15. One exported component per file
   - §S16. `app/` holds routes only
   - §S17. Shared only when it is shared
+  - §S18. A moved or renamed file is new code
 - Sweeps
 
 ## Rules
@@ -37,6 +38,7 @@ Where code lives is part of its contract. A path promises something about what i
 - Flatten a folder that holds one file. `Foo/Foo.tsx` with no siblings is just `Foo.tsx`.
 - No barrel re-export files. Import the module path directly, which also keeps tree shaking working. A barrel for a single component is fine.
 - Named exports on new files, declared inline (`export const foo = ...`), not collected in a trailing export block.
+- A file the change moves or renames is new code: it meets every rule a new file does (named exports, a doc comment on what it exports, relative imports within its folder, a name and a place that follow its new siblings), even where the old file did not.
 - Delete dead wrappers in every shape: async-await passthrough, destructure-and-reconstruct, single-use alias, identity transform, a Promise wrapped around a Promise, a hook returning another hook's values unchanged, a wrapper whose only addition is an `onSuccess` every caller could pass itself.
 - Code built or placed for reuse (a mixin, concern, trait or protocol extension; a higher-order function, or a hook or helper module in a shared folder) earns that shape only when two or more units use it today. With one user it goes back next to that user, or, when that user would then break a simplicity or structure rule, into the repo's existing kind of unit for that logic.
 - A module exports the thing it is named for plus its own surface (its props, argument and return types). An unrelated export, such as a domain enum in a hook file, moves to where its consumers are; a type only this module uses stays.
@@ -85,10 +87,11 @@ The structure gate agent ticks every box below against the diff. A box is FAIL i
 - [ ] §S15 One exported component per file: no new or changed component file exports more than one component (**enumerate**: count the exported components in every changed component file, one verdict per file with its count). Its other exports (hooks, helpers, shared style constants) move out to their own files, placed by §S2 and §S11, a subcomponent with one consumer stays private in that consumer's file, and no new file only wraps one value or element. (N/A: no changed file exports a component)
 - [ ] §S17 Shared only when it is shared: code built or placed for reuse (a mixin, concern, trait or protocol extension in class-based code; a higher-order function, or a hook or helper module in a shared folder, in functional code) that only one unit uses today is flagged. **Enumerate**: for each such piece the diff adds, name its users (grep). With one user it moves back next to that user (same file or a file beside it), or, when that user would then break a simplicity or structure rule, into the kind of unit the repo already uses for that logic, near its user and called from it; with no such kind in the repo, the finding says to ask first. Inherently-shared-layer code under §S2's role override is exempt. (N/A: the diff adds no mixin, concern, trait, protocol extension, higher-order function, or shared-folder hook or helper)
 - [ ] §S16 `app/` holds routes only: every new file under the routing layer (`app/`, or the repo's equivalent) is a route file the framework reads by name, a test for one, a route-level action, or the app's own entry, provider or router; a component, hook, util or constant there FAILS, even beside existing ones, since precedent is not an exemption. **Enumerate**: list every new file under it with a verdict. (N/A: no new file under the routing layer)
+- [ ] §S18 Moved and renamed files are graded as new: every file the diff moves or renames (the `R` lines of `git diff -M --name-status`) passes every new-file box (exports, doc comments, imports, naming, placement), even where the old file did not. **Enumerate** the `R` lines with a verdict each. (N/A: no file moved or renamed)
 
 ## Review detail
 
-Code-placement and API-shape rules for the diff under review. Covers sixteen independent failure modes: mixed responsibilities inside one unit, wrong-layer co-location, leftover single-file folders and re-export barrels, dead wrappers, branch-selection that should be a lookup, misplaced helpers, missing JSDoc on exported APIs, default exports on new files, literal unions standing in for serialized enums, unflagged breaking changes to a public API, modules sitting in a folder that promises a different kind of module, public exports widened only to share an internal, exports unrelated to their module, new code placed in a home whose subject it does not act on, files exporting several components, and non-route files in the routing layer.
+Code-placement and API-shape rules for the diff under review. Covers sixteen independent failure modes: mixed responsibilities inside one unit, wrong-layer co-location, leftover single-file folders and re-export barrels, dead wrappers, branch-selection that should be a lookup, misplaced helpers, missing JSDoc on exported APIs, default exports on new files, literal unions standing in for serialized enums, unflagged breaking changes to a public API, modules sitting in a folder that promises a different kind of module, public exports widened only to share an internal, exports unrelated to their module, new code placed in a home whose subject it does not act on, files exporting several components, non-route files in the routing layer, and moved or renamed files graded as old.
 
 ### §S1. Separation of concerns
 
@@ -421,6 +424,10 @@ app/widgets/
 ```
 
 A new file added beside legacy helpers that already sit there still fails: moving the old ones is out of scope, but the new one starts outside `app/`.
+
+### §S18. A moved or renamed file is new code
+
+A move is an easy place to carry old habits forward. A hook moved to the shared layer keeps its default export, its `@/` import of the file that is now beside it, and a doc comment that still names its old folder; a renamed hook keeps its props type under the old name. Each is a box a new file would fail, and a diff that shows the file as renamed with a high similarity score invites a reviewer to skip it. Grade the moved file as written fresh, and finish the move: every importer updated, the old path gone, and the names inside it following the new name.
 
 ## Sweeps
 
