@@ -17,24 +17,24 @@
 #                         directory name, so name <dest-dir> "kc-claude-kit".
 #
 # What it does, per skill directory plugins/<plugin>/skills/<skill>/:
-#   - copies it to <skills-dir>/kc-<plugin>-<skill>/ (replacing an earlier export);
-#   - sets the frontmatter `name:` to kc-<plugin>-<skill>, because other tools
+#   - copies it to <skills-dir>/<plugin>-<skill-without-kc>/ (replacing an earlier export);
+#   - sets the frontmatter `name:` to <plugin>-<skill-without-kc>, because other tools
 #     share one flat namespace in which bare names like `naming` collide;
 #   - in SKILL.md, rewrites `${CLAUDE_PLUGIN_ROOT}/skills/<s>/` to the absolute
-#     path of the exported kc-<plugin>-<s>/, so a bundled script referenced as
-#     `${CLAUDE_PLUGIN_ROOT}/skills/<topic>/scripts/x.sh` resolves to
+#     path of the exported <plugin>-<s>/, so a bundled script referenced as
+#     `${CLAUDE_PLUGIN_ROOT}/skills/kc-<topic>/scripts/x.sh` resolves to
 #     `<new skill dir>/scripts/x.sh`;
 #   - rewrites `<plugin>:<skill>` references to exported skills into their
-#     kc-<plugin>-<skill> names;
+#     <plugin>-<skill-without-kc> names;
 #   - if a bundled script sources the plugin's shared library through
 #     `../../../scripts/lib/` (the conventions sweeps do), copies
 #     plugins/<plugin>/scripts/lib/ into the skill's scripts/lib/ and points
 #     the scripts at `lib/`, so the exported skill is self-contained.
 #
 # Skipped on purpose:
-#   - code-review/post-review: its safety depends on a Claude Code PreToolUse
+#   - kc-gates/kc-post-review: its safety depends on a Claude Code PreToolUse
 #     hook that blocks unapproved GitHub posts. No other tool runs that hook.
-#   - conventions/init: it copies the plugin-level rules/ directory into
+#   - kc-conventions/kc-init: it copies the plugin-level rules/ directory into
 #     .claude/rules/. Neither exists for another tool: rules/ is not a skill
 #     and is not exported, and .claude/rules/ is read only by Claude Code.
 #
@@ -57,8 +57,8 @@
 set -euo pipefail
 
 SKIPPED_SKILLS=(
-  "code-review/post-review|posting to GitHub is guarded by a Claude Code hook that other tools do not run"
-  "conventions/init|it installs plugin rules into .claude/rules/, which only Claude Code reads"
+  "kc-gates/kc-post-review|posting to GitHub is guarded by a Claude Code hook that other tools do not run"
+  "kc-conventions/kc-init|it installs plugin rules into .claude/rules/, which only Claude Code reads"
 )
 
 usage() {
@@ -166,6 +166,9 @@ rewrite_skill_md() {
         split(pairs[i], parts, "/")
         export_plugin[i] = parts[1]
         export_skill[i] = parts[2]
+        short_skill = parts[2]
+        sub(/^kc-/, "", short_skill)
+        export_name[i] = parts[1] "-" short_skill
       }
     }
     NR == 1 && $0 == "---" { in_frontmatter = 1; print; next }
@@ -177,11 +180,11 @@ rewrite_skill_md() {
         if (export_plugin[i] == plugin) {
           line = replace_all(line, \
             "${CLAUDE_PLUGIN_ROOT}/skills/" export_skill[i] "/", \
-            skills_dir "/kc-" plugin "-" export_skill[i] "/")
+            skills_dir "/" export_name[i] "/")
         }
         line = replace_ref(line, \
           export_plugin[i] ":" export_skill[i], \
-          "kc-" export_plugin[i] "-" export_skill[i])
+          export_name[i])
       }
       print line
     }
@@ -261,7 +264,7 @@ bundle_plugin_scripts() {
 for pair in "${exported[@]}"; do
   plugin="${pair%%/*}"
   skill="${pair#*/}"
-  new_name="kc-$plugin-$skill"
+  new_name="$plugin-${skill#kc-}"
   source_dir="$repo_root/plugins/$plugin/skills/$skill"
   target_dir="$skills_dir/$new_name"
 

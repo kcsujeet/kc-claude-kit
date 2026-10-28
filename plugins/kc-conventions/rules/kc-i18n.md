@@ -1,0 +1,24 @@
+---
+paths:
+  - "**/*.{ts,tsx,js,jsx}"
+  - "**/locales/**/*.json"
+  - "**/messages/**/*.json"
+  - "**/i18n/**/*.{json,ts}"
+---
+<!-- Generated from skills/kc-i18n/SKILL.md by scripts/build-rules.sh. Edit the skill, not this file. -->
+
+# Translations
+
+A key is added once and read by every translator afterwards. Two keys for one string means one of them silently goes untranslated.
+
+- Edit the source locale only. If the project generates the other locales, an edit to a generated file is lost on the next deploy.
+- Before adding a key, grep the whole source-locale tree for the value **and** for the leaf key name. Reuse the existing key; a second key for the same string is the default failure here.
+- A grep miss is not proof: think about semantic equivalents too, since "Save changes" and "Save" and "Update" evade each other's greps while meaning the same thing on the same button.
+- The key name says what the value says. `fooSection: "Foo"` bakes in a `Section` the value does not have.
+- Generic nouns, labels and headings live in the shared namespace, not inside a feature file. `Total`, `Notes`, `Header` are not feature-specific just because you needed one there first.
+- Every countable noun is an ICU plural, including a label that only ever shows one today. No `item`/`items` key pairs, no plural baked into the key name.
+- Never concatenate translations. `t('delete') + ' ' + t('booking')` has an order that is wrong in half the languages we ship. A verb plus a noun decomposes into an action template with the noun interpolated.
+- A label next to a runtime value **is** interpolation, and that is correct. Do not invent a composite key to avoid it.
+- Text shown to people is never also used as an identifier. A value kept in state, a link, a filter or a stored field holds a key (`other`), and the screen shows its translation; the moment the label is translated, a label used as a value either stays untranslated or breaks.
+
+Detection criteria, the per-key audit table, and per-box review failure modes live in the `## Review checklist` of the `kc-i18n` skill (`kc-conventions:kc-i18n`), with the detail under its `## Review detail`. These rules are the statement of the convention; that checklist is how a diff gets graded against it.

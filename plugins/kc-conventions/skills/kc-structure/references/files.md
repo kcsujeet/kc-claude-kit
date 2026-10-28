@@ -1,0 +1,26 @@
+# Structure: file and folder shape
+
+Review detail for structure §S3 and §S20, moved out of `SKILL.md` to keep it under the line cap. The boxes are in `SKILL.md` under `## Review checklist`.
+
+## §S3. Flatten single-file folders; no big barrels
+
+**Single-file folders: flatten.** A folder containing exactly one file (no sub-components, no co-located hook, no helpers, no styles, no test) is dead structure — drop the folder, leave the file at the parent level. The folder earns its place the moment a second file appears alongside.
+
+**No big barrels.** An `index.ts` that gathers several modules (a folder's components, a feature, a package's internals) breaks tree shaking, hides which file an import reads, and grows with every addition. Import those files directly. **One unit's `index.ts` is fine:** a unit folder may re-export its main file, `order-form/index.ts` holding only `export * from './order-form'`, so callers import `@/components/order-form`; this is bulletproof-react's component pattern. It re-exports named exports only: `export { default } from './X'` carries the default-export anti-pattern (§S8) along.
+
+## §S20. A unit's helpers share one file named for the unit
+
+Helpers, constants and types live at the level their consumers decide (§S2), and each level has one file shape. In a React codebase the app and feature levels are bulletproof-react's layout (the structure skill's React section), which this rule doesn't change; the unit level is this kit's own addition below what bulletproof-react covers.
+
+- **Shared across packages or apps:** the shared utils package, one file per subject (`dates.ts`, `currency.ts`) holding that subject's functions.
+- **Shared across one app:** the app's `utils/` folder; **within one feature:** `features/<feature>/utils/`. Again one file per subject.
+- **Used by one unit** (a component, a form, a screen): one file in the unit's folder, named for the unit and the kind of thing it holds, `<unit>.utils.ts`, beside `<unit>.tsx` and its hook: `order-form/order-form.tsx`, `order-form/use-order-form.ts`, `order-form/order-form.utils.ts`. Its constants and types follow the same form (`<unit>.constants.ts`, `<unit>.types.ts`) when they need a file apart from the code that uses them.
+
+Two shapes fail:
+
+- **A file per function or constant** (`get-order-total.ts`, `default-order-status.ts`). It scatters one unit's logic across many small files, adds an import line per helper, and makes a reader open several files to follow one flow. Related helpers belong together in their subject's or unit's file.
+- **A bare `utils.ts`, `constants.ts` or `types.ts` inside a unit's folder.** Repeated in every folder, the name says nothing on its own (naming §N7): a file-name search returns dozens of identical hits, and editor tabs and stack traces show the same name for different files. `<unit>.utils.ts` is unique in search, sorts next to its unit in the folder, and says whose helpers it holds.
+
+Applies to new and moved files (§S18). An existing file in the old shape is renamed when its unit is already being changed, not as a side effect of unrelated work. A repo with its own stated rule for this follows that rule.
+
+The §S11 sweep lists a `<unit>.utils.ts` under a components folder as a candidate: it passes when its only consumers are that unit (§S2).

@@ -1,0 +1,11 @@
+{
+  "name": "kc-autopilot",
+  "description": "Plan in, PRs out: a staff-engineer skill splits an approved plan into units, and a workflow runs each through engineer, review, persona QA and verification until clean",
+  "version": "0.2.0",
+  "author": { "name": "Sujeet Kc" },
+  "dependencies": [
+    { "name": "kc-gates", "version": "^3.0.0" },
+    { "name": "kc-conventions", "version": "^2.0.0" },
+    { "name": "kc-verify" }
+  ]
+}

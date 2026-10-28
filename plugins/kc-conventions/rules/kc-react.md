@@ -1,0 +1,62 @@
+---
+paths:
+  - "**/*.{tsx,jsx}"
+  - "**/hooks/**/*.{ts,js}"
+  - "**/api/**/*.{ts,js}"
+---
+<!-- Generated from skills/kc-react/SKILL.md by scripts/build-rules.sh. Edit the skill, not this file. -->
+
+# React
+
+Placement is covered by the `structure` skill, which defers to bulletproof-react. This file is everything else: how components, data access, forms and state are built.
+
+## Doing it the way similar code does
+
+- Before writing a component, hook, form, store or test, find how the app already does that kind of job: about ten pieces of similar code (code that does the same kind of work, wherever it lives; all of it when there is less), read for each area the change touches, and do it their way. That covers how data is fetched, cached and written (the API client or resource layer, the query library, cache keys, how filters and related data are requested), how forms hold state and validate (the form and schema libraries, field components), where shared state lives (a store, context, the URL), which shared components and design tokens are used, how files and exports are named, and how tests render, mock and assert. A new library, wrapper or way of doing any of these is the last resort: only once every existing way has been tried and shown not to fit, and only with the developer's agreement.
+
+## Components and markup
+
+- A component owns its own container. It never leaves a required wrapper to the caller, and never sets root `size`, `flexGrow` or self-margins that only work under one particular parent.
+- Conditional element assembly is a named local component with early returns, not a `let` reassigned through `if/else` and not a multi-line ternary building markup inline.
+- Three or more structurally identical sibling blocks that differ only by data become a map over an array, with stable keys.
+- No index as a key for anything reorderable, and never mix indices taken from a filtered list with an unfiltered one.
+- No side-effect-only component: a `useEffect` with `return null` is a hook or an HOC, not a component.
+- No `renderSomething()` inline render functions, and no skipping items by returning null from a ternary inside a map. Filter first.
+- Assign a hook result to a variable, then derive on the next line. Never inline a selector or subscription inside a transforming expression.
+- Do not reach for `useMemo` or `useCallback` by default when the project runs React Compiler. Write the plain value or function.
+- Without React Compiler, a `useMemo` or `useCallback` has to hit: empty dependencies mean a module constant, and a dependency that changes every render (an inline object, array or function) means the memo never does. Pass stable references to memoized children.
+- A block of markup past about thirty lines that reads as its own unit is a named component, and a wrapper element that only repeats its parent's styling is deleted.
+- On React 19 and later, `ref` is a plain prop. Do not add `forwardRef`, and never declare `ref` in the props of a component that is also wrapped in `forwardRef`.
+- A field that picks a record is the codebase's picker component for that kind of record (its own file, shaped like the existing pickers, taking the narrowing as props). When none exists, add one in that shape rather than wiring a fetch and an options list inside a form.
+- Markup two screens share (a labelled control, a set of options) is a component that takes the differences as props, not a hook or function that returns markup.
+- An empty slot reads as empty: muted, plainly a placeholder, with an icon that names what goes there (an image icon for a logo, a person only for a person's photo). An empty state styled like a filled one tells the reader something is already there.
+- A `min-height` or `min-width` on a flex item is set knowing its parent: an explicit minimum replaces the default `min-*: auto`, so inside a fixed-size flex parent the item shrinks to that minimum and its content spills past its own background. Check the parent's display and size, and keep the item from shrinking (`flex-shrink: 0`) when its content can outgrow the minimum.
+
+## Data access
+
+- Reads and writes live in separate hooks. A component contains no raw `fetch`, no `axios`, no direct `useQuery` or `useMutation` call; grep how the sibling features do it and follow that.
+- The fetch lives with the actual consumer. A page does not duplicate a fetch its child already owns, especially with different params, and nothing fetches a whole list to derive one boolean.
+- Every read asks the server for exactly what the screen shows: its narrowing goes into the request, the way sibling reads send theirs. Fetching wider and filtering in code, or fetching again to resolve ids whose records the response already carries, is the fallback only when the server cannot filter. An endpoint that only lacks the filter is one you change: add the filter to the server (often one line beside its existing filters) rather than filter in code.
+- After a write, patch the cache first, then update surgically, and invalidate only as a last resort.
+- Prefer `mutate` with callbacks over `mutateAsync` with `await` when the resolved value only drives a side effect.
+- A request's method matches its effect: a read uses GET unless its input cannot fit in a query string.
+- A cache patch or invalidation targets the narrowest key that shows the change.
+- A query key includes every context its response depends on that isn't in its params (the current tenant, the signed-in user, the locale). A write that adds a record or changes a field a list filters on refetches filtered lists rather than patching them, and refetches counts and totals derived from what it changed.
+- A write hook touches only its own resource. Another resource's writes live in that resource's hook, and the caller composes the two.
+- A read hook wires up every option it accepts. Accepting an option and ignoring it is dead surface.
+
+## Forms and state
+
+- The form is the single source of truth. No `useState` shadowing a value the form already holds.
+- A form-state hook returns form plumbing only (the methods, submit and discard, saving state). One field's fetching, watching and lookup state live in that field's component.
+- A form with Save and Discard holds every change until Save, picked and removed files included. Nothing it edits reaches the server before Save, so Discard leaves the record as it was.
+- A section that isn't being edited shows its saved values the way similar sections show theirs (the codebase's read-only display), not as inputs disabled until Edit.
+- A form that shows only part of a set field (in a store's context, that store's links) seeds that part and sends the rest back unchanged.
+- Each form watch lives in the smallest component that renders from it; a child reads shared form values itself rather than taking them as props.
+- A form that edits a record seeds the related record its inputs render from, not just the id.
+- Check the validation library's own API before hand-rolling a check, a regex, or a coercion. Most of them already exist there.
+- New state lives at the lowest common ancestor of its actual consumers, never lifted because a parent might want it later.
+- Two state updates whose order matters carry a one-line comment at the call site saying why.
+- A child that needs two or more props derived from one hook the parent called should call the hook itself.
+
+Detection criteria and per-box review failure modes live in the `## Review checklist` of the `kc-react` skill (`kc-conventions:kc-react`), with the detail under its `## Review detail`. These rules are the statement of the convention; that checklist is how a diff gets graded against it.
