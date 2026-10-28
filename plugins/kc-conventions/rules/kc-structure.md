@@ -10,7 +10,7 @@ Where code lives is part of its contract. A path promises something about what i
 
 - One observable responsibility per unit. A directory name is a promise: `hooks/` contains hooks, `utils/` contains pure functions.
 - Co-locate with the single consumer. Promote at the second consumer: within a feature, to the nearest common ancestor; across features, to the shared app level, never sideways into another feature.
-- Flatten a folder that holds one file. `Foo/Foo.tsx` with no siblings is just `Foo.tsx`.
+- Flatten a folder that holds one file. `foo/foo.tsx` with no siblings is just `foo.tsx`.
 - A unit's own helpers share one file named for the unit, `<unit>.utils.ts` beside it (likewise `.constants`, `.types`); shared helpers sit in a file named for their subject. Never a file per function or constant, and never a bare `utils.ts`, `constants.ts` or `types.ts` in a unit's folder: it scatters one unit's logic, and the repeated name makes search and tabs useless.
 - No barrel re-export files. Import the module path directly, which also keeps tree shaking working. A barrel for a single component is fine.
 - Named exports on new files, declared inline (`export const foo = ...`), not collected in a trailing export block.
