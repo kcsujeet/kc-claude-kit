@@ -41,6 +41,7 @@ A Rails app almost never needs a new shape. It already has dozens of controllers
 - A hook or option is only there when something uses it: no override point kept for one subclass that could do its work directly, no contract or form option nothing reads.
 - Bulk writes use `insert_all` / `upsert_all` with an explicit `unique_by`, and dedupe their input first: Postgres rejects an upsert that touches the same row twice.
 - A check-then-act on a shared resource (credits, seats, quota, a "first record" check, a generated unique code) runs under the same lock or transaction as the act, or the race is stated and accepted. Take the lock before the check, not around the write after it.
+- Every id a write accepts is checked against what the caller may reach, the way the other ids on that write already are. A new id param with no check lets a record point at another tenant's data.
 
 ### Queries
 
@@ -49,13 +50,16 @@ A Rails app almost never needs a new shape. It already has dozens of controllers
 - Every computed serializer attribute (a method, not a column) is checked for a per-record query, including one that calls another computed attribute.
 - Serializer and view params carry the data (the signed-in customer, the current shop), not a flag worked out from it for one consumer; the consumer that needs it decides.
 - The client asks for what it needs; the server doesn't hand it everything. A serializer exposes its own model's attributes, and another model's data reaches the client only through a relationship the client chooses to include, never as that model's attributes copied onto this serializer or sent by default.
+- The server never edits what the client asked for. An include, filter or field the endpoint does not support is rejected with an error, not dropped or rewritten in the request; what a request can reach is set by what the serializer and query declare.
+- Related records that are shown under rules (only active ones, only the viewer's) come from their own resource's list endpoint, with the rules in that endpoint's query scope and the parent as an ordinary filter, not from an association built to serve one response.
+- A query's base scope loads the records and nothing else. Relationships the client can include load when it asks for them; the backend preloads only what the client cannot ask for (a computed attribute), at the render seam.
 - A response the client only counts returns a count, not a serialized collection.
 - No plain `@x ||=` memo on a value that depends on time or a window; it freezes silently.
 
 ### Requests
 
 - Nothing unbounded runs in a request: rows in an upload, records serialized, external calls in a loop. Each has an explicit cap with a clear message, or moves to a background job.
-- A GET never writes. Reads may run on a replica with writes blocked, and a crawler or prefetch can trigger them. Create a missing record on the first real write instead.
+- A GET never writes. Reads may run on a replica with writes blocked, and a crawler or prefetch can trigger them. A record every parent needs (a settings row, a profile) is created with its parent, and existing parents get it from a backfill; nothing creates it lazily on read or on the first write.
 - Every accepted attribute has a defined result for present, `null`, `""` and missing, traced through type coercion, validation and the write. A cleared value either clears cleanly or falls back the same way every other write path does.
 - The HTTP verb matches the effect: a read is a GET, and a POST that writes nothing is a finding.
 
@@ -83,14 +87,18 @@ The rails gate ticks every box against the diff. A box is FAIL if any matching c
 - [ ] §RL3c No dead hooks or options: every override point, callback hook and contract or form option added is used by something today. Enumerate added `option :`, `attr_reader`, and methods that only call `super`. (N/A: none added)
 - [ ] §RL3d Bulk writes: every `insert_all|upsert_all` has `unique_by` and deduped input. (N/A: no bulk write)
 - [ ] §RL3e Races: every check-then-act on shared state takes its lock or transaction before the check, or the race is stated. Enumerate added `exists?|lock|with_lock|first_or_create|find_or_create`. (N/A: no check-then-act)
+- [ ] §RL3f Every id a write accepts is scoped: each id param added to a schema, permit list or form object has a check that the record belongs to what the caller may reach, written the way the write's other id checks are. Enumerate the added id params. (N/A: no id param added)
 - [ ] §RL4a Per-record reads: every added `sum|count|average|minimum|maximum|any?|exists?|pluck` reached per record is classified (walks loaded rows vs queries); a querying one has a bulk pass. (N/A: none added)
 - [ ] §RL4b A bulk pass sits at a seam every caller passes and is named for what it does; callers that still miss it are named. (N/A: no bulk pass)
 - [ ] §RL4c Every added or touched computed serializer attribute was checked for per-record queries. (N/A: no serializer touched)
 - [ ] §RL4d The client asks for what it needs: every added serializer attribute belongs to the serializer's own model, and no relationship is loaded or sent unless the client includes it. An attribute whose value is read from another model (`object.store.currency`, a computed attribute that delegates to an associated record, an association's ids such as `taggings.map(&:tag_id)`) FAILS: expose it on that model's serializer and have the client include the relationship. When the association is missing from the client's path, add the relationship, not the attribute. (N/A: no serializer attribute added)
 - [ ] §RL4e Params handed to a serializer or view carry data, not a decision precomputed for one consumer (`signed_in: customer.present?`): pass the record and let the attribute that needs it check it. (N/A: no serializer or view params added)
 - [ ] §RL4d No time-dependent `@x ||=` memo; an endpoint whose client only counts returns a count. (N/A: none added)
+- [ ] §RL4f The request is served as asked: no added code removes, rewrites or allowlists the client's includes, filters or fields before the query runs; an unsupported one surfaces as an error. (N/A: no request params touched)
+- [ ] §RL4g Rule-bound related records come from their own list endpoint: no association or serializer relationship is added only to hand one response a filtered set of another resource; the rules sit in that resource's query scope and the parent is a filter. (N/A: no association or relationship added)
+- [ ] §RL4h A query's base scope preloads nothing the client can include; every added `includes|preload|eager_load|with_attached_*` in a query scope is for a value the client cannot request, and sits at the render seam. Enumerate them. (N/A: no preload added)
 - [ ] §RL5a No unbounded work in a request; a cap has a clear message, or the work moves to a job. (N/A: nothing unbounded added)
-- [ ] §RL5b No GET or HEAD writes: every read path added or touched saves, creates and enqueues nothing. (N/A: no read path)
+- [ ] §RL5b No GET or HEAD writes: every read path added or touched saves, creates and enqueues nothing, and no record a parent always needs is created lazily (on read or first write) instead of with the parent plus a backfill. (N/A: no read path or required child record)
 - [ ] §RL5c Every accepted attribute has a defined result for present, `null`, `""` and missing, traced (or run) through coercion, validation and the write. (N/A: no attribute added or its handling unchanged)
 - [ ] §RL5d HTTP verb matches effect. (N/A: no new endpoint)
 - [ ] §RL5e A write that replaces a set of links (`tag_ids = [...]`) checks the caller's access to every id it removes as well as every id it adds, and a spec removes one the caller can't reach. A check over `ids - current_ids` alone FAILS. (N/A: no set-replacing write)
@@ -141,6 +149,10 @@ shop.lock!
 record.save!
 ```
 
+### §RL3f. Every id a write accepts is scoped
+
+A form object or contract usually checks each id it accepts against the caller's reach: `rule(:store_id) { key.failure('invalid') unless StoreQuery.new(shop: shop).scope.exists?(id: value) }`. When a change adds one more id to the same write (`storefront_id`), it is easy to add it to the schema and the write and forget the rule, and nothing fails: the record saves, pointing at a storefront another shop owns. List every id the diff adds to a write and find its check.
+
 ### §RL4. Per-record queries and N+1s
 
 Preloading does nothing for a reader that chains a scope onto the association: `member.transactions.usage.where(created_at: window..).sum(:amount)` runs one SUM per member even with `transactions` loaded, because the chain builds a new relation. Classify each per-record read: walks loaded rows (preload fixes it) or queries (needs a bulk pass computing for the whole set at once).
@@ -151,11 +163,17 @@ A computed serializer attribute that calls another computed attribute doubles th
 
 **§RL4d. The client asks for what it needs.** The server serves each record's own fields and the relationships to reach the rest; the client includes the related records it needs, so each screen pays only for what it reads. Copying an associated record's fields onto a serializer (`attribute :currency do |order| order.store.currency end`) works once and then spreads: the next screen needs one more field, the same values appear in two serializers that drift, and the client can no longer tell which record a value belongs to or cache it once. Expose the value on its own model's serializer, add the relationship if it is missing (`belongs_to :store`), and have the client include it (`?include=store`). When a field must stay hidden from some callers, gate it on that model's serializer, not by copying a safe subset elsewhere. An association's ids as an attribute (`attribute :tag_ids do |post| post.taggings.map(&:tag_id) end`) is the same copy: the relationship already carries the ids, and the attribute needs a preload on every render path or it queries per record.
 
+**§RL4f. The request is served as asked.** A public or shared endpoint is tempting to protect by trimming the client's request: keep only the includes on an allowlist, rewrite the filter, drop fields. The client then gets a response that silently differs from what it asked for, the allowlist drifts from what the serializers expose, and every endpoint grows its own copy. What a request can reach is already set by what the serializers and queries declare; tighten those instead (a smaller serializer for that audience, a relationship it does not declare), and let an unsupported include fail with the framework's error.
+
+**§RL4g. Rule-bound related records come from their own list endpoint.** A page that shows a brand with its storefronts, only the active ones and only those this customer may open, can get them through a filtered association on the brand (`has_many :visible_storefronts, -> { active.where(...) }`) included in the brand's response, plus a serializer block that filters again for the customer. The rules then live in two places, apply only through that one include, and the brand's endpoint carries another resource's access logic. Serve them from the storefronts' own list endpoint instead (`GET /storefronts?filter[brand_id]=…`): the active, visibility and access rules go in that endpoint's query scope, where they apply to every caller, and the brand is an ordinary filter.
+
+**§RL4h. A query's base scope preloads nothing the client can include.** A scope like `Member.where(shop: shop).includes(:stores, :orders)` loads those relationships on every request, asked for or not. The client asks for related records through includes, and the query loads them when asked. Preload in the backend only what the client cannot ask for, such as the records a computed attribute reads, and do it at the render seam (§RL4b), not in the base scope.
+
 ### §RL5. Request-shaped risks
 
 Request timeouts usually raise inside the app and render as a 500, so intermittent errors on large input are unbounded work until proven otherwise. Prefer a cap with a clear message when the work is fast, a background job when it is not.
 
-A GET that creates a missing record breaks on read replicas that block writes and under prefetching. Return an unsaved default on read and create on the first write.
+A GET that creates a missing record breaks on read replicas that block writes and under prefetching. Creating it on the first write instead leaves every reader handling "the row may not exist" (an unsaved default on read, a separate lookup that cannot create on delete). A record every parent needs is created with the parent, the way the parent's other default records are, and a backfill gives it to existing parents; say in the PR that the backfill runs right after deploy.
 
 Trace every accepted attribute: a PATCH treats a missing key as "no change", type coercion can turn `""` into `nil`, and a numericality validation then rejects `nil`, so "clear this field" may be impossible. Run the validator and model when it is not plain from the code.
 

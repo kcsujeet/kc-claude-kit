@@ -23,6 +23,7 @@ A Rails app almost never needs a new shape. It already has dozens of controllers
 - A hook or option is only there when something uses it: no override point kept for one subclass that could do its work directly, no contract or form option nothing reads.
 - Bulk writes use `insert_all` / `upsert_all` with an explicit `unique_by`, and dedupe their input first: Postgres rejects an upsert that touches the same row twice.
 - A check-then-act on a shared resource (credits, seats, quota, a "first record" check, a generated unique code) runs under the same lock or transaction as the act, or the race is stated and accepted. Take the lock before the check, not around the write after it.
+- Every id a write accepts is checked against what the caller may reach, the way the other ids on that write already are. A new id param with no check lets a record point at another tenant's data.
 
 ## Queries
 
@@ -31,13 +32,16 @@ A Rails app almost never needs a new shape. It already has dozens of controllers
 - Every computed serializer attribute (a method, not a column) is checked for a per-record query, including one that calls another computed attribute.
 - Serializer and view params carry the data (the signed-in customer, the current shop), not a flag worked out from it for one consumer; the consumer that needs it decides.
 - The client asks for what it needs; the server doesn't hand it everything. A serializer exposes its own model's attributes, and another model's data reaches the client only through a relationship the client chooses to include, never as that model's attributes copied onto this serializer or sent by default.
+- The server never edits what the client asked for. An include, filter or field the endpoint does not support is rejected with an error, not dropped or rewritten in the request; what a request can reach is set by what the serializer and query declare.
+- Related records that are shown under rules (only active ones, only the viewer's) come from their own resource's list endpoint, with the rules in that endpoint's query scope and the parent as an ordinary filter, not from an association built to serve one response.
+- A query's base scope loads the records and nothing else. Relationships the client can include load when it asks for them; the backend preloads only what the client cannot ask for (a computed attribute), at the render seam.
 - A response the client only counts returns a count, not a serialized collection.
 - No plain `@x ||=` memo on a value that depends on time or a window; it freezes silently.
 
 ## Requests
 
 - Nothing unbounded runs in a request: rows in an upload, records serialized, external calls in a loop. Each has an explicit cap with a clear message, or moves to a background job.
-- A GET never writes. Reads may run on a replica with writes blocked, and a crawler or prefetch can trigger them. Create a missing record on the first real write instead.
+- A GET never writes. Reads may run on a replica with writes blocked, and a crawler or prefetch can trigger them. A record every parent needs (a settings row, a profile) is created with its parent, and existing parents get it from a backfill; nothing creates it lazily on read or on the first write.
 - Every accepted attribute has a defined result for present, `null`, `""` and missing, traced through type coercion, validation and the write. A cleared value either clears cleanly or falls back the same way every other write path does.
 - The HTTP verb matches the effect: a read is a GET, and a POST that writes nothing is a finding.
 
