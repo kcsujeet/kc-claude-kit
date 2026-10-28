@@ -2,11 +2,11 @@
 
 Review detail for structure §S3 and §S20, moved out of `SKILL.md` to keep it under the line cap. The boxes are in `SKILL.md` under `## Review checklist`.
 
-## §S3. Flatten single-file folders; no re-export barrels
+## §S3. Flatten single-file folders; no big barrels
 
 **Single-file folders: flatten.** A folder containing exactly one file (no sub-components, no co-located hook, no helpers, no styles, no test) is dead structure — drop the folder, leave the file at the parent level. The folder earns its place the moment a second file appears alongside.
 
-**No `export { default } from './X'` re-export barrels.** A single-item `index.ts` that exists only to shorten an import path adds no value: it perpetuates the default-export anti-pattern (§S8) and the importer can resolve the actual file directly with one extra path segment. Either flatten the folder or have the importer reach the file directly. This is distinct from a real barrel that groups several already-declared named exports with intent — that earns its place; a barrel whose sole content is one re-exported default does not.
+**No big barrels.** An `index.ts` that gathers several modules (a folder's components, a feature, a package's internals) breaks tree shaking, hides which file an import reads, and grows with every addition. Import those files directly. **One unit's `index.ts` is fine:** a unit folder may re-export its main file, `order-form/index.ts` holding only `export * from './order-form'`, so callers import `@/components/order-form`; this is bulletproof-react's component pattern. It re-exports named exports only: `export { default } from './X'` carries the default-export anti-pattern (§S8) along.
 
 ## §S20. A unit's helpers share one file named for the unit
 

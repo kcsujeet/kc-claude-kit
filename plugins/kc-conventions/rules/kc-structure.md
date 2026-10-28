@@ -12,7 +12,7 @@ Where code lives is part of its contract. A path promises something about what i
 - Co-locate with the single consumer. Promote at the second consumer: within a feature, to the nearest common ancestor; across features, to the shared app level, never sideways into another feature.
 - Flatten a folder that holds one file. `foo/foo.tsx` with no siblings is just `foo.tsx`.
 - A unit's own helpers share one file named for the unit, `<unit>.utils.ts` beside it (likewise `.constants`, `.types`); shared helpers sit in a file named for their subject. Never a file per function or constant, and never a bare `utils.ts`, `constants.ts` or `types.ts` in a unit's folder: it scatters one unit's logic, and the repeated name makes search and tabs useless.
-- No barrel re-export files. Import the module path directly, which also keeps tree shaking working. A barrel for a single component is fine.
+- No big barrels: no `index.ts` that gathers several modules, a folder or a feature. A unit folder may have an `index.ts` that re-exports only its main file (`export * from './order-form'`), as bulletproof-react's components do.
 - Named exports on new files, declared inline (`export const foo = ...`), not collected in a trailing export block.
 - A file the change moves or renames is new code: it meets every rule a new file does (named exports, a doc comment on what it exports, relative imports within its folder, a name and a place that match similar code), even where the old file did not.
 - A provider (an endpoint, a module, a function) gives its caller what the caller asks for. It does not trim or rewrite the request, and it does not load or attach what nobody asked for; it decides only what it is allowed to give, through what it declares.
@@ -37,7 +37,7 @@ Where anything above appears to disagree with it, that document wins and this fi
 - No cross-feature imports. Two features that need the same thing compose at the app level, or the shared thing moves up.
 - Dependencies flow one way: shared can be used anywhere, features import only from shared, the app imports from both.
 - `app/` is the routing layer: route files, their tests and route-level actions, plus the app's own entry, provider and router. Components, hooks and utils go to the shared folders or a feature, never beside a route.
-- Its guidance on barrel files matches the rule above: barrels were once recommended per feature and no longer are, because they break tree shaking. Import files directly.
+- Its guidance on barrel files matches the rule above: a component folder has an `index.ts` re-exporting that one component (`button/button.tsx`, `button/index.ts`), and feature-level barrels were once recommended and no longer are, because they break tree shaking.
 
 Apply this to a repo that already uses a feature-based layout or is migrating to one. In a legacy flat layout, do not demand a migration as a side effect of unrelated work; just avoid making the existing structure more inconsistent than it already is. Two rules here go below the level it covers, inside one unit, and add to it rather than replace it: a unit's files share a folder named for the unit (§S15), and its own helpers, constants and types share a file named for it (§S20).
 
