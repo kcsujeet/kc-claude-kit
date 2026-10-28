@@ -38,6 +38,7 @@ Before opening the app, walk the design (mockup, prototype, spec) and write down
 - every role or permission that sees the screen differently
 - with and without each optional piece of data (no items, one item, many)
 - every drawer, dialog, menu and confirmation the screen opens, with its exact wording, in each state of filling it in: empty, one item picked, several picked, and editing an existing item (what appears after a pick is where drawers differ most)
+- what each choice in a create form adds to the form (picking one option can reveal a required field), and the state the new record lands in after create: switched on or off, which sections show
 
 Then put the app in each state and diff it against the design: which sections, fields, columns and actions appear, in which states, and what they do. Each difference in structure or behaviour is a finding, unless the ticket or the product owner decided otherwise; name that decision when you skip one.
 
@@ -73,6 +74,7 @@ Each state above can look right while the path into it is broken. QA by a person
 - **Use the records real data holds.** Include records the new screens can no longer create: blank optional fields, old links, defaults from before a migration. Then try the new actions next to them (create one more, link, delete).
 - **Do each interaction twice.** Search, pick, search again, pick again; add, remove, add; open, close, reopen. State that survives one pass often breaks on the second.
 - **Clear every field you can edit, and save.** Expect a message on the field, or a sensible default, never a generic error.
+- **Discard every kind of change.** In each section with Save and Discard, change a field, pick a file and remove a file, then Discard. The saved record is unchanged after a reload, with no request sent before Save.
 - **Read every confirmation against what happens.** After confirming, check the result matches the words: "remove" that deletes, or "delete" that only unlinks, is a finding.
 - **See signed-in state everywhere it shows.** Sign in from each entry point, then check every surface that shows who is signed in, and what a signed-in person should and shouldn't see.
 - **Fill it past the screen.** Make a list or page taller than the viewport and check the background, footer and scrolling hold.
@@ -129,6 +131,8 @@ Do not report a UI change verified until every box is ticked:
 - [ ] Records in states the new UI can't create (blank optional fields, old links, pre-migration defaults) were used next to the new actions.
 - [ ] Each interaction was done twice in a row (search and pick twice; add, remove, add).
 - [ ] Every editable field was cleared and saved, and every confirmation's words were checked against what actually happened.
+- [ ] In each section with Save and Discard, a field change, a picked file and a removed file were each discarded, and the saved record was unchanged after a reload.
+- [ ] Each create form was submitted for every option that changes it, and the new record's landing state (on or off, sections shown) was compared with the design.
 - [ ] Signed-in state was checked on every surface that shows it, after signing in from each entry point.
 - [ ] A list or page was filled past the viewport, and a record created fresh through the UI was taken through its whole flow.
 - [ ] Every reported layout defect was traced through its ancestors in code and reproduced at the content size the report shows, before it was fixed or left open.

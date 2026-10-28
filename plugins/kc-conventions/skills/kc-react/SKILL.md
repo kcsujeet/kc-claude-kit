@@ -45,6 +45,7 @@ Placement is covered by the `structure` skill, which defers to bulletproof-react
 - Without React Compiler, a `useMemo` or `useCallback` has to hit: empty dependencies mean a module constant, and a dependency that changes every render (an inline object, array or function) means the memo never does. Pass stable references to memoized children.
 - A block of markup past about thirty lines that reads as its own unit is a named component, and a wrapper element that only repeats its parent's styling is deleted.
 - On React 19 and later, `ref` is a plain prop. Do not add `forwardRef`, and never declare `ref` in the props of a component that is also wrapped in `forwardRef`.
+- An empty slot reads as empty: muted, plainly a placeholder, with an icon that names what goes there (an image icon for a logo, a person only for a person's photo). An empty state styled like a filled one tells the reader something is already there.
 - A `min-height` or `min-width` on a flex item is set knowing its parent: an explicit minimum replaces the default `min-*: auto`, so inside a fixed-size flex parent the item shrinks to that minimum and its content spills past its own background. Check the parent's display and size, and keep the item from shrinking (`flex-shrink: 0`) when its content can outgrow the minimum.
 
 ### Data access
@@ -64,6 +65,8 @@ Placement is covered by the `structure` skill, which defers to bulletproof-react
 
 - The form is the single source of truth. No `useState` shadowing a value the form already holds.
 - A form-state hook returns form plumbing only (the methods, submit and discard, saving state). One field's fetching, watching and lookup state live in that field's component.
+- A form with Save and Discard holds every change until Save, picked and removed files included. Nothing it edits reaches the server before Save, so Discard leaves the record as it was.
+- A section that isn't being edited shows its saved values the way similar sections show theirs (the codebase's read-only display), not as inputs disabled until Edit.
 - A form that shows only part of a set field (in a store's context, that store's links) seeds that part and sends the rest back unchanged.
 - Each form watch lives in the smallest component that renders from it; a child reads shared form values itself rather than taking them as props.
 - A form that edits a record seeds the related record its inputs render from, not just the id.
@@ -110,6 +113,9 @@ The react gate agent ticks every box against the diff. A box is FAIL if any matc
 - [ ] §R30 A read asks the server for what the screen shows: for every fetch the diff adds or changes (a list, table, picker, search, count, or a lookup of related records), its narrowing (a status, a parent, a visibility, the current user's scope) goes into the request the server answers, the way 2 cited sibling reads send theirs, and a related record the screen names comes from the response that already carries it (§R26). A response filtered in code (`data.filter(...)` where the server could have narrowed) FAILS, and so does a second fetch to look up records the first response already carries, unless a comment says why the server can't. (N/A: no fetch added or changed)
 - [ ] §R31 A form that shows part of a set keeps the rest: when the screen's context limits which entries of a set field the form shows (one store's links on a store page), the form seeds only those, and on submit it sends back every hidden entry unchanged. Rendering entries it can't name (a bare id) FAILS, and so does dropping them. (N/A: no set field limited by context)
 - [ ] §R32 Done the way similar code does it: for every new or reshaped component, hook, form, store or test, the evidence names by path the similar code read for each area the change touches (about ten pieces, or all there are when fewer: data fetching and caching, forms and validation, shared state, shared components and tokens, naming and exports, tests), states the pattern it follows, and lists what the change does differently. Fewer than ten read when more exist FAILS, and so does a new library, wrapper or way of doing an area's job without evidence that the existing ways were tried and the developer agreed. (N/A: no new or reshaped component, hook, form, store or test)
+- [ ] §R33 A form with Save and Discard sends nothing before Save: every file it picks or removes is held in form state and applied in the submit, the way 2 cited similar forms hold theirs. An upload, delete or other write that fires on pick, drop or remove inside such a form FAILS, since Discard can't undo it. (N/A: no form with Save and Discard added or changed)
+- [ ] §R34 A section with an edit mode shows its saved values, out of edit mode, through the read-only display 2 cited similar sections use. Inputs that are only disabled until Edit FAIL when the codebase has a read-only display, and so does an empty value shown as a blank box instead of the codebase's empty marker. (N/A: no section with an edit mode added or changed)
+- [ ] §R35 An empty slot (an image, a file, an avatar, a list) reads as empty: muted styling the filled state doesn't share, and an icon that names what belongs there, matching 2 cited empty slots in the codebase. A placeholder styled like content, or an icon for something else (a person icon where a logo goes), FAILS. (N/A: no empty slot added or changed)
 
 ## Review detail
 
@@ -305,20 +311,7 @@ Suggested fix order (match whatever shape the target repo already uses for the c
 
 **`renderXxx()` inline render functions are an anti-pattern, not a fix.** A `const renderContent = () => (...)` called from the same component's return: re-runs on every parent render without its own reconciliation, doesn't show up in DevTools, hides a missing sub-component behind a method-shape that pretends to be cheap, obscures the JSX tree (readers scanning the return have to jump elsewhere to find the actual content), and closures over scoped variables make later extraction harder. Flag any new `renderXxx` called from its own component's return; point at §R9's named-component extraction instead. **Acceptable shapes:** a function handed to a render-prop API the library demands (`renderRow={(row) => ...}`); or a `useCallback`-wrapped handler that returns JSX for an event-driven mount (rare; usually still a missed component). Further reading: Nadia Makarevich, *React re-renders guide*, ["Antipattern: creating components in render function"](https://www.developerway.com/posts/react-re-renders-guide#%EF%B8%8F-antipattern-creating-components-in-render-function).
 
-#### §R20. React 19: `ref` is a prop, `forwardRef` is not needed
-
-Check the project's React version first; this box applies from React 19. There `ref` is an ordinary prop, so new components take it in their props and never use `forwardRef`:
-
-```tsx
-// Flag
-export const WidgetInput = forwardRef<WidgetInputHandle, WidgetInputProps>(({ label }, ref) => { /* ... */ })
-
-// Prefer
-interface WidgetInputProps { label: string; ref?: Ref<WidgetInputHandle> }
-export const WidgetInput = ({ label, ref }: WidgetInputProps) => { /* ... */ }
-```
-
-**The half-migrated case is the one to look for:** a props type that already declares `ref?: Ref<T>` while the component is still wrapped in `forwardRef`. `forwardRef` strips `ref` out of props, so the declaration is unreachable and misleading.
+The detail for §R20 and §R35 is in `${CLAUDE_PLUGIN_ROOT}/skills/kc-react/references/components.md`. Read it in full before grading either.
 
 ---
 
@@ -330,7 +323,7 @@ The detail for §R11-§R13, §R21-§R23, §R27, §R28 and §R30 is in `${CLAUDE_
 
 ### Section 4 — Forms
 
-The detail for §R14, §R24-§R26 and §R31 is in `${CLAUDE_PLUGIN_ROOT}/skills/kc-react/references/forms.md`. Read it in full before grading any of them.
+The detail for §R14, §R24-§R26, §R31, §R33 and §R34 is in `${CLAUDE_PLUGIN_ROOT}/skills/kc-react/references/forms.md`. Read it in full before grading any of them.
 
 ---
 

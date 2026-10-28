@@ -27,6 +27,7 @@ Placement is covered by the `structure` skill, which defers to bulletproof-react
 - Without React Compiler, a `useMemo` or `useCallback` has to hit: empty dependencies mean a module constant, and a dependency that changes every render (an inline object, array or function) means the memo never does. Pass stable references to memoized children.
 - A block of markup past about thirty lines that reads as its own unit is a named component, and a wrapper element that only repeats its parent's styling is deleted.
 - On React 19 and later, `ref` is a plain prop. Do not add `forwardRef`, and never declare `ref` in the props of a component that is also wrapped in `forwardRef`.
+- An empty slot reads as empty: muted, plainly a placeholder, with an icon that names what goes there (an image icon for a logo, a person only for a person's photo). An empty state styled like a filled one tells the reader something is already there.
 - A `min-height` or `min-width` on a flex item is set knowing its parent: an explicit minimum replaces the default `min-*: auto`, so inside a fixed-size flex parent the item shrinks to that minimum and its content spills past its own background. Check the parent's display and size, and keep the item from shrinking (`flex-shrink: 0`) when its content can outgrow the minimum.
 
 ## Data access
@@ -46,6 +47,8 @@ Placement is covered by the `structure` skill, which defers to bulletproof-react
 
 - The form is the single source of truth. No `useState` shadowing a value the form already holds.
 - A form-state hook returns form plumbing only (the methods, submit and discard, saving state). One field's fetching, watching and lookup state live in that field's component.
+- A form with Save and Discard holds every change until Save, picked and removed files included. Nothing it edits reaches the server before Save, so Discard leaves the record as it was.
+- A section that isn't being edited shows its saved values the way similar sections show theirs (the codebase's read-only display), not as inputs disabled until Edit.
 - A form that shows only part of a set field (in a store's context, that store's links) seeds that part and sends the rest back unchanged.
 - Each form watch lives in the smallest component that renders from it; a child reads shared form values itself rather than taking them as props.
 - A form that edits a record seeds the related record its inputs render from, not just the id.

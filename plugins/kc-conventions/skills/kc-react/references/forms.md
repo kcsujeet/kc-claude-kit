@@ -1,6 +1,6 @@
 # React: forms
 
-Review detail for react §R14 and §R24-§R26, moved out of `SKILL.md` to keep it under the line cap. The boxes are in `SKILL.md` under `## Review checklist`.
+Review detail for react §R14, §R24-§R26, §R31, §R33 and §R34, moved out of `SKILL.md` to keep it under the line cap. The boxes are in `SKILL.md` under `## Review checklist`.
 
 ## §R14. Form is the single source of truth; validate via the library's own API
 
@@ -81,3 +81,24 @@ const kept = order.storefronts.filter((storefront) => !isHere(storefront))
 
 The server still checks removals (rails §RL5e): hiding an entry is not authorization.
 
+## §R33. A form with Save and Discard holds every change until Save
+
+Discard promises that the saved record is as it was before Edit. Anything the form sends early breaks that promise: an image uploaded as soon as it is picked, a file deleted as soon as its remove button is clicked. The user discards, and the change is already saved.
+
+Hold files in form state like any other field, as the picked file or a marker that the saved one is removed, and apply them in the submit after the record's own fields:
+
+```ts
+const onSubmit = async ({ name, logo }: StoreFormValues) => {
+  if (name !== store.name) await updateStore.mutateAsync({ id: store.id, name })
+  if (logo?.file) await uploadLogo.mutateAsync(logo.file)
+  else if (logo?.removed) await removeLogo.mutateAsync()
+}
+```
+
+Discard then only resets the form. Look for the codebase's own file field that already works this way (a drop zone bound to a form field) before writing one, and cite it.
+
+## §R34. Out of edit mode, a section shows values, not disabled inputs
+
+A section with Edit, Save and Discard has two faces. Out of edit mode it shows what is saved, as text, through the read-only display similar sections use (often a `readOnly` prop on the form inputs, or a label and value row). Inputs left on screen and only disabled read as "this can't be changed" rather than "this is what's saved", grey out the values, and show empty values as blank boxes instead of the codebase's empty marker.
+
+Check two similar sections in the same area and match them. When the codebase itself shows disabled inputs in view mode, follow it and leave a note for the developer instead of failing the box.
