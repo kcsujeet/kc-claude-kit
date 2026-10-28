@@ -118,14 +118,3 @@ const { data: options } = useProducts({ status }) // GET /products?status=active
 
 Filter in code only when the server cannot, and say why in a comment.
 
-## §R32. A resource's list read is one hook named for the resource
-
-A brand page needs the brand's storefronts. The quick version is a hook for that page, `useBrandStorefronts({ brandId })`, that builds the filter inside. The next screen that lists storefronts (by region, by status) adds another, and each one hides a request the others cannot reuse. The repo already has the shape: a record hook (`useStorefront`) and a list hook (`useStorefronts`) taking the standard query params, with the caller passing its narrowing:
-
-```ts
-const { data: storefronts } = useStorefronts({
-  queryParams: { filter: { brand_id: { eq: brand.id } } }
-})
-```
-
-When no list hook exists for the resource yet, write it in the shape of 2 sibling list hooks (same params, same return), named for the resource, not for the first screen that needed it.

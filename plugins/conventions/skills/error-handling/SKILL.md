@@ -17,6 +17,5 @@ Fail early, fail loudly, never swallow.
 - One error envelope for the whole surface, with a code, a human message, and optional details. Do not invent a second shape per endpoint.
 - A message says what failed and what to do about it. "Something went wrong" is not an error message.
 - Validation failures return the field-level issues, not a single sentence the client cannot act on.
-- Moving a check to another layer (into a schema, a contract, a model) keeps the message the user sees at least as clear. Find where the client shows the error, and compare the text before and after: a library's default wording (`must be filled`) replacing the repo's own (`is required`) is a regression.
 - Every error code maps to real copy and a real recovery action in the UI. No silent failure, no generic alert as the catch-all.
 - Log with structured context (the ids that identify the record and the request), never a bare interpolated string.

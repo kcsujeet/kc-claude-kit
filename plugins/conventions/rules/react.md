@@ -37,7 +37,6 @@ Placement is covered by the `structure` skill, which defers to bulletproof-react
 - A query key includes every context its response depends on that isn't in its params (the current tenant, the signed-in user, the locale). A write that adds a record or changes a field a list filters on refetches filtered lists rather than patching them, and refetches counts and totals derived from what it changed.
 - A write hook touches only its own resource. Another resource's writes live in that resource's hook, and the caller composes the two.
 - A read hook wires up every option it accepts. Accepting an option and ignoring it is dead surface.
-- A resource's reads follow the repo's pair: one hook for a record and one for its list, named for the resource and taking the repo's standard query params. A screen's narrowing (a parent id, a status) goes in at the call site; no hook is named for one screen or caller (`useBrandStorefronts({ brandId })`).
 
 ## Forms and state
 

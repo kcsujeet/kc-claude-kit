@@ -390,7 +390,7 @@ On a component, `prop={flagA ? value : undefined}`. Before proposing it, check t
 
 ### §C20. A comment about other code is checked against it
 
-A comment that explains why a function exists often names its readers: "the sign-in and no-access pages read this". Written from memory, it sounds right and is easy to get half wrong, and a reader trusts it more than the code because it is plain English. Before writing such a line, grep the readers, the callers or the response it describes and write what is there. When the change touches that other code later, the comment is part of what must stay true.
+A comment that explains why a function exists often names its readers: "the export job and the settings page read this". Written from memory, it sounds right and is easy to get half wrong, and a reader trusts it more than the code because it is plain English. Before writing such a line, grep the readers, the callers or the response it describes and write what is there. When the change touches that other code later, the comment is part of what must stay true.
 
 ## Sweeps
 

@@ -27,6 +27,7 @@ paths:
   - §S16. `app/` holds routes only
   - §S17. Shared only when it is shared
   - §S18. A moved or renamed file is new code
+  - §S19. The caller asks, the provider serves
 - Sweeps
 
 ## Rules
@@ -39,6 +40,7 @@ Where code lives is part of its contract. A path promises something about what i
 - No barrel re-export files. Import the module path directly, which also keeps tree shaking working. A barrel for a single component is fine.
 - Named exports on new files, declared inline (`export const foo = ...`), not collected in a trailing export block.
 - A file the change moves or renames is new code: it meets every rule a new file does (named exports, a doc comment on what it exports, relative imports within its folder, a name and a place that follow its new siblings), even where the old file did not.
+- A provider (an endpoint, a module, a function) gives its caller what the caller asks for. It does not trim or rewrite the request, and it does not load or attach what nobody asked for; it decides only what it is allowed to give, through what it declares.
 - Delete dead wrappers in every shape: async-await passthrough, destructure-and-reconstruct, single-use alias, identity transform, a Promise wrapped around a Promise, a hook returning another hook's values unchanged, a wrapper whose only addition is an `onSuccess` every caller could pass itself.
 - Code built or placed for reuse (a mixin, concern, trait or protocol extension; a higher-order function, or a hook or helper module in a shared folder) earns that shape only when two or more units use it today. With one user it goes back next to that user, or, when that user would then break a simplicity or structure rule, into the repo's existing kind of unit for that logic.
 - A module exports the thing it is named for plus its own surface (its props, argument and return types). An unrelated export, such as a domain enum in a hook file, moves to where its consumers are; a type only this module uses stays.
@@ -88,10 +90,11 @@ The structure gate agent ticks every box below against the diff. A box is FAIL i
 - [ ] §S17 Shared only when it is shared: code built or placed for reuse (a mixin, concern, trait or protocol extension in class-based code; a higher-order function, or a hook or helper module in a shared folder, in functional code) that only one unit uses today is flagged. **Enumerate**: for each such piece the diff adds, name its users (grep). With one user it moves back next to that user (same file or a file beside it), or, when that user would then break a simplicity or structure rule, into the kind of unit the repo already uses for that logic, near its user and called from it; with no such kind in the repo, the finding says to ask first. Inherently-shared-layer code under §S2's role override is exempt. (N/A: the diff adds no mixin, concern, trait, protocol extension, higher-order function, or shared-folder hook or helper)
 - [ ] §S16 `app/` holds routes only: every new file under the routing layer (`app/`, or the repo's equivalent) is a route file the framework reads by name, a test for one, a route-level action, or the app's own entry, provider or router; a component, hook, util or constant there FAILS, even beside existing ones, since precedent is not an exemption. **Enumerate**: list every new file under it with a verdict. (N/A: no new file under the routing layer)
 - [ ] §S18 Moved and renamed files are graded as new: every file the diff moves or renames (the `R` lines of `git diff -M --name-status`) passes every new-file box (exports, doc comments, imports, naming, placement), even where the old file did not. **Enumerate** the `R` lines with a verdict each. (N/A: no file moved or renamed)
+- [ ] §S19 The caller asks, the provider serves: no added code in a provider removes, rewrites or second-guesses what its caller asked for (fields, related data, filters, options), and none loads or returns extra the caller did not ask for. What a caller may reach is limited by what the provider declares, not by editing the request. **Enumerate** request-shaping and eager-loading code the diff adds. (N/A: no provider added or changed)
 
 ## Review detail
 
-Code-placement and API-shape rules for the diff under review. Covers sixteen independent failure modes: mixed responsibilities inside one unit, wrong-layer co-location, leftover single-file folders and re-export barrels, dead wrappers, branch-selection that should be a lookup, misplaced helpers, missing JSDoc on exported APIs, default exports on new files, literal unions standing in for serialized enums, unflagged breaking changes to a public API, modules sitting in a folder that promises a different kind of module, public exports widened only to share an internal, exports unrelated to their module, new code placed in a home whose subject it does not act on, files exporting several components, non-route files in the routing layer, and moved or renamed files graded as old.
+Code-placement and API-shape rules for the diff under review. Covers sixteen independent failure modes: mixed responsibilities inside one unit, wrong-layer co-location, leftover single-file folders and re-export barrels, dead wrappers, branch-selection that should be a lookup, misplaced helpers, missing JSDoc on exported APIs, default exports on new files, literal unions standing in for serialized enums, unflagged breaking changes to a public API, modules sitting in a folder that promises a different kind of module, public exports widened only to share an internal, exports unrelated to their module, new code placed in a home whose subject it does not act on, files exporting several components, non-route files in the routing layer, moved or renamed files graded as old, and providers that reshape what their caller asked for.
 
 ### §S1. Separation of concerns
 
@@ -427,7 +430,17 @@ A new file added beside legacy helpers that already sit there still fails: movin
 
 ### §S18. A moved or renamed file is new code
 
-A move is an easy place to carry old habits forward. A hook moved to the shared layer keeps its default export, its `@/` import of the file that is now beside it, and a doc comment that still names its old folder; a renamed hook keeps its props type under the old name. Each is a box a new file would fail, and a diff that shows the file as renamed with a high similarity score invites a reviewer to skip it. Grade the moved file as written fresh, and finish the move: every importer updated, the old path gone, and the names inside it following the new name.
+A move is an easy place to carry old habits forward. A module moved to a shared folder keeps the export style the repo has moved away from, an absolute import of a file that now sits beside it, and a doc comment naming its old home; a renamed unit keeps its helper types under the old name. Each is a box a new file would fail, and a diff that shows the file as renamed with a high similarity score invites a reviewer to skip it. Grade the moved file as written fresh, and finish the move: every importer updated, the old path gone, and the names inside it following the new name.
+
+### §S19. The caller asks, the provider serves
+
+The caller knows what it needs; the provider knows what it may give. Mixing the two produces quiet surprises:
+
+- An endpoint drops the related data a client asked for because it is not on an allowlist. The client gets a different response than it requested, and the allowlist drifts from what the endpoint really exposes. Limit what the endpoint declares instead, and let an unsupported request fail visibly.
+- A data-access function always loads three related tables because one caller once needed them. Every other caller pays for it. Load what the caller asks for.
+- A parent's response carries a filtered list of another resource (only the active children, only the viewer's) built just for one screen. The filtering rules now live inside the parent and apply only through that one path. Let the caller ask the children's own provider, with the rules kept there and the parent as an ordinary filter.
+
+In each case the fix is the same split: the caller says what it wants, and the provider serves it within what it declares.
 
 ## Sweeps
 

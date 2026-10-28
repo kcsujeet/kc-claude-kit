@@ -54,7 +54,6 @@ Placement is covered by the `structure` skill, which defers to bulletproof-react
 - A query key includes every context its response depends on that isn't in its params (the current tenant, the signed-in user, the locale). A write that adds a record or changes a field a list filters on refetches filtered lists rather than patching them, and refetches counts and totals derived from what it changed.
 - A write hook touches only its own resource. Another resource's writes live in that resource's hook, and the caller composes the two.
 - A read hook wires up every option it accepts. Accepting an option and ignoring it is dead surface.
-- A resource's reads follow the repo's pair: one hook for a record and one for its list, named for the resource and taking the repo's standard query params. A screen's narrowing (a parent id, a status) goes in at the call site; no hook is named for one screen or caller (`useBrandStorefronts({ brandId })`).
 
 ### Forms and state
 
@@ -105,7 +104,6 @@ The react gate agent ticks every box against the diff. A box is FAIL if any matc
 - [ ] §R29 A new or changed `min-height`/`min-width` (or `minHeight`/`minWidth`) on an element was checked against its parent: when the parent is a flex container with a fixed size, the element either cannot shrink (`flex-shrink: 0`) or its content can never outgrow the minimum, and the finding names the parent and its size. **Enumerate**: grep the diff for `min-height`, `min-width`, `minHeight`, `minWidth`, one verdict per hit. (N/A: `grepped min sizing: 0 hits`)
 - [ ] §R30 A read asks the server for what the screen shows: for every fetch the diff adds or changes (a list, table, picker, search, count, or a lookup of related records), its narrowing (a status, a parent, a visibility, the current user's scope) goes into the request the server answers, the way 2 cited sibling reads send theirs, and a related record the screen names comes from the response that already carries it (§R26). A response filtered in code (`data.filter(...)` where the server could have narrowed) FAILS, and so does a second fetch to look up records the first response already carries, unless a comment says why the server can't. (N/A: no fetch added or changed)
 - [ ] §R31 A form that shows part of a set keeps the rest: when the screen's context limits which entries of a set field the form shows (one store's links on a store page), the form seeds only those, and on submit it sends back every hidden entry unchanged. Rendering entries it can't name (a bare id) FAILS, and so does dropping them. (N/A: no set field limited by context)
-- [ ] §R32 A list read goes through the resource's list hook: every list read the diff adds uses a hook named for the resource that takes the repo's standard query params, as 2 cited sibling list hooks do, with the caller's narrowing passed at the call site. A hook added for one screen or caller, or one that takes a bespoke argument for its filter (`brandId`), FAILS. (N/A: no list read added)
 
 ## Review detail
 
@@ -320,7 +318,7 @@ export const WidgetInput = ({ label, ref }: WidgetInputProps) => { /* ... */ }
 
 ### Section 3 — Data fetching
 
-The detail for §R11-§R13, §R21-§R23, §R27, §R28, §R30 and §R32 is in `${CLAUDE_PLUGIN_ROOT}/skills/react/references/data-fetching.md`. Read it in full before grading any of them.
+The detail for §R11-§R13, §R21-§R23, §R27, §R28 and §R30 is in `${CLAUDE_PLUGIN_ROOT}/skills/react/references/data-fetching.md`. Read it in full before grading any of them.
 
 ---
 

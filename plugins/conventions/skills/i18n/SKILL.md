@@ -1,6 +1,6 @@
 ---
 name: i18n
-description: "Translation conventions for locale JSON files and the TypeScript and JavaScript code that calls them: source-locale-only edits, duplicate keys, key names that match their values, shared namespace for generic words, ICU plurals, no concatenated translations, display text kept apart from stored values, and locale-aware sorting. Use when writing or reviewing code that adds or changes a translation key, a locale file, or a `t()` call."
+description: "Translation conventions for locale JSON files and the TypeScript and JavaScript code that calls them: source-locale-only edits, duplicate keys, key names that match their values, shared namespace for generic words, ICU plurals, and no concatenated translations. Use when writing or reviewing code that adds or changes a translation key, a locale file, or a `t()` call."
 user-invocable: false
 paths:
   - "**/*.{ts,tsx,js,jsx}"
@@ -23,8 +23,7 @@ paths:
   - §I5. Generic nouns and labels belong in the shared namespace
   - §I6. Every countable noun is an ICU plural
   - §I7. Never concatenate translations
-  - §I8. Display text is never also a stored value
-  - §I9. User-visible lists sort in the reader's locale
+  - §I8. Text shown to people is never also an identifier
 
 ## Rules
 
@@ -38,8 +37,7 @@ A key is added once and read by every translator afterwards. Two keys for one st
 - Every countable noun is an ICU plural, including a label that only ever shows one today. No `item`/`items` key pairs, no plural baked into the key name.
 - Never concatenate translations. `t('delete') + ' ' + t('booking')` has an order that is wrong in half the languages we ship. A verb plus a noun decomposes into an action template with the noun interpolated.
 - A label next to a runtime value **is** interpolation, and that is correct. Do not invent a composite key to avoid it.
-- A value kept in state, a URL, a filter or a cache key is an identifier, never display text: a filter holds `city=other` and renders it through a translation, not `city=Other`. Display text that doubles as a value either stays untranslated or breaks the state the day it is translated.
-- A list of names a user reads sorts with a locale-aware comparison (`localeCompare`, `Intl.Collator`), not code-unit order, and every view of the same list (a filter menu and the headings it filters) uses one shared comparator, so their orders agree.
+- Text shown to people is never also used as an identifier. A value kept in state, a link, a filter or a stored field holds a key (`other`), and the screen shows its translation; the moment the label is translated, a label used as a value either stays untranslated or breaks.
 
 Detection criteria, the per-key audit table, and per-box review failure modes live in the `## Review checklist` of the `i18n` skill (`conventions:i18n`), with the detail under its `## Review detail`. These rules are the statement of the convention; that checklist is how a diff gets graded against it.
 
@@ -54,12 +52,11 @@ The i18n gate agent ticks every box against the diff. A box is FAIL if any key o
 - [ ] §I5 Generic nouns/labels/headings live in the project's shared namespace, not a feature file — judged independently of the §I3 grep result. (N/A: no new keys in the diff)
 - [ ] §I6 Every countable noun is an ICU plural, including singular-only labels/headings/columns; no separate x/xs key pairs, no baked-plural compound keys. (N/A: project has no ICU-capable i18n library, or no countable-noun keys in diff — state which)
 - [ ] §I7 No translation concatenation: no `t(a) + t(b)` or template-joined translatable fragments; verb+noun values decompose into an action template plus a noun key; label+data is interpolation and is not flagged, and no redundant composite key was invented in its place. (N/A: no new key values or call sites in diff)
-- [ ] §I8 Display text is never a stored value: every string the diff adds that a user sees and that is also written to state, a URL, a filter, a stored field or a cache key FAILS; the stored side holds an identifier and the screen renders a translation of it. **Enumerate** constants and literals that reach both a render and a value. (N/A: none added)
-- [ ] §I9 Locale-aware sorting: every added sort of user-visible strings uses a locale-aware comparison, and two views of the same list share one comparator. A bare `.sort()` on names, or two orderings of one list built differently, FAILS. **Enumerate** added `.sort(` / `sort_by` on strings. (N/A: no string sort added)
+- [ ] §I8 Text shown to people is never an identifier: every string the diff adds that a user sees and that is also stored, compared, put in a link or used as a key FAILS; the stored side holds a key and the screen renders its translation. **Enumerate** constants and literals that reach both a screen and a value. (N/A: none added)
 
 ## Review detail
 
-Translation/locale-key rules for the diff under review. Covers nine independent failure modes: mandatory per-key audit evidence, source-locale-only edits, duplicate keys (exact and semantic), key names that don't match their values, generic nouns misplaced outside the shared namespace, missing ICU plurals, translation concatenation, display text reused as a stored value, and user-visible lists sorted outside the reader's locale.
+Translation/locale-key rules for the diff under review. Covers eight independent failure modes: mandatory per-key audit evidence, source-locale-only edits, duplicate keys (exact and semantic), key names that don't match their values, generic nouns misplaced outside the shared namespace, missing ICU plurals, translation concatenation, and display text used as an identifier.
 
 ### §I1. The per-key audit table is the mandatory first output
 
@@ -200,13 +197,9 @@ t('edit') + ' ' + t('widget')
 
 **Caveat — a verb phrase still uses the action template even when its slot is data.** The label-plus-data carve-out above is for nouns/labels followed by data (`dueDate`, `amountDue`). It does not license a one-off key for a verb phrase whose slot happens to be data. `"Pay {amount}"` starts with the transitive verb "Pay," so it belongs in the action-template file as `actions.paySomething: "Pay {something}"`, called with the formatted amount as `something` — not a standalone `payAmount: "Pay {amount}"` key. The verb decomposition rule applies whether the slot is a noun or a data value; the verb is what forces the action-template path. A single interpolated key outside the action-template file is only correct for a non-verb phrase that is one translatable sentence unit with a data slot and duplicates no existing base label — e.g. a full greeting like `"Welcome back, {name}"`.
 
-### §I8. Display text is never also a stored value
+### §I8. Text shown to people is never also an identifier
 
-A store filter lists its cities and adds an "Other" entry for stores with no city. Using the string `"Other"` as both the option's label and its value works in English: the URL says `?city=Other`, the list groups under "Other". Then the page is translated, and either "Other" stays English on a French page, or the label changes and every saved URL and every comparison against `"Other"` breaks. Keep an identifier for the value (`other`) and translate only where it is shown.
-
-### §I9. User-visible lists sort in the reader's locale
-
-A bare `.sort()` orders by code unit, so `Zürich` and `Århus` land after `Zagreb`, and capitals sort before lowercase. `a.localeCompare(b)` (or a shared `Intl.Collator`) orders names the way the reader expects. When the same names appear twice, in a filter menu and as the headings of the list it filters, write the comparison once and use it in both places; two hand-written sorts drift, and the menu and the page then disagree.
+A filter offers "Other" for records with no category and uses the same string as the option's value: the link reads `?category=Other` and the code compares against `"Other"`. It works until the screen is translated. Then the label either stays in the source language, or it changes and every saved link and comparison stops matching. Keep a key for the value (`other`) and translate it only where it is shown.
 
 ## Sweeps
 
