@@ -45,6 +45,8 @@ Placement is covered by the `structure` skill, which defers to bulletproof-react
 - Without React Compiler, a `useMemo` or `useCallback` has to hit: empty dependencies mean a module constant, and a dependency that changes every render (an inline object, array or function) means the memo never does. Pass stable references to memoized children.
 - A block of markup past about thirty lines that reads as its own unit is a named component, and a wrapper element that only repeats its parent's styling is deleted.
 - On React 19 and later, `ref` is a plain prop. Do not add `forwardRef`, and never declare `ref` in the props of a component that is also wrapped in `forwardRef`.
+- A field that picks a record is the codebase's picker component for that kind of record (its own file, shaped like the existing pickers, taking the narrowing as props). When none exists, add one in that shape rather than wiring a fetch and an options list inside a form.
+- Markup two screens share (a labelled control, a set of options) is a component that takes the differences as props, not a hook or function that returns markup.
 - An empty slot reads as empty: muted, plainly a placeholder, with an icon that names what goes there (an image icon for a logo, a person only for a person's photo). An empty state styled like a filled one tells the reader something is already there.
 - A `min-height` or `min-width` on a flex item is set knowing its parent: an explicit minimum replaces the default `min-*: auto`, so inside a fixed-size flex parent the item shrinks to that minimum and its content spills past its own background. Check the parent's display and size, and keep the item from shrinking (`flex-shrink: 0`) when its content can outgrow the minimum.
 
@@ -116,6 +118,8 @@ The react gate agent ticks every box against the diff. A box is FAIL if any matc
 - [ ] §R33 A form with Save and Discard sends nothing before Save: every file it picks or removes is held in form state and applied in the submit, the way 2 cited similar forms hold theirs. An upload, delete or other write that fires on pick, drop or remove inside such a form FAILS, since Discard can't undo it. (N/A: no form with Save and Discard added or changed)
 - [ ] §R34 A section with an edit mode shows its saved values, out of edit mode, through the read-only display 2 cited similar sections use. Inputs that are only disabled until Edit FAIL when the codebase has a read-only display, and so does an empty value shown as a blank box instead of the codebase's empty marker. (N/A: no section with an edit mode added or changed)
 - [ ] §R35 An empty slot (an image, a file, an avatar, a list) reads as empty: muted styling the filled state doesn't share, and an icon that names what belongs there, matching 2 cited empty slots in the codebase. A placeholder styled like content, or an icon for something else (a person icon where a logo goes), FAILS. (N/A: no empty slot added or changed)
+- [ ] §R36 A field that picks a record is a picker component for that kind of record, in its own file, shaped like 2 cited existing pickers (the props they take, how they narrow, how they show an empty list). A form or field component that fetches records and builds the options itself FAILS. (N/A: no record picker added or changed)
+- [ ] §R37 Markup shared by two or more components is a component taking the differences as props. A hook or function whose return value carries JSX for callers to render FAILS, unless the codebase's API for that spot takes options with node labels and 2 cited similar call sites build them inline. (N/A: no shared markup added or moved)
 
 ## Review detail
 
@@ -311,7 +315,7 @@ Suggested fix order (match whatever shape the target repo already uses for the c
 
 **`renderXxx()` inline render functions are an anti-pattern, not a fix.** A `const renderContent = () => (...)` called from the same component's return: re-runs on every parent render without its own reconciliation, doesn't show up in DevTools, hides a missing sub-component behind a method-shape that pretends to be cheap, obscures the JSX tree (readers scanning the return have to jump elsewhere to find the actual content), and closures over scoped variables make later extraction harder. Flag any new `renderXxx` called from its own component's return; point at §R9's named-component extraction instead. **Acceptable shapes:** a function handed to a render-prop API the library demands (`renderRow={(row) => ...}`); or a `useCallback`-wrapped handler that returns JSX for an event-driven mount (rare; usually still a missed component). Further reading: Nadia Makarevich, *React re-renders guide*, ["Antipattern: creating components in render function"](https://www.developerway.com/posts/react-re-renders-guide#%EF%B8%8F-antipattern-creating-components-in-render-function).
 
-The detail for §R20 and §R35 is in `${CLAUDE_PLUGIN_ROOT}/skills/kc-react/references/components.md`. Read it in full before grading either.
+The detail for §R20, §R35, §R36 and §R37 is in `${CLAUDE_PLUGIN_ROOT}/skills/kc-react/references/components.md`. Read it in full before grading either.
 
 ---
 

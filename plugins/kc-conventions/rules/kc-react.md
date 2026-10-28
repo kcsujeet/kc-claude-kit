@@ -27,6 +27,8 @@ Placement is covered by the `structure` skill, which defers to bulletproof-react
 - Without React Compiler, a `useMemo` or `useCallback` has to hit: empty dependencies mean a module constant, and a dependency that changes every render (an inline object, array or function) means the memo never does. Pass stable references to memoized children.
 - A block of markup past about thirty lines that reads as its own unit is a named component, and a wrapper element that only repeats its parent's styling is deleted.
 - On React 19 and later, `ref` is a plain prop. Do not add `forwardRef`, and never declare `ref` in the props of a component that is also wrapped in `forwardRef`.
+- A field that picks a record is the codebase's picker component for that kind of record (its own file, shaped like the existing pickers, taking the narrowing as props). When none exists, add one in that shape rather than wiring a fetch and an options list inside a form.
+- Markup two screens share (a labelled control, a set of options) is a component that takes the differences as props, not a hook or function that returns markup.
 - An empty slot reads as empty: muted, plainly a placeholder, with an icon that names what goes there (an image icon for a logo, a person only for a person's photo). An empty state styled like a filled one tells the reader something is already there.
 - A `min-height` or `min-width` on a flex item is set knowing its parent: an explicit minimum replaces the default `min-*: auto`, so inside a fixed-size flex parent the item shrinks to that minimum and its content spills past its own background. Check the parent's display and size, and keep the item from shrinking (`flex-shrink: 0`) when its content can outgrow the minimum.
 

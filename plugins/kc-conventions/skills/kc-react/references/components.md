@@ -1,6 +1,6 @@
 # React: components
 
-Review detail for react §R20 and §R35, moved out of `SKILL.md` to keep it under the line cap. The boxes are in `SKILL.md` under `## Review checklist`.
+Review detail for react §R20, §R35, §R36 and §R37, moved out of `SKILL.md` to keep it under the line cap. The boxes are in `SKILL.md` under `## Review checklist`.
 
 ## §R20. React 19: `ref` is a prop, `forwardRef` is not needed
 
@@ -25,3 +25,13 @@ A slot with nothing in it (no logo uploaded, no attachment, no photo) has to loo
 - **The wrong icon.** The icon names what goes there: an image icon for a logo or a background, a document icon for a file, a person only for a person's photo. A generic default that happens to be a person tells the reader a profile picture is expected.
 
 When the shared component's default icon is wrong for the slot, pass the right one in rather than changing the default for every caller.
+
+## §R36. A record picker is the codebase's picker component
+
+Most codebases have one picker component per kind of record (`OwnerAutocomplete`, `TagSelect`), each in its own file, taking the narrowing (a filter, a status, a parent) as props and passing it to the server. A new field that picks records reuses that component, or adds one in the same shape when none exists, rather than fetching inside the form and mapping an options list inline.
+
+Copy what the existing pickers do: the props they take, the default field name, how ids are converted, and how they handle an empty list (a disabled picker with a reason, a hint). Cite two.
+
+## §R37. Shared markup is a component, not a hook that returns it
+
+When two components render the same labelled control, extract a component that takes what differs as props (`disabled`, a type, which options are allowed). A hook or helper that returns options with JSX labels, for each caller to drop into its own control, splits one piece of UI across files and still leaves each caller assembling the control. The exception is a codebase API that itself takes options with node labels, where similar call sites build them inline.
