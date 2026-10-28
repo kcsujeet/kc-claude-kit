@@ -65,7 +65,7 @@ Where anything above appears to disagree with it, that document wins and this fi
 - `app/` is the routing layer: route files, their tests and route-level actions, plus the app's own entry, provider and router. Components, hooks and utils go to the shared folders or a feature, never beside a route.
 - Its guidance on barrel files matches the rule above: barrels were once recommended per feature and no longer are, because they break tree shaking. Import files directly.
 
-Apply this to a repo that already uses a feature-based layout or is migrating to one. In a legacy flat layout, do not demand a migration as a side effect of unrelated work; just avoid making the existing structure more inconsistent than it already is.
+Apply this to a repo that already uses a feature-based layout or is migrating to one. In a legacy flat layout, do not demand a migration as a side effect of unrelated work; just avoid making the existing structure more inconsistent than it already is. Two rules here go below the level it covers, inside one unit, and add to it rather than replace it: a unit's files share a folder named for the unit (§S15), and its own helpers, constants and types share a file named for it (§S20).
 
 Detection criteria and per-box review failure modes live in the `## Review checklist` of the `kc-structure` skill (`kc-conventions:kc-structure`) and of the `react` skill, with the detail under each one's `## Review detail`. These rules are the statement of the convention; those checklists are how a diff gets graded against it.
 

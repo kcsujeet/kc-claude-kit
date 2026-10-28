@@ -10,10 +10,10 @@ Review detail for structure §S3 and §S20, moved out of `SKILL.md` to keep it u
 
 ## §S20. A unit's helpers share one file named for the unit
 
-Helpers, constants and types live at the level their consumers decide (§S2), and each level has one file shape:
+Helpers, constants and types live at the level their consumers decide (§S2), and each level has one file shape. In a React codebase the app and feature levels are bulletproof-react's layout (the structure skill's React section), which this rule doesn't change; the unit level is this kit's own addition below what bulletproof-react covers.
 
 - **Shared across packages or apps:** the shared utils package, one file per subject (`dates.ts`, `currency.ts`) holding that subject's functions.
-- **Shared across one app or feature:** its `utils/` folder, again one file per subject.
+- **Shared across one app:** the app's `utils/` folder; **within one feature:** `features/<feature>/utils/`. Again one file per subject.
 - **Used by one unit** (a component, a form, a screen): one file in the unit's folder, named for the unit and the kind of thing it holds, `<unit>.utils.ts`, beside `<unit>.tsx` and its hook. Its constants and types follow the same form (`<unit>.constants.ts`, `<unit>.types.ts`) when they need a file apart from the code that uses them. Match the unit's own casing (`OrderForm.utils.ts`, `order-form.utils.ts`).
 
 Two shapes fail:
