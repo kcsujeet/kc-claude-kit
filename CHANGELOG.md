@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added
+
+- `kc-instructions` 3.1.0: the audit says what on-demand loading needs. A session started above the repo loads none of the repo's instructions until a file there is opened, and a file read through the shell triggers nothing, so a rule meant to shape a plan never arrives. New box §A16: plan-shaping instructions load at launch, at user scope or from a SessionStart hook, and agents read code with the Read tool. It comes from a session that planned in a workspace folder, read the code with shell commands, and proposed a design the project's path-scoped rules forbid.
+
 ### Changed
 
 - Every plugin and skill is renamed with a `kc-` prefix, so none collides with other public plugins and skills, and no plugin shares a name with one of its skills. Plugins: `conventions` is `kc-conventions` (2.0.0), `code-review` is `kc-gates` (3.0.0), `testing` is `kc-verify` (2.0.0), `instructions` is `kc-instructions` (3.0.0), `autopilot` is `kc-autopilot` (0.2.0), `usage-band` is `kc-usage-band` (2.0.0), `image-preview` is `kc-image-preview` (2.0.0). Skills: every conventions topic is `kc-<topic>` (`kc-conventions:kc-naming`), the review skill is `kc-gates:kc-code-review` and the posting skill `kc-gates:kc-post-review`, the verify skills are `kc-verify:kc-ui` and `kc-verify:kc-e2e`, and `kc-autopilot:kc-init`, `kc-autopilot:kc-run`, `kc-instructions:kc-audit`. Agents keep their names under the new plugin (`kc-gates:naming-gate`). The rules a project installs are now `.claude/rules/kc-<topic>.md`; run `/kc-conventions:kc-init` again and delete the old unprefixed copies. Exported skills for other tools are named `<plugin>-<skill>` (`kc-gates-code-review`). Already installed? Reinstall under the new names:
