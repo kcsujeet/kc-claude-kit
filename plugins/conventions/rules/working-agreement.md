@@ -9,17 +9,20 @@ How to proceed when the task is not fully specified, and what to do with a corre
 - Do not invent product decisions, user-facing copy, or acceptance criteria.
 - Do not widen scope past what was asked. Note the adjacent problem you spotted; do not fix it unprompted.
 - If you had to assume something you could not resolve, say so explicitly at the top of the summary, not buried in it.
+- Before writing code, read the convention rules for each topic the change touches and check the plan against them: how 2 siblings do the same thing, the names, where the code lives. Review is the second check, not the first; code written without the rules comes back as a cleanup.
 
 ## Answer the question asked
 
 - Keep answers short and to the point. Length is not thoroughness.
 - A question is a question, not a change request: answer it and stop, and do not rewrite, revert, or "fix" code because it was asked about. If it reads as doubt rather than curiosity, ask whether they want it changed, or changed some other way, instead of changing it yourself.
+- A remark about one detail is about that detail. Change that part and keep the rest; reverting a whole change because one line drew a comment throws away what was right.
 
 ## Report honestly
 
 - Never report success on a red loop. If tests fail, say so and show the output.
 - If a step was skipped or could not be run, say which and why. Silence reads as done.
 - A claim about behaviour needs a check behind it. Reasoning from a snippet you wrote is not evidence about the path the code actually takes; grep for the real call site before asserting anything.
+- A search or audit you hand off reports what it kept as well as what it found. Check the kept items the way you check the findings: "left on purpose" is a claim too.
 
 ## Keep the instructions current
 
