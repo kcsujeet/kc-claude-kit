@@ -10,6 +10,10 @@ paths:
 
 Placement is covered by the `structure` skill, which defers to bulletproof-react. This file is everything else: how components, data access, forms and state are built.
 
+## Doing it the way similar code does
+
+- Before writing a component, hook, form, store or test, find how the app already does that kind of job: about ten pieces of similar code (code that does the same kind of work, wherever it lives; all of it when there is less), read for each area the change touches, and do it their way. That covers how data is fetched, cached and written (the API client or resource layer, the query library, cache keys, how filters and related data are requested), how forms hold state and validate (the form and schema libraries, field components), where shared state lives (a store, context, the URL), which shared components and design tokens are used, how files and exports are named, and how tests render, mock and assert. A new library, wrapper or way of doing any of these is the last resort: only once every existing way has been tried and shown not to fit, and only with the developer's agreement.
+
 ## Components and markup
 
 - A component owns its own container. It never leaves a required wrapper to the caller, and never sets root `size`, `flexGrow` or self-margins that only work under one particular parent.

@@ -8,17 +8,17 @@ paths:
 
 # Rails
 
-A Rails app almost never needs a new shape. It already has dozens of controllers, models, jobs and whatever layers it adds (commands, service objects, form objects, contracts, query objects, serializers). New code looks like its siblings; a file that does not is the finding.
+A Rails app almost never needs a new shape. It already has dozens of controllers, models, jobs and whatever layers it adds (commands, service objects, form objects, contracts, query objects, serializers). New code looks like similar code already in the app; code that does not is the finding.
 
 ## Siblings and conventions
 
-- Before writing or accepting a file, read two or three siblings of the same kind (a controller against other controllers, a job against other jobs) and match their shape: base class, callbacks, how they build the record, where they validate, what they delegate. Say which siblings and what differs. A deviation is stated and justified, never silent.
+- Before writing or accepting code, find how the app already does that kind of job: about ten pieces of similar code (code that does the same kind of work, wherever it lives; all of it when there is less), read for each layer the change touches, and do it their way. That covers how input is validated (model validations, contracts, form objects, a validation library), where the work runs (commands, service objects, the model), how controllers, routes and API endpoints are shaped, how associations are declared, how serializers expose fields and relationships, how queries and scopes filter, and how jobs and specs are written. Say what you read and what differs. A new way of doing any of these is the last resort: only once every existing way has been tried and shown not to fit, and only with the developer's agreement.
 - New code acts on the subject of its home. A route, method or constant that only borrows its home's inputs belongs where its subject lives.
 - Rails conventions hold: the file path matches the class, pluralisation is conventional, every `has_many` / `has_one` declares `dependent:`, a reusable filter is a `scope :name, -> { }` rather than an inline `where` repeated at call sites, and callbacks are the documented ones.
 
 ## Layers
 
-- Work lives in the layer the app already uses for it: input parsing in its parser or service, validation where the app validates (model validations, contracts or form objects), writes in its write layer, scoping in its query layer, rendering in its serializers, authorization in its policies. A controller that builds and saves inline, or validates by hand, is a finding when its siblings do not.
+- Work lives in the layer the app already uses for it: input parsing in its parser or service, validation where the app validates (model validations, contracts or form objects), writes in its write layer, scoping in its query layer, rendering in its serializers, authorization in its policies. A controller that builds and saves inline, or validates by hand, is a finding when similar controllers do not.
 - One check lives in one place. The same rule in a validator and again in the command is one too many, unless the second guards a race (it runs under a lock the first cannot), and a comment says so.
 - A hook or option is only there when something uses it: no override point kept for one subclass that could do its work directly, no contract or form option nothing reads.
 - Bulk writes use `insert_all` / `upsert_all` with an explicit `unique_by`, and dedupe their input first: Postgres rejects an upsert that touches the same row twice.

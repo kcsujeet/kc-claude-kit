@@ -9,7 +9,7 @@ How to proceed when the task is not fully specified, and what to do with a corre
 - Do not invent product decisions, user-facing copy, or acceptance criteria.
 - Do not widen scope past what was asked. Note the adjacent problem you spotted; do not fix it unprompted.
 - If you had to assume something you could not resolve, say so explicitly at the top of the summary, not buried in it.
-- Before writing code, read the convention rules for each topic the change touches and check the plan against them: how 2 siblings do the same thing, the names, where the code lives. Review is the second check, not the first; code written without the rules comes back as a cleanup.
+- Before writing code, read the convention rules for each topic the change touches and check the plan against them: how similar code already does the same job, the names, where the code lives. Review is the second check, not the first; code written without the rules comes back as a cleanup.
 
 ## Answer the question asked
 

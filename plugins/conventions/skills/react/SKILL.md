@@ -21,11 +21,16 @@ paths:
   - Section 4: Forms (in `references/forms.md`)
   - Section 5: State
   - Section 6: Render cost and layout
+  - Section 7: Doing it the way similar code does
 - Sweeps
 
 ## Rules
 
 Placement is covered by the `structure` skill, which defers to bulletproof-react. This file is everything else: how components, data access, forms and state are built.
+
+### Doing it the way similar code does
+
+- Before writing a component, hook, form, store or test, find how the app already does that kind of job: about ten pieces of similar code (code that does the same kind of work, wherever it lives; all of it when there is less), read for each area the change touches, and do it their way. That covers how data is fetched, cached and written (the API client or resource layer, the query library, cache keys, how filters and related data are requested), how forms hold state and validate (the form and schema libraries, field components), where shared state lives (a store, context, the URL), which shared components and design tokens are used, how files and exports are named, and how tests render, mock and assert. A new library, wrapper or way of doing any of these is the last resort: only once every existing way has been tried and shown not to fit, and only with the developer's agreement.
 
 ### Components and markup
 
@@ -104,6 +109,7 @@ The react gate agent ticks every box against the diff. A box is FAIL if any matc
 - [ ] §R29 A new or changed `min-height`/`min-width` (or `minHeight`/`minWidth`) on an element was checked against its parent: when the parent is a flex container with a fixed size, the element either cannot shrink (`flex-shrink: 0`) or its content can never outgrow the minimum, and the finding names the parent and its size. **Enumerate**: grep the diff for `min-height`, `min-width`, `minHeight`, `minWidth`, one verdict per hit. (N/A: `grepped min sizing: 0 hits`)
 - [ ] §R30 A read asks the server for what the screen shows: for every fetch the diff adds or changes (a list, table, picker, search, count, or a lookup of related records), its narrowing (a status, a parent, a visibility, the current user's scope) goes into the request the server answers, the way 2 cited sibling reads send theirs, and a related record the screen names comes from the response that already carries it (§R26). A response filtered in code (`data.filter(...)` where the server could have narrowed) FAILS, and so does a second fetch to look up records the first response already carries, unless a comment says why the server can't. (N/A: no fetch added or changed)
 - [ ] §R31 A form that shows part of a set keeps the rest: when the screen's context limits which entries of a set field the form shows (one store's links on a store page), the form seeds only those, and on submit it sends back every hidden entry unchanged. Rendering entries it can't name (a bare id) FAILS, and so does dropping them. (N/A: no set field limited by context)
+- [ ] §R32 Done the way similar code does it: for every new or reshaped component, hook, form, store or test, the evidence names by path the similar code read for each area the change touches (about ten pieces, or all there are when fewer: data fetching and caching, forms and validation, shared state, shared components and tokens, naming and exports, tests), states the pattern it follows, and lists what the change does differently. Fewer than ten read when more exist FAILS, and so does a new library, wrapper or way of doing an area's job without evidence that the existing ways were tried and the developer agreed. (N/A: no new or reshaped component, hook, form, store or test)
 
 ## Review detail
 
@@ -438,6 +444,29 @@ A flex item's default minimum is `auto`: it never shrinks below its content. Set
 ```
 
 `flex-grow: 1` also fills the screen, but only under a flex parent, which is the parent assumption the components rule forbids. Check the case with content longer than the container (§R19 checks the narrow one).
+
+### Section 7: Doing it the way similar code does
+
+#### §R32. Do it the way similar code does
+
+Similar code means code that does the same kind of job, wherever it lives. Folder layouts differ between apps and between features of one app, so search by what the code does (`useQuery(`, `useMutation(`, `useForm(`, `create(` for a store, `render(` in tests), not by which folder it sits in.
+
+Read about ten pieces, not two or three. Two or three can be the odd ones out; ten show what the app does by default and which files are the exceptions. Per area:
+
+| Area | What to match |
+|---|---|
+| Data | the resource or client layer, how a record and a list are read (one hook each, named for the resource), how filters and related data go into the request, cache keys, how writes update the cache |
+| Forms | the form and schema libraries, field components, how defaults are seeded and errors shown |
+| State | where shared state lives (a store, context, the URL), and what stays local |
+| Components and styling | the shared component library and its variants, design tokens, layout primitives |
+| Names and exports | how hooks, components and files are named, named or default exports |
+| Tests | how components are rendered, how requests are mocked, shared fixtures, what is asserted |
+
+Write in the evidence what you read and what differs. A difference is a finding unless the change already says why.
+
+A new library, wrapper or way of doing any of these is the last resort. Try each existing way first and show why it does not fit; then ask the developer before building it. A shape only one file uses is not a pattern to copy either.
+
+Typical misses this catches: a data hook named for the one screen that uses it, where every other is named for its resource; a small hook created to format one value that every other component formats inline; a test that builds its own mock data where the others use shared fixtures; a cache key or constant named differently from the rest of its family.
 
 ## Sweeps
 

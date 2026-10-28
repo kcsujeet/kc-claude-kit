@@ -1,6 +1,6 @@
 ---
 name: rails
-description: "Rails conventions for Ruby source, specs and migrations: copying sibling files of the same kind, Rails naming and model conventions, work in the app's own layers, check-then-act races, per-record queries and N+1s (aggregates that preloading does not fix, bulk passes at a shared seam, computed serializer attributes, time-dependent memos), request-shaped risks (unbounded work, null and empty input, GETs that write, HTTP verbs), renaming, retiring or backfilling stored values, and spec honesty (N+1 specs, mutation checks, real data shapes, schema dumps). Use when writing or reviewing a Rails model, controller, command or service object, query, serializer, contract or form object, job, migration, backfill or spec."
+description: "Rails conventions for Ruby source, specs and migrations: doing each job the way similar code in the app already does it, Rails naming and model conventions, work in the app's own layers, check-then-act races, per-record queries and N+1s (aggregates that preloading does not fix, bulk passes at a shared seam, computed serializer attributes, time-dependent memos), request-shaped risks (unbounded work, null and empty input, GETs that write, HTTP verbs), renaming, retiring or backfilling stored values, and spec honesty (N+1 specs, mutation checks, real data shapes, schema dumps). Use when writing or reviewing a Rails model, controller, command or service object, query, serializer, contract or form object, job, migration, backfill or spec."
 user-invocable: false
 paths:
   - "**/*.{rb,rake}"
@@ -15,7 +15,7 @@ paths:
 - Rules
 - Review checklist
 - Review detail
-  - §RL1. Copy the siblings
+  - §RL1. Do it the way similar code does
   - §RL2. Rails conventions
   - §RL3. Work in the app's own layers
   - §RL4. Per-record queries and N+1s
@@ -26,17 +26,17 @@ paths:
 
 ## Rules
 
-A Rails app almost never needs a new shape. It already has dozens of controllers, models, jobs and whatever layers it adds (commands, service objects, form objects, contracts, query objects, serializers). New code looks like its siblings; a file that does not is the finding.
+A Rails app almost never needs a new shape. It already has dozens of controllers, models, jobs and whatever layers it adds (commands, service objects, form objects, contracts, query objects, serializers). New code looks like similar code already in the app; code that does not is the finding.
 
 ### Siblings and conventions
 
-- Before writing or accepting a file, read two or three siblings of the same kind (a controller against other controllers, a job against other jobs) and match their shape: base class, callbacks, how they build the record, where they validate, what they delegate. Say which siblings and what differs. A deviation is stated and justified, never silent.
+- Before writing or accepting code, find how the app already does that kind of job: about ten pieces of similar code (code that does the same kind of work, wherever it lives; all of it when there is less), read for each layer the change touches, and do it their way. That covers how input is validated (model validations, contracts, form objects, a validation library), where the work runs (commands, service objects, the model), how controllers, routes and API endpoints are shaped, how associations are declared, how serializers expose fields and relationships, how queries and scopes filter, and how jobs and specs are written. Say what you read and what differs. A new way of doing any of these is the last resort: only once every existing way has been tried and shown not to fit, and only with the developer's agreement.
 - New code acts on the subject of its home. A route, method or constant that only borrows its home's inputs belongs where its subject lives.
 - Rails conventions hold: the file path matches the class, pluralisation is conventional, every `has_many` / `has_one` declares `dependent:`, a reusable filter is a `scope :name, -> { }` rather than an inline `where` repeated at call sites, and callbacks are the documented ones.
 
 ### Layers
 
-- Work lives in the layer the app already uses for it: input parsing in its parser or service, validation where the app validates (model validations, contracts or form objects), writes in its write layer, scoping in its query layer, rendering in its serializers, authorization in its policies. A controller that builds and saves inline, or validates by hand, is a finding when its siblings do not.
+- Work lives in the layer the app already uses for it: input parsing in its parser or service, validation where the app validates (model validations, contracts or form objects), writes in its write layer, scoping in its query layer, rendering in its serializers, authorization in its policies. A controller that builds and saves inline, or validates by hand, is a finding when similar controllers do not.
 - One check lives in one place. The same rule in a validator and again in the command is one too many, unless the second guards a race (it runs under a lock the first cannot), and a comment says so.
 - A hook or option is only there when something uses it: no override point kept for one subclass that could do its work directly, no contract or form option nothing reads.
 - Bulk writes use `insert_all` / `upsert_all` with an explicit `unique_by`, and dedupe their input first: Postgres rejects an upsert that touches the same row twice.
@@ -76,9 +76,9 @@ A Rails app almost never needs a new shape. It already has dozens of controllers
 
 The rails gate ticks every box against the diff. A box is FAIL if any matching construct violates it; N/A only when the diff has no matching construct, stated. Every grep receipt states its hit count and gives every hit a `file:line` verdict.
 
-- [ ] §RL1 Siblings: for every changed Ruby file, two or three siblings of the same kind were read and named by path, and the evidence says what the new file does differently (base class, callbacks, record building, validation, delegation). A changed file with no named siblings is FAIL, never N/A. (N/A: only specs and config changed)
+- [ ] §RL1 Done the way similar code does it: for every changed Ruby file, the evidence names by path the similar code read for each layer the change touches (about ten pieces per layer, or all there are when fewer: validation, the write, controller, routes and API shape, associations, serializer, query, job, spec), states the pattern that code follows, and lists what the change does differently. Fewer than ten read when more exist FAILS, and so does any new way of doing a layer's job without evidence that the existing ways were tried and the developer agreed. A changed file with no similar code named is FAIL, never N/A. (N/A: only specs and config changed)
 - [ ] §RL2 Rails conventions: path matches class, pluralisation conventional, every new association declares `dependent:`, a filter used in more than one place or named for a concept is a `scope`, callbacks are documented ones. Enumerate added `has_many|has_one|where(` lines. (N/A: no model, association or query added)
-- [ ] §RL3a Layers: each piece of work sits in the layer its siblings put it in; no controller building, saving or validating inline where siblings delegate. (N/A: no controller, command or service touched)
+- [ ] §RL3a Layers: each piece of work sits in the layer similar code puts it in; no controller building, saving or validating inline where similar controllers delegate. (N/A: no controller, command or service touched)
 - [ ] §RL3b One check, one place: no rule checked twice (validator or contract and again in the write), unless the second runs under a lock the first cannot and a comment says so. (N/A: no validation or guard added)
 - [ ] §RL3c No dead hooks or options: every override point, callback hook and contract or form option added is used by something today. Enumerate added `option :`, `attr_reader`, and methods that only call `super`. (N/A: none added)
 - [ ] §RL3d Bulk writes: every `insert_all|upsert_all` has `unique_by` and deduped input. (N/A: no bulk write)
@@ -102,11 +102,27 @@ The rails gate ticks every box against the diff. A box is FAIL if any matching c
 
 ## Review detail
 
-### §RL1. Copy the siblings
+### §RL1. Do it the way similar code does
 
-"There was no pattern to follow" is almost never true in a Rails app. Pick siblings from the same directory family (`app/controllers/`, `app/models/`, `app/jobs/`, and the app's own layer folders), read them, and write in the evidence which ones and what the new file does differently. A difference is a finding unless the change already says why.
+"There was no pattern to follow" is almost never true in a Rails app. Similar code means code that does the same kind of job, wherever it lives: the folder layout differs between apps, so search by what the code does (`rule(`, `validates`, `def call`, `has_many`, `render json:`, `scope :`), not by which directory it sits in.
 
-Typical misses this catches: a create action that builds its record inline when its siblings build it in a setup callback; a subclass that overrides a save hook only to wrap it in a lock, when siblings take the lock up front; a validation repeated in the write step that siblings leave to the validator.
+Read about ten pieces, not two or three. Two or three can be the odd ones out; ten show what the app does by default and which files are the exceptions. Read them per layer the change touches:
+
+| Layer | What to match |
+|---|---|
+| Validation | where it lives (model validations, contracts, form objects, a validation library such as dry-validation), how ids are checked against the caller's scope, the wording of messages |
+| The write | commands, service objects or the model; how they are called, transactions, callbacks, what they return |
+| Controllers, routes and API shape | base class, before actions, how records are found and authorized, how params are read, response shape, member versus collection routes |
+| Associations | how they are declared, `dependent:`, scopes on them, whether one record is reached through another |
+| Serializers | which fields and relationships they expose, how related data is included, conditional fields |
+| Queries and scopes | how filtering, scoping to the tenant, sorting and paging are done; what is loaded and when |
+| Jobs and specs | queue choice, arguments, retries; spec type, factories, how requests are made and asserted |
+
+Write in the evidence what you read and what differs. A difference is a finding unless the change already says why.
+
+A new way of doing any of these is the last resort. Try each existing way first and show why it does not fit; then ask the developer before building the new one. A shape that only one file uses is not a pattern to copy either.
+
+Typical misses this catches: a create action that builds its record inline when similar actions build it in a setup callback; a subclass that overrides a save hook only to wrap it in a lock, when similar code takes the lock up front; a validation repeated in the write step that similar code leaves to the validator; a controller that rewrites its own request params when no other controller does; a new serializer variant for one response when similar responses reuse the existing serializer.
 
 ### §RL2. Rails conventions
 
@@ -114,7 +130,7 @@ Deviating from Rails conventions costs every future reader an assumption they ar
 
 ### §RL3. Work in the app's own layers
 
-Whatever layers the app adds (service objects, commands, form objects, contracts, query objects), each kind of work has one home. Find it from the siblings, not from preference.
+Whatever layers the app adds (service objects, commands, form objects, contracts, query objects), each kind of work has one home. Find it from similar code, not from preference.
 
 A check done in two places drifts. The exception is a race: a validator runs before any lock, so a check that must see committed state (no child rows were added since) belongs after the lock in the write, and the validator copy goes.
 
