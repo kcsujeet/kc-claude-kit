@@ -51,6 +51,7 @@ Where code lives is part of its contract. A path promises something about what i
 - Exported APIs carry a short doc comment saying what they are for, not restating the signature.
 - Do not widen a package's public exports so a sibling package can reach an internal. Move the shared piece to a shared layer both consume.
 - A discriminator the backend serializes is a string enum, not a literal union: if the backend can return it, it needs a name in the code.
+- A generated file is never edited by hand. Edit its source (the template, skill or schema it is built from), rerun the generator, and run the repo's own drift check (`--check`, a CI step) before pushing. The repo's README or CI config names which files are generated.
 
 ### React and TypeScript codebases
 
@@ -93,6 +94,7 @@ The structure gate agent ticks every box below against the diff. A box is FAIL i
 - [ ] §S16 `app/` holds routes only: every new file under the routing layer (`app/`, or the repo's equivalent) is a route file the framework reads by name, a test for one, a route-level action, or the app's own entry, provider or router; a component, hook, util or constant there FAILS, even beside existing ones, since precedent is not an exemption. **Enumerate**: list every new file under it with a verdict. (N/A: no new file under the routing layer)
 - [ ] §S18 Moved and renamed files are graded as new: every file the diff moves or renames (the `R` lines of `git diff -M --name-status`) passes every new-file box (exports, doc comments, imports, naming, placement), even where the old file did not. **Enumerate** the `R` lines with a verdict each. (N/A: no file moved or renamed)
 - [ ] §S19 The caller asks, the provider serves: no added code in a provider removes, rewrites or second-guesses what its caller asked for (fields, related data, filters, options), and none loads or returns extra the caller did not ask for. What a caller may reach is limited by what the provider declares, not by editing the request. **Enumerate** request-shaping and eager-loading code the diff adds. (N/A: no provider added or changed)
+- [ ] §S21 No generated file is edited by hand: every changed file that the repo generates (named in its README, CI config or a header comment) changed only through its source and the generator, and the repo's drift check passes. **Enumerate** changed files that look generated (a build or `--check` script names them, or a header says generated) with a verdict each. (N/A: no generated file changed)
 
 ## Review detail
 
