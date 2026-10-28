@@ -31,6 +31,7 @@ A Rails app almost never needs a new shape. It already has dozens of controllers
 - Every computed serializer attribute (a method, not a column) is checked for a per-record query, including one that calls another computed attribute.
 - Serializer and view params carry the data (the signed-in customer, the current shop), not a flag worked out from it for one consumer; the consumer that needs it decides.
 - The client asks for what it needs; the server doesn't hand it everything. A serializer exposes its own model's attributes, and another model's data reaches the client only through a relationship the client chooses to include, never as that model's attributes copied onto this serializer or sent by default.
+- Which records the client gets is the client's filter, not the serializer's choice: a serializer never drops records from a collection or relationship (by status, a flag or a context param). The client sends the filter and the query applies it; a rollout flag that gates the behaviour is checked where the query applies the filter.
 - A response the client only counts returns a count, not a serialized collection.
 - No plain `@x ||=` memo on a value that depends on time or a window; it freezes silently.
 
