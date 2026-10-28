@@ -411,7 +411,7 @@ A component file that exports several components (or exports cells, hooks and st
 
 - each exported component gets its own file, named after it; the files can share a folder named after the parent component (`widget-table/widget-table.tsx`, `widget-table/widget-table-head.tsx`), imported by path with no barrel (§S3);
 - hooks and helpers move out of the component file into their own files, placed by §S2 and §S11;
-- a subcomponent with a single consumer stays private in that consumer's file only while it is small, a few lines of markup; a bigger one (its own state, handlers or a screenful of markup) gets its own file beside the parent in the unit's folder, so each file reads as one component;
+- a subcomponent with a single consumer stays private in that consumer's file only while it is small, a few lines of markup; a bigger one (its own state, handlers or a screenful of markup; the form a drawer opens is the usual case) gets its own file beside the parent in the unit's folder, so each file reads as one component;
 - no thin file: a component that only wraps one value or element is inlined where it is used.
 
 ### §S16. `app/` holds routes only
