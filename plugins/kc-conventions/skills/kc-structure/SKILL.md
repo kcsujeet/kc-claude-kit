@@ -15,7 +15,7 @@ paths:
 - Review detail
   - §S1. Separation of concerns
   - §S2. Code placement and co-location
-  - §S3. Flatten single-file folders; no re-export barrels
+  - §S3, §S20. File and folder shape (in `references/files.md`)
   - §S4. No dead wrappers
   - §S5. Lookup objects over switch/nested if
   - §S6. Code placement, general
@@ -37,6 +37,7 @@ Where code lives is part of its contract. A path promises something about what i
 - One observable responsibility per unit. A directory name is a promise: `hooks/` contains hooks, `utils/` contains pure functions.
 - Co-locate with the single consumer. Promote at the second consumer: within a feature, to the nearest common ancestor; across features, to the shared app level, never sideways into another feature.
 - Flatten a folder that holds one file. `Foo/Foo.tsx` with no siblings is just `Foo.tsx`.
+- A unit's own helpers share one file named for the unit, `<unit>.utils.ts` beside it (likewise `.constants`, `.types`); shared helpers sit in a file named for their subject. Never a file per function or constant, and never a bare `utils.ts`, `constants.ts` or `types.ts` in a unit's folder: it scatters one unit's logic, and the repeated name makes search and tabs useless.
 - No barrel re-export files. Import the module path directly, which also keeps tree shaking working. A barrel for a single component is fine.
 - Named exports on new files, declared inline (`export const foo = ...`), not collected in a trailing export block.
 - A file the change moves or renames is new code: it meets every rule a new file does (named exports, a doc comment on what it exports, relative imports within its folder, a name and a place that match similar code), even where the old file did not.
@@ -45,7 +46,7 @@ Where code lives is part of its contract. A path promises something about what i
 - Code built or placed for reuse (a mixin, concern, trait or protocol extension; a higher-order function, or a hook or helper module in a shared folder) earns that shape only when two or more units use it today. With one user it goes back next to that user, or, when that user would then break a simplicity or structure rule, into the repo's existing kind of unit for that logic.
 - A module exports the thing it is named for plus its own surface (its props, argument and return types). An unrelated export, such as a domain enum in a hook file, moves to where its consumers are; a type only this module uses stays.
 - New code acts on its home's subject. A method added to the order module creates, reads or changes orders; one that only prices a cart belongs with the cart.
-- One exported component per file. Its hooks and helpers move to their own files. A subcomponent with one consumer stays private in that consumer's file only while it is small (a few lines of markup); a bigger one gets its own file, and the unit's files share a folder named after it.
+- One exported component per file. Its hooks move to their own files, its helpers to the unit's helpers file. A subcomponent with one consumer stays private in that consumer's file only while it is small (a few lines of markup); a bigger one gets its own file, and the unit's files share a folder named after it.
 - A lookup object beats a `switch` or an `if` chain that maps a key to a value. Use thunks when the branches need per-branch work.
 - Exported APIs carry a short doc comment saying what they are for, not restating the signature.
 - Do not widen a package's public exports so a sibling package can reach an internal. Move the shared piece to a shared layer both consume.
@@ -75,6 +76,7 @@ The structure gate agent ticks every box below against the diff. A box is FAIL i
 - [ ] §S1 Separation of concerns: each unit (function, hook, component, module) has one observable responsibility; no data-reading unit also bundles a selector, formatter, or mutation; no util silently performs a side effect. (N/A: no multi-responsibility unit added)
 - [ ] §S2 Co-location/promotion: single-consumer code stays next to its consumer; multi-consumer code sits at the consumers' nearest common ancestor judged by scope/coupling, not raw count; view-local helpers are promoted only when a real external consumer appears (YAGNI-gated), not on speculation; inherently-shared-layer code is placed in its shared layer from day one regardless of current consumer count. (N/A: no files moved/added)
 - [ ] §S3 Single-file folders are flattened; no `export { default } from './X'` re-export barrels. (N/A: no folders/barrels touched)
+- [ ] §S20 Helpers, constants and types used by one unit sit in one `<unit>.utils` / `.constants` / `.types` file in the unit's folder; shared ones in a file named for their subject; no new or moved file holds a single helper or constant (`getFoo.ts`), and none is a bare `utils.ts`, `constants.ts` or `types.ts` in a unit's folder. (N/A: no helper, constant or type files added or moved)
 - [ ] §S4 No dead wrappers: single-item array wrap-then-spread, no-op async passthroughs, argument destructure-and-reconstruct passthroughs, single-use const aliases, verbatim object-spread, a producer value the consumer independently re-derives, promise-wrapping-a-promise, manual await-then-callback when the callee already accepts a callback, a hook or function returning an inner call's values unchanged (**enumerate**: for every changed hook, list the keys it returns and the keys it takes from inner hook calls; a key in both lists, untouched, is a passthrough), a wrapper whose only addition is an `onSuccess` or similar callback every caller could pass itself. (N/A: none added)
 - [ ] §S5 Lookup objects over `switch`/nested `if`: branch-selecting-a-value uses a named map, not a switch or if/else-if chain; differing per-branch computation is handled with a thunk map, not treated as an exemption; a trailing default/else becomes the map's fallback; more than one level of `if` nesting is flattened; the branch key, if derived from multiple booleans, is built from named single-level intermediates, never a chained ternary; a fix for one violation here doesn't introduce another (e.g. replacing the map with an if-early-return helper); map entries are plain values unless a value closes over a per-call argument or must be lazy, and the map is typed so its fallback is justified; every `switch`, `else if`, and value IIFE in the added lines (`switch-else-if-iife.sh`), and every nested `if` the indentation scan reports (`nested-ifs.sh`), is enumerated with a verdict. (N/A: only when both sweeps return 0 hits, stated as `grepped switch/else-if/IIFE: 0 hits` and `nested-if scan: 0 hits`)
 - [ ] §S6 Helpers placed by consumer count: a helper with exactly one consumer is not pulled into its own subfolder; a helper with two or more consumers is not left stranded in one consumer's local folder. (N/A: no helper added)
@@ -144,11 +146,9 @@ New code should follow the target repo's existing layout — grep for where simi
 
 **Cross-feature imports** (one feature importing directly from another feature's internals) are a placement smell in any codebase organized by feature — compose at a shared layer instead (boxed in the `react` skill, §R2, for React/TS diffs; for non-React code organized by feature folders, raise it under §S2 with the same compose-at-the-top fix).
 
-### §S3. Flatten single-file folders; no re-export barrels
+### §S3, §S20. File and folder shape
 
-**Single-file folders: flatten.** A folder containing exactly one file (no sub-components, no co-located hook, no helpers, no styles, no test) is dead structure — drop the folder, leave the file at the parent level. The folder earns its place the moment a second file appears alongside.
-
-**No `export { default } from './X'` re-export barrels.** A single-item `index.ts` that exists only to shorten an import path adds no value: it perpetuates the default-export anti-pattern (§S8) and the importer can resolve the actual file directly with one extra path segment. Either flatten the folder or have the importer reach the file directly. This is distinct from a real barrel that groups several already-declared named exports with intent — that earns its place; a barrel whose sole content is one re-exported default does not.
+The detail for these two boxes (single-file folders and barrels; where a unit's helpers, constants and types go and what their file is named) is in `${CLAUDE_PLUGIN_ROOT}/skills/kc-structure/references/files.md`. Read it in full before grading either.
 
 ### §S4. No dead wrappers
 
@@ -410,7 +410,7 @@ A home (a module, a resource, a folder, a file) is named for one subject, and it
 A component file that exports several components (or exports cells, hooks and style constants so another component can reuse them) is the usual result of a refactor, not of a new file. Split it by kind, the way the repo already places each kind:
 
 - each exported component gets its own file, named after it; the files can share a folder named after the parent component (`widget-table/widget-table.tsx`, `widget-table/widget-table-head.tsx`), imported by path with no barrel (§S3);
-- hooks and helpers move out of the component file into their own files, placed by §S2 and §S11;
+- hooks move out of the component file into their own files and helpers into the unit's `<unit>.utils` file (§S20), placed by §S2 and §S11;
 - a subcomponent with a single consumer stays private in that consumer's file only while it is small, a few lines of markup; a bigger one (its own state, handlers or a screenful of markup; the form a drawer opens is the usual case) gets its own file beside the parent in the unit's folder, so each file reads as one component;
 - no thin file: a component that only wraps one value or element is inlined where it is used.
 

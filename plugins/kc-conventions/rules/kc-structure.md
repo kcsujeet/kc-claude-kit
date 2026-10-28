@@ -11,6 +11,7 @@ Where code lives is part of its contract. A path promises something about what i
 - One observable responsibility per unit. A directory name is a promise: `hooks/` contains hooks, `utils/` contains pure functions.
 - Co-locate with the single consumer. Promote at the second consumer: within a feature, to the nearest common ancestor; across features, to the shared app level, never sideways into another feature.
 - Flatten a folder that holds one file. `Foo/Foo.tsx` with no siblings is just `Foo.tsx`.
+- A unit's own helpers share one file named for the unit, `<unit>.utils.ts` beside it (likewise `.constants`, `.types`); shared helpers sit in a file named for their subject. Never a file per function or constant, and never a bare `utils.ts`, `constants.ts` or `types.ts` in a unit's folder: it scatters one unit's logic, and the repeated name makes search and tabs useless.
 - No barrel re-export files. Import the module path directly, which also keeps tree shaking working. A barrel for a single component is fine.
 - Named exports on new files, declared inline (`export const foo = ...`), not collected in a trailing export block.
 - A file the change moves or renames is new code: it meets every rule a new file does (named exports, a doc comment on what it exports, relative imports within its folder, a name and a place that match similar code), even where the old file did not.
@@ -19,7 +20,7 @@ Where code lives is part of its contract. A path promises something about what i
 - Code built or placed for reuse (a mixin, concern, trait or protocol extension; a higher-order function, or a hook or helper module in a shared folder) earns that shape only when two or more units use it today. With one user it goes back next to that user, or, when that user would then break a simplicity or structure rule, into the repo's existing kind of unit for that logic.
 - A module exports the thing it is named for plus its own surface (its props, argument and return types). An unrelated export, such as a domain enum in a hook file, moves to where its consumers are; a type only this module uses stays.
 - New code acts on its home's subject. A method added to the order module creates, reads or changes orders; one that only prices a cart belongs with the cart.
-- One exported component per file. Its hooks and helpers move to their own files. A subcomponent with one consumer stays private in that consumer's file only while it is small (a few lines of markup); a bigger one gets its own file, and the unit's files share a folder named after it.
+- One exported component per file. Its hooks move to their own files, its helpers to the unit's helpers file. A subcomponent with one consumer stays private in that consumer's file only while it is small (a few lines of markup); a bigger one gets its own file, and the unit's files share a folder named after it.
 - A lookup object beats a `switch` or an `if` chain that maps a key to a value. Use thunks when the branches need per-branch work.
 - Exported APIs carry a short doc comment saying what they are for, not restating the signature.
 - Do not widen a package's public exports so a sibling package can reach an internal. Move the shared piece to a shared layer both consume.
