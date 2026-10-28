@@ -72,10 +72,12 @@ Each state above can look right while the path into it is broken. QA by a person
 - **Switch context mid-page.** Change the current tenant, workspace or account while on each changed page. Every panel follows, with no reload; a record that belongs to the previous context shows a clear not-found, not a blank or half-loaded page.
 - **Go where the write shows up.** After each create, edit, archive or delete, visit every other screen that shows something derived from it (a list, a count, a badge, a picker on another page) without reloading, and check it changed, and that it didn't appear where its filters exclude it.
 - **Use the records real data holds.** Include records the new screens can no longer create: blank optional fields, old links, defaults from before a migration. Then try the new actions next to them (create one more, link, delete).
+- **Keep archived records around.** Archive, deactivate or soft-delete one of each kind the screen counts or lists, then check every count, list and picker leaves it out unless it says otherwise.
+- **Cross the tenant line.** View a record linked to records in another tenant or workspace from this one: the others show by name or not at all, never as raw ids, and can't be changed from here.
 - **Do each interaction twice.** Search, pick, search again, pick again; add, remove, add; open, close, reopen. State that survives one pass often breaks on the second.
-- **Clear every field you can edit, and save.** Expect a message on the field, or a sensible default, never a generic error.
+- **Clear every field you can edit, and save; then enter an invalid value and save.** Expect a message on the field, or a sensible default, never a generic error.
 - **Discard every kind of change.** In each section with Save and Discard, change a field, pick a file and remove a file, then Discard. The saved record is unchanged after a reload, with no request sent before Save.
-- **Read every confirmation against what happens.** After confirming, check the result matches the words: "remove" that deletes, or "delete" that only unlinks, is a finding.
+- **Read every confirmation against what happens.** After confirming, check the result matches the words: "remove" that deletes, or "delete" that only unlinks, is a finding. Read alerts and helper text the same way, as the user would: plain words, no internal terms, no stray spaces around an inserted value.
 - **See signed-in state everywhere it shows.** Sign in from each entry point, then check every surface that shows who is signed in, and what a signed-in person should and shouldn't see.
 - **Fill it past the screen.** Make a list or page taller than the viewport and check the background, footer and scrolling hold.
 - **Start from a fresh record.** Create the thing through the UI and take it through the whole flow it exists for. When a result looks wrong, check the inputs before calling it a bug: a total of zero explains a skipped payment.
@@ -129,8 +131,10 @@ Do not report a UI change verified until every box is ticked:
 - [ ] Each changed page was re-checked after switching the current tenant or workspace on it, with no reload.
 - [ ] After each write, every other screen showing data derived from it (lists, counts, badges, pickers) was visited without a reload, including filtered ones it must not appear in.
 - [ ] Records in states the new UI can't create (blank optional fields, old links, pre-migration defaults) were used next to the new actions.
+- [ ] Archived, deactivated and soft-deleted records were checked out of every count, list and picker.
+- [ ] A record linked to another tenant's records was viewed from this tenant: no raw ids, nothing of theirs editable.
 - [ ] Each interaction was done twice in a row (search and pick twice; add, remove, add).
-- [ ] Every editable field was cleared and saved, and every confirmation's words were checked against what actually happened.
+- [ ] Every editable field was cleared and saved, and saved with an invalid value; every confirmation's words were checked against what actually happened, and every alert read for plain wording.
 - [ ] In each section with Save and Discard, a field change, a picked file and a removed file were each discarded, and the saved record was unchanged after a reload.
 - [ ] Each create form was submitted for every option that changes it, and the new record's landing state (on or off, sections shown) was compared with the design.
 - [ ] Signed-in state was checked on every surface that shows it, after signing in from each entry point.
