@@ -117,6 +117,8 @@ One line per surface: what you looked at, in which configurations, and what you 
 
 Finish with what you did not check and why.
 
+A QA pass on something already shipped ends at the report: change no code until the findings are triaged with the user, each one sorted into a bug or a question for the team, then into a fix now (a hotfix) or a ticket for later, with what introduced it checked in history. A remark about one finding during that talk ("this should be X") is input to the triage, not a go-ahead to build X while the rest are untriaged.
+
 ### Step 6b — a walkthrough for others (a video of how to test)
 
 When the evidence is for someone who doesn't know the change (a tester, the reporter, a reviewer), it must explain itself without you there. Before a change goes to review, its ticket gets a **How to test** section at the end of the description, written for someone who has never seen it: links to the change's pull requests (with the merge order when one depends on another), the setup, the cases as numbered steps with what to expect, and the walkthrough video embedded under them. Append it without rewording the rest of the description. Write the setup for the team's usual local environment (the hostnames and commands everyone runs), in the pull request's How to test too, never the ports, worktrees or server entries of your own session: a reader can't follow `localhost:3014` and a CORS override they don't run.
@@ -166,6 +168,7 @@ Do not report a UI change verified until every box is ticked:
 - [ ] Narrow viewport, the other theme and a keyboard pass were done, or the report says why not.
 - [ ] Every UI fix was seen fixed in a browser before it was reported done or anyone was told it is fixed.
 - [ ] The report lists each state checked, each finding with the state that produces it, and what was not checked.
+- [ ] After a QA pass on shipped work, no code changed until the user agreed which findings are bugs, which are questions, and which go in a hotfix versus a ticket.
 - [ ] Before review, the ticket's description ends with a How to test section (PR links, setup, numbered cases, expected results) and the walkthrough: a short MP4, not a GIF, that opens with the setup, captions each case with its state and expected result, and boxes and labels what to look at.
 - [ ] The How to test setup, on the ticket and the pull request, is the team's usual local environment, with no port, worktree or server entry from your own session.
 - [ ] The walkthrough is in the product's main device aspect ratio (16:9 for a laptop product, portrait only for a phone ticket), every frame the same size.
