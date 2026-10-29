@@ -109,6 +109,15 @@ One line per surface: what you looked at, in which configurations, and what you 
 
 Finish with what you did not check and why.
 
+### Step 6b — a walkthrough for others (a GIF or video of how to test)
+
+When the evidence is for someone who doesn't know the change (a tester, the reporter, a reviewer), it must explain itself without you there:
+
+- **Open with the setup**: the data each case needs, the switch or setting and where it lives, and the checks in order.
+- **One case per frame or clip, captioned** with the state ("Flag on, record not archived") and the expected result in one sentence.
+- **Box what to look at.** A red outline around the part that changes, with a short label inside it ("Archived item hidden"). Where the change is something missing, box what remains and say so ("Only the open item shows").
+- **Show that it moves.** A GIF gets a progress bar along the bottom, filling over the whole loop, and a quick pace (about 3–4 seconds a case). A still first frame with no bar reads as an image, and people stop watching.
+
 ## Tools
 
 Use whatever the project already has: a browser tool if one is connected, the project's own screenshot or visual-regression setup, a simulator, or a dev server plus a manual look. Do not install a new visual testing framework to satisfy this skill; the point is to look at the screen, not to build an apparatus for looking at screens.
@@ -143,3 +152,4 @@ Do not report a UI change verified until every box is ticked:
 - [ ] Narrow viewport, the other theme and a keyboard pass were done, or the report says why not.
 - [ ] Every UI fix was seen fixed in a browser before it was reported done or anyone was told it is fixed.
 - [ ] The report lists each state checked, each finding with the state that produces it, and what was not checked.
+- [ ] A walkthrough GIF or video for others opens with the setup, captions each case with its state and expected result, boxes and labels what to look at, and (a GIF) shows a progress bar at a 3–4 second pace.
