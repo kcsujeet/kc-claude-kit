@@ -109,14 +109,14 @@ One line per surface: what you looked at, in which configurations, and what you 
 
 Finish with what you did not check and why.
 
-### Step 6b — a walkthrough for others (a GIF or video of how to test)
+### Step 6b — a walkthrough for others (a video of how to test)
 
 When the evidence is for someone who doesn't know the change (a tester, the reporter, a reviewer), it must explain itself without you there:
 
 - **Open with the setup**: the data each case needs, the switch or setting and where it lives, and the checks in order.
 - **One case per frame or clip, captioned** with the state ("Flag on, record not archived") and the expected result in one sentence.
 - **Box what to look at.** A red outline around the part that changes, with a short label inside it ("Archived item hidden"). Where the change is something missing, box what remains and say so ("Only the open item shows").
-- **Show that it moves.** A GIF gets a progress bar along the bottom, filling over the whole loop, and a quick pace (about 3–4 seconds a case). A still first frame with no bar reads as an image, and people stop watching.
+- **Make it a video, not a GIF.** A GIF can't be paused or scrubbed, and a still first frame reads as an image, so people stop watching. Build a short MP4 (H.264, `yuv420p`, `+faststart`) with each frame held for a set time (about 5 seconds a case, 6 for the setup); the player's own controls let people pause on a case. With `ffmpeg`, give each image its own `-loop 1 -t <seconds>` input and join them with the `concat` filter: the concat demuxer's `duration` lines cut the first image short.
 
 ## Tools
 
@@ -152,4 +152,4 @@ Do not report a UI change verified until every box is ticked:
 - [ ] Narrow viewport, the other theme and a keyboard pass were done, or the report says why not.
 - [ ] Every UI fix was seen fixed in a browser before it was reported done or anyone was told it is fixed.
 - [ ] The report lists each state checked, each finding with the state that produces it, and what was not checked.
-- [ ] A walkthrough GIF or video for others opens with the setup, captions each case with its state and expected result, boxes and labels what to look at, and (a GIF) shows a progress bar at a 3–4 second pace.
+- [ ] A walkthrough for others is a short MP4, not a GIF: it opens with the setup, captions each case with its state and expected result, and boxes and labels what to look at.
