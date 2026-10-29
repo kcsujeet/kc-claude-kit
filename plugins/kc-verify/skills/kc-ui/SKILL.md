@@ -119,6 +119,7 @@ The walkthrough:
 - **One case per frame or clip, captioned** with the state ("Flag on, record not archived") and the expected result in one sentence.
 - **Box what to look at.** A red outline around the part that changes, with a short label inside it ("Archived item hidden"). Where the change is something missing, box what remains and say so ("Only the open item shows").
 - **Make it a video, not a GIF.** A GIF can't be paused or scrubbed, and a still first frame reads as an image, so people stop watching. Build a short MP4 (H.264, `yuv420p`, `+faststart`) with each frame held for a set time (about 5 seconds a case, 6 for the setup); the player's own controls let people pause on a case. With `ffmpeg`, give each image its own `-loop 1 -t <seconds>` input and join them with the `concat` filter: the concat demuxer's `duration` lines cut the first image short.
+- **Embed it as a player, and see it play.** Trackers render an attached video either as a block player or as an inline file chip, and the chip often won't play. A connector's "append this file inline" option tends to produce the chip, so write the block media node yourself, copying one from a ticket whose video already plays. Then have someone signed in open the ticket and press play before it goes to review: a successful upload says nothing about playback.
 
 ## Tools
 
@@ -155,3 +156,4 @@ Do not report a UI change verified until every box is ticked:
 - [ ] Every UI fix was seen fixed in a browser before it was reported done or anyone was told it is fixed.
 - [ ] The report lists each state checked, each finding with the state that produces it, and what was not checked.
 - [ ] Before review, the ticket's description ends with a How to test section (PR links, setup, numbered cases, expected results) and the walkthrough: a short MP4, not a GIF, that opens with the setup, captions each case with its state and expected result, and boxes and labels what to look at.
+- [ ] The walkthrough is embedded as a block player, not an inline file chip, and was seen playing on the ticket.
