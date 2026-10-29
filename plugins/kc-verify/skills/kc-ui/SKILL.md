@@ -12,7 +12,7 @@ So look at it. Once, deliberately, before saying it is done.
 ## Hard rules
 
 - **Never report a UI change complete without having seen it.** "The tests pass" is not the same claim and must not be presented as one.
-- **The browser check is not optional.** It is part of fixing a UI bug, the same as the code change: never offer it as a choice or a follow-up ("QA first, or post as is?"), and never tell a tester or reviewer something is fixed before you have seen it fixed. If the dev servers are down, start them; if a sign-in only the user can do stands in the way, ask for it, and until then nothing is called fixed.
+- **The browser check is not optional.** It is part of fixing a UI bug, the same as the code change: never offer it as a choice or a follow-up ("QA first, or post as is?"), and never tell a tester or reviewer something is fixed before you have seen it fixed. If the dev servers are down, start them; if a sign-in stands in the way, use the project's dev-only sign-in (Step 2), and only where it has none, ask the user for theirs. Until then nothing is called fixed.
 - **Report what you did and what you saw**, screen by screen. Not "verified the layout" but "narrow viewport, dark mode: the invoice total wraps under the button".
 - **Keep the failure.** If a state renders wrong, that is the finding. Do not adjust the data until it looks fine and then call it passing.
 - **Realistic data or nothing.** `Lorem ipsum`, `Test User`, and a three-row list prove only that the happy path with short strings works. Production has 400 rows, names with diacritics, and a description that runs four lines.
@@ -51,6 +51,14 @@ A design is not a pixel spec for things the app already has a pattern for. Title
 Use the project's seed or fixture path if it has one. Otherwise construct data that is deliberately awkward: a long name, an empty collection, a large collection, a zero amount, a negative amount, a missing optional field, a non-Latin string.
 
 The point is not coverage for its own sake. Every one of those is a shape that has broken a layout before.
+
+Sign in as a seeded local user without anyone's password. When sign-in goes through an outside identity provider, a check that waits on the user's password stalls every time a dev server restarts or runs on a new port: browser sessions and cookies are kept per origin. Look for a credential the local backend can mint itself, often an auth strategy it already accepts (an API key, a signed token) that only tests create. Have the frontend send it only in its development mode. If the project has no such path, propose one before building it, guarded at every layer:
+
+- The secret signing the credential exists only in development, so staging and production reject it.
+- The mint command refuses to run outside the development environment.
+- The frontend reads it behind a compile-time development check, so production builds drop it.
+- The build fails if the variable is set for a production build, rather than ignoring it.
+- The credential lives in the process environment, never in a committed file or in chat.
 
 ### Step 3 — walk the states
 
@@ -132,6 +140,7 @@ If nothing is available and you genuinely cannot see the UI, say that plainly an
 Do not report a UI change verified until every box is ticked:
 
 - [ ] Every surface the diff reaches is listed, including other consumers of shared components.
+- [ ] The app was signed in through the project's dev-only credential, not someone's password; where it has none, the guarded path was proposed, and the user signed in only until it exists.
 - [ ] When the work spans several branches or pull requests, the list covers every screen any of them changes, not only the one being worked on now.
 - [ ] If a design exists, the state matrix is written from it, covering every switch in both positions, every layout-changing option, every role, empty/one/many, and every drawer and dialog.
 - [ ] Every drawer and dialog was opened and filled in: empty, one item picked, several picked, and editing an existing item.
