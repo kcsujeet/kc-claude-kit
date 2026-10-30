@@ -18,6 +18,10 @@ A lesson arrives as one case; the rule is the habit that catches the whole class
 - State the principle at the widest scope it holds, and keep the case as one example among several ("a list, table, picker, search or count").
 - Examples show the idea in plain code a reader of any stack can follow.
 
+## Lessons
+
+Lessons arrive from the maintainer's other work: a correction, a review comment or a QA finding that would have been caught by a habit. Each becomes its own PR here, written to the two sections above, and is merged once its checks pass, so installs get it on their next update.
+
 ## Before a PR
 
 Run `/kc-gates:kc-ready-for-review`: it walks `.claude/hand-off-checklist.md`, which checks the two sections above and the version bump.

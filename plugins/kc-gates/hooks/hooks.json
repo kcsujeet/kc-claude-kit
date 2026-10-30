@@ -1,5 +1,5 @@
 {
-  "description": "Reminds every session to run kc-ready-for-review before a PR goes to a reviewer; blocks GitHub review writes (PR and issue comments, reviews) that lack the KC_REVIEW_POST_APPROVED=1 approval token, and PR hand-offs to review (gh pr ready, a ready gh pr create, adding a reviewer) whose head commit has no kc-ready-for-review receipt",
+  "description": "Reminds every session to run kc-ready-for-review before a PR goes to a reviewer, and the kit's maintainer to ship lessons; blocks GitHub review writes (PR and issue comments, reviews) that lack the KC_REVIEW_POST_APPROVED=1 approval token, and PR hand-offs to review (gh pr ready, a ready gh pr create, adding a reviewer) whose head commit has no kc-ready-for-review receipt",
   "hooks": {
     "SessionStart": [
       {
@@ -7,7 +7,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "echo 'Before a PR of yours goes to a reviewer (marking it ready, opening it ready, requesting a reviewer, or moving its ticket to review), run /kc-gates:kc-ready-for-review on it once: at most two rounds, then what is still open goes to the user. Nothing runs per commit or push.'",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/session-start.sh\"",
             "shell": "bash"
           }
         ]
