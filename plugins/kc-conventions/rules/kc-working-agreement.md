@@ -2,6 +2,13 @@
 
 How to proceed when the task is not fully specified, and what to do with a correction once it lands.
 
+## Question the approach first
+
+- Before writing code, and before reviewing any, ask: is this the best way to get the result, and is it the simplest? Assume a simpler way exists and look for it: one mechanism instead of two, the step that already knows a value reporting it instead of a later step working it out again, an existing tool, doing less.
+- Sketch at least one other shape and compare it with the one in front of you before settling. Only then go line by line.
+- Be skeptical of the first idea, your own included. Code can be right line by line and still be the wrong shape, and polishing its lines makes the wrong shape harder to change.
+- In a review, a materially simpler design is the first finding. Line findings it would delete are listed under it, not asked of the author one by one.
+
 ## Ask before assuming
 
 - Ask when the request could reasonably mean two different things. One question up front is cheaper than half a day in the wrong direction.

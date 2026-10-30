@@ -12,6 +12,7 @@ The correctness gate hunts bugs on every diff. The other gates catch what slips 
 ## Hard rules
 
 - **Failing even ONE checklist item is worth raising.** Many rules are expressed as a checklist of failure modes (e.g. a ternary rule listing nested / long / multi-line / non-trivial-branch as independent failure modes). A code item that trips a *single* box is a finding. Do NOT wait for two or three boxes to fail, and do NOT decide "it's only one of the conditions, that's fine." Walk each box independently and raise on the first failure. (Severity still calibrates per the rubric below; "worth raising" can be a 🟡, but it gets raised.) The recurring miss is pattern-matching a rule to its example domain, e.g. reading a "ternary" rule as "JSX ternaries only" and skipping a multi-line *value* ternary, so apply each checklist to every matching construct, not just the ones that look like the example.
+- **Question the approach before the lines.** Before any line-level finding, read the goal (the linked issue, the description) and the diff as a whole, and ask whether this is the simplest way to get that result. Assume a simpler shape exists and look for it (one mechanism where the diff runs two side by side, the step that already knows a value reporting it instead of a later pass recomputing it, an existing tool, doing less). A line-by-line review of the wrong design is a polished wrong design: it hands the author fifteen fixes to code that should be deleted. See §G5.
 - **Apply DRY, YAGNI, and KISS as a standing lens on every diff, not just the specific checklists.** Evaluate every change against three questions and surface a finding whenever the answer is "no", with the same any-finding-fails weight as any other rule:
   - **DRY**: is any logic, value, literal, or markup duplicated that should be a single source? A copied block, a re-declared constant, a re-implemented helper.
   - **YAGNI**: is there speculative or unused code? Unused params/props, an abstraction with a single caller built for a hypothetical second one, config options nothing passes, dead branches, a generality the diff doesn't use.
@@ -65,6 +66,7 @@ If a script fails, relay its message; fall back to the equivalent `gh`/`git` com
 - [ ] §G2 The diff does only what its title and description say. Out-of-scope work (an unrelated refactor, removed public surface, a new abstraction, a bundled feature or option) is one finding asking to split the PR, naming which commits belong in which PR; it is not reviewed silently as if it were in scope. (N/A: never; every target has a stated purpose, even if it is only a branch name)
 - [ ] §G3 Every linked issue was read in full (the `issue-<n>.md` files `scope-facts.sh` saved, and its `pr-body.md`), and each constraint it states ("no public API change", "must work offline") is checked against the diff; a violated constraint is a finding that cites the issue. (N/A: no linked issue)
 - [ ] §G4 A diff too large to read in one pass (roughly 35KB or more) was read from the saved file in offset/limit chunks, every chunk; no hunk was skimmed. The gate agents get the saved path, not a truncated paste. (N/A: the diff was read whole)
+- [ ] §G5 The approach was questioned before the lines. The orchestrator wrote down the result the change is after, then at least one other way to get it, and compared them: fewer mechanisms, fewer places that know the same thing, less code. When another way is materially simpler, it is one design finding that leads the report and any drafted comment, and the line findings it would delete are folded under it instead of listed as separate asks. Evidence: the goal in one line, the alternative considered, and why it is or is not simpler. (N/A: never; even a one-line change has a goal another shape could meet)
 
 ### Step 2: dispatch the gate agents in two phases (mandatory: ALL gates, EVERY round)
 
@@ -162,6 +164,8 @@ Report directly in chat. No file output. **Be terse.** The reader is the user, n
 ### Review: <PR title>
 **Head:** `<short-sha>` · **Verdict:** ✅ PASSED | ❌ FAILED (<n> gate(s) failing)
 
+**Approach:** <one line: the simpler design and the line findings it replaces, or "no simpler shape found: <the alternative weighed>">.
+
 **Gate status:** (one row per gate, every round)
 | Gate | Status |
 |------|--------|
@@ -192,7 +196,7 @@ Report directly in chat. No file output. **Be terse.** The reader is the user, n
 
 **Checklist:** (one line per applicable trigger group, per the verification gate's "How to use this in the output": a cited receipt, or `n/a, diff does not touch X`)
 - Always: <files read at sha, findings cite file:line + sha, nothing posted to GitHub>.
-- Scope: <§G1-§G4 results, e.g. "not stacked (author has no other open PR); title matches; no linked issue; diff read whole">.
+- Scope: <§G1-§G5 results, e.g. "not stacked (author has no other open PR); title matches; no linked issue; diff read whole; approach: weighed one grouping step for both cases, the diff's two are needed because <reason>">.
 - <trigger group>: <receipt, or "n/a, diff does not touch X">.
 - Integrity: <n> fixes re-checked; <n> rewrites checked; <n> findings, <n> verified, <n> dropped.
 
