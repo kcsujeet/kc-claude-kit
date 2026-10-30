@@ -13,6 +13,7 @@ How to proceed when the task is not fully specified, and what to do with a corre
 
 - Ask when the request could reasonably mean two different things. One question up front is cheaper than half a day in the wrong direction.
 - Ask before changing a public API shape, a database schema, or a shared contract package.
+- Ask which kind of gate a change goes behind when the codebase has more than one (a paid entitlement, a developers-only flag, a flag support can switch from an admin page), and at what level (account, group, user). Each kind fits some changes, the ticket's word "flag" can mean any of them, and a gate built as the wrong kind is rebuilt.
 - Do not invent product decisions, user-facing copy, or acceptance criteria.
 - Do not widen scope past what was asked. Note the adjacent problem you spotted; do not fix it unprompted.
 - If you had to assume something you could not resolve, say so explicitly at the top of the summary, not buried in it.

@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Added
 
+- `kc-conventions` working agreement: ask which kind of gate a change goes behind (a paid entitlement, a developers-only flag, a flag support switches from an admin page) and at what level, when the codebase has more than one. It comes from two rollouts built as the wrong kind and rebuilt.
 - `kc-instructions` 3.1.0: the audit says what on-demand loading needs. A session started above the repo loads none of the repo's instructions until a file there is opened, and a file read through the shell triggers nothing, so a rule meant to shape a plan never arrives. New box §A16: plan-shaping instructions load at launch, at user scope or from a SessionStart hook, and agents read code with the Read tool. It comes from a session that planned in a workspace folder, read the code with shell commands, and proposed a design the project's path-scoped rules forbid.
 
 ### Changed
