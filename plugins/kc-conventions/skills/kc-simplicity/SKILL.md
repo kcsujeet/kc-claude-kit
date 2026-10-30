@@ -27,11 +27,13 @@ paths:
   - §P14. Handle the states the data can be in, not the ones a comment says it once was
   - §P14. A caller the convention misses passes the value, not a smarter guess
   - §P15. Deferred work is done when its condition is met
+  - §P16. The shape of the whole change is the simplest that works
 
 ## Rules
 
 The simplest code that does the job is the easiest to read, change and delete. Every construct earns its place.
 
+- Question the approach before the lines, whether writing the change or reviewing it. Ask whether this is the simplest way to get the result, assume a simpler one exists, and look for it: one mechanism instead of two side by side, the step that already knows a value reporting it instead of a later step working it out again, an existing tool, doing less. Line-level polish on the wrong shape only makes it harder to change.
 - DRY is about knowledge: a rule, a format, an API call or a meaningful value has one source. Code that only looks alike is not duplication.
 - A helper earns its place by carrying knowledge its callers should not hold (an API call, a data format or conversion, a domain rule, several steps), or by wide use. One plain expression (a `find` by id, a filter plus a sort, a one-field object) stays inline, even with two callers.
 - YAGNI: no speculative code. No param, prop or config option that nothing passes, no abstraction built for a hypothetical second caller, no dead branch. A generality the change does not use is removed, even if it might be needed later.
@@ -66,6 +68,7 @@ The simplicity gate agent ticks every box against the diff. A box is FAIL if any
 - [ ] §P14 Every new branch, fallback or exception for a data state (blank, missing, legacy shape) cites evidence that the state can still occur: the writer that can still produce it, or a data query. A state that create-time defaults, validations or a completed backfill rule out FAILS; handle it in the backfill or the validation instead. (N/A: no new branch for a data state)
 - [ ] §P14 A value a shared unit derives by convention (a name built from another name, a default read from a string pattern) is not made cleverer for one caller it gets wrong (pluralization rules, another regex, a special case); that caller passes the value through an optional override, and every other caller keeps the old default. (N/A: no derived value changed or worked around in the diff)
 - [ ] §P15 Deferred work is done when its condition is met: grep the repo for the markers of the work this diff finishes (its feature or phase name, `once`, `after`, `remove when`); each one whose condition the diff meets FAILS unless the diff removes the code it guards. Each one left in place states what it still waits on. (N/A: the diff finishes no deferred work)
+- [ ] §P16 The shape of the whole change is the simplest that works: state the result the diff is after, then at least one other way to get it, and compare. A diff that runs two mechanisms for one job (two storage shapes, two lookups, a branch on a mode through every step), recomputes downstream what an earlier step already knew, or adds a layer an existing one could carry FAILS when the other way is materially simpler, and the finding describes that shape in a sentence or a short sketch. Line findings that shape would delete go under this one, not beside it. (N/A: never; even a one-line change has a goal another shape could meet)
 
 ## Review detail
 
@@ -305,6 +308,15 @@ Old comments outlive the data they describe: "the first store may have no name o
 ### §P15. Deferred work is done when its condition is met
 
 A change that ships in steps leaves markers behind: `// TODO: drop once the old checkout is gone`, a field kept "until the frontend reads the new one", a column ignored "until the next deploy". They are promises, and they are kept only if the step that meets the condition looks for them. When a step finishes (the old checkout is deleted, the frontend switched), grep for the markers that name it and remove the code they guard in the same change. At the end of the whole effort, sweep every marker it left; one that stays says plainly what it is waiting for (a production run, a deploy), so the next reader knows when it can go.
+
+
+### §P16. The shape of the whole change is the simplest that works
+
+Every other box here looks at one construct. This one looks at the change from above, and it comes first: a reviewer who starts line by line can list fifteen correct findings against code that a different shape would have deleted, and the author fixes all fifteen and keeps the wrong design.
+
+Example: a change made an order list group items more precisely. It added a second grouping method beside the existing one, a flag choosing between them at each step, and a pass after grouping that worked out per-day counts again from the grouped result. The existing method could already take the precise boundaries, so one method served both cases, and the grouping step already knew the counts as it placed each item. A review that went straight to lines flagged ternaries, names and duplicated arithmetic in code the simpler shape removes.
+
+The same question applies before writing: sketch two shapes and pick the smaller before the first line.
 
 ## Sweeps
 

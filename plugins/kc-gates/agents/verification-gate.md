@@ -20,7 +20,7 @@ This applies identically to two scenarios:
 The dispatch prompt gives you:
 
 - every phase-1 gate's returned verdict block, verbatim (naming, clarity, structure, simplicity, datetime, react, rails, i18n, testing, correctness, project-conventions);
-- the orchestrator's `SCOPE:` block (§G1-§G4);
+- the orchestrator's `SCOPE:` block (§G1-§G5);
 - on a re-review, the orchestrator's classification of each carried-over finding (fixed, declined-with-reason, still open);
 - the head SHA, the path to the saved unified diff file, and the changed-file list, so you can tell which trigger groups the diff hits.
 
@@ -60,7 +60,7 @@ For §V2, list which trigger groups applied and cite each group's receipt, or it
 - [ ] §V4 Every finding whose claim rests on the behavior of a library, platform, or external API cites the documentation fetched (or the installed source read) this session; a behavioral claim from memory FAILS. (N/A: no finding depends on external behavior)
 - [ ] §V5 On a re-review, a prior finding is marked fixed only when the construct is gone; a construct that was renamed, moved to another file, or re-wrapped is still open and is re-raised citing the prior comment. (N/A: first round, or no prior finding)
 - [ ] §V6 A finding the author defended as intentional is not marked resolved on the claim alone; when it concerns observable behavior or layout, the review cites a run, a visual check, or a concrete numeric walkthrough showing the intended result actually works. (N/A: no finding was defended)
-- [ ] §V7 The orchestrator's `SCOPE:` block is present and walks §G1-§G4 from the kc-code-review skill's Step 1 one box at a time, each with evidence (the command run or the issue quoted) or its N/A reason; a missing block or a box with no evidence FAILS. (N/A: never; every review has a scope)
+- [ ] §V7 The orchestrator's `SCOPE:` block is present and walks §G1-§G5 from the kc-code-review skill's Step 1 one box at a time, each with evidence (the command run or the issue quoted) or its N/A reason; a missing block or a box with no evidence FAILS. (N/A: never; every review has a scope)
 - [ ] §V8 Fixes and rewrites were re-checked: on a re-review, code verified as fixed this round was walked against every gate's checklist like any new line (`<n> fixes re-checked`), and every rewrite a gate proposed in a finding passes every gate's checklist itself, not only the rule that surfaced it (`<n> rewrites checked`). (N/A: first round with no proposed rewrite)
 
 ---
@@ -181,7 +181,7 @@ When the author replies that a flagged change was deliberate (in the description
 
 ## §V7. The scope checks were walked
 
-The orchestrator walks §G1-§G4 in the kc-code-review skill's Step 1 itself, because they concern the target as a whole rather than one topic. This box confirms the `SCOPE:` block exists and has per-box evidence: the author's other open PRs from `scope-facts.sh` for stacking, the title set against the diff's areas, the linked issue quoted (or "no linked issue"), the diff size and how it was read. A scope check reported as "scope fine" with no per-box line fails, the same as an aggregated receipt under §V3.
+The orchestrator walks §G1-§G5 in the kc-code-review skill's Step 1 itself, because they concern the target as a whole rather than one topic. This box confirms the `SCOPE:` block exists and has per-box evidence: the author's other open PRs from `scope-facts.sh` for stacking, the title set against the diff's areas, the linked issue quoted (or "no linked issue"), the diff size and how it was read, and for §G5 the goal, the alternative weighed and the comparison. An approach box that names no alternative fails: "approach looks fine" is the line-by-line review this box exists to stop. A scope check reported as "scope fine" with no per-box line fails, the same as an aggregated receipt under §V3.
 
 ## §V8. Fixes and rewrites are re-checked
 
@@ -198,7 +198,7 @@ Example (generic file names):
 ```
 **Checklist:**
 - Always: read widget-form.tsx, widget-list.tsx, widget-actions.ts at abc1234; findings cite file:line + abc1234; nothing posted to GitHub.
-- Scope: §G1 author has no other open PR; §G2 title "Add widget filters" matches the diff; §G3 issue #12 read, constraint "no API change" holds; §G4 diff 14KB, read whole.
+- Scope: §G1 author has no other open PR; §G2 title "Add widget filters" matches the diff; §G3 issue #12 read, constraint "no API change" holds; §G4 diff 14KB, read whole; §G5 goal "filter widgets by status", weighed filtering in the existing list query instead of a second client-side pass, the diff already does that.
 - Locale: per-key audit below.
   - shared.json:L14: `total` = "Total" | namespace: ok (shared), plural: n/a (label), dupe: none, naming: matches value
   - widgets.json:L9: `widgetCount` = "Widgets" | namespace: FLAG generic noun → shared.json, plural: FLAG baked-plural → ICU, dupe: none, naming: matches value
