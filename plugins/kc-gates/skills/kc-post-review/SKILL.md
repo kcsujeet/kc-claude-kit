@@ -22,7 +22,7 @@ Before producing the first draft, paste this checklist in chat with each box exp
 - [ ] Courtesy, in the user's own voice: plainly say what is hard or wrong, then what would help, the way a person would say it out loud. There is no stock opener: not "Could we", not "Worth", not "Would be better", not any phrase used as a formula. Read the drafts side by side; if two open or are built the same way, rewrite one. Ask a question only when it is a real question. No bare command as the opener (`Drop`, `Rename`, `Move`, `Use`, etc.). Politeness is non-negotiable; brevity does not excuse curtness, and the label (`issue` / `chore` / `suggestion`) already signals the weight.
 - [ ] Plain words: no press-release or trailer phrasing (`demonstrably`, `a real fix`, `worth shipping on its own`, `well-scoped`, `robust`, `elegant`). Read each draft aloud; if it sounds like an announcement, rewrite it as the plain statement (`fixes the bug`, `this breaks when X`).
 - [ ] Simple words, checked not felt: reread each draft as its author would. No hard or technical words, no sentence over about 25 words, and the author never has to open the code to follow it (see "Tone rules").
-- [ ] Proof fits the reader: proof (steps, error text, repro, example) only when asked for, when the reader will use it, or to back up a review point; otherwise just the result. No greeting or emoji opener, no bold list labels, messages people read in quotes rather than backticks, no closing line that repeats the point (see "Tone rules").
+- [ ] Proof fits the reader: proof (steps, error text, repro, example) only when asked for, when the reader will use it, or to back up a review point; otherwise just the result. No greeting, and no emoji anywhere in a comment or reply (opener, close or mid-sentence), no bold list labels, messages people read in quotes rather than backticks, no closing line that repeats the point (see "Tone rules").
 - [ ] Worth a comment: small nits are left out of the draft set (see "Pick what to post"). Naming and "name this condition" comments stay.
 - [ ] Closed spec: the drafts use only the labels in the Labels table, the `**<label>**:` / body layout, plain fenced code blocks, and the posting shapes in "Posting via the GitHub API". No field, format, or decoration this file does not list (see "The spec is closed").
 - [ ] Label picked from the Labels table, not from the user's reaction. How strongly the user phrased their feedback is not an input to the label.
@@ -102,7 +102,7 @@ In rough order of frequency for review findings:
 
   Outside those three, say the result and stop. Each of these is checked on its own:
   - **Proof nobody needed:** test steps, exact error text, or the list of cases tried, in a status reply to someone who only needs the outcome.
-  - **Greeting or emoji opener:** no "Hey", no 👋. Start with the mention, then the point.
+  - **Greeting or emoji:** no "Hey", and no emoji anywhere (👋, 🙂, ✅ all read as filler in a review). Start with the mention, then the point.
   - **Bold labels in lists:** plain list items, no `**Label:**` heads.
   - **Code formatting on words people read:** an error message or a UI label goes in quotes ("id cannot be changed"); backticks are for code names and values.
   - **A closing line that repeats:** drop a last sentence that restates the point or cites someone else's decision ("The PM said matching is fine, so no change here").
