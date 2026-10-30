@@ -18,6 +18,10 @@ A lesson arrives as one case; the rule is the habit that catches the whole class
 - State the principle at the widest scope it holds, and keep the case as one example among several ("a list, table, picker, search or count").
 - Examples show the idea in plain code a reader of any stack can follow.
 
+## Before a PR
+
+Run `/kc-gates:kc-ready-for-review`: it walks `.claude/hand-off-checklist.md`, which checks the two sections above and the version bump.
+
 ## Developing
 
 Layout, conventions and release steps are in the README's "Developing" section and in `docs/architecture.md`.
