@@ -16,31 +16,10 @@
 
 set -u
 
+# shellcheck source=lib/hook-input.sh
+. "$(dirname "$0")/lib/hook-input.sh"
+
 readonly APPROVAL_TOKEN='KC_REVIEW_POST_APPROVED=1'
-
-extract_command() {
-  local input="$1"
-  if [ "${KC_GUARD_NO_JQ:-0}" != 1 ] && command -v jq >/dev/null 2>&1; then
-    printf '%s' "$input" | jq -r '.tool_input.command // empty' 2>/dev/null
-    return
-  fi
-  # JSON strings hold no raw newlines, so joining lines is safe. The capture
-  # keeps escapes such as \" and \n; the checks below tolerate them.
-  printf '%s' "$input" \
-    | tr '\n' ' ' \
-    | sed -nE 's/.*"command"[[:space:]]*:[[:space:]]*"(([^"\\]|\\.)*)".*/\1/p' \
-    | sed -e 's/\\n/\
-/g' -e 's/\\"/"/g'
-}
-
-# One shell segment per line: split on newlines, ;, &&, || and |.
-split_segments() {
-  printf '%s\n' "$1" | sed -e 's/&&/\
-/g' -e 's/||/\
-/g' -e 's/;/\
-/g' -e 's/|/\
-/g'
-}
 
 readonly GH_WORD='(^|[^[:alnum:]_.-])gh[[:space:]]+'
 readonly REVIEW_ENDPOINT='(pulls|issues)/([0-9]+/(comments|reviews)|comments/[0-9]+)'
@@ -89,7 +68,7 @@ EOF
 main() {
   local input command
   input="$(cat)"
-  command="$(extract_command "$input")"
+  command="$(extract_field "$input" command)"
   if [ -z "$command" ]; then
     exit 0
   fi

@@ -230,6 +230,12 @@ The review never posts; its output stays in chat. To turn findings into PR comme
 
 A post only goes through when the same Bash command carries the approval token `KC_REVIEW_POST_APPROVED=1`, typed after your signal. A `PreToolUse` hook in the plugin (`scripts/guard-github-post.sh`) blocks every GitHub review write without it, because an instruction is only context and a hook is what enforces. It covers `gh pr comment`, `gh pr review`, `gh issue comment`, and `gh api` writes to a PR's or issue's comments or reviews. Reads, `gh pr create` and `gh pr merge` pass untouched.
 
+## Before a PR goes to review
+
+`/kc-gates:kc-ready-for-review` is the one pass on your own PR before a person reviews it, so the reviewer finds nothing your rules already say. It runs `kc-code-review`, your repo's hand-off checklist (`.claude/hand-off-checklist.md`: the description, the ticket, paired PRs) and QA, fixes what they find, re-reviews once, and hands anything still open to you instead of looping. Two rounds at most, and nothing runs per commit or push. Claude also runs it on its own when work is about to go to review: a `SessionStart` hook in the plugin puts a one-line reminder in every session, in every project, wherever kc-gates is installed, with nothing to set up per project. If you are the kit's maintainer (the GitHub user signed in to `gh` owns the repo you installed from), the same hook adds a line telling Claude to turn feedback worth keeping into kit lessons, shipped as merged PRs; anyone else installed the kit to use it and doesn't get that line.
+
+It ends in a receipt for the PR's head commit. A second `PreToolUse` hook (`scripts/guard-hand-off.sh`) blocks `gh pr ready`, a ready `gh pr create`, `gh pr edit --add-reviewer` and reviewer requests through `gh api` until that commit has one. To hand off without the pass, tell Claude to skip it; the command then carries `KC_READY_SKIP=1`.
+
 ## Adding your repo's own rules
 
 If the repository under review has a `.claude/review-conventions.md`, it becomes an extra gate (`kc-gates:project-conventions-gate`). Use it for project-specific rules: data-layer patterns, UI-library rules, domain helpers, whatever the built-in topics do not know about. Write each rule as a checklist of failure modes with one canonical example path, so the gate can walk it box by box.
@@ -275,6 +281,8 @@ The deterministic steps are scripts, each with fixture tests, so the model runs 
 | `review-threads.sh <pr> [--mine <login>]` | Prints every review comment thread, root then replies, and with `--mine` marks the threads you started and whether the author replied after you (requires `jq`) |
 | `build-comment-payloads.sh <drafts.json> <diff> <sha> --pr <n>` | Used by `kc-post-review`: checks each drafted comment's path and line against the diff's hunks, writes one payload per comment, and prints the approval-token commands for you to approve; never posts (requires `jq`) |
 | `guard-github-post.sh` | The `PreToolUse` hook that blocks GitHub review writes without the approval token |
+| `ready-receipt.sh (write <sha> (--rounds <n> --open <n> \| --after <pass-sha>) \| check <sha>)` | Used by `kc-ready-for-review`: writes or checks the receipt for the commit a pass ended on, under `~/.claude/kc-ready-for-review/` (`KC_READY_DIR` overrides) |
+| `guard-hand-off.sh` | The `PreToolUse` hook that blocks handing a PR to review until its head commit has a receipt |
 
 **Convention checks** (`plugins/kc-conventions/`):
 
