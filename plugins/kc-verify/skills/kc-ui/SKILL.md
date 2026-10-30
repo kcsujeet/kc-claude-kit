@@ -12,7 +12,7 @@ So look at it. Once, deliberately, before saying it is done.
 ## Hard rules
 
 - **Never report a UI change complete without having seen it.** "The tests pass" is not the same claim and must not be presented as one.
-- **The browser check is not optional.** It is part of fixing a UI bug, the same as the code change: never offer it as a choice or a follow-up ("QA first, or post as is?"), and never tell a tester or reviewer something is fixed before you have seen it fixed. If the dev servers are down, start them; if a sign-in only the user can do stands in the way, ask for it, and until then nothing is called fixed.
+- **The browser check is not optional.** It is part of fixing a UI bug, the same as the code change: never offer it as a choice or a follow-up ("QA first, or post as is?"), and never tell a tester or reviewer something is fixed before you have seen it fixed. If the dev servers are down, start them; if a sign-in stands in the way, use the project's dev-only sign-in (Step 2), and only where it has none, ask the user for theirs. Until then nothing is called fixed.
 - **Report what you did and what you saw**, screen by screen. Not "verified the layout" but "narrow viewport, dark mode: the invoice total wraps under the button".
 - **Keep the failure.** If a state renders wrong, that is the finding. Do not adjust the data until it looks fine and then call it passing.
 - **Realistic data or nothing.** `Lorem ipsum`, `Test User`, and a three-row list prove only that the happy path with short strings works. Production has 400 rows, names with diacritics, and a description that runs four lines.
@@ -51,6 +51,14 @@ A design is not a pixel spec for things the app already has a pattern for. Title
 Use the project's seed or fixture path if it has one. Otherwise construct data that is deliberately awkward: a long name, an empty collection, a large collection, a zero amount, a negative amount, a missing optional field, a non-Latin string.
 
 The point is not coverage for its own sake. Every one of those is a shape that has broken a layout before.
+
+Sign in as a seeded local user without anyone's password. When sign-in goes through an outside identity provider, a check that waits on the user's password stalls every time a dev server restarts or runs on a new port: browser sessions and cookies are kept per origin. Look for a credential the local backend can mint itself, often an auth strategy it already accepts (an API key, a signed token) that only tests create. Have the frontend send it only in its development mode. If the project has no such path, propose one before building it, guarded at every layer:
+
+- The secret signing the credential exists only in development, so staging and production reject it.
+- The mint command refuses to run outside the development environment.
+- The frontend reads it behind a compile-time development check, so production builds drop it.
+- The build fails if the variable is set for a production build, rather than ignoring it.
+- The credential lives in the process environment, never in a committed file or in chat.
 
 ### Step 3 — walk the states
 
@@ -109,6 +117,22 @@ One line per surface: what you looked at, in which configurations, and what you 
 
 Finish with what you did not check and why.
 
+A QA pass on something already shipped ends at the report: change no code until the findings are triaged with the user, each one sorted into a bug or a question for the team, then into a fix now (a hotfix) or a ticket for later, with what introduced it checked in history. A remark about one finding during that talk ("this should be X") is input to the triage, not a go-ahead to build X while the rest are untriaged.
+
+### Step 6b — a walkthrough for others (a video of how to test)
+
+When the evidence is for someone who doesn't know the change (a tester, the reporter, a reviewer), it must explain itself without you there. Before a change goes to review, its ticket gets a **How to test** section at the end of the description, written for someone who has never seen it: links to the change's pull requests (with the merge order when one depends on another), the setup, the cases as numbered steps with what to expect, and the walkthrough video embedded under them. Append it without rewording the rest of the description. Write the setup for the team's usual local environment (the hostnames and commands everyone runs), in the pull request's How to test too, never the ports, worktrees or server entries of your own session: a reader can't follow `localhost:3014` and a CORS override they don't run.
+
+The walkthrough:
+
+- **Open with the setup**: the data each case needs, the switch or setting and where it lives, and the checks in order.
+- **One case per frame or clip, captioned** with the state ("Flag on, record not archived") and the expected result in one sentence.
+- **Box what to look at.** A red outline around the part that changes, with a short label inside it ("Archived item hidden"). Where the change is something missing, box what remains and say so ("Only the open item shows").
+- **Make it a video, not a GIF.** A GIF can't be paused or scrubbed, and a still first frame reads as an image, so people stop watching. Build a short MP4 (H.264, `yuv420p`, `+faststart`) with each frame held for a set time (about 5 seconds a case, 6 for the setup); the player's own controls let people pause on a case. With `ffmpeg`, give each image its own `-loop 1 -t <seconds>` input and join them with the `concat` filter: the concat demuxer's `duration` lines cut the first image short.
+- **Shape it like the screen people use.** Record in the aspect ratio of the device the product is mainly used on: 16:9 for a product used on laptops (a 1440×810 viewport at 2x gives 2880×1620), portrait only when the ticket is about phones. Full-page shots of a long page come out tall and shrink to nothing in a player, so frame each case on the part that changes and keep every frame the same size.
+- **Keep it sharp.** Capture each frame at 2x device pixels from a headless browser (Playwright's `deviceScaleFactor: 2`, a full-page or clipped `screenshot`), never from an agent tool's screenshot, which comes back downscaled and JPEG-compressed. Draw the captions and boxes into the page before the shot so they stay text, not scaled pixels, and encode at the frames' own size (`-crf 16 -tune stillimage`) without scaling down. Before sending it, pull a frame back out of the video and read small text at 100%.
+- **Embed it as a player, and see it play.** Trackers render an attached video either as a block player or as an inline file chip, and the chip often won't play. A connector's "append this file inline" option tends to produce the chip, so write the block media node yourself, copying one from a ticket whose video already plays. Then have someone signed in open the ticket and press play before it goes to review: a successful upload says nothing about playback.
+
 ## Tools
 
 Use whatever the project already has: a browser tool if one is connected, the project's own screenshot or visual-regression setup, a simulator, or a dev server plus a manual look. Do not install a new visual testing framework to satisfy this skill; the point is to look at the screen, not to build an apparatus for looking at screens.
@@ -120,6 +144,7 @@ If nothing is available and you genuinely cannot see the UI, say that plainly an
 Do not report a UI change verified until every box is ticked:
 
 - [ ] Every surface the diff reaches is listed, including other consumers of shared components.
+- [ ] The app was signed in through the project's dev-only credential, not someone's password; where it has none, the guarded path was proposed, and the user signed in only until it exists.
 - [ ] When the work spans several branches or pull requests, the list covers every screen any of them changes, not only the one being worked on now.
 - [ ] If a design exists, the state matrix is written from it, covering every switch in both positions, every layout-changing option, every role, empty/one/many, and every drawer and dialog.
 - [ ] Every drawer and dialog was opened and filled in: empty, one item picked, several picked, and editing an existing item.
@@ -141,5 +166,11 @@ Do not report a UI change verified until every box is ticked:
 - [ ] A list or page was filled past the viewport, and a record created fresh through the UI was taken through its whole flow.
 - [ ] Every reported layout defect was traced through its ancestors in code and reproduced at the content size the report shows, before it was fixed or left open.
 - [ ] Narrow viewport, the other theme and a keyboard pass were done, or the report says why not.
-- [ ] Every UI fix was seen fixed in a browser before it was reported done or anyone was told it is fixed.
+- [ ] Every UI fix was seen fixed in a browser before it was reported done or anyone was told it is fixed, internal admin pages included (signed in through a dev-only credential, as in Step 2), not only covered by specs.
 - [ ] The report lists each state checked, each finding with the state that produces it, and what was not checked.
+- [ ] After a QA pass on shipped work, no code changed until the user agreed which findings are bugs, which are questions, and which go in a hotfix versus a ticket.
+- [ ] Before review, the ticket's description ends with a How to test section (PR links, setup, numbered cases, expected results) and the walkthrough: a short MP4, not a GIF, that opens with the setup, captions each case with its state and expected result, and boxes and labels what to look at.
+- [ ] The How to test setup, on the ticket and the pull request, is the team's usual local environment, with no port, worktree or server entry from your own session.
+- [ ] The walkthrough is in the product's main device aspect ratio (16:9 for a laptop product, portrait only for a phone ticket), every frame the same size.
+- [ ] The walkthrough's frames were captured at 2x in a headless browser, not from a downscaled tool screenshot, encoded at their own size, and a frame pulled from the video reads sharp at 100%.
+- [ ] The walkthrough is embedded as a block player, not an inline file chip, and was seen playing on the ticket.
