@@ -25,6 +25,7 @@ Where code lives is part of its contract. A path promises something about what i
 - Exported APIs carry a short doc comment saying what they are for, not restating the signature.
 - Do not widen a package's public exports so a sibling package can reach an internal. Move the shared piece to a shared layer both consume.
 - A discriminator the backend serializes is a string enum, not a literal union: if the backend can return it, it needs a name in the code.
+- A generated file is never edited by hand. Edit its source (the template, skill or schema it is built from), rerun the generator, and run the repo's own drift check (`--check`, a CI step) before pushing. The repo's README or CI config names which files are generated.
 
 ## React and TypeScript codebases
 
