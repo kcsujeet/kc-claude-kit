@@ -27,6 +27,7 @@ Cite `file:line` for every finding. A box with no receipt is FAIL by default, be
 - [ ] §A13 No content duplicated between mechanisms: the same rule in both `CLAUDE.md` and a rule file, or in both a rule file and a skill. Duplication doubles the cost and is how contradictions start. (N/A: single instruction file)
 - [ ] §A14 Skill descriptions are specific enough to match on. Claude picks skills by matching the task against descriptions, so two skills with overlapping vague descriptions means the wrong one loads. Flag any description that does not name concrete trigger phrases. (N/A: no skills in repo)
 - [ ] §A15 The instructions say how they get updated. A file with no convention for adding to it goes stale; the repo should say where a new correction lands. Note that auto memory now records corrections and preferences on its own, so a hand-maintained log of those is partly redundant. (N/A: convention documented)
+- [ ] §A16 Instructions that must shape a plan (which layer decides, workflow, rollout) load before any file is opened: at launch from the directory sessions actually start in, at user scope, or through a SessionStart hook, not only through `paths:` or a nested `CLAUDE.md`. The instructions also say to read code with the Read tool, since shell reads trigger no on-demand loading. (N/A: sessions always start in the repo and nothing plan-shaping is deferred)
 
 ## Reporting
 
