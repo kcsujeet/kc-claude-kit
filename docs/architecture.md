@@ -30,10 +30,11 @@ kc-claude-kit/
     │   ├── .claude-plugin/plugin.json      # depends on kc-conventions
     │   ├── skills/
     │   │   ├── kc-code-review/SKILL.md     # orchestrator: scope, dispatch, aggregate
-    │   │   └── kc-post-review/             # user-invoked only: drafting and posting comments
+    │   │   ├── kc-post-review/             # user-invoked only: drafting and posting comments
+    │   │   └── kc-ready-for-review/SKILL.md # the one pass before a PR goes to a reviewer
     │   ├── agents/<topic>-gate.md          # one gate agent per topic, plus project-conventions-gate.md and verification-gate.md
-    │   ├── hooks/hooks.json                # blocks unapproved GitHub posts
-    │   ├── scripts/guard-github-post.sh
+    │   ├── hooks/hooks.json                # blocks unapproved GitHub posts and unreviewed hand-offs
+    │   ├── scripts/guard-github-post.sh, guard-hand-off.sh, lib/hook-input.sh
     │   ├── scripts/*.sh                    # gather-review, scope-facts, review-threads, build-comment-payloads
     │   ├── tests/
     │   └── evals/

@@ -1,0 +1,6 @@
+pr view 12 --repo acme/widgets --json headRefOid	pr-reviewed.json
+pr view 13 --repo acme/widgets --json headRefOid	pr-unreviewed.json
+pr view 13 --json headRefOid	pr-unreviewed.json
+pr view --json headRefOid	pr-reviewed.json
+api repos/acme/widgets/commits/feature	commit-reviewed.json
+api repos/{owner}/{repo}/commits/feature	commit-reviewed.json
