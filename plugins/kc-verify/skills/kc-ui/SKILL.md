@@ -166,7 +166,7 @@ Do not report a UI change verified until every box is ticked:
 - [ ] A list or page was filled past the viewport, and a record created fresh through the UI was taken through its whole flow.
 - [ ] Every reported layout defect was traced through its ancestors in code and reproduced at the content size the report shows, before it was fixed or left open.
 - [ ] Narrow viewport, the other theme and a keyboard pass were done, or the report says why not.
-- [ ] Every UI fix was seen fixed in a browser before it was reported done or anyone was told it is fixed.
+- [ ] Every UI fix was seen fixed in a browser before it was reported done or anyone was told it is fixed, internal admin pages included (signed in through a dev-only credential, as in Step 2), not only covered by specs.
 - [ ] The report lists each state checked, each finding with the state that produces it, and what was not checked.
 - [ ] After a QA pass on shipped work, no code changed until the user agreed which findings are bugs, which are questions, and which go in a hotfix versus a ticket.
 - [ ] Before review, the ticket's description ends with a How to test section (PR links, setup, numbered cases, expected results) and the walkthrough: a short MP4, not a GIF, that opens with the setup, captions each case with its state and expected result, and boxes and labels what to look at.
