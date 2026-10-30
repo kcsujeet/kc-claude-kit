@@ -11,6 +11,15 @@ Claude Code has four places project instructions can live. They differ in **when
 
 Nested `CLAUDE.md` files in subdirectories are a fifth option, loading on demand when Claude reads files in that directory. They do the same job as a path-scoped rule; prefer whichever the repo already uses rather than mixing both for the same purpose.
 
+## What on-demand loading needs
+
+On-demand loading has two conditions, and a session can miss both without any sign:
+
+- **The working directory.** Only the `CLAUDE.md` files and unscoped rules from the session's own directory upward load at launch. A session started above the repo (a workspace folder holding several repos) treats the repo as a subdirectory, so its `CLAUDE.md` and every rule wait for a file inside it to be opened.
+- **The Read tool.** A path-scoped rule, nested `CLAUDE.md` or subdirectory file loads when the Read tool opens a matching file. A file read through the shell (`cat`, `sed`, `head`, `grep` output) loads nothing, and agents in permissive modes are often told to read files that way.
+
+So an instruction that has to shape a plan, before any code is opened, cannot rely on deferral. Put it where it loads for the directory sessions actually start in, at user scope, or in a SessionStart hook's `additionalContext`. Then tell agents to read code with the Read tool, so the path-scoped rest still arrives.
+
 ## Hard numbers
 
 - **Target under 200 lines per `CLAUDE.md`.** Longer files consume more context and measurably reduce adherence.
