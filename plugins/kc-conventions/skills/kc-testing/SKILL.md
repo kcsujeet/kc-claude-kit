@@ -24,6 +24,7 @@ paths:
   - §T9. A test names its expected record
   - §T10. Time comes from a clock the test can freeze
   - §T11. A test pins every input its result depends on
+  - §T12. A UI test leaves nothing to update outside its waits
 - Sweeps
 
 ## Rules
@@ -46,6 +47,8 @@ The loop is not a formality at the end. A change is not done until it is green.
 - A test names the record it expects: the one it created, or one picked with an order whose last key is unique. `first` over an order with ties (a position that restarts per group, a timestamp, an unordered query) returns any of the tied rows, so the test passes or fails depending on the database's mood.
 - Code that compares against "now" takes it from the app's clock and passes it in (a bound parameter to SQL), not from the database (`CURRENT_TIMESTAMP`, `NOW()`, `CURRENT_DATE`), and its tests freeze that clock. A database clock can't be frozen, so a test that checks "not due yet" passes or fails by the hour CI happens to run.
 - A test sets every attribute its result depends on, instead of taking the factory's default. A factory that samples values (a random type, a random offset) makes a test that leaves them unset pass or fail by the draw, and the run's seed usually doesn't reproduce it. Read the factory before relying on its defaults.
+- A UI test awaits only the testing library's own waits and events between an action and its last assertion, so every update the action starts (a hover tooltip, a transition, a ripple) lands inside them. A bare `await` on something else (a clipboard read, a timer, a fetch) leaves a gap where a slow runner lets those updates land outside, and the test fails in CI only. End hover state the action leaves behind (`unhover`) rather than wait for its effect.
+- A test that fails only in CI is reproduced locally before a fix is called done: slow down the suspected gap (a delay at that `await`, a slower mock) until it fails the way CI does, then show the fix passes under the same delay. A fix that passed locally before and after proves nothing.
 - When the end-to-end suite runs in a harness or fixture app, each headline user-facing feature also gets at least one test that drives the shipped app (its demo or default configuration, with its seed data). A suite that only ever sees clean fixtures cannot catch a bug that needs the real combination of settings and data.
 
 Detection criteria and per-box review failure modes live in the `## Review checklist` of the `kc-testing` skill (`kc-conventions:kc-testing`), with the detail under its `## Review detail`. These rules are the statement of the convention; that checklist is how a diff gets graded against it.
@@ -65,6 +68,7 @@ The testing gate agent ticks every box against the diff. A box is FAIL if any ma
 - [ ] §T9 Every expected record in a test is named, not re-derived: it is a record the test created and holds, or a lookup whose order ends on a unique key. A `first`/`last`/`take` (or `[0]` on a query result) over an order that can tie FAILS; the evidence names the ordering columns and why they cannot tie. **Enumerate**: grep the test diff for `.first`, `.last`, `.take` and `[0]` on query results, one verdict per hit. (N/A: `grepped first/last/take: 0 hits`)
 - [ ] §T10 Time-dependent behaviour is tested at a frozen time: each test of code that compares against now (due, overdue, today, expiry, local hour) freezes the clock, and the code reads now from that clock, not from the database. A query the diff adds or changes that uses `CURRENT_TIMESTAMP`, `NOW()` or `CURRENT_DATE` for a comparison a test covers FAILS. **Enumerate**: grep the diff for those three, one verdict per hit. (N/A: `grepped database clock: 0 hits` and no time comparison added)
 - [ ] §T11 Every record a new or changed test builds sets each attribute the code under test branches on; the evidence names the factory and confirms each such attribute is either set in the test or fixed (not sampled) in the factory. A branch-deciding attribute left to a factory that samples it FAILS. (N/A: the diff adds or changes no test that builds records)
+- [ ] §T12 In every UI test the diff adds or changes, each `await` between the first user action and the last assertion is the testing library's own (a user event, `findBy*`, `waitFor`); a bare `await` on anything else (`navigator.clipboard.readText()`, a sleep, a direct fetch) FAILS, and so does hover or focus state an action leaves behind without an `unhover`/`blur` or a wait for its effect. A fix for a CI-only failure in such a test names the delay that reproduced it locally. **Enumerate**: grep the test diff for `await ` lines that are not `user.`, `findBy`, `findAllBy` or `waitFor`, one verdict per hit. (N/A: the diff adds or changes no UI test)
 
 ## Review detail
 
@@ -207,6 +211,10 @@ Test helpers that freeze time (`travel_to`, `freeze_time`, fake timers) move the
 ### §T11. A test pins every input its result depends on
 
 Factories often sample values so that tests see variety: a random type, a random count, a random offset. That is fine for attributes the code under test ignores and a trap for the ones it branches on. A test of "due at 03:00, not yet due at 02:00" left the action's offset to the factory; one draw in about fifty picked an offset that fires regardless of time, and the case failed in CI and never locally. The neighbouring examples pinned the offset; the new one copied their shape but not that line. List the attributes the code branches on and set each one in the test.
+
+### §T12. A UI test leaves nothing to update outside its waits
+
+A test of a copy-link button clicked it, then awaited `navigator.clipboard.readText()`, then waited for the confirmation toast. The pointer stayed on the button, so its tooltip opened after the hover delay. Locally the clipboard read was instant and the tooltip opened inside the next wait; on CI the read took long enough for the tooltip, and the toast's enter transition, to update outside any wait, and the setup that fails tests on console errors failed it. The first fix waited for the tooltip at the end and passed locally, as the old test had, and CI failed again. Putting a 400 ms delay on the clipboard read reproduced the CI failure in one run; moving the pointer off the button after the click, waiting for the toast first and reading the clipboard inside `waitFor` passed under the same delay.
 
 ## Sweeps
 

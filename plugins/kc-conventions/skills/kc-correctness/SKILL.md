@@ -26,6 +26,7 @@ paths:
   - §B11. A client mirror of a server calculation reads the server's inputs
   - §B12. A list shows only what the viewer can open
   - §B13. When one becomes many, nothing picks "the" one
+  - §B14. A guard against a delete counts only what the delete would harm
 - Sweeps
 
 ## Rules
@@ -44,6 +45,7 @@ Code that reads well and is wrong is still wrong. Walk every change for the bugs
 - A bug fix covers every instance of its cause, not only the one that was reported. Once the cause is known, grep the repo, tests included, for the same pattern (the same query, call or assumption) and fix or list each hit; code written alongside the original, on the same day or in a sibling branch, is the first place to look.
 - Before saying what a value holds ("this column is always blank", the cause of a flaky test), find every writer of it: the class body, every module or concern it includes and their callbacks, factories and seed code. A claim read off the visible class alone is a guess.
 - When a change turns one into many (a shop's store becomes stores), every accessor that still picks "the" one (the first, the lowest id, a "default") is a leftover unless a stated product rule chooses it. Each reader uses the specific record it already has (the order's store, the one in the URL), and the accessor and every fallback to it go.
+- A guard that refuses a delete or removal ("has orders", "has items") counts only the related records the delete would harm: completed payments, live work, records people still see. Abandoned, expired, failed, archived or deleted ones go with it, or are cleaned up, and the message says in plain words what blocks it and what to do instead.
 
 Detection criteria and per-box review failure modes live in the `## Review checklist` of the `kc-correctness` skill (`kc-conventions:kc-correctness`), with the detail under its `## Review detail`. These rules are the statement of the convention; that checklist is how a diff gets graded against it.
 
@@ -64,6 +66,7 @@ The correctness gate agent ticks every box against the diff. A box is FAIL if an
 - [ ] §B11 A client that mirrors a server calculation (a price, a total, a balance it shows before the server charges it) reads each input from the record the server reads, and the evidence names the server code and the client read side by side. An input read from a different record that holds the same value only some of the time (a copy, a legacy column, a record that can be deleted) FAILS. (N/A: the diff mirrors no server calculation)
 - [ ] §B12 A list shows only what the viewer can open: when each listed item has its own access check (its page turns some viewers away), the list applies the same check, server-side, and the evidence names both. A list gated only as a whole, whose items then refuse the viewer, FAILS. (N/A: no list of items with their own access check)
 - [ ] §B13 Nothing picks "the" one after one becomes many: when the diff, or the feature it continues, turns a one-to-one into a one-to-many, every accessor that returns a single record from the many (`first`, lowest id, `default_*`, a single-record association with an order) and every fallback to it (`order.store || shop.store`) is listed with its readers. Each FAILS unless a product rule says how that record is chosen, and the finding names the specific record each reader should use instead. (N/A: no cardinality change in scope)
+- [ ] §B14 A guard that refuses a delete or removal counts only the related records the delete would harm, and the evidence lists each status or state the related record can have with a verdict (blocks, goes with it). A guard that counts every related row, so an abandoned, expired, failed or archived one blocks the delete, FAILS, as does a message that names an internal term or no way forward. (N/A: no delete guard in scope)
 
 **Point, do not double-report.** A removed export or a changed shared prop shape is structure §S10. A cast asserting a type the value does not have, as syntax, is clarity §C17. Duplicated markup, dead imports, or props threaded through and never read after a refactor are simplicity §P9. A locale formatter with no explicit time zone is datetime §D7. When a bug and one of those boxes describe the same line, report it once, under the closer fit, and name the other box in the evidence.
 
@@ -158,6 +161,12 @@ A page that lists items, each behind its own access check, is safe only when the
 A shop had one store, so code reached it as `shop.store`. When shops gain several stores, keeping `shop.store` as "the first one" lets old code compile and run, and it silently picks whichever store has the lowest id: a charge priced with that store's settings, an email branded with its logo, a fallback `order.store || shop.store` that sends the wrong store's message. None of it fails; it is just wrong for every shop with a second store.
 
 **How to check.** Find every accessor that returns one record from the many (an ordered single-record association, `.first`, a `default_` method) and grep its readers. Each reader already has, or can get, the specific record it means: the order's store, the store in the URL, the store on the customer's account. Point it there, then delete the accessor and its fallbacks. Keep one only when a product rule says which record it is ("the store the shop marked primary"), and name that rule in the code.
+
+### §B14. A guard against a delete counts only what the delete would harm
+
+A shop could not delete a storefront "that has checkouts". Every checkout counted, so one guest who opened a checkout and left (expired) locked the storefront forever, and a test environment, where nobody completes payments, filled with storefronts nobody could delete. The guard existed to keep payment history; only paid checkouts, and ones still in progress, hold any.
+
+**How to check.** List every status or state the related record can have and decide, for each, whether deleting the parent harms it. Count only those. Expired, failed, cancelled, archived and soft-deleted rows go with the parent or are cleaned up first. Then read the message as the person who hit it would: it names what blocks the delete in their words and says what to do instead ("turn it off").
 
 ## Sweeps
 

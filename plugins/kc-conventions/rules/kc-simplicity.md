@@ -8,6 +8,7 @@ paths:
 
 The simplest code that does the job is the easiest to read, change and delete. Every construct earns its place.
 
+- Question the approach before the lines, whether writing the change or reviewing it. Ask whether this is the simplest way to get the result, assume a simpler one exists, and look for it: one mechanism instead of two side by side, the step that already knows a value reporting it instead of a later step working it out again, an existing tool, doing less. Line-level polish on the wrong shape only makes it harder to change.
 - DRY is about knowledge: a rule, a format, an API call or a meaningful value has one source. Code that only looks alike is not duplication.
 - A helper earns its place by carrying knowledge its callers should not hold (an API call, a data format or conversion, a domain rule, several steps), or by wide use. One plain expression (a `find` by id, a filter plus a sort, a one-field object) stays inline, even with two callers.
 - YAGNI: no speculative code. No param, prop or config option that nothing passes, no abstraction built for a hypothetical second caller, no dead branch. A generality the change does not use is removed, even if it might be needed later.
