@@ -331,7 +331,7 @@ Results land in `plugins/<name>/evals/results/`, which is ignored.
 
 ### Releasing
 
-`version` lives in each plugin's `plugin.json` only; the marketplace entries carry none, since a marketplace version is silently masked by `plugin.json` ([marketplaces](https://code.claude.com/docs/en/plugin-marketplaces)). To release a plugin, bump its `plugin.json` version, add a `CHANGELOG.md` entry, commit, then tag from the plugin directory:
+`version` lives in each plugin's `plugin.json` only; the marketplace entries carry none, since a marketplace version is silently masked by `plugin.json` ([marketplaces](https://code.claude.com/docs/en/plugin-marketplaces)). Every pull request that changes a plugin bumps its `plugin.json` version (a patch for a small change), with a `CHANGELOG.md` entry; CI's `version-bumps` job fails it otherwise, since installed plugins update only when their version goes up. Users who turn on auto-update for this marketplace (`/plugin`, Marketplaces) then get each merge within minutes of starting a session. To tag a release, commit, then tag from the plugin directory:
 
 ```bash
 cd plugins/kc-conventions

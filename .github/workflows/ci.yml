@@ -70,6 +70,9 @@ jobs:
       - name: shellcheck
         run: git ls-files -z '*.sh' | xargs -0 --no-run-if-empty shellcheck
 
+      - name: Version bump check tests
+        run: bash scripts/tests/check-version-bumps.test.sh
+
       - name: Convention sweep fixtures
         run: bash plugins/kc-conventions/tests/run-sweeps.sh
 
@@ -86,6 +89,20 @@ jobs:
             bash "$runner"
             echo "::endgroup::"
           done
+
+  version-bumps:
+    name: Changed plugins bump their version
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      # Installed plugins update only when their version goes up, so an unbumped change never
+      # reaches anyone.
+      - name: Compare each changed plugin's version with the base branch
+        run: bash scripts/check-version-bumps.sh "origin/$GITHUB_BASE_REF"
 
   evals:
     name: Plugin evals
