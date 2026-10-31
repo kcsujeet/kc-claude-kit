@@ -22,6 +22,14 @@ A lesson arrives as one case; the rule is the habit that catches the whole class
 
 Lessons arrive from the maintainer's other work: a correction, a review comment or a QA finding that would have been caught by a habit. Each becomes its own PR here, written to the two sections above, and is merged once its checks pass, so installs get it on their next update.
 
+Before writing a lesson:
+
+1. Write the class of mistake in one sentence, then two or three other cases it would catch, from areas other than the one it came from. The rule is written for the class; the case that taught it is one example among those.
+2. Treat wording the request suggests, from the user or from another session, as a starting point, not the rule: it was written about the case.
+3. Grade the draft against `.claude/hand-off-checklist.md` before the first commit, not at hand-off, and fix what fails. The PR description states the class and the other cases.
+
+The checklist applies to draft PRs too (`drafts: true` in its front matter), so kc-gates' hand-off guard won't open even a draft PR here until its head commit has a checklist receipt (`ready-receipt.sh write <sha> --checklist`).
+
 ## Versions
 
 Raise a changed plugin's `plugin.json` version by the smallest step that fits. Semver's "new behavior is a minor" doesn't apply here: a new rule is the everyday change, and a minor for each one says more changed than did.

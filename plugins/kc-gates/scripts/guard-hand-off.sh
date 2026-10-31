@@ -11,6 +11,13 @@
 # literal KC_READY_SKIP=1 passes: the skill adds it only when the user has
 # said to skip the pass for that PR.
 #
+# A draft `gh pr create` is checked too when the repo's hand-off checklist,
+# read at the PR's head commit, opens with front matter holding
+# `drafts: true`: the head commit then needs a receipt, which
+# `ready-receipt.sh write <sha> --checklist` gives once the checklist alone
+# has been walked. A draft whose head commit or checklist can't be read
+# passes.
+#
 # Commands are read word by word, so a PR is named the way gh documents it,
 # right after the subcommand (`gh pr edit 12 --add-reviewer ana`); with no
 # number there, gh's own default, the current branch's PR, is checked.
@@ -80,6 +87,37 @@ is_hand_off() {
   esac
 }
 
+is_draft_create() {
+  local words
+  read -ra words <<< "$1"
+  [ "${#words[@]}" -ge 2 ] && [ "${words[0]} ${words[1]}" = "pr create" ] || return 1
+  has_word -d "${words[@]}" || has_word --draft "${words[@]}"
+}
+
+# Prints the repo's hand-off checklist at <sha>: from the local clone when it
+# has the commit, otherwise from GitHub's contents API
+# (https://docs.github.com/en/rest/repos/contents#get-repository-content),
+# whose `content` is base64.
+checklist_at() {
+  local rest=$1 dir=$2 sha=$3 words repo
+  read -ra words <<< "$rest"
+  if git -C "$dir" show "$sha:.claude/hand-off-checklist.md" 2>/dev/null; then
+    return
+  fi
+  repo=$(flag_value -R --repo "${words[@]}")
+  if [ -z "$repo" ]; then repo='{owner}/{repo}'; fi
+  (cd "$dir" && gh api "repos/$repo/contents/.claude/hand-off-checklist.md?ref=$sha" --jq .content | base64 --decode) 2>/dev/null
+}
+
+# Succeeds when the checklist's front matter (its opening `---` block) holds
+# `drafts: true`.
+applies_to_drafts() {
+  awk 'NR == 1 && $0 != "---" { exit }
+       NR > 1 && $0 == "---" { exit }
+       NR > 1 && /^drafts:[[:space:]]*true[[:space:]]*$/ { found = 1; exit }
+       END { exit !found }'
+}
+
 # Prints the head commit of the PR the hand-off names, or nothing.
 resolve_head() {
   local rest=$1 dir=$2 words repo selector head repo_args=()
@@ -110,8 +148,16 @@ resolve_head() {
   esac
 }
 
+print_deny_reason() {
+  printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Blocked by the kc-gates plugin: %s Only when the user has said in their latest message to skip it for this PR, prefix the command with KC_READY_SKIP=1; never add it on your own."}}\n' "$1"
+}
+
 print_deny() {
-  printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Blocked by the kc-gates plugin: %s Run /kc-gates:kc-ready-for-review first: one pass of review and QA, at most two rounds, ending in a receipt for the commit the PR will show. Only when the user has said in their latest message to skip that pass for this PR, prefix the command with KC_READY_SKIP=1; never add it on your own."}}\n' "$1"
+  print_deny_reason "$1 Run /kc-gates:kc-ready-for-review first: one pass of review and QA, at most two rounds, ending in a receipt for the commit the PR will show."
+}
+
+print_draft_deny() {
+  print_deny_reason "this repo's hand-off checklist (.claude/hand-off-checklist.md) applies to draft PRs too, and head commit $1 has no receipt. Grade every box of that checklist against the PR as it will be read (title, description, changed files), fix what fails and push, then run: bash $scripts_dir/ready-receipt.sh write <full-sha> --checklist."
 }
 
 main() {
@@ -138,7 +184,19 @@ main() {
       continue
     fi
     rest=$(gh_words "$segment")
-    if [ -z "$rest" ] || ! is_hand_off "$rest"; then
+    if [ -z "$rest" ]; then
+      continue
+    fi
+    if is_draft_create "$rest"; then
+      head=$(resolve_head "$rest" "$dir")
+      if [ -n "$head" ] && checklist_at "$rest" "$dir" "$head" | applies_to_drafts \
+        && ! bash "$scripts_dir/ready-receipt.sh" check "$head" >/dev/null 2>&1; then
+        print_draft_deny "$head"
+        exit 0
+      fi
+      continue
+    fi
+    if ! is_hand_off "$rest"; then
       continue
     fi
     head=$(resolve_head "$rest" "$dir")
