@@ -10,6 +10,9 @@
 #   ready-receipt.sh write <sha> --after <pass-sha>
 #       After commits that only apply fixes the user picked from that pass's
 #       open list. Refused unless <pass-sha> has a receipt.
+#   ready-receipt.sh write <sha> --checklist
+#       After walking the repo's hand-off checklist alone, before opening a
+#       draft PR in a repo whose checklist applies to drafts.
 #   ready-receipt.sh check <sha>
 #       Exits 0 and prints the receipt when there is one, 1 otherwise.
 set -euo pipefail
@@ -17,7 +20,7 @@ set -euo pipefail
 receipts_dir=${KC_READY_DIR:-$HOME/.claude/kc-ready-for-review}
 
 usage() {
-  sed -n '7,14s/^# \{0,1\}//p' "$0" >&2
+  sed -n '7,17s/^# \{0,1\}//p' "$0" >&2
   exit 2
 }
 
@@ -26,10 +29,11 @@ is_full_sha() {
 }
 
 write_receipt() {
-  local sha=$1 rounds="" open="" after=""
+  local sha=$1 rounds="" open="" after="" checklist=false
   shift
   while [ "$#" -gt 0 ]; do
     case "$1" in
+      --checklist) checklist=true; shift ;;
       --rounds) rounds=$2; shift 2 ;;
       --open) open=$2; shift 2 ;;
       --after) after=$2; shift 2 ;;
@@ -37,7 +41,9 @@ write_receipt() {
     esac
   done
   mkdir -p "$receipts_dir"
-  if [ -n "$after" ]; then
+  if $checklist; then
+    printf 'sha=%s\ndate=%s\nchecklist=walked\n' "$sha" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$receipts_dir/$sha"
+  elif [ -n "$after" ]; then
     is_full_sha "$after" || { echo "ready-receipt: --after needs a full SHA" >&2; exit 2; }
     if [ ! -f "$receipts_dir/$after" ]; then
       echo "ready-receipt: $after has no receipt; run the pass first" >&2

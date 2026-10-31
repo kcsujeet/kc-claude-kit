@@ -24,6 +24,16 @@ make_repo() {
 }
 make_repo "$work_dir/ready-repo" ready
 make_repo "$work_dir/draft-repo" draft
+# Two repos with a hand-off checklist: one opts drafts in, one doesn't.
+make_checklist_repo() {
+  git init -q "$1"
+  mkdir -p "$1/.claude"
+  printf '%b' "$2" > "$1/.claude/hand-off-checklist.md"
+  git -C "$1" add .claude
+  git -C "$1" -c user.name=t -c user.email=t@example.test commit -q -m checklist
+}
+make_checklist_repo "$work_dir/lesson-repo" '---\ndrafts: true\n---\n\n# Hand-off checklist\n'
+make_checklist_repo "$work_dir/plain-repo" '# Hand-off checklist\n\n- [ ] drafts: true is not front matter here\n'
 
 receipt=$(bash "$scripts/ready-receipt.sh" write "$reviewed" --rounds 2 --open 1)
 expect_contains "receipt: written for the reviewed commit" "$KC_READY_DIR/$reviewed" "$receipt"
@@ -38,6 +48,8 @@ if bash "$scripts/ready-receipt.sh" write "$reviewed" --rounds 3 --open 0 >/dev/
 else
   record "receipt: a third round is refused" ok
 fi
+checklist_receipt=$(bash "$scripts/ready-receipt.sh" write "$(printf 'e%.0s' {1..40})" --checklist && bash "$scripts/ready-receipt.sh" check "$(printf 'e%.0s' {1..40})")
+expect_contains "receipt: --checklist records the walk" "checklist=walked" "$checklist_receipt"
 if bash "$scripts/ready-receipt.sh" check "$unreviewed" >/dev/null; then
   record "receipt: check fails for a commit without one" fail "check passed"
 else
@@ -98,6 +110,12 @@ check allow "allowed: cd into a reviewed repo, then gh pr create" \
   "cd $work_dir/ready-repo && gh pr create --fill" "$work_dir/draft-repo"
 check allow "allowed: draft PR" \
   "gh pr create --draft --fill" "$work_dir/draft-repo"
+check allow "allowed: draft PR, checklist without drafts front matter" \
+  "gh pr create --draft --fill" "$work_dir/plain-repo"
+check deny  "blocked: draft PR, checklist applies to drafts, no receipt" \
+  "gh pr create -d --fill" "$work_dir/lesson-repo"
+check deny  "blocked: draft PR, checklist read from GitHub at the --head commit" \
+  "gh pr create --draft --repo acme/widgets --head lesson --fill"
 check allow "allowed: back to draft" \
   "gh pr ready 13 --undo"
 check allow "allowed: edit without a reviewer" \
@@ -110,5 +128,12 @@ check allow "allowed: gh pr view" \
   "gh pr view 13 --json headRefOid"
 check allow "allowed: non-gh command" \
   "git push origin HEAD"
+
+bash "$scripts/ready-receipt.sh" write "$(git -C "$work_dir/lesson-repo" rev-parse HEAD)" --checklist >/dev/null
+bash "$scripts/ready-receipt.sh" write "$(printf 'd%.0s' {1..40})" --checklist >/dev/null
+check allow "allowed: draft PR once the checklist was walked" \
+  "gh pr create --draft --fill" "$work_dir/lesson-repo"
+check allow "allowed: draft PR from GitHub once the checklist was walked" \
+  "gh pr create --draft --repo acme/widgets --head lesson --fill"
 
 finish

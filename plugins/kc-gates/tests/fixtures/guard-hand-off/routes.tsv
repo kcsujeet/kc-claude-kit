@@ -4,3 +4,5 @@ pr view 13 --json headRefOid	pr-unreviewed.json
 pr view --json headRefOid	pr-reviewed.json
 api repos/acme/widgets/commits/feature	commit-reviewed.json
 api repos/{owner}/{repo}/commits/feature	commit-reviewed.json
+api repos/acme/widgets/commits/lesson	commit-lesson.json
+api repos/acme/widgets/contents/.claude/hand-off-checklist.md?ref=dddddddddddddddddddddddddddddddddddddddd	checklist-drafts.json

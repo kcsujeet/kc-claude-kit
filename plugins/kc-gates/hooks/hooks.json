@@ -1,5 +1,5 @@
 {
-  "description": "Reminds every session to run kc-ready-for-review before a PR goes to a reviewer, and the kit's maintainer to ship lessons; blocks GitHub review writes (PR and issue comments, reviews) that lack the KC_REVIEW_POST_APPROVED=1 approval token, and PR hand-offs to review (gh pr ready, a ready gh pr create, adding a reviewer) whose head commit has no kc-ready-for-review receipt",
+  "description": "Reminds every session to run kc-ready-for-review before a PR goes to a reviewer, and the kit's maintainer to ship lessons; blocks GitHub review writes (PR and issue comments, reviews) that lack the KC_REVIEW_POST_APPROVED=1 approval token, and PR hand-offs to review (gh pr ready, a ready gh pr create, adding a reviewer) whose head commit has no kc-ready-for-review receipt, and draft PRs too where the repo's hand-off checklist says drafts: true",
   "hooks": {
     "SessionStart": [
       {

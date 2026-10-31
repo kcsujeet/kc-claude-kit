@@ -41,7 +41,9 @@ When round 1 finds nothing, there is no round 2.
 
 ## The guard
 
-`scripts/guard-hand-off.sh` blocks `gh pr ready`, `gh pr create` without `--draft`, `gh pr edit --add-reviewer` and a write to a PR's `requested_reviewers` until the PR's head commit has a receipt. A hand-off done in a browser or through another tool isn't seen; run the pass before those too.
+`scripts/guard-hand-off.sh` blocks `gh pr ready`, `gh pr create` without `--draft`, `gh pr edit --add-reviewer` and a write to a PR's `requested_reviewers` until the PR's head commit has a receipt.
+
+A repo whose hand-off checklist opens with front matter holding `drafts: true` wants it walked before any PR opens, draft or not. There, a draft `gh pr create` is blocked too until its head commit has a receipt: grade every box of the checklist alone against the PR as it will be read, fix what fails, push, and write `ready-receipt.sh write <full-sha> --checklist`. The full pass still runs before the PR is marked ready. A hand-off done in a browser or through another tool isn't seen; run the pass before those too.
 
 When the user says to skip the pass for a PR, prefix that command with `KC_READY_SKIP=1`. Never add it on your own, and never to get past a pass that found something.
 

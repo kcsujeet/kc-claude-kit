@@ -1,3 +1,7 @@
+---
+drafts: true
+---
+
 # Hand-off checklist
 
 Read by `kc-gates:kc-ready-for-review` before a pull request here is opened or merged. This repo is public and its rules apply to any codebase, so most kit PRs carry a lesson learned on some other project: these boxes check the lesson left that project behind. The rules behind them are in `CLAUDE.md`.
@@ -8,6 +12,7 @@ Read by `kc-gates:kc-ready-for-review` before a pull request here is opened or m
 - [ ] Nothing the case brought with it narrows the rule: no single API shape, library, framework, UI element or data type in the rule itself. A stack skill (rails, react) gets a lesson only when it truly is about that stack.
 - [ ] The case appears as one example among several, labelled as an example.
 - [ ] An existing rule that should have caught it was widened instead of adding a narrower one beside it.
+- [ ] The PR description names the class of mistake in one sentence and two or three other cases the rule catches, from areas other than the one it came from; wording the request suggested was rewritten for the class, not kept because it was given.
 
 ## Nothing names where it came from
 
