@@ -19,7 +19,7 @@ The reviewer should find nothing the project's rules already say. This pass is w
 
 1. **Review the code:** run `kc-gates:kc-code-review` on the PR's whole diff. It includes the project-conventions gate, which grades the repo's own `.claude/review-conventions.md`.
 2. **Check the hand-off:** grade every box in the repo's `.claude/hand-off-checklist.md` against the PR as it will be read, not the diff: its title and description, the linked ticket, the paired or stacked PRs, the flags and tasks it names. No such file: check the description against the repo's PR template and say so.
-3. **QA:** for a change a person sees, walk it in the running app with `kc-verify:kc-ui` and the project's QA rules, every state the change reaches. For one nobody sees, run the specs that cover it and exercise the endpoint, job or admin screen it changed.
+3. **QA:** for a change a person sees, walk it in the running app with `kc-verify:kc-ui` (how it looks), `kc-verify:kc-ux` (whether a person can use it) and the project's QA rules, every state the change reaches. For one nobody sees, run the specs that cover it and exercise the endpoint, job or admin screen it changed.
 4. **Fix everything found** in one go. A finding that needs a decision (two rules disagree, the fix changes behaviour the ticket didn't ask for, the rule looks wrong for this case) is asked, not fixed.
 
 ### Round 2

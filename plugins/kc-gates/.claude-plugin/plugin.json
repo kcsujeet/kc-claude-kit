@@ -1,7 +1,7 @@
 {
   "name": "kc-gates",
   "description": "Gate-based code review: one gate agent per convention topic, per-box PASS/FAIL verdicts, zero rationalized skips",
-  "version": "3.1.2",
+  "version": "3.1.3",
   "author": {
     "name": "Sujeet Kc"
   },
