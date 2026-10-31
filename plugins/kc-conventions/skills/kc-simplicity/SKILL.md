@@ -1,6 +1,6 @@
 ---
 name: kc-simplicity
-description: "DRY, YAGNI and KISS conventions for TypeScript, JavaScript and other source files: reuse before writing, search for an existing capability first, delete or collapse what adds nothing, numeric coercion, types as narrow as their consumers, refactor leftovers, props added to a shared component for one caller, helpers that earn their place, defaults over per-scenario variants, and precedent for new patterns. Use when writing or reviewing code that adds a helper, component, type, prop, option or abstraction, or that repeats logic."
+description: "DRY, YAGNI and KISS conventions for TypeScript, JavaScript and other source files: reuse before writing, search for an existing capability first, delete or collapse what adds nothing, numeric coercion, types as narrow as their consumers, refactor leftovers, props added to a shared component for one caller, helpers that earn their place, defaults over per-scenario variants, precedent for new patterns, and user flows that work the way people know them from other products. Use when writing or reviewing code that adds a helper, component, type, prop, option or abstraction, that repeats logic, or that adds or changes a flow people go through (sign-up, sign-in, password reset, checkout, settings, navigation)."
 user-invocable: false
 paths:
   - "**/*.{ts,tsx,js,jsx,mjs,cjs,rb,py,swift,go,java,kt,php,cs,rs}"
@@ -28,6 +28,7 @@ paths:
   - §P14. A caller the convention misses passes the value, not a smarter guess
   - §P15. Deferred work is done when its condition is met
   - §P16. The shape of the whole change is the simplest that works
+  - §P17. A flow people know from other products works the way they know it
 
 ## Rules
 
@@ -44,6 +45,7 @@ The simplest code that does the job is the easiest to read, change and delete. E
 - A prop added to a shared component for one caller's case makes every other caller carry it. Let that caller own or compose the behavior instead.
 - Defaults carry the everyday case, and a caller overrides only what differs. No variant per scenario (`WidgetWithIcon`, `useWidgetsForToday`, `formatPriceShort`, `mockOrderWithOwner`): give the base unit a default and let the one caller pass a prop, argument or override.
 - Everything new conforms to how the codebase already does that kind of thing. Before writing an endpoint, a data read, a function, a file, a test or a message, read about ten pieces of similar code (code that does the same job, wherever it lives; all of it when there is less) and match their shape, name, place and wording; whatever differs says why. A new pattern is the last resort: only once every existing way has been tried and shown not to fit, and only with the developer's agreement.
+- Don't reinvent the wheel for a flow people already know. Signing up, signing in, resetting a password, checking out, changing account settings and finding your way around each have an order and behavior people bring from other products: follow it, as closely as the product allows. A shortcut that saves a step but changes that order or behavior is not taken. A departure is a product decision: ask the developer rather than make it in the design. Example: a password reset asks for the email, emails a code, then takes the code and the new password; it does not ask for the new password before the code is sent.
 - When a shared unit works a value out by convention (a field name from another name, a path from an id) and one caller doesn't fit, that caller passes the value through an optional override. The guessing logic doesn't grow special cases.
 - A branch for a data state (a field that may be blank, a record that may be missing, an old shape) is written only after checking the state can still occur. Create-time defaults, validations and backfills that already ran may have ruled it out; a comment saying it exists is not evidence.
 - A marker that defers work until a condition (`TODO: remove once the new page ships`, "phase 2", "after the backfill runs") is acted on in the change that meets the condition: the code it guards goes, with the marker. A multi-step change ends with a sweep of its own markers, and each one left says what it still waits on.
@@ -69,10 +71,11 @@ The simplicity gate agent ticks every box against the diff. A box is FAIL if any
 - [ ] §P14 A value a shared unit derives by convention (a name built from another name, a default read from a string pattern) is not made cleverer for one caller it gets wrong (pluralization rules, another regex, a special case); that caller passes the value through an optional override, and every other caller keeps the old default. (N/A: no derived value changed or worked around in the diff)
 - [ ] §P15 Deferred work is done when its condition is met: grep the repo for the markers of the work this diff finishes (its feature or phase name, `once`, `after`, `remove when`); each one whose condition the diff meets FAILS unless the diff removes the code it guards. Each one left in place states what it still waits on. (N/A: the diff finishes no deferred work)
 - [ ] §P16 The shape of the whole change is the simplest that works: state the result the diff is after, then at least one other way to get it, and compare. A diff that runs two mechanisms for one job (two storage shapes, two lookups, a branch on a mode through every step), recomputes downstream what an earlier step already knew, or adds a layer an existing one could carry FAILS when the other way is materially simpler, and the finding describes that shape in a sentence or a short sketch. Line findings that shape would delete go under this one, not beside it. (N/A: never; even a one-line change has a goal another shape could meet)
+- [ ] §P17 Familiar flows stay familiar: every flow people go through that the diff adds or reshapes (sign-up, sign-in, password reset, checkout, account settings, navigation, or any other task most products run the same way) asks for things in the order, and behaves the way, people know from other products. A step dropped, merged, moved or added against that order to save a screen or a request FAILS; a departure the developer chose is fine only when the diff or the PR says so, and otherwise is a `question`. A flow that copies a departure the codebase already has is raised as one too, not taken as precedent (§P13). **Enumerate** each flow with its steps in order beside the order most products use. (N/A: the diff adds or reshapes no flow a person goes through)
 
 ## Review detail
 
-Covers the standing DRY/YAGNI/KISS lens applied to every diff, reuse-over-reinvention (including the "assume it already exists" search), two numeric-hygiene rules (safe coercion and repeated-conversion extraction), the delete-or-collapse test on every new construct, type signatures wider than their sink needs, unverified "this mirrors X" claims, refactor leftovers, shared-component props added for one caller, helpers that carry no knowledge, per-scenario variants, and new patterns with no precedent.
+Covers the standing DRY/YAGNI/KISS lens applied to every diff, reuse-over-reinvention (including the "assume it already exists" search), two numeric-hygiene rules (safe coercion and repeated-conversion extraction), the delete-or-collapse test on every new construct, type signatures wider than their sink needs, unverified "this mirrors X" claims, refactor leftovers, shared-component props added for one caller, helpers that carry no knowledge, per-scenario variants, new patterns with no precedent, and flows that depart from the order people know from other products.
 
 ### §P1–P3. The DRY / YAGNI / KISS standing lens
 
@@ -317,6 +320,20 @@ Every other box here looks at one construct. This one looks at the change from a
 Example: a change made an order list group items more precisely. It added a second grouping method beside the existing one, a flag choosing between them at each step, and a pass after grouping that worked out per-day counts again from the grouped result. The existing method could already take the precise boundaries, so one method served both cases, and the grouping step already knew the counts as it placed each item. A review that went straight to lines flagged ternaries, names and duplicated arithmetic in code the simpler shape removes.
 
 The same question applies before writing: sketch two shapes and pick the smaller before the first line.
+
+### §P17. A flow people know from other products works the way they know it
+
+§P13 matches new code to the rest of the codebase. This matches what people go through to the rest of the products they use. Nobody learns signing up, signing in, resetting a password, checking out, editing their account or getting around a site from one product: they arrive knowing how it goes, because the products they already use do it the same way. A flow in that order needs no explaining. One in a different order, even a shorter one, makes people stop and wonder what is happening, and a confused person at a sign-in or a checkout gives up or writes to support. Being consistent with what people know beats being clever.
+
+Example: a password reset asked for the new password first, then emailed a code to confirm it. It saved a screen and it worked, and it confused the first person who used it, who expected what every other site does:
+
+1. Enter the email.
+2. Get a code (or a link) by email.
+3. Enter the code, then choose the new password.
+
+Others in the same family: a checkout that takes payment before the shipping address; a Back button inside a multi-step form that leaves the form instead of going back one step; a logo that does not lead home.
+
+Before designing a flow, write down how it usually goes, step by step, from products people already use, and start from that order. Each difference needs a reason a person going through the flow would care about; saving the developer a screen, a request or a table is not one. When the codebase already runs the flow its own way, and that way departs from the familiar one, raise it with the developer rather than copying it to a new place.
 
 ## Sweeps
 
