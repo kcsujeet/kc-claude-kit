@@ -21,6 +21,7 @@ So look at it. Once, deliberately, before saying it is done.
 - **When there is a design, the design is the test plan.** Walk it state by state and compare the app to it. "It renders" and "it matches the design" are different claims.
 - **A moved field is two screens.** When a screen stops editing a value and points elsewhere ("managed in product settings", a read-only value with a link), follow the pointer: open the destination, confirm the field is there and saves, and that the first screen shows the new value without a reload. Compare the destination with the design's version of it too. A pointer to a screen that cannot edit the value is a bug, and so is a read-only value that no screen edits.
 - **Trace a layout bug before parking it.** A reported layout defect (a gap, a bar, content past its background) is read in code first: the element's styles, then every ancestor up to the root layout (display, fixed sizes, overflow, backgrounds). "Needs a look in the browser" is not a status; reproduce it there with the same content size the report shows.
+- **Nobody should have to learn the product to use it.** Use the change as a person who has never seen the product and wants to get something done, not as the person who built it. Anything that makes them stop and work it out (hunt, scroll, guess, read instructions, remember another screen) is a usability finding, even when every element works as built: people who have to learn a product to use it give up on it (Step 3b).
 - **Look at the shipped screen, not a stand-in.** A story, fixture page or test harness is not the app. Check the change where users see it, with its real configuration, and treat a probe as evidence only after it has been shown it can fail (see `kc-verify:kc-e2e`).
 
 ## Workflow
@@ -86,6 +87,13 @@ Each state above can look right while the path into it is broken. QA by a person
 - **Clear every field you can edit, and save; then enter an invalid value and save.** Expect a message on the field, or a sensible default, never a generic error.
 - **Discard every kind of change.** In each section with Save and Discard, change a field, pick a file and remove a file, then Discard. The saved record is unchanged after a reload, with no request sent before Save.
 - **Read every confirmation against what happens.** After confirming, check the result matches the words: "remove" that deletes, or "delete" that only unlinks, is a finding. Read alerts and helper text the same way, as the user would: plain words, no internal terms, no stray spaces around an inserted value.
+- **Walk it as someone new to the product.** For each changed screen, name the goal it serves (choose a plan, add a storefront, fix a failed order) and reach it from each entry point the way a person who has never seen the product would. Note every place you had to stop and work something out, even where everything works as built:
+  - an action that lands away from what it names: "Choose a plan" opening the top of a page with the plans out of sight, "Add a storefront" opening the list instead of the form;
+  - a screen that doesn't show what it is for or what to do next: an empty list with no way to add the first item, a success message with nowhere to go;
+  - a control placed where nobody would look for it, or a step that needs something from another screen the person has to remember, or doesn't have yet;
+  - an error that says what went wrong but not what to do, or a dead end with no way back or forward.
+
+  Look once the page has finished loading, since content that arrives late (a signed-in header, a banner) can push what matters out of view. A flow people know from other products keeps the order they know (`kc-conventions:kc-simplicity` §P17).
 - **See signed-in state everywhere it shows.** Sign in from each entry point, then check every surface that shows who is signed in, and what a signed-in person should and shouldn't see.
 - **Fill it past the screen.** Make a list or page taller than the viewport and check the background, footer and scrolling hold.
 - **Start from a fresh record.** Create the thing through the UI and take it through the whole flow it exists for. When a result looks wrong, check the inputs before calling it a bug: a total of zero explains a skipped payment.
@@ -162,6 +170,7 @@ Do not report a UI change verified until every box is ticked:
 - [ ] Every editable field was cleared and saved, and saved with an invalid value; every confirmation's words were checked against what actually happened, and every alert read for plain wording.
 - [ ] In each section with Save and Discard, a field change, a picked file and a removed file were each discarded, and the saved record was unchanged after a reload.
 - [ ] Each create form was submitted for every option that changes it, and the new record's landing state (on or off, sections shown) was compared with the design.
+- [ ] Each changed screen was walked toward its goal from each entry point as someone new to the product, after the page finished loading, and every place that made the person stop and work something out (an action landing away from what it names, no clear next step, a control nobody would find, a dead end, an error with no way forward) is reported as a finding.
 - [ ] Signed-in state was checked on every surface that shows it, after signing in from each entry point.
 - [ ] A list or page was filled past the viewport, and a record created fresh through the UI was taken through its whole flow.
 - [ ] Every reported layout defect was traced through its ancestors in code and reproduced at the content size the report shows, before it was fixed or left open.
