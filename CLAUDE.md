@@ -22,9 +22,19 @@ A lesson arrives as one case; the rule is the habit that catches the whole class
 
 Lessons arrive from the maintainer's other work: a correction, a review comment or a QA finding that would have been caught by a habit. Each becomes its own PR here, written to the two sections above, and is merged once its checks pass, so installs get it on their next update.
 
+## Versions
+
+Raise a changed plugin's `plugin.json` version by the smallest step that fits. Semver's "new behavior is a minor" doesn't apply here: a new rule is the everyday change, and a minor for each one says more changed than did.
+
+- **Patch:** a rule, checklist box, example or wording added to or changed in an existing skill, agent or script, and any fix. Almost every PR, every lesson included.
+- **Minor:** a new skill, agent, hook or command in the plugin.
+- **Major:** renaming or removing something an install relies on (a plugin, skill, agent or installed rule file), so users must reinstall or rerun something.
+
+When unsure, it is a patch; ask before going higher.
+
 ## Before a PR
 
-Run `/kc-gates:kc-ready-for-review`: it walks `.claude/hand-off-checklist.md`, which checks the two sections above and the version bump.
+Run `/kc-gates:kc-ready-for-review`: it walks `.claude/hand-off-checklist.md`, which checks the rules above and the version bump.
 
 ## Developing
 
