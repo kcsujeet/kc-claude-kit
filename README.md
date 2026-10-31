@@ -15,6 +15,7 @@ Sujeet's personal Claude Code toolkit for any codebase: portable coding conventi
 ## Contents
 
 - [Install](#install)
+  - [Staying up to date](#staying-up-to-date)
 - [Writing code: the conventions](#writing-code-the-conventions)
 - [Reviewing code](#reviewing-code)
 - [Delivering a plan with autopilot](#delivering-a-plan-with-autopilot)
@@ -97,6 +98,29 @@ And no thumbnails at all:
 Copying an image file in Finder (⌘C on the file) puts the file's icon on the clipboard, not the picture, so ctrl+v pastes the file type's generic icon (a grey "JPG" page, say). `kc-image-preview` checks the clipboard when a new tag appears; if it holds a copied image file, the thumbnail shows the real file, and on send Claude gets a note naming that file so it reads the real image. The icon is still attached to the prompt: a plugin cannot remove an attachment.
 
 It is built on Claude Code's function hooks, like `kc-usage-band`. It reads the prompt every 300ms to spot new tags, and finds each image in Claude Code's paste cache, `<tmp>/<project>/<session>/images/<n>.<ext>`. Neither is a documented contract, so a Claude Code update can move them.
+
+### Staying up to date
+
+Turn on auto-update for this marketplace: `/plugin`, the Marketplaces tab, `kc-claude-kit`, **Enable auto-update**. It is off by default for every marketplace that isn't Anthropic's ([keep plugins updated](https://code.claude.com/docs/en/discover-plugins#keep-plugins-updated)).
+
+That alone isn't enough where `DISABLE_AUTOUPDATER=1` is set: it switches off the plugin update pass too ([when auto-update runs](https://code.claude.com/docs/en/plugins/loading#when-auto-update-runs)). Sessions in the Claude desktop app have been seen starting with it set, with nothing in the user's shell or settings setting it. `FORCE_AUTOUPDATE_PLUGINS=1` turns plugin updates back on ([environment variables](https://code.claude.com/docs/en/env-vars)). Put it in `~/.claude/settings.json`, where it applies however Claude Code is launched:
+
+```json
+{
+  "env": {
+    "FORCE_AUTOUPDATE_PLUGINS": "1"
+  }
+}
+```
+
+Then, in each interactive session, Claude Code updates the kit's plugins on disk within about ten minutes of your first message. The session that updated keeps the versions it loaded until `/reload-plugins`; the next one loads the new ones. To check, `claude plugin list` shows each plugin's version. To update right away instead of waiting:
+
+```bash
+claude plugin marketplace update kc-claude-kit
+claude plugin update kc-conventions@kc-claude-kit   # and each other kit plugin you installed
+```
+
+The rules `/kc-conventions:kc-init` copied don't update with the plugin. The `SessionStart` hook says when they are older than it; run `/kc-conventions:kc-init` again then.
 
 ## Writing code: the conventions
 
@@ -332,7 +356,7 @@ Results land in `plugins/<name>/evals/results/`, which is ignored.
 
 ### Releasing
 
-`version` lives in each plugin's `plugin.json` only; the marketplace entries carry none, since a marketplace version is silently masked by `plugin.json` ([marketplaces](https://code.claude.com/docs/en/plugin-marketplaces)). Every pull request that changes a plugin bumps its `plugin.json` version (a patch for a small change), with a `CHANGELOG.md` entry; CI's `version-bumps` job fails it otherwise, since installed plugins update only when their version goes up. Users who turn on auto-update for this marketplace (`/plugin`, Marketplaces) then get each merge within minutes of starting a session. To tag a release, commit, then tag from the plugin directory:
+`version` lives in each plugin's `plugin.json` only; the marketplace entries carry none, since a marketplace version is silently masked by `plugin.json` ([marketplaces](https://code.claude.com/docs/en/plugin-marketplaces)). Every pull request that changes a plugin bumps its `plugin.json` version (a patch for a small change), with a `CHANGELOG.md` entry; CI's `version-bumps` job fails it otherwise, since installed plugins update only when their version goes up. Users who turn on auto-update for this marketplace, with `FORCE_AUTOUPDATE_PLUGINS=1` where `DISABLE_AUTOUPDATER` is set ([Staying up to date](#staying-up-to-date)), then get each merge within minutes of starting a session. To tag a release, commit, then tag from the plugin directory:
 
 ```bash
 cd plugins/kc-conventions

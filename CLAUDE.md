@@ -20,7 +20,7 @@ A lesson arrives as one case; the rule is the habit that catches the whole class
 
 ## Lessons
 
-Lessons arrive from the maintainer's other work: a correction, a review comment or a QA finding that would have been caught by a habit. Each becomes its own PR here, written to the two sections above, and is merged once its checks pass, so installs get it on their next update.
+Lessons arrive from the maintainer's other work: a correction, a review comment or a QA finding that would have been caught by a habit. Each becomes its own PR here, written to the two sections above, and is merged once its checks pass, so installs get it on their next update. Installs update only with auto-update on for this marketplace and, where `DISABLE_AUTOUPDATER=1` is set (desktop app sessions have been seen with it set), `FORCE_AUTOUPDATE_PLUGINS=1` in `~/.claude/settings.json`; the README's "Staying up to date" says how. When a lesson doesn't show up in a session, check `claude plugin list` before assuming it loaded.
 
 Before writing a lesson:
 
