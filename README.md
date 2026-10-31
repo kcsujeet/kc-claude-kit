@@ -106,7 +106,7 @@ Each convention topic is one skill. It holds the rules to write against and the 
 | `naming` | source files | One word per concept, role-not-type names, verb-noun functions, booleans as assertions, unambiguous where read not where declared, named predicates, file names that stand without their path |
 | `clarity` | source files | Ternary limits, early returns, comments that earn their place, magic numbers, no defensive coercion |
 | `structure` | source files | One responsibility per unit, co-location and promotion, no barrels, named exports, lookup over switch |
-| `simplicity` | source files | DRY, YAGNI and KISS; look for what already exists before hand-rolling it |
+| `simplicity` | source files | DRY, YAGNI and KISS; look for what already exists before hand-rolling it; flows people know from other products (sign-in, password reset, checkout) work the way they know them |
 | `datetime` | source files | No hand-rolled date math, ISO 8601 with offset, truncation accounting, timezone and clock as settings |
 | `react` | components, hooks, api | Components own their container, reads and writes in separate hooks, cache-patch before invalidate, form is the source of truth |
 | `rails` | Ruby, rake, Gemfile, `db/` | Copy siblings of the same kind, one check in one place, locks before checks, N+1s that preloading does not fix, GETs never write, backfills that know every writer, honest Rails specs |
@@ -161,7 +161,7 @@ Two rules keep findings honest:
 | naming | `kc-gates:naming-gate` | every diff | Role names, honest names, extracted boolean chains, names unambiguous where read, verb-led functions, file names |
 | clarity | `kc-gates:clarity-gate` | every diff | Ternaries, guard clauses, comments, magic numbers, casts and `any` that lie, defensive coercion |
 | structure | `kc-gates:structure-gate` | every diff | One responsibility, co-location, no barrels, dead wrappers, lookups over `switch`, breaking changes named |
-| simplicity | `kc-gates:simplicity-gate` | every diff | DRY, YAGNI, KISS; reuse of what already exists, searched by shape as well as by name |
+| simplicity | `kc-gates:simplicity-gate` | every diff | DRY, YAGNI, KISS; reuse of what already exists, searched by shape as well as by name; familiar user flows kept in their familiar order |
 | correctness | `kc-gates:correctness-gate` | every diff | Logic bugs, edge cases (empty, null, zero, boundary, timezone), data matching its declared type at a boundary, no regression of a bug the repo already fixed |
 | datetime | `kc-gates:datetime-gate` | diff touches date/time logic | No hand-rolled date math, ISO 8601 with offset, truncation, timezone as an input |
 | react | `kc-gates:react-gate` | diff has React/JSX UI code | Bulletproof-react structure, keys, data-fetching hooks, forms, render cost |
