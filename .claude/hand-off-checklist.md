@@ -16,5 +16,6 @@ Read by `kc-gates:kc-ready-for-review` before a pull request here is opened or m
 
 ## It reaches people
 
-- [ ] Each changed plugin's `plugin.json` version is raised (a patch for a small change) and `CHANGELOG.md` has the entry; CI's `version-bumps` job checks the first.
+- [ ] Each changed plugin's `plugin.json` version is raised by the level `CLAUDE.md`'s Versions section gives: a patch for a new or changed rule, box, example or fix; a minor only for a new skill, agent, hook or command; a major only for a rename or removal. CI's `version-bumps` job checks that it went up, not the level.
+- [ ] `CHANGELOG.md` has the entry, with the same version.
 - [ ] A rule added to a topic skill has a box on that skill's review checklist, and `rules/` was regenerated.
