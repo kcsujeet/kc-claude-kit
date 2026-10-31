@@ -10,7 +10,7 @@ Sujeet's personal Claude Code toolkit for any codebase: portable coding conventi
 | `kc-conventions` | The conventions themselves, one skill per topic, each with its authoring rules, its review checklist and the scripts that check them. `/kc-conventions:kc-init` installs the rules into a project. |
 | `kc-gates` | Reviews a PR, branch or diff with one read-only gate agent per convention topic, and returns a single PASSED or FAILED verdict. Posting to GitHub is a separate skill that only you can run, behind a hook. |
 | `kc-instructions` | Audits a repo's instruction setup and proposes what stays in CLAUDE.md, what becomes a path-scoped rule, a skill, or a hook. |
-| `kc-verify` | Verification workflows: look at the UI before calling it done, and drive a cross-layer change end to end. |
+| `kc-verify` | Verification workflows: look at the UI before calling it done, check a person can use it, and drive a cross-layer change end to end. |
 
 ## Contents
 
@@ -60,6 +60,7 @@ Most skills trigger on their own:
 | "review this PR", "review my changes" | `kc-gates:kc-code-review` |
 | "audit my CLAUDE.md", "should this be a skill or a rule" | `kc-instructions:kc-audit` |
 | "does this look right" | `kc-verify:kc-ui` |
+| "is this easy to use", "check the flow" | `kc-verify:kc-ux` |
 | "test this end to end" | `kc-verify:kc-e2e` |
 | "run this plan", "autopilot this" | `kc-autopilot:kc-run` |
 | (the topic comes up) | `kc-conventions:kc-<topic>` |

@@ -1,6 +1,6 @@
 ---
 name: kc-ui
-description: Verify a UI change visually before calling it done. Trigger on "check the UI", "does this look right", "verify my UI change", "screenshot this page", "check dark mode", "check mobile", or before reporting a frontend change complete. Drives the actual screen with realistic data across states, viewports, themes and font scales, and reports what was checked and what was seen. Use when a change touches anything a person looks at.
+description: Verify a UI change visually before calling it done: does it look right. Trigger on "check the UI", "does this look right", "verify my UI change", "screenshot this page", "check dark mode", "check mobile", or before reporting a frontend change complete. Drives the actual screen with realistic data across states, viewports, themes and font scales, and reports what was checked and what was seen. Use when a change touches anything a person looks at. Whether a person can use it (flows, where actions land, wording) is kc-ux.
 ---
 
 # Verifying a UI change
@@ -8,6 +8,8 @@ description: Verify a UI change visually before calling it done. Trigger on "che
 A green test suite tells you nothing about whether the screen looks right. Unit tests assert the values; they do not notice that the heading is clipped, the empty state never renders, or the total sits under a sticky footer.
 
 So look at it. Once, deliberately, before saying it is done.
+
+This skill checks that it looks right. Whether a person can use it (the flows, where each action lands, what the words say) is `kc-verify:kc-ux`; a change a person both sees and uses gets both.
 
 ## Hard rules
 
@@ -19,9 +21,7 @@ So look at it. Once, deliberately, before saying it is done.
 - **State what you could not check.** No device, no seed data, no access to that route: say so explicitly rather than quietly narrowing the sweep.
 - **Spot checks are not QA.** Opening the screen you just changed and seeing that it renders is a smoke test. QA walks every state the screen can be in, the way a QA engineer works through a test plan, and does that every time, not only when asked.
 - **When there is a design, the design is the test plan.** Walk it state by state and compare the app to it. "It renders" and "it matches the design" are different claims.
-- **A moved field is two screens.** When a screen stops editing a value and points elsewhere ("managed in product settings", a read-only value with a link), follow the pointer: open the destination, confirm the field is there and saves, and that the first screen shows the new value without a reload. Compare the destination with the design's version of it too. A pointer to a screen that cannot edit the value is a bug, and so is a read-only value that no screen edits.
 - **Trace a layout bug before parking it.** A reported layout defect (a gap, a bar, content past its background) is read in code first: the element's styles, then every ancestor up to the root layout (display, fixed sizes, overflow, backgrounds). "Needs a look in the browser" is not a status; reproduce it there with the same content size the report shows.
-- **Nobody should have to learn the product to use it.** Use the change as a person who has never seen the product and wants to get something done, not as the person who built it. Anything that makes them stop and work it out (hunt, scroll, guess, read instructions, remember another screen) is a usability finding, even when every element works as built: people who have to learn a product to use it give up on it (Step 3b).
 - **Look at the shipped screen, not a stand-in.** A story, fixture page or test harness is not the app. Check the change where users see it, with its real configuration, and treat a probe as evidence only after it has been shown it can fail (see `kc-verify:kc-e2e`).
 
 ## Workflow
@@ -74,36 +74,13 @@ For each surface, look at every state it can be in, not only the populated one:
 
 A missing empty state and a missing loading state are the two most commonly shipped omissions, because the developer's data is always already there.
 
-### Step 3b — walk the flows around the change
-
-Each state above can look right while the path into it is broken. QA by a person finds these first, because a person moves between screens and keeps going. Walk them on every surface the change reaches:
-
-- **Switch context mid-page.** Change the current tenant, workspace or account while on each changed page. Every panel follows, with no reload; a record that belongs to the previous context shows a clear not-found, not a blank or half-loaded page.
-- **Go where the write shows up.** After each create, edit, archive or delete, visit every other screen that shows something derived from it (a list, a count, a badge, a picker on another page) without reloading, and check it changed, and that it didn't appear where its filters exclude it.
-- **Use the records real data holds.** Include records the new screens can no longer create: blank optional fields, old links, defaults from before a migration. Then try the new actions next to them (create one more, link, delete).
-- **Keep archived records around.** Archive, deactivate or soft-delete one of each kind the screen counts or lists, then check every count, list and picker leaves it out unless it says otherwise.
-- **Cross the tenant line.** View a record linked to records in another tenant or workspace from this one: the others show by name or not at all, never as raw ids, and can't be changed from here.
-- **Do each interaction twice.** Search, pick, search again, pick again; add, remove, add; open, close, reopen. State that survives one pass often breaks on the second.
-- **Clear every field you can edit, and save; then enter an invalid value and save.** Expect a message on the field, or a sensible default, never a generic error.
-- **Discard every kind of change.** In each section with Save and Discard, change a field, pick a file and remove a file, then Discard. The saved record is unchanged after a reload, with no request sent before Save.
-- **Read every confirmation against what happens.** After confirming, check the result matches the words: "remove" that deletes, or "delete" that only unlinks, is a finding. Read alerts and helper text the same way, as the user would: plain words, no internal terms, no stray spaces around an inserted value.
-- **Walk it as someone new to the product.** For each changed screen, name the goal it serves (choose a plan, add a storefront, fix a failed order) and reach it from each entry point the way a person who has never seen the product would. Note every place you had to stop and work something out, even where everything works as built:
-  - an action that lands away from what it names: "Choose a plan" opening the top of a page with the plans out of sight, "Add a storefront" opening the list instead of the form;
-  - a screen that doesn't show what it is for or what to do next: an empty list with no way to add the first item, a success message with nowhere to go;
-  - a control placed where nobody would look for it, or a step that needs something from another screen the person has to remember, or doesn't have yet;
-  - an error that says what went wrong but not what to do, or a dead end with no way back or forward.
-
-  Look once the page has finished loading, since content that arrives late (a signed-in header, a banner) can push what matters out of view. A flow people know from other products keeps the order they know (`kc-conventions:kc-simplicity` §P17).
-- **See signed-in state everywhere it shows.** Sign in from each entry point, then check every surface that shows who is signed in, and what a signed-in person should and shouldn't see.
-- **Fill it past the screen.** Make a list or page taller than the viewport and check the background, footer and scrolling hold.
-- **Start from a fresh record.** Create the thing through the UI and take it through the whole flow it exists for. When a result looks wrong, check the inputs before calling it a bug: a total of zero explains a skipped payment.
+Then fill a list or page taller than the viewport and check the background, footer and scrolling hold.
 
 ### Step 4 — vary the environment
 
 - **Narrow and wide viewport.** The narrow one is where things break; check it first.
 - **Dark and light**, if the project supports both. A colour defined only inside one theme block is invisible in the other.
 - **Largest font scale** the platform offers. Text that fits at default clips at 200%.
-- **Keyboard only**, for anything interactive: is focus visible, and can you reach every control?
 
 ### Step 5 — look for the specific defects
 
@@ -158,23 +135,12 @@ Do not report a UI change verified until every box is ticked:
 - [ ] Every drawer and dialog was opened and filled in: empty, one item picked, several picked, and editing an existing item.
 - [ ] The app was put in every state of the matrix and compared to the design section by section, not only the state you happened to land in.
 - [ ] Every new or changed component was measured against its siblings on the same screen (title, subtitle, field labels, spacing).
-- [ ] Every pointer to another screen ("managed in X", a read-only value with a link) was followed: the destination has the field, it saves, the first screen shows the new value without a reload, and the destination matches the design's version. Every read-only value has a screen that edits it, or the report names it as a bug.
 - [ ] Each finding is about structure or behaviour; cosmetic differences where the app has an existing pattern (titles, labels, casing, icons) follow the app.
 - [ ] Loading, empty and error states were each seen.
-- [ ] Each changed page was re-checked after switching the current tenant or workspace on it, with no reload.
-- [ ] After each write, every other screen showing data derived from it (lists, counts, badges, pickers) was visited without a reload, including filtered ones it must not appear in.
-- [ ] Records in states the new UI can't create (blank optional fields, old links, pre-migration defaults) were used next to the new actions.
-- [ ] Archived, deactivated and soft-deleted records were checked out of every count, list and picker.
-- [ ] A record linked to another tenant's records was viewed from this tenant: no raw ids, nothing of theirs editable.
-- [ ] Each interaction was done twice in a row (search and pick twice; add, remove, add).
-- [ ] Every editable field was cleared and saved, and saved with an invalid value; every confirmation's words were checked against what actually happened, and every alert read for plain wording.
-- [ ] In each section with Save and Discard, a field change, a picked file and a removed file were each discarded, and the saved record was unchanged after a reload.
 - [ ] Each create form was submitted for every option that changes it, and the new record's landing state (on or off, sections shown) was compared with the design.
-- [ ] Each changed screen was walked toward its goal from each entry point as someone new to the product, after the page finished loading, and every place that made the person stop and work something out (an action landing away from what it names, no clear next step, a control nobody would find, a dead end, an error with no way forward) is reported as a finding.
-- [ ] Signed-in state was checked on every surface that shows it, after signing in from each entry point.
-- [ ] A list or page was filled past the viewport, and a record created fresh through the UI was taken through its whole flow.
+- [ ] A list or page was filled past the viewport, and the background, footer and scrolling held.
 - [ ] Every reported layout defect was traced through its ancestors in code and reproduced at the content size the report shows, before it was fixed or left open.
-- [ ] Narrow viewport, the other theme and a keyboard pass were done, or the report says why not.
+- [ ] Narrow viewport, the other theme and the largest font scale were done, or the report says why not.
 - [ ] Every UI fix was seen fixed in a browser before it was reported done or anyone was told it is fixed, internal admin pages included (signed in through a dev-only credential, as in Step 2), not only covered by specs.
 - [ ] The report lists each state checked, each finding with the state that produces it, and what was not checked.
 - [ ] After a QA pass on shipped work, no code changed until the user agreed which findings are bugs, which are questions, and which go in a hotfix versus a ticket.

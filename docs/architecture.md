@@ -48,7 +48,7 @@ kc-claude-kit/
     │   ├── hooks/hooks.json                # PreToolUse guard for kc-autopilot:* agents
     │   ├── scripts/*.sh                    # guard, read-config, validate-plan, worktree, boot-app, run-checks, qa-browser, pr-body, ...
     │   └── tests/                          # script runners, workflow syntax and simulation; e2e/ is manual and costs money
-    ├── kc-verify/                          # kc-ui and kc-e2e skills
+    ├── kc-verify/                          # kc-ui, kc-ux and kc-e2e skills
     ├── kc-instructions/                    # kc-audit skill; the claude- prefix is reserved
     ├── kc-usage-band/                      # mod
     └── kc-image-preview/                   # mod

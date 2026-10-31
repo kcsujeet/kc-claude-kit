@@ -5,6 +5,7 @@ tools: Read, Write, Bash
 model: sonnet
 skills:
   - kc-verify:kc-ui
+  - kc-verify:kc-ux
   - kc-verify:kc-e2e
 ---
 
