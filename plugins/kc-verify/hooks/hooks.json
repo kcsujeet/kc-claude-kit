@@ -1,0 +1,17 @@
+{
+  "description": "Says when the session runs an older kc-verify than is installed, so Claude asks for /reload-plugins",
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/check-loaded-version.sh\"",
+            "shell": "bash",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}
