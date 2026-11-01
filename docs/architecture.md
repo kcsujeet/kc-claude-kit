@@ -33,8 +33,9 @@ kc-claude-kit/
     │   │   ├── kc-post-review/             # user-invoked only: drafting and posting comments
     │   │   └── kc-ready-for-review/SKILL.md # the one pass before a PR goes to a reviewer
     │   ├── agents/<topic>-gate.md          # one gate agent per topic, plus project-conventions-gate.md and verification-gate.md
-    │   ├── hooks/hooks.json                # hand-off reminder at session start; blocks unapproved GitHub posts and unreviewed hand-offs
+    │   ├── hooks/hooks.json                # hand-off reminder at session start; keeps the marketplace's plugins current and says when the session runs an older kc-gates; blocks unapproved GitHub posts and unreviewed hand-offs
     │   ├── scripts/guard-github-post.sh, guard-hand-off.sh, lib/hook-input.sh
+    │   ├── scripts/update-marketplace.sh, check-loaded-version.sh  # plugin updates during a session; every plugin links the check
     │   ├── scripts/*.sh                    # gather-review, scope-facts, review-threads, build-comment-payloads
     │   ├── tests/
     │   └── evals/
