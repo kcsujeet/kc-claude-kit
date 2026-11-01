@@ -20,7 +20,11 @@ The reviewer should find nothing the project's rules already say. This pass is w
 1. **Review the code:** run `kc-gates:kc-code-review` on the PR's whole diff. It includes the project-conventions gate, which grades the repo's own `.claude/review-conventions.md`.
 2. **Check the hand-off:** grade every box in the repo's `.claude/hand-off-checklist.md` against the PR as it will be read, not the diff: its title and description, the linked ticket, the paired or stacked PRs, the flags and tasks it names. No such file: check the description against the repo's PR template and say so.
 3. **QA:** for a change a person sees, walk it in the running app with `kc-verify:kc-ui` (how it looks), `kc-verify:kc-ux` (whether a person can use it) and the project's QA rules, every state the change reaches. For one nobody sees, run the specs that cover it and exercise the endpoint, job or admin screen it changed.
-4. **Fix everything found** in one go. A finding that needs a decision (two rules disagree, the fix changes behaviour the ticket didn't ask for, the rule looks wrong for this case) is asked, not fixed.
+4. **Fix everything found** in one go, so that round 2 finds nothing new. The fixes are new code, held to every rule of every gate, not only the one that raised each (`kc-code-review`: any fix must itself pass every rule, of every gate). A fix checked only against its own rule brings a new finding into round 2: a rename whose new name no longer says what the value holds, a function moved to fix a structure finding that now imports across layers, a helper extracted for simplicity and named for how it works instead of what it answers.
+   - **Before committing the fixes,** walk every line they changed against every gate's checklist, the hand-off checklist and the QA rules, yourself (this is not a second gate fan-out), and fix what that turns up.
+   - **Ask in round 1, don't pick,** when a finding needs a decision: two gates' fixes for one construct conflict (one wants a list, the other an object), the fix changes behaviour the ticket didn't ask for, or the rule looks wrong for this case. Show conflicting fixes side by side and wait; applying one quietly makes the other a round-2 finding (`kc-code-review`: when two gates' fixes conflict, the user chooses).
+
+   Example: a pass whose round 2 raised 12 items, 7 of them inside round 1's own fixes, plus a list-vs-object conflict the author settled alone.
 
 ### Round 2
 
@@ -37,7 +41,7 @@ When round 1 finds nothing, there is no round 2.
    bash "${CLAUDE_PLUGIN_ROOT}/scripts/ready-receipt.sh" write <full-sha> --rounds <1|2> --open <count>
    ```
 
-8. **Fixes the user picks** from the open list: apply them, run the specs and lint they touch, push, and write `ready-receipt.sh write <new-sha> --after <pass-sha>`. That is not a third round. Any other change after the pass needs a new pass.
+8. **Fixes the user picks** from the open list: apply them, walk the lines they changed as in step 4, run the specs and lint they touch, push, and write `ready-receipt.sh write <new-sha> --after <pass-sha>`. That is not a third round. Any other change after the pass needs a new pass.
 
 ## The guard
 
@@ -57,7 +61,7 @@ Chat, short:
 
 | Check | Round 1 | Round 2 |
 |-------|---------|---------|
-| Code review | <n> found, fixed | PASS · <n> open |
+| Code review | <n> found, fixed, fixes walked against every gate · <n> asked | PASS · <n> open |
 | Hand-off checklist | … | … |
 | QA | <what was walked> | … |
 
