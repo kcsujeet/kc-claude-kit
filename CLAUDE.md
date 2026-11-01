@@ -20,7 +20,7 @@ A lesson arrives as one case; the rule is the habit that catches the whole class
 
 ## Lessons
 
-Lessons arrive from the maintainer's other work: a correction, a review comment or a QA finding that would have been caught by a habit. Each becomes its own PR here, written to the two sections above, and is merged once its checks pass, so installs get it on their next update. Installs update only with auto-update on for this marketplace and, where `DISABLE_AUTOUPDATER=1` is set (desktop app sessions have been seen with it set), `FORCE_AUTOUPDATE_PLUGINS=1` in `~/.claude/settings.json`; the README's "Staying up to date" says how. kc-gates' hooks then update installs during a session too, and tell Claude when a session runs older versions than are installed, so it asks for `/reload-plugins`, which only the person can run. When a lesson still doesn't show up, check `claude plugin list` before assuming it loaded.
+Lessons arrive from the maintainer's other work: a correction, a review comment or a QA finding that would have been caught by a habit. Each becomes its own PR here, written to the two sections above, and is merged once its checks pass, so installs get it on their next update. Installs update only with auto-update on for this marketplace and, where `DISABLE_AUTOUPDATER=1` is set (desktop app sessions have been seen with it set), `FORCE_AUTOUPDATE_PLUGINS=1` in `~/.claude/settings.json`; the README's "Staying up to date" says how. kc-gates also updates installs during a session, and each plugin tells Claude when the session runs an older version of it than is installed, so Claude asks the person to type `/reload-plugins`. When a lesson still doesn't show up, check `claude plugin list` before assuming it loaded.
 
 Before writing a lesson:
 
