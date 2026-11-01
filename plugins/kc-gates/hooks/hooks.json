@@ -1,5 +1,5 @@
 {
-  "description": "Reminds every session to run kc-ready-for-review before a PR goes to a reviewer, and the kit's maintainer to ship lessons; blocks GitHub review writes (PR and issue comments, reviews) that lack the KC_REVIEW_POST_APPROVED=1 approval token, and PR hand-offs to review (gh pr ready, a ready gh pr create, adding a reviewer) whose head commit has no kc-ready-for-review receipt, and draft PRs too where the repo's hand-off checklist says drafts: true",
+  "description": "Reminds every session to run kc-ready-for-review before a PR goes to a reviewer, and the kit's maintainer to ship lessons; keeps its marketplace's plugins updated during a session and says when the session runs older versions than are installed; blocks GitHub review writes (PR and issue comments, reviews) that lack the KC_REVIEW_POST_APPROVED=1 approval token, and PR hand-offs to review (gh pr ready, a ready gh pr create, adding a reviewer) whose head commit has no kc-ready-for-review receipt, and draft PRs too where the repo's hand-off checklist says drafts: true",
   "hooks": {
     "SessionStart": [
       {
@@ -8,6 +8,16 @@
           {
             "type": "command",
             "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/session-start.sh\"",
+            "shell": "bash"
+          }
+        ]
+      },
+      {
+        "matcher": "startup|resume",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/check-loaded-versions.sh\" snapshot",
             "shell": "bash"
           }
         ]
@@ -27,6 +37,24 @@
             "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/guard-hand-off.sh\"",
             "shell": "bash",
             "timeout": 30
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/check-loaded-versions.sh\" check",
+            "shell": "bash",
+            "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/update-marketplace.sh\"",
+            "shell": "bash",
+            "async": true
           }
         ]
       }

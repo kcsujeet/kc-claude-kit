@@ -113,7 +113,7 @@ That alone isn't enough where `DISABLE_AUTOUPDATER=1` is set: it switches off th
 }
 ```
 
-Then, in each interactive session, Claude Code updates the kit's plugins on disk within about ten minutes of your first message. The session that updated keeps the versions it loaded until `/reload-plugins`; the next one loads the new ones. To check, `claude plugin list` shows each plugin's version. To update right away instead of waiting:
+Then, in each interactive session, Claude Code updates the kit's plugins on disk within about ten minutes of your first message. With `kc-gates` installed, a hook keeps checking after that: at most every ten minutes, when you send a message, it compares the marketplace with its source and updates the kit's plugins when something new was merged, under the same switches. The session keeps the versions it loaded until `/reload-plugins`, which only you can run; a second hook tells Claude when the session runs older versions than are installed, and Claude asks you to reload. To check, `claude plugin list` shows each plugin's version. To update right away instead of waiting:
 
 ```bash
 claude plugin marketplace update kc-claude-kit
@@ -308,6 +308,8 @@ The deterministic steps are scripts, each with fixture tests, so the model runs 
 | `guard-github-post.sh` | The `PreToolUse` hook that blocks GitHub review writes without the approval token |
 | `ready-receipt.sh (write <sha> (--rounds <n> --open <n> \| --after <pass-sha> \| --checklist) \| check <sha>)` | Used by `kc-ready-for-review`: writes or checks the receipt for the commit a pass ended on, under `~/.claude/kc-ready-for-review/` (`KC_READY_DIR` overrides) |
 | `guard-hand-off.sh` | The `PreToolUse` hook that blocks handing a PR to review until its head commit has a receipt, and a draft PR too where the hand-off checklist says `drafts: true` |
+| `update-marketplace.sh` | The background `UserPromptSubmit` hook that, at most every ten minutes, updates the marketplace this copy came from and the plugins installed from it when its source moved, under Claude Code's auto-update switches |
+| `check-loaded-versions.sh (snapshot \| check)` | The hooks that record the versions a session loaded (`SessionStart`) and, on each message (`UserPromptSubmit`), tell Claude once when one installed is newer, so it asks you for `/reload-plugins` |
 
 **Convention checks** (`plugins/kc-conventions/`):
 
