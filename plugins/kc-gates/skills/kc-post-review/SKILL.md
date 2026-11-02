@@ -20,6 +20,7 @@ Before producing the first draft, paste this checklist in chat with each box exp
 - [ ] Replies to feedback on OUR OWN PR are one sentence unless a listed exception applies (see "Replying to feedback on your own PR"). A reply that declines sounds like a person talking, humble and plain: a soft "I think we need this" is fine, a ruling ("I'd rather", "Keeping it") is not, and so is a stock close or emoji ("if that's okay", 🙂). No restating the reviewer's point, no explaining why they were right, no precedent for a change they already asked for.
 - [ ] Any draft the user will post under their own name (an issue tracker comment, a chat message), not only a PR comment, follows these tone rules and the user's voice (see "Tone rules"), checked against a few of the user's own past messages in that place. No option headings, bold labels or "(my recommendation)" tags; a recommendation is one plain sentence.
 - [ ] Courtesy, in the user's own voice: plainly say what is hard or wrong, then what would help, the way a person would say it out loud. There is no stock opener: not "Could we", not "Worth", not "Would be better", not any phrase used as a formula. Read the drafts side by side; if two open or are built the same way, rewrite one. Ask a question only when it is a real question. No bare command as the opener (`Drop`, `Rename`, `Move`, `Use`, etc.). Politeness is non-negotiable; brevity does not excuse curtness, and the label (`issue` / `chore` / `suggestion`) already signals the weight.
+- [ ] To the point: the first sentence is the problem or the ask. No sentence sets the stage, recaps what the author already did, or explains the design back to them; grounded and humble, never curt (see "Tone rules").
 - [ ] Plain words: no press-release or trailer phrasing (`demonstrably`, `a real fix`, `worth shipping on its own`, `well-scoped`, `robust`, `elegant`). Read each draft aloud; if it sounds like an announcement, rewrite it as the plain statement (`fixes the bug`, `this breaks when X`).
 - [ ] Simple words, checked not felt: reread each draft as its author would. No hard or technical words, no sentence over about 25 words, and the author never has to open the code to follow it (see "Tone rules").
 - [ ] Proof fits the reader: proof (steps, error text, repro, example) only when asked for, when the reader will use it, or to back up a review point; otherwise just the result. No greeting, and no emoji anywhere in a comment or reply (opener, close or mid-sentence), no bold list labels, messages people read in quotes rather than backticks, no closing line that repeats the point (see "Tone rules").
@@ -75,6 +76,17 @@ In rough order of frequency for review findings:
 ## Tone rules
 
 - No em dashes (`—`). Use periods, commas, parentheses, or semicolons.
+- **Say the point; don't set the stage.** The reader is an engineer. The first sentence is the problem or the ask, stated accurately, and the comment stops when that is said. Each of these is cut on its own: a sentence recapping what the author already did, a sentence explaining the design back to them, a justification past one short reason, and a softener that only performs politeness. Grounded and humble is not the same as curt: "I think", "I still see" or a real question is how a person says it. Example, with a neutral domain:
+
+  Bad:
+  ```
+  Thanks for the update, the totals now come from one place and the tests moved into the shared suite. The discount is still worked out in two places, the cart summary and the receipt, and since those use different rounding they can disagree, so it would be simpler to have one helper that both read, which would also let the rounding fix at the end go.
+  ```
+
+  Good:
+  ```
+  The cart and the receipt still work out the discount separately, so they can disagree on a 3-for-2 order. I think one shared helper is enough, and then the rounding fix isn't needed.
+  ```
 - Polite and plain, in the user's voice: name what is hard, then what would help, in whatever words fit that comment. No phrase is the house opener. "Could we", "Worth" and "Would be better" are each fine once in a while, but a set where the drafts share an opener or a sentence shape reads like a template, and the user notices.
 - **Write so a ten-year-old could follow it.** Short sentences, everyday words, straight to the point, still polite. Say what is hard and what would help; skip the theory. Words like "drift", "passthrough", "predicate", "derive", "co-locate", "invariant" and "semantics" get swapped for plain ones ("stay the same", "only hands it on", "condition", "work out"). Real comments in this voice:
   - "I find this whole section very hard to read. This can be simplified in my opinion."
@@ -125,7 +137,7 @@ In rough order of frequency for review findings:
 - No accusations or assumptions about the author's process. Describe the technical issue directly.
 - **No praise / emphasis openers when accepting feedback.** Drop "Good catch", "Good call", "Fair point", "Real bug", "Nice find". They read as performative agreement. State the action: "Switched both keys to `.filled` (...). Done in <sha>." If the change is non-obvious enough to warrant context, give it after the fact (one line, neutral) without leading with praise.
 - **Default to short replies. Long is fine when the situation calls for it.** When accepting feedback and the fix is straightforward, the ideal reply is one sentence: `Addressed in <sha>.` or `Done in <sha>.` Skip restating the suggestion or itemising what changed when the linked commit makes both obvious. Go long only when the reply needs to (a) explain a subtle tradeoff, (b) push back on the suggestion with technical reasoning, (c) clarify a non-obvious decision that lives in the commit. Brevity is the default; verbosity has to earn its place.
-- **Very polite and down to earth, always.** Write the way you'd talk to a teammate you like: warm, humble, plain. No phrasing that sounds like a ruling ("Declining", "Rejecting", "Not doing this", "I'd rather", "Keeping it as is"), even when the code stays the same. Sound human, not polite by formula: no stock closes or emoji ("if that's okay", "happy to change it if you'd prefer", 🙂). A soft first-person line like "I think we need this lock here." is how a person says it; use it where it fits, not on every reply.
+- **Grounded and humble, always.** Write the way you'd talk to a teammate you respect: humble, plain, never rude. No phrasing that sounds like a ruling ("Declining", "Rejecting", "Not doing this", "I'd rather", "Keeping it as is"), even when the code stays the same. Sound human, not polite by formula: no stock closes or emoji ("if that's okay", "happy to change it if you'd prefer", 🙂). A soft first-person line like "I think we need this lock here." is how a person says it; use it where it fits, not on every reply.
 - **Politeness throughout, regardless of length.** Soft framing applies equally to one-line replies and multi-paragraph ones. "Addressed in <sha>" is polite; "Yep, fixed" is curt. Don't sacrifice tone for terseness.
 - No attribution footers ("Generated with Claude Code", thumbs reactions, etc.).
 - **Translation/locale findings must show a concrete before/after example, not just describe the rule.** A comment that says "this should be an ICU plural in the shared strings file" leaves the author guessing at the exact shape. Include the corrected key (with the full ICU plural value) and the updated call site, in fenced blocks. Mirror an existing key the codebase already has so the shape is unambiguous. See the worked example below.
@@ -197,8 +209,8 @@ After producing the drafts and before showing them as "ready to post", paste a o
 
 ```
 **Post-draft audit:**
-1. <file:line> | length: <N sentences> | label on own line ✓ | no §X / no jargon / no press-release phrasing ✓ | no em dashes ✓ | polite, own voice ✓ | clear ask ✓ | suggestion has a reason ✓/n-a | one topic ✓ | simple words ✓ | worth posting ✓ | code earns its place, stands alone, to repo conventions ✓/n-a
-2. <file:line> | length: <N sentences> | label on own line ✓ | no §X / no jargon / no press-release phrasing ✓ | no em dashes ✓ | polite, own voice ✓ | clear ask ✓ | suggestion has a reason ✓/n-a | one topic ✓ | simple words ✓ | worth posting ✓ | code earns its place, stands alone, to repo conventions ✓/n-a
+1. <file:line> | length: <N sentences> | label on own line ✓ | no §X / no jargon / no press-release phrasing ✓ | no em dashes ✓ | polite, own voice ✓ | to the point, no stage-setting ✓ | clear ask ✓ | suggestion has a reason ✓/n-a | one topic ✓ | simple words ✓ | worth posting ✓ | code earns its place, stands alone, to repo conventions ✓/n-a
+2. <file:line> | length: <N sentences> | label on own line ✓ | no §X / no jargon / no press-release phrasing ✓ | no em dashes ✓ | polite, own voice ✓ | to the point, no stage-setting ✓ | clear ask ✓ | suggestion has a reason ✓/n-a | one topic ✓ | simple words ✓ | worth posting ✓ | code earns its place, stands alone, to repo conventions ✓/n-a
 Top-level body: none ✓ | or: says <the one thing no inline says> ✓
 …
 ```

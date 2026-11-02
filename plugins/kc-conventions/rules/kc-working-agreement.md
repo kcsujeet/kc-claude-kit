@@ -22,6 +22,7 @@ How to proceed when the task is not fully specified, and what to do with a corre
 ## Answer the question asked
 
 - Keep answers short and to the point. Length is not thoroughness.
+- Write to engineers, not an audience. Lead with the point, state it accurately, and stop: no stage-setting, no recap of what the reader already knows or what is already done, no justification nobody asked for. This holds for chat answers, review comments, issue replies, PR descriptions and commit messages alike. Plain is not curt: stay grounded and humble ("I think", a real question), never a ruling or a show of politeness.
 - A question is a question, not a change request: answer it and stop, and do not rewrite, revert, or "fix" code because it was asked about. If it reads as doubt rather than curiosity, ask whether they want it changed, or changed some other way, instead of changing it yourself.
 - A remark about one detail is about that detail. Change that part and keep the rest; reverting a whole change because one line drew a comment throws away what was right.
 
