@@ -84,8 +84,19 @@ expect_eq "source unchanged: updates nothing" "" "$(run_update)"
 commit_to "$source_repo" two
 expect_eq "source moved: updates the marketplace, then each plugin installed from it at user scope" \
   "$full_update" "$(run_update)"
-expect_eq "looked 599 seconds ago: doesn't look again" "" "$(run_update 599)"
+# Short of the interval by more than the second the clock can tick before the hook reads it.
+expect_eq "looked 590 seconds ago: doesn't look again" "" "$(run_update 590)"
 expect_eq "looked 600 seconds ago: looks again" "$full_update" "$(run_update 600)"
+
+# An update moves this plugin's install to a new version folder, while the session keeps running
+# the copy it loaded.
+cp "$config/plugins/installed_plugins.json" "$work_dir/installed_plugins.before.json"
+jq --arg moved "$config/plugins/cache/shop-kit/kc-gates/3.2.0" \
+  '.plugins["kc-gates@shop-kit"][0] |= (.installPath = $moved | .version = "3.2.0")' \
+  "$work_dir/installed_plugins.before.json" > "$config/plugins/installed_plugins.json"
+expect_eq "this plugin's install moved to a newer version than the session runs: still updates" \
+  "$full_update" "$(run_update)"
+mv "$work_dir/installed_plugins.before.json" "$config/plugins/installed_plugins.json"
 
 write_known_marketplaces false
 expect_eq "auto-update off for the marketplace: updates nothing" "" "$(run_update)"

@@ -35,10 +35,14 @@ if [ "${FORCE_AUTOUPDATE_PLUGINS:-}" != 1 ]; then
   is_env_switch_on "${CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC:-}" && exit 0
 fi
 
-# The marketplace is in the id of the install whose path is this copy. A copy loaded from a clone
-# or with --plugin-dir has no install, so no marketplace, and the autoUpdate check below stops it.
-plugin_id=$(jq -r --arg root "$loaded_root" \
-  '.plugins | to_entries[] | select(any(.value[]; .installPath == $root)) | .key' \
+# The marketplace is in the id of this plugin's install. Every install sits beside the loaded copy
+# in cache/<marketplace>/<plugin>/<version>, and an update moves it to a new version folder while
+# the session's hooks keep the loaded one
+# (https://code.claude.com/docs/en/plugins/loading#find-plugins-on-disk), so the install is matched
+# by that folder, not by this copy's path. A copy loaded from a clone or with --plugin-dir has no
+# install, so no marketplace, and the autoUpdate check below stops it.
+plugin_id=$(jq -r --arg plugin_dir "$(dirname "$loaded_root")/" \
+  'first(.plugins | to_entries[] | select(any(.value[]; .installPath | startswith($plugin_dir))) | .key) // empty' \
   "$installed_plugins_file" 2>/dev/null)
 marketplace=${plugin_id#*@}
 
