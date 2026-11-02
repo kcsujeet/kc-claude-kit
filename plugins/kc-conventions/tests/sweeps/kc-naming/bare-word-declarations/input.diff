@@ -13,3 +13,18 @@ index 0000000..1111111
 +return { value }
 +// a constant is declared below
 +const [first, second] = pair
+diff --git a/scripts/sync-orders.sh b/scripts/sync-orders.sh
+new file mode 100644
+index 0000000..1111111
+--- /dev/null
++++ b/scripts/sync-orders.sh
+@@ -0,0 +1,9 @@
++data=$(cat orders.json)
++local count=0
++readonly -a stores=(one two)
++order_total() {
++function fail {
++for store in "${stores[@]}"; do
++export PATH="$HOME/bin:$PATH"
++echo "count=$count"
++  if [ "$count" -gt 0 ]; then

@@ -1,3 +1,9 @@
+scripts/sync-orders.sh:1: data=$(cat orders.json)
+scripts/sync-orders.sh:2: local count=0
+scripts/sync-orders.sh:3: readonly -a stores=(one two)
+scripts/sync-orders.sh:4: order_total() {
+scripts/sync-orders.sh:5: function fail {
+scripts/sync-orders.sh:6: for store in "${stores[@]}"; do
 src/use-retention-policy.ts:1: const check = <A extends unknown[], R>(action: (...args: A) => R) => action
 src/use-retention-policy.ts:2: let guard = false
 src/use-retention-policy.ts:3: export const checkRetentionPolicy = () => true

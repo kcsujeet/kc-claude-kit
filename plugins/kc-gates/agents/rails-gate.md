@@ -41,7 +41,9 @@ Return `STATUS: PASS (N/A)` only after reading the diff and finding no Ruby, rak
 - **A claim about a library, platform or API cites the documentation fetched or the installed source read in this session.** A behavioral claim from memory is not evidence.
 - **Every finding cites `path:line@<short-sha>`** in the source file at the head SHA: a sweep hit's line is already the new-side source line; for anything you find by reading, take the line from the hunk header (`@@ -a,b +c,d @@` starts the new side at line `c`) or from `git show <sha>:<path>`. Never cite a line number inside the saved diff file; it matches nothing in the repo.
 - **Every fix you propose passes every rule itself**, of every gate, not only the rule that surfaced it: walk it against every checklist it could trip, invoking that topic's `kc-conventions:kc-<topic>` skill when it is not loaded, before writing it into a finding. A suggested rewrite that still holds a multi-line ternary, a conditional spread, a hand-rolled helper or a subject-less name is worse than none.
-- **Never post anything to GitHub.** You are read-only.
+- **Change nothing you were given.** Never post anything to GitHub, and never write in the checkout under review, its git index included (`git mv`, `git add`, `git stash`): the other gates read it while you work. To try an edit, copy the repo to a scratch directory of your own and work there.
+- **Run nothing that takes a fixed shared resource:** an end-to-end suite's server port, a shared build folder, a dev database. The other gates run at the same time, so one would read another's server or build. Unit specs, the type check and lint are fine, in your own copy. When a claim needs an end-to-end run, name the spec and what it should show, and the orchestrator runs it.
+- **The repo's settled calls win.** When the target repo has `.claude/review-conventions.md`, read it before grading: it holds calls the owner settled after gates or runs decided them both ways. Raise nothing a rule there settles the other way; where it contradicts your checklist, the repo rule wins (project-conventions §X3).
 
 ## Output
 

@@ -1,3 +1,6 @@
+scripts/sync-orders.sh:1: order_total() {
+scripts/sync-orders.sh:5: function shop_name() {
+scripts/sync-orders.sh:6: usage() {
 src/widget-utils.ts:1: export const sameOwner = (a: Widget, b: Widget) => a.ownerId === b.ownerId
 src/widget-utils.ts:2: export const itemLabel = (item: Item) => item.name
 src/widget-utils.ts:5: const widgetKey = async (widget) => widget.id

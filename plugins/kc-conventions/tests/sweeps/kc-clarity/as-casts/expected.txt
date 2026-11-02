@@ -3,3 +3,5 @@ src/submission-field-row.tsx:2: const id = raw as string
 src/submission-field-row.tsx:3: const modes = ['a', 'b'] as const
 src/submission-field-row.tsx:4: const widget = response as unknown as Widget
 src/submission-field-row.tsx:5: import { format as formatDate } from 'date-fns'
+src/submission-field-row.tsx:10: const { url } = (await response.json()) as { url: string }
+src/submission-field-row.tsx:11: const pair = point as [number, number]

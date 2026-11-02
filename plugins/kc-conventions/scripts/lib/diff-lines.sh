@@ -9,6 +9,14 @@
 # awk, so `\b` and other GNU-only escapes are not available: spell a word
 # boundary as `(^|[^A-Za-z0-9_$])`.
 
+# Paths of source files in the languages the conventions cover, shell scripts included.
+# shellcheck disable=SC2034  # read by the scripts that source this file
+KC_CODE_PATHS='\.(sh|bash|js|jsx|ts|tsx|mjs|cjs|rb|py|swift|go|java|kt|php|cs|rs)$'
+# Paths of test files: *.test.* and *.spec.* (JavaScript, TypeScript), *_test.* and *_spec.* (Go,
+# Ruby), test_*.py, and anything under a test, tests, spec, __tests__ or e2e directory.
+# shellcheck disable=SC2034  # read by the scripts that source this file
+KC_TEST_PATHS='(\.(test|spec)\.[A-Za-z0-9]+$|_(test|spec)\.[A-Za-z0-9]+$|(^|/)test_[^/]*\.py$|(^|/)(test|tests|spec|__tests__|e2e)/)'
+
 # Exits 2 with a usage line unless $1 is a readable file or `-`.
 kc_require_diff_arg() {
   local script_name=$1

@@ -28,6 +28,7 @@ paths:
   - §B13. When one becomes many, nothing picks "the" one
   - §B14. A guard against a delete counts only what the delete would harm
   - §B15. A change moves only the states it is for
+  - §B16. A stored value is read in every state it can reach
 - Sweeps
 
 ## Rules
@@ -48,6 +49,7 @@ Code that reads well and is wrong is still wrong. Walk every change for the bugs
 - When a change turns one into many (a shop's store becomes stores), every accessor that still picks "the" one (the first, the lowest id, a "default") is a leftover unless a stated product rule chooses it. Each reader uses the specific record it already has (the order's store, the one in the URL), and the accessor and every fallback to it go.
 - A guard that refuses a delete or removal ("has orders", "has items") counts only the related records the delete would harm: completed payments, live work, records people still see. Abandoned, expired, failed, archived or deleted ones go with it, or are cleaned up, and the message says in plain words what blocks it and what to do instead.
 - A change to a condition, fallback, default or validation moves only the states it is for. List every state that reaches the changed line, saved and unsaved values, empty ones and each option of a choice, with what each does before and after; any other state whose result moves is a new bug. A change a reviewer suggests is code too: walk it the same way before suggesting it.
+- A value written now and read later (a cookie, a cache or storage entry, a URL parameter, a file, a row, a flag) is read in every state it can be in by then: missing, stale, written by an older version of the code, someone else's, half-written, or written by two writers at once (which copy wins, and by what stamp). List those states, and the events between the write and the read (a reload, a sign-out or expiry, back and forward, a retry, a restart, a second tab, an update or deploy), and give each one a path that handles it.
 
 Detection criteria and per-box review failure modes live in the `## Review checklist` of the `kc-correctness` skill (`kc-conventions:kc-correctness`), with the detail under its `## Review detail`. These rules are the statement of the convention; that checklist is how a diff gets graded against it.
 
@@ -70,6 +72,7 @@ The correctness gate agent ticks every box against the diff. A box is FAIL if an
 - [ ] §B13 Nothing picks "the" one after one becomes many: when the diff, or the feature it continues, turns a one-to-one into a one-to-many, every accessor that returns a single record from the many (`first`, lowest id, `default_*`, a single-record association with an order) and every fallback to it (`order.store || shop.store`) is listed with its readers. Each FAILS unless a product rule says how that record is chosen, and the finding names the specific record each reader should use instead. (N/A: no cardinality change in scope)
 - [ ] §B14 A guard that refuses a delete or removal counts only the related records the delete would harm, and the evidence lists each status or state the related record can have with a verdict (blocks, goes with it). A guard that counts every related row, so an abandoned, expired, failed or archived one blocks the delete, FAILS, as does a message that names an internal term or no way forward. (N/A: no delete guard in scope)
 - [ ] §B15 A change moves only the states it is for: for each changed condition, fallback, default or validation, and for each one a finding proposes, the evidence lists every state that reaches the line (each value its inputs can hold: saved and unsaved, empty, each option of a choice, each existing record) with the result before and after. A state outside the change's purpose whose result moves FAILS; a proposed fix that moves one is rewritten or dropped before it is reported. (N/A: no condition, fallback, default or validation changed or proposed)
+- [ ] §B16 A stored value is read in every state it can reach: for each value the diff writes for a later step or reads from an earlier one (a cookie, a cache or storage entry, a URL or query parameter, a file, a row, a flag), the evidence is a table with one row per state or event and the `file:line` that handles it, or "unhandled". The states are what it can be when read (missing, stale, written by an older version, another user's or session's, half-written, written by two writers at once, with which copy wins and by what stamp); the events are what can happen between the write and the read (reload, sign-out or expiry, back and forward, retry, restart, a second tab, an update or deploy). A row with no handler FAILS. A submitted form value is §B5. (N/A: the diff writes or reads no value that waits for a later step)
 
 **Point, do not double-report.** A removed export or a changed shared prop shape is structure §S10. A cast asserting a type the value does not have, as syntax, is clarity §C17. Duplicated markup, dead imports, or props threaded through and never read after a refactor are simplicity §P9. A locale formatter with no explicit time zone is datetime §D7. When a bug and one of those boxes describe the same line, report it once, under the closer fit, and name the other box in the evidence.
 
@@ -183,6 +186,15 @@ A change is written with one state in mind, and the line it touches is reached b
 **How to check.** For each changed condition, fallback, default or validation, write down every state that reaches it: read each input where it comes from (the saved record, the unsaved form, the URL, a default), and list its values, including empty, each option of a choice, and records saved before the change. Next to each, write what happens before and after. Only the rows the change is for may move. Run the code when the result is not plain from reading it.
 
 **A suggestion is a change too.** A fix proposed in a review is code someone will write because the reviewer asked, so it gets this walk before the comment is drafted, not after the author ships it. A suggestion whose table moves a row it is not for is rewritten until it doesn't, or dropped.
+### §B16. A stored value is read in every state it can reach
+
+A value written now and read later meets everything that happens in between. By the time it is read it can be missing, stale, written by an older version of the code, someone else's, half-written, or written by two writers at once, where the copy that wins is decided by a stamp taken before the slower one read its source; and code written along the path the feature was built on handles one of those.
+
+An order page reads `?receipt=<id>` from its address to thank the buyer. Opened from the browser's history a week later, the address names an order since refunded. Opened from a link someone shared, it names another shop's order. Opened after the session expired, the page can't load the order at all. The page reaches each of these with no new code, and each needs its own answer.
+
+The same habit catches a sign-in hint cookie that outlives its session, a draft saved by an older version in a shape the new code can't read, a retried job whose first run half-finished, and a script that updates its own install and then reads a path it stored before the update.
+
+**How to check.** For each value the diff writes for later or reads from earlier, write the table: the value, each state it can be in when read, each event between the write and the read, and the `file:line` that handles each, or "unhandled". A row with no handler is the finding. A form value the user submits is §B5's; this box is for values that wait.
 
 ## Sweeps
 

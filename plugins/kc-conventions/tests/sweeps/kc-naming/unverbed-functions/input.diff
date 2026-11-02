@@ -17,3 +17,16 @@ index 0000000..1111111
 +const check = () => true
 +const count = items.length
 +const doubled = value => value * 2
+diff --git a/scripts/sync-orders.sh b/scripts/sync-orders.sh
+new file mode 100644
+index 0000000..1111111
+--- /dev/null
++++ b/scripts/sync-orders.sh
+@@ -0,0 +1,7 @@
++order_total() {
++is_full_sha() {
++print_env_line() {
++function fail {
++function shop_name() {
++usage() {
++  local total=1

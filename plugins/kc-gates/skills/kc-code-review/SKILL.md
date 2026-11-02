@@ -26,7 +26,10 @@ The correctness gate hunts bugs on every diff. The other gates catch what slips 
 - (Self-review parallel: when reviewing *my own* work, precedent never excuses a violation either; the same confirmed-findings bar applies before I call work done.)
 - **A round reviews one version of the code.** Do not change the code under review while its gates run. A fix made during or after a round is unreviewed until a new round covers it: re-run the gates on the whole diff before reporting, and never carry a PASS onto code that changed after the gate saw it.
 - **A duplication finding on a one- or two-line expression is answered inline.** The fix never adds a file, hook or helper for a plain expression (`kc-conventions:kc-simplicity` §P11); it leaves the expression inline at each site or reuses a unit that already exists.
-- **When two gates' fixes for one construct conflict, the user chooses.** Present both findings with each gate's fix side by side and wait; applying one quietly turns the other into a finding next round.
+- **A contested call is the user's, and it is recorded in the repo.** A call is contested when two gates' fixes for one construct conflict, or a finding reverses a call an earlier round or run made on the same construct. Never settle one yourself, not even by applying the fix that looks better: applying one quietly turns the other into a finding next round. Ask the user, one question per call, with each side's fix as an option. Then write the answer to the repo's `.claude/review-conventions.md`, so the next run in that repo holds the code to it instead of deciding again:
+  - When the file is missing, create it: a short header saying it holds calls the owner settled, which win over the built-in rules; `## Rules`, with the call as `### R<n>` (the rule as a do or don't, what fails it, an example path or snippet); and `## Gate checklist`, with one box per rule ending in its N/A condition. The project-conventions gate walks those boxes.
+  - When it exists, add the next `R<n>` and its box, and leave the rules already there alone.
+  - Say in the report which rules were added, and leave the file for the user to commit.
 - **When a rule lists examples, examples are illustrations, never an exhaustive boundary.** State the principle first, examples second, explicitly labeled as illustrations. Apply the rule to *every* item in the diff that matches the principle, including items not in the example list. If you find yourself thinking "this item isn't in the listed examples so the rule doesn't apply," you're misreading the rule. This applies BOTH when reading rules (don't narrow to the listed examples) AND when writing rules (don't frame a rule around a specific domain when the principle is general).
 - **Brevity is a hard rule on every surface: chat findings, drafted comments, and replies.** Length is the most consistently violated rule in this skill. Every unit of output has a budget, and a sentence past it must earn its place: **a chat finding is one line**, **a drafted comment is one to three sentences**, **a reply accepting feedback is one sentence plus the commit SHA**. A drafted `suggestion` carries one brief reason inside its budget (see `kc-post-review`). Prose that restates the rule, justifies a change the reader already asked for, re-describes what a linked commit shows, or over-justifies a finding past that one reason does NOT earn its place; cut it. If the reader needs more of the why, they will ask. Count before you show: an over-budget unit is a rewrite *before* the user sees it, never after they ask you to shorten it.
 - **No em dashes (U+2014) in any output.** Not in the chat report, verdict blocks, drafted comments or replies. Use a period, comma, colon or parentheses instead.
@@ -40,7 +43,7 @@ The correctness gate hunts bugs on every diff. The other gates catch what slips 
 
 ## Workflow: agent-driven gates
 
-The review is NOT a single inline pass. It is a fan-out of independent **gate agents**, one per convention topic, aggregated into a single PASS/FAIL verdict. The whole fan-out runs **every time the skill is invoked, including every re-review after the author has addressed previous comments**. There is no delta-only, "I already looked at this", or "only the changed files since last round" shortcut: a re-review re-runs every gate against the new head SHA from scratch. A previously-passed gate can fail on a later round (the fix introduced a new violation), so each round earns its PASS independently.
+The review is NOT a single inline pass. It is a fan-out of independent **gate agents**, one per convention topic, aggregated into a single PASS/FAIL verdict. The whole fan-out runs **every time the skill is invoked, including every re-review after the author has addressed previous comments**. There is no delta-only, "I already looked at this", or "only the changed files since last round" shortcut: a re-review re-runs every gate against the new head SHA from scratch. A previously-passed gate can fail on a later round (the fix introduced a new violation), so each round earns its PASS independently. The one review of a delta is `kc-ready-for-review`'s fix check, which reads round 1's fixes with the whole diff beside them; it is not a re-review, and the round after it reads the whole diff again.
 
 **Why agents instead of inline:** an inline reviewer silently skips checklist items ("low-value", "matches the neighbors", "no new keys"); this has been the repeated failure mode. A dedicated agent that owns exactly one topic and must return a per-box PASS/FAIL verdict has no other job to crowd it out, so it cannot quietly drop a box.
 
@@ -111,6 +114,24 @@ The agents carry this contract in their own definitions; the dispatch prompt sup
 - the changed-file list (`CHANGED_FILES` from `meta.env`);
 - the target repo root.
 
+**Optional inputs**, for a caller that acts on the findings itself (`kc-ready-for-review` passes them; a review on request passes none, and its findings stay one line each). The chat report still shows each finding as one line.
+
+- **Edits.** Under each finding's line, unindented, its fix as edits that apply as written, each SEARCH block copied exactly from the file at the head SHA and found once in it:
+
+  ```
+  EDIT <path>
+  <<<<<<< SEARCH
+  <the exact lines to replace>
+  ======= REPLACE
+  <the lines that replace them>
+  >>>>>>> END
+  ```
+
+  A new file is `CREATE <path>`, then its content between `<<<<<<< CONTENT` and `>>>>>>> END`; `DELETE <path>` and `MOVE <path> <new-path>` stand alone. A pre-existing finding, and one whose fix is no file change (the PR's text, a split, a receipt another gate must show), says what to do in words. Gates stay read-only: they write edits and never apply them. Each gate walks its edits against every gate's checklist, not only its own, and gives the receipt `<n> rewrites checked against <gates>` (verification §V8).
+- **Mutation output.** The mutation sweep's output on the diff, for the testing gate (`surviving-mutants.sh`, `kc-conventions:kc-testing`). The caller runs the sweep, not a gate: once per area with `--paths` (the unit specs for the server code, a page's end-to-end spec for that page) and the install command as `--setup` when a fresh checkout needs one. It starts the sweep before dispatching the other gates and dispatches the testing gate when it is done. Run inside a gate, the sweep's test runs would overlap the other gates' runs, and a suite that takes a fixed port or a shared build would read another run's server.
+- **Lessons.** The kinds of mistake an earlier round of the pass found, one line each (`kc-ready-for-review` step 5). Each gate holds the diff and its own edits to them, and a finding of a listed kind names the lesson it repeats.
+- **Whole diff**, in a fix check only: the PR's whole diff beside the fix delta under review, for context. The mutation sweep runs on it too.
+
 Each agent must:
 
 1. Read its topic's `## Review checklist` and `## Review detail` in full.
@@ -140,7 +161,7 @@ A verdict that does not have this shape, or that has a box with no evidence, is 
 - Emit the gate-status table first, then the deduped findings, then the explicit `PASSED`/`FAILED` verdict (see Output format).
 - On a re-review, run Steps 1-4 again in full, and fold in the author's replies to your prior comments (Step 1): mark each carried-over item as fixed (verify the whole class), declined-with-reason (surface it, don't re-post over their reply), or still-open. Report the new verdict; do not carry forward a prior round's PASS.
 
-**Self-review trigger:** when *I* am the one implementing changes (not reviewing a teammate's PR), the gate fan-out runs in two cases only: when the user asks for a review, or as part of `kc-gates:kc-ready-for-review`, the one pass before a PR goes to a reviewer, which runs it at most twice and then hands what is still open to the user. It does not run after each fix, commit or push; the fan-out costs too much time and too many tokens for that. When it runs, lint and types passing is not the same as gate-clean, and every gate's checklist is walked box by box to a PASS. Separately, UI work is looked at rendered in a browser before I call it done (see the verification gate's self-review group), since tests lay nothing out.
+**Self-review trigger:** when *I* am the one implementing changes (not reviewing a teammate's PR), the gate fan-out runs in two cases only: when the user asks for a review, or as part of `kc-gates:kc-ready-for-review`, the one pass before a PR goes to a reviewer, which runs it in two rounds with a check of round 1's fixes between them, and then hands what is still open to the user. It does not run after each fix, commit or push; the fan-out costs too much time and too many tokens for that. When it runs, lint and types passing is not the same as gate-clean, and every gate's checklist is walked box by box to a PASS. Separately, UI work is looked at rendered in a browser before I call it done (see the verification gate's self-review group), since tests lay nothing out.
 
 **"Matches the existing pattern" is a yellow flag, not a green light.** A gate agent must not pass a box because the diff copied the shape of nearby code. If the surrounding pattern violates the rule, the new code that extends it violates it too. Every copied block, every matched helper, every duplicated key style is evaluated against the rule on its own; nearby precedent is not the evaluation.
 

@@ -153,7 +153,7 @@ print_deny_reason() {
 }
 
 print_deny() {
-  print_deny_reason "$1 Run /kc-gates:kc-ready-for-review first: one pass of review and QA, at most two rounds, ending in a receipt for the commit the PR will show."
+  print_deny_reason "$1 Run /kc-gates:kc-ready-for-review first: one pass of review and QA, two rounds with one check of the fixes between them, ending in a receipt for the commit the PR will show."
 }
 
 print_draft_deny() {

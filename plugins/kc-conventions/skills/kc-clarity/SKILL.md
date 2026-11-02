@@ -73,7 +73,7 @@ The clarity gate agent ticks every box against the diff. A box is FAIL if any ma
 - [ ] §C13 An expression (template literal, call argument, JSX prop, or return) that inlines 2+ non-trivial sub-expressions (each a `??`/optional-chain fallback, call, ternary, or cast) extracts them to named locals first. (N/A: no such multi-part expression in diff)
 - [ ] §C14 No circular imports introduced (soft). A cycle through a module that does work at definition time is correctness §B6, which fails. (N/A: no cross-module import change)
 - [ ] §C15 Ternaries: none nested/chained (2+ `?`), long, multi-line once formatted, or with a non-trivial branch (more than a short value/identifier). Applies to value/assignment/returned/arg ternaries too, not just JSX — the branch content is irrelevant, only the shape. Walk every ternary in the diff. A proposed fix respects the remedy limits in §C15 (no `flagA && value` for a value-or-absent prop, no conditionally spread options object). **Enumerate with the `ternaries.sh` sweep, do not eyeball**, labelling every hit single-line or MULTI-LINE; see §C15. (N/A: only when `ternaries.sh` returns 0 hits, stated as `grepped ternaries: 0 hits`)
-- [ ] §C16 Bare numeric literals for dimensions/thresholds/timeouts are named constants with a one-line why, or a design token when the project has a token system; a magic value repeated 2+ times is also a DRY finding. (N/A: no magic literal added)
+- [ ] §C16 Bare numeric literals for dimensions/thresholds/timeouts are named constants with a one-line why, or a design token when the project has a token system; a magic value repeated 2+ times is also a DRY finding. **Enumerate with the `numeric-literals.sh` sweep**, one verdict per hit. (N/A: only when `numeric-literals.sh` returns 0 hits, stated as `grepped numeric literals: 0 hits`)
 - [ ] §C17 No type escape hatches: no `as` cast (including `as unknown as T`) that asserts a type the value does not actually have in order to silence a mismatch; no `any`, explicit or through an untyped boundary; no non-null assertion (`value!`). **Enumerate with the `as-casts.sh`, `any-types.sh` and `non-null-assertions.sh` sweeps, do not eyeball**; see §C17. (N/A: only when all three sweeps return 0 hits, stated as `grepped as-casts: 0 hits`, `grepped any: 0 hits`, `grepped non-null assertions: 0 hits`)
 - [ ] §C18 No finding this gate proposes suggests removing a named intermediate that makes an expression readable on the grounds that it looks redundant, costs a type-narrowing step, or eagerly evaluates a trivial branch the ternary will not take. Sibling gates that propose inlining (simplicity §P6, structure §S4) apply the same test. (N/A: no finding proposes removing a named intermediate)
 - [ ] §C19 No conditional spread, of any size and whatever its comment: no `...(flagA ? { key } : {})` or `...(flagA && { key })` inline, and no object built conditionally (`const extra = flagA && { key }`) and spread later into an object or as component props. The fix gives the key or prop a permanent slot set to `undefined` when absent, and the finding confirms the consumer drops `undefined`. **Enumerate with the `conditional-spreads.sh` sweep.** (N/A: only when `conditional-spreads.sh` returns 0 hits, stated as `grepped conditional spreads: 0 hits`)
@@ -430,4 +430,10 @@ Save the diff under review to a file (`gh pr diff <num> > /tmp/review.diff`, or 
 
   ```bash
   bash "${CLAUDE_PLUGIN_ROOT}/skills/kc-clarity/scripts/non-null-assertions.sh" <diff-file>
+  ```
+
+- `numeric-literals.sh` (§C16): added code lines holding a bare number other than 0 or 1, skipping comments, a declaration that names its number, and an exact expected value in an assertion. Test files are included, since a delay or a date offset in a test is as magic as one in code. Receipt: `grepped numeric literals: N hits`.
+
+  ```bash
+  bash "${CLAUDE_PLUGIN_ROOT}/skills/kc-clarity/scripts/numeric-literals.sh" <diff-file>
   ```
