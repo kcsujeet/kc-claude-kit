@@ -27,6 +27,7 @@ Before producing the first draft, paste this checklist in chat with each box exp
 - [ ] Closed spec: the drafts use only the labels in the Labels table, the `**<label>**:` / body layout, plain fenced code blocks, and the posting shapes in "Posting via the GitHub API". No field, format, or decoration this file does not list (see "The spec is closed").
 - [ ] Label picked from the Labels table, not from the user's reaction. How strongly the user phrased their feedback is not an input to the label.
 - [ ] Top-level body: none, unless it says something no inline comment says (see "Top-level review body").
+- [ ] Verified before suggested: every draft that asks for a behaviour change (a condition, fallback, default, validation), in code or in words, asks only for one whose before/after was walked for every state reaching the line (kc-code-review's rule for proposed fixes, correctness §B15). A change not walked is walked now, and one that moves a state it is not for is rewritten or dropped: a suggestion must not introduce a bug.
 - [ ] Code examples: prefer none, and point at existing code that already does the thing. Include a snippet only when the shape is genuinely ambiguous without one, and then write it to the target repo's conventions and read it back as if it had arrived in the diff. Every new name in it is defined, or explained as new or existing (see "Tone rules"). A snippet that needs a new one-off helper, or that restructures control flow to fit, means you are designing the fix instead of naming the defect.
 ```
 
@@ -208,13 +209,13 @@ After producing the drafts and before showing them as "ready to post", paste a o
 
 ```
 **Post-draft audit:**
-1. <file:line> | length: <N sentences> | label on own line ✓ | no §X / no jargon / no press-release phrasing ✓ | no em dashes ✓ | grounded and humble, own voice ✓ | clear ask ✓ | suggestion has a reason ✓/n-a | one topic ✓ | simple words ✓ | worth posting ✓ | code earns its place, stands alone, to repo conventions ✓/n-a
-2. <file:line> | length: <N sentences> | label on own line ✓ | no §X / no jargon / no press-release phrasing ✓ | no em dashes ✓ | grounded and humble, own voice ✓ | clear ask ✓ | suggestion has a reason ✓/n-a | one topic ✓ | simple words ✓ | worth posting ✓ | code earns its place, stands alone, to repo conventions ✓/n-a
+1. <file:line> | length: <N sentences> | label on own line ✓ | no §X / no jargon / no press-release phrasing ✓ | no em dashes ✓ | grounded and humble, own voice ✓ | clear ask ✓ | suggestion has a reason ✓/n-a | one topic ✓ | simple words ✓ | worth posting ✓ | asked-for change walked per state, breaks nothing ✓/n-a | code earns its place, stands alone, to repo conventions ✓/n-a
+2. <file:line> | length: <N sentences> | label on own line ✓ | no §X / no jargon / no press-release phrasing ✓ | no em dashes ✓ | grounded and humble, own voice ✓ | clear ask ✓ | suggestion has a reason ✓/n-a | one topic ✓ | simple words ✓ | worth posting ✓ | asked-for change walked per state, breaks nothing ✓/n-a | code earns its place, stands alone, to repo conventions ✓/n-a
 Top-level body: none ✓ | or: says <the one thing no inline says> ✓
 …
 ```
 
-Any FAIL marks (length > 3 without justification, jargon citation, press-release phrasing, a top-level body that restates the inlines, em dashes, a bare command as the opener, two drafts that open or are built the same way (any stock phrase repeated), a `suggestion` with no reason, multi-topic, hard words or a sentence over about 25 words, a small nit that should have been left out, a snippet with an unexplained new name or one that would not pass this same review) mean rewrite *before* asking for the post signal, not after the user catches it.
+Any FAIL marks (length > 3 without justification, jargon citation, press-release phrasing, a top-level body that restates the inlines, em dashes, a bare command as the opener, two drafts that open or are built the same way (any stock phrase repeated), a `suggestion` with no reason, multi-topic, hard words or a sentence over about 25 words, a small nit that should have been left out, an asked-for change never walked per state or one that breaks a state it is not for, a snippet with an unexplained new name or one that would not pass this same review) mean rewrite *before* asking for the post signal, not after the user catches it.
 
 ## Top-level review body
 
