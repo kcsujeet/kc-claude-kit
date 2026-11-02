@@ -1,11 +1,13 @@
 ---
 name: kc-ready-for-review
-description: The one review-and-QA pass on your own PR before it goes to a human reviewer. Runs kc-code-review, the project's hand-off checklist and QA, fixes what they find, re-reviews once, and hands whatever is still open to the user instead of looping; at most two rounds. Ends in a receipt for the head commit, which the kc-gates hand-off guard requires before `gh pr ready`, a ready `gh pr create` or adding a reviewer. Use when work is about to go to review ("ready for review", "send it to review", "request a review", "move the ticket to review"), or when the guard blocks a hand-off. Not after each commit or push.
+description: The one review-and-QA pass on your own PR before it goes to a human reviewer. Runs kc-code-review, the project's hand-off checklist and QA, applies the fixes the gates write, checks those fixes once, re-reviews once, and hands whatever is still open to the user instead of looping; two rounds, with a check of round 1's fixes between them. Ends in a receipt for the head commit, which the kc-gates hand-off guard requires before `gh pr ready`, a ready `gh pr create` or adding a reviewer. Use when work is about to go to review ("ready for review", "send it to review", "request a review", "move the ticket to review"), or when the guard blocks a hand-off. Not after each commit or push.
 ---
 
 # Ready for review
 
 The reviewer should find nothing the project's rules already say. This pass is where those rules are applied: once per PR, right before a person reviews it, never per commit or push.
+
+Round 2 is there to confirm, not to discover. What it used to find traces to two causes: code written while fixing round 1, which no gate had seen, and constructs round 1 sampled instead of listing. So the gates write the fixes, round 1's findings become a short list of the kinds of mistake this PR makes, which every fix is checked against and the rest of the diff is searched for, one check reviews the fixes before round 2, and scripts list what a gate would otherwise sample (the sweeps, and the testing gate's mutation run).
 
 ## When it runs
 
@@ -15,33 +17,56 @@ The reviewer should find nothing the project's rules already say. This pass is w
 
 ## The pass
 
+### Before round 1
+
+- The tree is clean and HEAD is the branch's last commit, the one the PR shows or will show. Every review in the pass reads the local head in branch mode against the PR's base, each into its own directory (`gather-review.sh --branch <base> --out-dir <dir>`), and nothing is pushed until round 2 is done.
+- The test command: the specs that cover the changed files, as the project runs them, narrowed so one run takes seconds where it can (a page only an end-to-end spec covers takes that spec), plus the install command when a fresh checkout needs one. Each review below starts the mutation sweep with it (`surviving-mutants.sh` on the whole diff, one run per area) before dispatching its gates, and dispatches the testing gate with the output when the sweep is done. The sweep runs in a throwaway checkout and the gates run no end-to-end specs, so nothing else holds the suite's port meanwhile.
+
 ### Round 1
 
-1. **Review the code:** run `kc-gates:kc-code-review` on the PR's whole diff. It includes the project-conventions gate, which grades the repo's own `.claude/review-conventions.md`.
+1. **Review the code:** run `kc-gates:kc-code-review` on the whole diff with both of its optional inputs, edits and the mutation output (its Step 3). It includes the project-conventions gate, which grades the repo's own `.claude/review-conventions.md`. Note round 1's head, `HEAD_SHA` in its `meta.env`.
 2. **Check the hand-off:** grade every box in the repo's `.claude/hand-off-checklist.md` against the PR as it will be read, not the diff: its title and description, the linked ticket, the paired or stacked PRs, the flags and tasks it names. No such file: check the description against the repo's PR template and say so.
 3. **QA:** for a change a person sees, walk it in the running app with `kc-verify:kc-ui` (how it looks), `kc-verify:kc-ux` (whether a person can use it) and the project's QA rules, every state the change reaches. For one nobody sees, run the specs that cover it and exercise the endpoint, job or admin screen it changed.
-4. **Fix everything found** in one go, so that round 2 finds nothing new. The fixes are new code, held to `kc-code-review`'s rule for proposed fixes. A fix checked only against the rule that raised it brings a new finding into round 2. For example: a rename whose new name no longer says what the value holds, a label added for QA under a new key when an existing key already holds that text, a test added for coverage that asserts on a class name, a description rewritten for the hand-off checklist that now names something it must not.
-   - **Before committing the fixes,** walk every line they changed against every gate's checklist, the hand-off checklist and the QA rules, yourself (this is not a second gate fan-out), and fix what that turns up.
-   - **Ask in round 1, don't pick,** when a finding needs a decision: two gates' fixes for one construct conflict (`kc-code-review`'s rule for conflicting fixes), the fix changes behaviour the ticket didn't ask for, or the rule looks wrong for this case.
+4. **Settle the approach first.** A finding that changes the shape of the change (scope §G5, simplicity §P16) is the user's call. If they take it, drop every other edit, since each was written against the old shape, make the change, and run round 1 again on the new code, once.
+5. **Turn the findings into lessons.** The findings are instances; what the PR gets wrong is a short list of kinds. Write that list before anything is fixed, and use it for the rest of the pass:
+   - One line per kind of mistake, as a do or don't that holds beyond the line it was found on: "a comment that says what another unit does is checked against that unit", "both sides of every condition have a test", "a test helper's name says which session it fakes". Several findings of one kind are one line.
+   - **Find the rest of each kind.** Dispatch one agent with the lessons, the whole diff and the repo root, under the gates' rules (it changes nothing in the checkout and runs no end-to-end specs). For each lesson it lists every other line of the diff of that kind as a finding with edits in kc-code-review's format. Verify them as gate findings; they join round 1's.
+   - **Check every edit against the lessons before it lands.** This is yours, since you have read every finding. An edit that repeats a listed kind (a comment about another unit that the unit doesn't bear out, a test of one side of a condition, a helper the list rules out) is rewritten or asked about, not applied. So are two gates' edits that repeat a kind together, such as the same setup written into two tests.
+   - Every later review in the pass gets the list as kc-code-review's lessons input, and a new kind any of them finds adds a line.
 
-   Example: a pass whose round 2 raised 12 items, 7 of them inside round 1's own fixes, plus a list-vs-object conflict the author settled alone.
+   Example: a pass whose round 2 found a false comment, a one-sided test and an ambiguous helper name, each a kind round 1 had flagged on other lines.
+6. **Apply the fixes as the gates wrote them,** once they pass the lessons. Apply each verified finding's edits (kc-code-review's lead-not-fact check), all of a finding's edits or none.
+   - **Ask in round 1, don't pick,** when a finding needs a decision: two gates' edits touch the same lines (kc-code-review's rule for conflicting fixes), the fix changes behaviour the ticket didn't ask for, or the rule looks wrong for this case. Each answer to a conflict becomes a rule in the repo's `.claude/review-conventions.md`, created when missing, before the edits are applied.
+   - An edit whose text is no longer in the file is not sent back: apply what it meant by hand, or ask, and list it either way.
+   - A pre-existing finding isn't fixed in this PR. A hand-off or QA finding is fixed as it says.
+   - Then run the project's typecheck, lint and the specs the fixes touch. A finding whose edits break them goes to the user as a decision. Commit, and check that HEAD moved and the tree is clean.
+7. **Check the fixes once,** before round 2. They are new code that no gate has seen.
+   - Gather the fix delta, `gather-review.sh --branch <round-1 head> --out-dir <dir>`. When round 1's head is not an ancestor of HEAD (after a rebase, or a merge of the base), check the whole diff instead, and say so.
+   - Run kc-code-review's phase-1 gates on it with the whole diff beside it, the lessons and both optional inputs; the mutation sweep runs on the whole diff, so a test added in step 6 is shown to catch its mutant. Of the scope checks only §G2 applies, read as "the fixes do only what round 1's findings asked"; the verification phase doesn't run.
+   - Grade the hand-off checklist again if round 1 changed the PR's text or ticket, and walk QA on what the fixes changed that a person sees.
+   - Apply what it finds as in steps 5 and 6, each edit checked against the lessons, run the checks and commit. It runs once: round 2 reviews what it applied.
+
+   Example: a pass whose round 2 raised 19 items, 16 of them on lines the author wrote while fixing round 1, and none on lines a gate wrote that the author applied as written.
+
+When round 1 finds nothing, there is no fix check and no round 2.
 
 ### Round 2
 
-5. **Re-review once:** the fixes are new code, so run steps 1 and 2 again on the whole diff at the new head, and QA again only what the fixes touched.
-6. **Stop.** Fix nothing further in this pass. Each finding still open goes to the user as one line with its proposed fix; the user picks.
+8. **Re-review once:** run steps 1 and 2 again on the whole diff at the new head, with the lessons, and QA again what the fixes touched.
+9. **Settle disagreements.** A round-2 finding that reverses a call made earlier in the pass on the same construct (a gate passed it, wrote it or asked for it the other way), or two gates' findings that pull one construct opposite ways, is not an open finding. Put both sides to the user as one choice and record the answer in the repo's `.claude/review-conventions.md`, creating the file when the repo has none (kc-code-review's rule for contested calls), so later runs hold the code to it instead of judging it afresh.
 
-When round 1 finds nothing, there is no round 2.
+   Example: a pass where one gate split a request-body read into steps, the next asked for the one-line form back, and a third run asked for a literal union that an earlier run had praised.
+10. **Stop.** Fix nothing further in this pass. Each finding still open goes to the user as one line with its proposed fix, whether its kind is on the lessons list, and where it sits: on a line round 1's fixes or the fix check changed (the added lines of the delta from round 1's head, `added-lines.sh`), on a line round 1 passed, or in pre-existing code. The user picks.
 
 ### Receipt
 
-7. Push, then write the receipt for the head commit the PR now shows:
+11. Push, check that the PR's head is HEAD (`gh pr view --json headRefOid`), then write the receipt for it:
 
    ```bash
    bash "${CLAUDE_PLUGIN_ROOT}/scripts/ready-receipt.sh" write <full-sha> --rounds <1|2> --open <count>
    ```
 
-8. **Fixes the user picks** from the open list: apply them, walk the lines they changed as in step 4, run the specs and lint they touch, push, and write `ready-receipt.sh write <new-sha> --after <pass-sha>`. That is not a third round. Any other change after the pass needs a new pass.
+12. **Fixes the user picks** from the open list: apply their edits, check them against the lessons and as in step 7 against the pass's head, run the specs and lint they touch, push, and write `ready-receipt.sh write <new-sha> --after <pass-sha>`. That is not a third round. Any other change after the pass needs a new pass.
 
 ## The guard
 
@@ -59,21 +84,24 @@ Chat, short:
 ### Ready for review: <PR title>
 **Head:** `<short-sha>` · **Rounds:** <1|2> · **Open:** <n>
 
-| Check | Round 1 | Round 2 |
-|-------|---------|---------|
-| Code review | <n> found, fixed, fixes walked against every gate · <n> asked | PASS · <n> open |
-| Hand-off checklist | … | … |
-| QA | <what was walked> | … |
+| Check | Round 1 | Fix check | Round 2 |
+|-------|---------|-----------|---------|
+| Code review | <n> found · <n> applied as written · <n> by hand · <n> asked | <n> found, applied | PASS · <n> open |
+| Lessons | <n> kinds · <n> more found · <n> edits held back | <n> new kinds | <n> open of a listed kind |
+| Mutation | <n> mutants · <n> survived | <n> survived | <n> survived |
+| Hand-off checklist | … | … | … |
+| QA | <what was walked> | … | … |
 
 **Open (your call):**
-- `<file>:L<n>` <finding>. Fix: <one line>.
+- `<file>:L<n>` <finding> (<on a fix line | missed by round 1 | pre-existing>; <a listed kind | a new kind>). Fix: <one line>.
 ```
 
 ## After the reviewer comments
 
-Sort each comment the reviewer makes:
+Sort each comment the reviewer makes, and each finding round 2 left open:
 
-- **Covered:** a rule already said it. The pass missed it, so fix the check that should have caught it: a vague box, a rule with no box, a checklist item that wasn't walked. Don't add a second rule.
+- **Covered:** a rule already said it. The pass missed it, so fix the check that should have caught it: the lessons step, for a kind it listed but didn't find everywhere or let through in an edit, the fix check, a sweep that didn't list the construct, a vague box, a rule with no box, a checklist item that wasn't walked. Don't add a second rule.
 - **New:** no rule said it. It becomes a lesson in the rules, with a box on their checklist.
+- **Disagreement:** runs or gates decided it both ways. The user settles it once, and it becomes a rule in the repo's `.claude/review-conventions.md` (step 9).
 
-The goal is that "covered" stays at zero.
+The goal is that "covered" stays at zero, and that round 2 leaves at most two items, none 🟠 or 🔴.

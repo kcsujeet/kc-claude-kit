@@ -1,0 +1,5 @@
+src/order-sync.ts:3: setTimeout(syncOrders, 3000)
+src/order-sync.ts:4: const expiresAt = periodEnd - 86_400
+src/order-sync.ts:11: if (orders.length > 2) splitOrders(orders)
+scripts/sync.sh:2: sleep 5
+scripts/sync.sh:3: [ "$#" -ge 2 ] || exit 2

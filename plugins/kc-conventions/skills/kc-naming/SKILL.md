@@ -406,7 +406,7 @@ Save the diff under review to a file (`gh pr diff <num> > /tmp/review.diff`, or 
   bash "${CLAUDE_PLUGIN_ROOT}/skills/kc-naming/scripts/and-or-chains.sh" <diff-file>
   ```
 
-- `bare-word-declarations.sh` (§N5): added declarations whose name starts lowercase; the bare-word ones are then grepped across the repo. Receipt: `grepped bare-word declarations: N hits`.
+- `bare-word-declarations.sh` (§N5): added declarations whose name starts lowercase, with a shell script's assignments, `local`s, functions and loop variables; the bare-word ones are then grepped across the repo. Receipt: `grepped bare-word declarations: N hits`.
 
   ```bash
   bash "${CLAUDE_PLUGIN_ROOT}/skills/kc-naming/scripts/bare-word-declarations.sh" <diff-file>
@@ -418,7 +418,7 @@ Save the diff under review to a file (`gh pr diff <num> > /tmp/review.diff`, or 
   bash "${CLAUDE_PLUGIN_ROOT}/skills/kc-naming/scripts/name-collisions.sh" <name> [<repo-root>]
   ```
 
-- `unverbed-functions.sh` (§N6): added function declarations whose name does not start with a known verb. Receipt: `grepped unverbed functions: N hits`.
+- `unverbed-functions.sh` (§N6): added function declarations whose name does not start with a known verb, a shell script's snake_case functions included. Receipt: `grepped unverbed functions: N hits`.
 
   ```bash
   bash "${CLAUDE_PLUGIN_ROOT}/skills/kc-naming/scripts/unverbed-functions.sh" <diff-file>

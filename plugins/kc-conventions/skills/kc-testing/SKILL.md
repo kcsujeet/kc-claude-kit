@@ -59,8 +59,8 @@ The testing gate agent ticks every box against the diff. A box is FAIL if any ma
 
 - [ ] §T1 Every new behavior (a feature, prop, option, branch, or bug fix) has a test that exercises it, and a bug fix's test fails without the fix. (N/A: no behavior change in diff)
 - [ ] §T2 No assertion on a class name as the evidence that a state is correct; assert what the user or a consumer observes (role, text, accessible state, a data attribute, an emitted value). A class that is itself the contract (a `className`-style prop the component forwards) is exempt. **Enumerate with the `class-assertions.sh` sweep** (see below). (N/A: only when `class-assertions.sh` returns 0 hits, stated as `grepped class assertions: 0 hits`)
-- [ ] §T3 Every gate (a condition that mounts, enables, or routes something) is tested both ways: once with the condition met and once without, so deleting the gate fails a test. (N/A: no gating logic added or changed)
-- [ ] §T4 Setup repeated across 2+ tests (the same render-plus-provider boilerplate, fixture literals, or datetime construction) is a local helper, not copy-paste. (N/A: no repeated setup in the diff's tests)
+- [ ] §T3 Every gate (a condition that mounts, enables, or routes something) is tested both ways: once with the condition met and once without, so deleting the gate fails a test. **Enumerate with the `surviving-mutants.sh` sweep's output** when the dispatch gives it: every surviving mutant, gate or not, gets its own verdict, the test that would fail on it, or no behaviour (the code changes nothing) and its deletion. Without it, or when it printed `not run`, each gate is named with the test covering each side. (N/A: no gating logic, condition or early exit added or changed)
+- [ ] §T4 Setup repeated across 2+ tests (the same render-plus-provider boilerplate, fixture literals, or datetime construction) is a local helper, not copy-paste. Setup means more than one plain expression: a repeated one-expression read stays inline at each test (simplicity §P11). (N/A: no repeated setup in the diff's tests)
 - [ ] §T5 A new or moved test sits beside the unit it covers and is named after it. (N/A: no test file added or moved)
 - [ ] §T6 Assertions are exact when the value is known (`toBe(3)`, `toEqual([0, 25, 50])`), not bounds or truthiness that a wrong value also satisfies (`toBeGreaterThan(0)`, `toBeTruthy()`, `toBeDefined()`). A tolerance is fine where the value is genuinely inexact (floating point, measured geometry), stated as `toBeCloseTo`. **Enumerate with the `loose-assertions.sh` sweep** (see below). (N/A: only when `loose-assertions.sh` returns 0 hits, stated as `grepped loose assertions: 0 hits`)
 - [ ] §T7 A submit is tested per state: each form or request that saves user input has a test for every field state that behaves differently (at least clearing a saved value; see correctness §B5), and each test asserts the request body sent, not only the success path. (N/A: the diff adds or changes no submit of user input)
@@ -218,7 +218,7 @@ A test of a copy-link button clicked it, then awaited `navigator.clipboard.readT
 
 ## Sweeps
 
-Save the diff under review to a file (`gh pr diff <num> > /tmp/review.diff`, or `git diff <default-branch>...HEAD > /tmp/review.diff`) and run each script over it; `-` reads the diff from stdin. Both scan only added lines in test files (`*.test.*`, `*.spec.*`, and anything under `__tests__/`). Each prints one `path:line: text` hit per line, where `line` is the new-side line number, and nothing else. Give every hit its own verdict, and state each receipt with its count, `0 hits` included.
+Save the diff under review to a file (`gh pr diff <num> > /tmp/review.diff`, or `git diff <default-branch>...HEAD > /tmp/review.diff`) and run each script over it; `-` reads the diff from stdin for the two assertion sweeps. Those two scan only added lines in test files (`KC_TEST_PATHS` in `scripts/lib/diff-lines.sh`: `*.test.*`, `*.spec.*`, `*_test.*`, `*_spec.*`, `test_*.py`, and anything under `test/`, `tests/`, `spec/`, `__tests__/` or `e2e/`). Each prints one `path:line: text` hit per line, where `line` is the new-side line number, and nothing else. Give every hit its own verdict, and state each receipt with its count, `0 hits` included.
 
 - `added-lines.sh` (citation map): every added line as `path:line: text`, with the source line number at the head SHA. Cite every finding's line from this output or from a sweep hit, never from a position in the diff file.
 
@@ -236,4 +236,10 @@ Save the diff under review to a file (`gh pr diff <num> > /tmp/review.diff`, or 
 
   ```bash
   bash "${CLAUDE_PLUGIN_ROOT}/skills/kc-testing/scripts/loose-assertions.sh" <diff-file>
+  ```
+
+- `surviving-mutants.sh` (§T3), run by the review's caller, never by a gate: the dispatch gives its output, and the gate grades it. In a throwaway checkout of HEAD, it breaks each condition and early exit on the diff's added code lines one at a time, runs the tests, and prints each break no test noticed, after a summary line. The caller runs it from the repo root, with the install command as `--setup` when a fresh checkout needs one, once per area with `--paths` set to its paths, before dispatching the gates. In a fix check it runs on the whole diff, so a test added for an earlier survivor is shown to catch it. It takes minutes, inside its `--max-minutes` budget (default 8), and lists every line the budget did not reach. Receipt: its summary line, then a verdict per survivor and per line not reached; `not run: <reason>` is stated as the receipt, and §T3 is then walked by hand.
+
+  ```bash
+  bash "${CLAUDE_PLUGIN_ROOT}/skills/kc-testing/scripts/surviving-mutants.sh" <diff-file> --test '<command>' [--setup '<command>'] [--paths '<regex>']
   ```

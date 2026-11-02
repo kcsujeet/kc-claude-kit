@@ -48,11 +48,12 @@ For §V2, list which trigger groups applied and cite each group's receipt, or it
   - locale files touched → i18n per-key audit table present (N/A: no locale files in diff)
   - boolean logic added/edited → `grepped &&/||: N hits` with per-hit verdicts (N/A: no boolean chain added/edited)
   - ternaries, casts, `any`, non-null assertions, or conditional spreads added/edited → `grepped ternaries: N hits` (each hit labelled single-line or MULTI-LINE) / `grepped as-casts: N hits` / `grepped any: N hits` / `grepped non-null assertions: N hits` / `grepped conditional spreads: N hits` (N/A: none of the five added/edited)
+  - numeric literals added → `grepped numeric literals: N hits` with a verdict per hit (N/A: the sweep found 0 hits, stated)
   - hooks/queries/mutations added/edited → named consumers per new hook, `mutateAsync` grep receipt (N/A: no hook/query/mutation added/edited)
   - state added/edited → lowest-common-ancestor placement stated, rationale comment confirmed for order-dependent mutations (N/A: no state added/edited)
   - dead wrappers kept anywhere in the diff → what each earns its place stated (N/A: no wrapper-shaped code in diff)
   - switch or if/else-if chain added → `grepped switch/else-if/IIFE: N hits` and `nested-if scan: N hits`, and the structure gate's lookup-object boxes walked per chain (N/A: no chain added)
-  - test files touched or behavior changed → `grepped class assertions: N hits` / `grepped loose assertions: N hits` with per-hit verdicts, and the gated conditions named with the test covering each side (N/A: no test file touched and no behavior change)
+  - test files touched or behavior changed → `grepped class assertions: N hits` / `grepped loose assertions: N hits` with per-hit verdicts, and either the mutation sweep's summary line with a verdict per survivor and per line it did not reach (when the dispatch gave its output and it ran) or the gated conditions named with the test covering each side (N/A: no test file touched and no behavior change)
   - exported APIs added → doc-comment box walked (N/A: no new exported API)
   - fixed-value discriminator added → enum boxes walked, call sites checked (N/A: no new discriminator type)
   - self-review only → lint/typecheck receipt, fan-out run only on request or once before a PR, UI looked at rendered, commit/push/PR permission confirmed (N/A: this is a peer review of someone else's diff, not a self-review)
@@ -125,9 +126,15 @@ Owning gate: **structure**, lookup-object boxes (§S5). Required receipts: `grep
 
 N/A: the diff adds no `switch` and no `if`/`else-if` chain.
 
+### Numeric literals added
+
+Owning gate: **clarity** (§C16). Required receipt: `grepped numeric literals: N hits`, `0 hits` stated when true, each hit with its verdict (named, a design token, plain on sight, or flagged).
+
+N/A: the sweep found no hit.
+
 ### Test files touched or behavior changed
 
-Owning gate: **testing** (§T2, §T3, §T6). Required receipts: `grepped class assertions: N hits` and `grepped loose assertions: N hits`, each with per-hit verdicts and `0 hits` stated when true; and for every gate the diff adds or changes, the condition named with the test that covers each side (`mode === Mode.EDIT: widget.test.tsx:40 (met), :52 (not met)`). "Gates are tested" without naming them fails this box.
+Owning gate: **testing** (§T2, §T3, §T6). Required receipts: `grepped class assertions: N hits` and `grepped loose assertions: N hits`, each with per-hit verdicts and `0 hits` stated when true. Then, when the dispatch gave the mutation sweep's output, its summary line for each area, with a verdict for each surviving mutant (the test that would fail on it, or no behaviour and its deletion) and for each line the time budget did not reach; a survivor count with no verdicts fails this box like any aggregated sweep. Otherwise, or when the sweep printed `not run`, for every gate the diff adds or changes, the condition named with the test that covers each side (`mode === Mode.EDIT: widget.test.tsx:40 (met), :52 (not met)`). "Gates are tested" without naming them fails this box.
 
 N/A: no test file touched and no behavior change in the diff.
 

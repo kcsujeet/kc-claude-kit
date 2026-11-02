@@ -23,7 +23,7 @@ kc-claude-kit/
     │   │   └── kc-working-agreement.md     # the one hand-written rule (no topic skill, always loaded)
     │   ├── scripts/build-rules.sh          # regenerates rules/, --check fails on drift
     │   ├── scripts/install-rules.sh        # what kc-init runs: copies rules/ and writes the version stamp
-    │   ├── tests/                          # sweep and lookup fixtures, their runners, install-rules test
+    │   ├── tests/                          # sweep and lookup fixtures, their runners, install-rules and mutation-sweep tests
     │   ├── hooks/                          # SessionStart: missing or stale rules
     │   └── evals/
     ├── kc-gates/
