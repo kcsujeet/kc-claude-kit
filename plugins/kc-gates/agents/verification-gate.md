@@ -188,7 +188,7 @@ When the author replies that a flagged change was deliberate (in the description
 
 ## §V7. The scope checks were walked
 
-The orchestrator walks §G1-§G5 in the kc-code-review skill's Step 1 itself, because they concern the target as a whole rather than one topic. This box confirms the `SCOPE:` block exists and has per-box evidence: the author's other open PRs from `scope-facts.sh` for stacking, the title set against the diff's areas, the linked issue quoted (or "no linked issue"), the diff size and how it was read, and for §G5 the goal, the alternative weighed and the comparison. An approach box that names no alternative fails: "approach looks fine" is the line-by-line review this box exists to stop. A scope check reported as "scope fine" with no per-box line fails, the same as an aggregated receipt under §V3.
+The orchestrator walks §G1-§G5 in the kc-code-review skill's Step 1 itself, because they concern the target as a whole rather than one topic. This box confirms the `SCOPE:` block exists and has per-box evidence: the author's other open PRs from `scope-facts.sh` for stacking, the title set against the diff's areas, the linked issue quoted (or "no linked issue") and each design it links named with the states walked in it, the diff size and how it was read, and for §G5 the goal, the alternative weighed and the comparison. A §G3 box that never opened a design the issue links, while the report has findings about what a person sees, fails. An approach box that names no alternative fails: "approach looks fine" is the line-by-line review this box exists to stop. A scope check reported as "scope fine" with no per-box line fails, the same as an aggregated receipt under §V3.
 
 ## §V8. Fixes and rewrites are re-checked
 
@@ -205,7 +205,7 @@ Example (generic file names):
 ```
 **Checklist:**
 - Always: read widget-form.tsx, widget-list.tsx, widget-actions.ts at abc1234; findings cite file:line + abc1234; nothing posted to GitHub.
-- Scope: §G1 author has no other open PR; §G2 title "Add widget filters" matches the diff; §G3 issue #12 read, constraint "no API change" holds; §G4 diff 14KB, read whole; §G5 goal "filter widgets by status", weighed filtering in the existing list query instead of a second client-side pass, the diff already does that.
+- Scope: §G1 author has no other open PR; §G2 title "Add widget filters" matches the diff; §G3 issue #12 read, constraint "no API change" holds, its linked mockup walked with filters empty and applied; §G4 diff 14KB, read whole; §G5 goal "filter widgets by status", weighed filtering in the existing list query instead of a second client-side pass, the diff already does that.
 - Locale: per-key audit below.
   - shared.json:L14: `total` = "Total" | namespace: ok (shared), plural: n/a (label), dupe: none, naming: matches value
   - widgets.json:L9: `widgetCount` = "Widgets" | namespace: FLAG generic noun → shared.json, plural: FLAG baked-plural → ICU, dupe: none, naming: matches value
