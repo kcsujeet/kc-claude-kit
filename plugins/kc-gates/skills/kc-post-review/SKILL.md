@@ -27,6 +27,7 @@ Before producing the first draft, paste this checklist in chat with each box exp
 - [ ] Closed spec: the drafts use only the labels in the Labels table, the `**<label>**:` / body layout, plain fenced code blocks, and the posting shapes in "Posting via the GitHub API". No field, format, or decoration this file does not list (see "The spec is closed").
 - [ ] Label picked from the Labels table, not from the user's reaction. How strongly the user phrased their feedback is not an input to the label.
 - [ ] Top-level body: none, unless it says something no inline comment says (see "Top-level review body").
+- [ ] One review: every comment drafted together goes up in one review request, with or without a body, never one request per comment (see "Posting via the GitHub API").
 - [ ] Every claim re-read at head: each thing a draft says about the code (what runs, how often, what it reads or writes, what the user sees) was checked against the code at the head SHA while drafting, not carried from the review's wording. Rewording a finding makes a new claim, so the new words get the check too. Examples: "loads the record twice" when the load is cached and only the formatting runs twice; "runs a query per row" when the rows are preloaded; "the button is hidden" when it is only disabled. A claim that does not hold is rewritten to what the code does, or the draft is dropped.
 - [ ] Verified before suggested: every draft that asks for a behaviour change (a condition, fallback, default, validation), in code or in words, asks only for one whose before/after was walked for every state reaching the line (kc-code-review's rule for proposed fixes, correctness §B15). A change not walked is walked now, and one that moves a state it is not for is rewritten or dropped: a suggestion must not introduce a bug.
 - [ ] Code examples: prefer none, and point at existing code that already does the thing. Include a snippet only when the shape is genuinely ambiguous without one, and then write it to the target repo's conventions and read it back as if it had arrived in the diff. Every new name in it is defined, or explained as new or existing (see "Tone rules"). A snippet that needs a new one-off helper, or that restructures control flow to fit, means you are designing the fix instead of naming the defect.
@@ -213,10 +214,11 @@ After producing the drafts and before showing them as "ready to post", paste a o
 1. <file:line> | length: <N sentences> | label on own line ✓ | no §X / no jargon / no press-release phrasing ✓ | no em dashes ✓ | grounded and humble, own voice ✓ | clear ask ✓ | suggestion has a reason ✓/n-a | one topic ✓ | simple words ✓ | worth posting ✓ | every claim re-read at head: <file:line read for each> ✓ | asked-for change walked per state, breaks nothing ✓/n-a | code earns its place, stands alone, to repo conventions ✓/n-a
 2. <file:line> | length: <N sentences> | label on own line ✓ | no §X / no jargon / no press-release phrasing ✓ | no em dashes ✓ | grounded and humble, own voice ✓ | clear ask ✓ | suggestion has a reason ✓/n-a | one topic ✓ | simple words ✓ | worth posting ✓ | every claim re-read at head: <file:line read for each> ✓ | asked-for change walked per state, breaks nothing ✓/n-a | code earns its place, stands alone, to repo conventions ✓/n-a
 Top-level body: none ✓ | or: says <the one thing no inline says> ✓
+Posting: one review, <n> comments, one command ✓
 …
 ```
 
-Any FAIL marks (length > 3 without justification, jargon citation, press-release phrasing, a top-level body that restates the inlines, em dashes, a bare command as the opener, two drafts that open or are built the same way (any stock phrase repeated), a `suggestion` with no reason, multi-topic, hard words or a sentence over about 25 words, a small nit that should have been left out, a claim about the code not re-read at the head SHA or one the code does not bear out, an asked-for change never walked per state or one that breaks a state it is not for, a snippet with an unexplained new name or one that would not pass this same review) mean rewrite *before* asking for the post signal, not after the user catches it.
+Any FAIL marks (length > 3 without justification, jargon citation, press-release phrasing, a top-level body that restates the inlines, em dashes, a bare command as the opener, two drafts that open or are built the same way (any stock phrase repeated), a `suggestion` with no reason, multi-topic, hard words or a sentence over about 25 words, a small nit that should have been left out, a claim about the code not re-read at the head SHA or one the code does not bear out, an asked-for change never walked per state or one that breaks a state it is not for, a snippet with an unexplained new name or one that would not pass this same review, comments split across several post commands) mean rewrite *before* asking for the post signal, not after the user catches it.
 
 ## Top-level review body
 
@@ -232,7 +234,7 @@ Not valid, even though they look summary-shaped:
 - A severity summary ("Two of these need to be addressed before merge"). The labels already say it.
 - Press-release sentences about the PR's quality.
 
-If you cannot point at a sentence that says something no inline says, there is no body, and the posting shape below follows from that.
+If you cannot point at a sentence that says something no inline says, there is no body: the comments still go up as one review, without one.
 
 ## Code examples are proposals, not illustrations
 
@@ -379,10 +381,10 @@ This is the most-violated rule and the most important. Read it twice.
 **The protocol:**
 1. Draft.
 2. Write the inline drafts to `drafts.json` and build their payloads (see "Build the payloads" below). A draft the script rejects is fixed before anyone sees it.
-3. Show all drafts to the user in chat, ending with the head SHA the comments will anchor to, the chosen posting shape, and the commands the script printed: *"These anchor to `<short-sha>` and go up as <individual inline comments / one review with a body>, with the commands below. Say the word when you want them sent."*
+3. Show all drafts to the user in chat, ending with the head SHA the comments will anchor to and the command the script printed: *"These anchor to `<short-sha>` and go up as one review<, with a body>, with the command below. Say the word when you want them sent."*
 4. Stop. Do not call `gh` to post.
-5. If the user changes anything (rename, drop, rephrase), apply the change, rebuild the payloads, re-show the full updated set with the new commands, and go back to step 4.
-6. Only when the user gives a fresh standalone post signal *after seeing the latest set*, run exactly the commands they saw, each carrying the approval token (see "The approval token" below).
+5. If the user changes anything (rename, drop, rephrase, post only some of them), apply the change, rebuild the payload from the drafts that remain, re-show the full updated set with the new command, and go back to step 4.
+6. Only when the user gives a fresh standalone post signal *after seeing the latest set*, run exactly the command they saw, carrying the approval token (see "The approval token" below).
 
 If you are about to post and the most recent message from the user combined a request with a post instruction (e.g. "show me the six and post"), default to step 2 and ask: *"Holding for your post signal - say the word when you want them sent."* Better to ask twice than to post against intent. Trust is hard to rebuild.
 
@@ -415,7 +417,7 @@ Resolve the target repo from the working directory rather than hardcoding a slug
 gh repo view --json nameWithOwner -q .nameWithOwner
 ```
 
-**Check the request shape once per session.** Before the first post in a session, fetch the current GitHub REST docs for the endpoint you are about to use and confirm the fields below still match: [create a review comment](https://docs.github.com/en/rest/pulls/comments#create-a-review-comment-for-a-pull-request) and [create a review](https://docs.github.com/en/rest/pulls/reviews#create-a-review-for-a-pull-request). Cached knowledge of request shapes drifts, and a wrong field fails the post or lands the comment on the wrong line.
+**Check the request shape once per session.** Before the first post in a session, fetch the current GitHub REST docs for the endpoint you are about to use and confirm the fields below still match: [create a review](https://docs.github.com/en/rest/pulls/reviews#create-a-review-for-a-pull-request), and for a reply [create a reply for a review comment](https://docs.github.com/en/rest/pulls/comments#create-a-reply-for-a-review-comment). Cached knowledge of request shapes drifts, and a wrong field fails the post or lands the comment on the wrong line.
 
 ### Build the payloads
 
@@ -425,51 +427,33 @@ Before any post, every inline draft goes through the payload builder. Write the 
 bash "${CLAUDE_PLUGIN_ROOT}/scripts/build-comment-payloads.sh" drafts.json "$DIFF_FILE" "$HEAD_SHA" --pr <NUM>
 ```
 
-`DIFF_FILE` and `HEAD_SHA` come from the `meta.env` that `kc-code-review` wrote with `gather-review.sh`; run that script again if the head has moved. The builder checks that each path is in the diff, that each `line` and `start_line` is a line a hunk covers on the comment's side, and that no body is empty. It lists every failing draft and writes nothing when any fails. When all pass it writes one payload per draft and prints one command per payload, already prefixed with the approval token. It never posts.
+`DIFF_FILE` and `HEAD_SHA` come from the `meta.env` that `kc-code-review` wrote with `gather-review.sh`; run that script again if the head has moved. Pass `--body-file <file>` only when the review has a top-level body (see "Top-level review body"). The builder checks that each path is in the diff, that each `line` and `start_line` is a line a hunk covers on the comment's side, and that no body is empty. It lists every failing draft and writes nothing when any fails. When all pass it writes one checked comment per draft, gathers them into one review payload (`review.json`), and prints the one command that posts it, already prefixed with the approval token. It never posts.
 
-Those printed commands are what the user approves. Show them with the drafts, and after the post signal run them unchanged. The token in them is still governed by "The approval token" above: printing it is not permission to run it.
+That printed command is what the user approves. Show it with the drafts, and after the post signal run it unchanged. The token in it is still governed by "The approval token" above: printing it is not permission to run it.
 
-**Choose the posting shape from the top-level body, not from severity:**
+**Every comment of one review goes up as one review**, whether or not it has a top-level body. The single-comment endpoint (`POST /repos/{owner}/{repo}/pulls/{pull_number}/comments`) wraps each comment in a review of its own, so five comments sent that way show on the PR as five separate reviews. Never post a review's comments one request at a time.
 
-1. **No top-level body** (the usual case): post each comment individually to `POST /repos/{owner}/{repo}/pulls/{pull_number}/comments`. No review wrapper, no body to invent.
-2. **A body that says something no inline says:** post one review to `POST /repos/{owner}/{repo}/pulls/{pull_number}/reviews`, with that body and the comments inside it. The event is `"COMMENT"`. Never offer `"REQUEST_CHANGES"` or `"APPROVE"`; use one only when the user asks for it. The docs mark `body` as "Required when using REQUEST_CHANGES or COMMENT for the event parameter", so a review with no real body is not an option: fall back to shape 1.
-3. **A note with no line to anchor to** (the PR is stacked, or should be split) and no inline comments: `KC_REVIEW_POST_APPROVED=1 gh pr comment <NUM> --body-file <file>`.
+1. **Inline comments, with or without a body** (the usual case): one `POST /repos/{owner}/{repo}/pulls/{pull_number}/reviews` with every comment in `comments`, event `"COMMENT"`, and `body` only when there is one. GitHub accepts a `COMMENT` review that has inline comments and no body, though the docs list `body` as required for `COMMENT`; checked by posting one. Never offer `"REQUEST_CHANGES"` or `"APPROVE"`; use one only when the user asks for it.
+2. **A note with no line to anchor to** (the PR is stacked, or should be split) and no inline comments: `KC_REVIEW_POST_APPROVED=1 gh pr comment <NUM> --body-file <file>`.
 
-**Shape 1, one request per comment.** This is the builder's output: one payload file and one printed command per draft. `body`, `commit_id`, and `path` are required. `line` is the diff line the comment applies to (the last line of a range); `side` is `RIGHT` for added or unchanged lines and `LEFT` for deletions. A multi-line comment adds `start_line` and `start_side`; a single-line comment omits them.
-
-```bash
-KC_REVIEW_POST_APPROVED=1 gh api repos/{owner}/{repo}/pulls/<NUM>/comments -X POST --input /tmp/comment-<NUM>-<i>.json
-```
-
-```json
-{
-  "commit_id": "<full 40-char head SHA>",
-  "path": "<file>",
-  "start_line": 9,
-  "start_side": "RIGHT",
-  "line": 12,
-  "side": "RIGHT",
-  "body": "..."
-}
-```
-
-**Shape 2, one review.** Run the builder over the inline drafts first, so every anchor is validated, then copy each payload's `path`, `line`, `side`, `body` and any start fields into `comments`. Write the review payload and POST it:
+The builder writes the shape-1 payload. Each comment needs `path` and `body`. `line` is the diff line the comment applies to (the last line of a range); `side` is `RIGHT` for added or unchanged lines and `LEFT` for deletions. A multi-line comment adds `start_line` and `start_side`; a single-line comment omits them.
 
 ```bash
-KC_REVIEW_POST_APPROVED=1 gh api repos/{owner}/{repo}/pulls/<NUM>/reviews -X POST --input /tmp/review-<NUM>.json
+KC_REVIEW_POST_APPROVED=1 gh api repos/{owner}/{repo}/pulls/<NUM>/reviews -X POST --input <out-dir>/review.json
 ```
 
 ```json
 {
   "commit_id": "<full 40-char head SHA>",
   "event": "COMMENT",
-  "body": "<the one thing no inline comment says>",
   "comments": [
     { "path": "<file>", "line": 17, "side": "RIGHT", "body": "..." },
     { "path": "<file>", "start_line": 9, "start_side": "RIGHT", "line": 12, "side": "RIGHT", "body": "..." }
   ]
 }
 ```
+
+With `--body-file`, the payload also has `"body": "<the one thing no inline comment says>"`.
 
 **A reply in a review thread** (answering a reviewer, usually on your own PR) goes to the thread's first comment, one request per reply. Write each reply body to a file and post it:
 

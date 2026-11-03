@@ -1,15 +1,16 @@
 #!/usr/bin/env bash
-# Turns drafted review comments into GitHub request payloads, after checking
-# every draft against the diff, and prints the post commands for the user to
+# Turns drafted review comments into one GitHub review payload, after checking
+# every draft against the diff, and prints the post command for the user to
 # approve. It never posts and never runs gh.
 #
-# Usage: build-comment-payloads.sh <drafts.json> <diff-file> <head-sha> --pr <n> [--out-dir <dir>]
+# Usage: build-comment-payloads.sh <drafts.json> <diff-file> <head-sha> --pr <n> [--body-file <file>] [--out-dir <dir>]
 #   <drafts.json>  a JSON array of {path, line, body}, each optionally with
 #                  start_line, side and start_side
 #   <diff-file>    the unified diff the comments anchor to (gather-review.sh's
 #                  review.diff)
 #   <head-sha>     the full 40-character head commit SHA
-#   --pr <n>       the PR number the printed commands post to
+#   --pr <n>       the PR number the printed command posts to
+#   --body-file    the review's top-level body, when it has one (omitted otherwise)
 #   --out-dir      where payloads go (default: ${TMPDIR:-/tmp}/kc-review-<sha>)
 #
 # Validation, per the create-a-review-comment docs
@@ -24,11 +25,16 @@
 #   - `body` is not empty.
 # Every failing draft is listed on stderr, and nothing is written.
 #
-# Output: one payload per draft at <out-dir>/comment-<i>.json,
+# Output: one checked comment per draft at <out-dir>/comment-<i>.json,
 # {commit_id, path, line, side, body} plus start_line and start_side for a
-# range; then, one per payload, the command the user approves, carrying the
-# approval token (docs/architecture.md), printed and not run:
-#   KC_REVIEW_POST_APPROVED=1 gh api repos/{owner}/{repo}/pulls/<n>/comments -X POST --input <file>
+# range, and all of them in one review at <out-dir>/review.json,
+# {commit_id, event: "COMMENT", comments, body when --body-file has one}. Every
+# comment of one review goes up in that one request, so GitHub shows one review:
+# the single-comment endpoint wraps each comment in a review of its own. GitHub
+# accepts a COMMENT review with inline comments and no body. Then the one
+# command the user approves, carrying the approval token (docs/architecture.md),
+# printed and not run:
+#   KC_REVIEW_POST_APPROVED=1 gh api repos/{owner}/{repo}/pulls/<n>/reviews -X POST --input <review.json>
 #
 # Requires jq. Exits 0 when every draft is valid, 1 when any draft fails
 # validation or jq is missing, 2 on a usage error or unreadable input.
@@ -36,7 +42,7 @@ set -euo pipefail
 
 script_name=$(basename "$0")
 usage() {
-  echo "usage: $script_name <drafts.json> <diff-file> <head-sha> --pr <n> [--out-dir <dir>]" >&2
+  echo "usage: $script_name <drafts.json> <diff-file> <head-sha> --pr <n> [--body-file <file>] [--out-dir <dir>]" >&2
   exit 2
 }
 input_error() {
@@ -46,12 +52,18 @@ input_error() {
 
 positional=()
 pr_number=""
+body_file=""
 out_dir=""
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --pr)
       [ "$#" -ge 2 ] || usage
       pr_number=$2
+      shift
+      ;;
+    --body-file)
+      if [ "$#" -lt 2 ] || [ -z "$2" ]; then usage; fi
+      body_file=$2
       shift
       ;;
     --out-dir)
@@ -76,6 +88,7 @@ command -v jq >/dev/null 2>&1 || {
 }
 [ -r "$drafts_file" ] || input_error "cannot read drafts file: $drafts_file"
 [ -r "$diff_file" ] || input_error "cannot read diff file: $diff_file"
+[ -z "$body_file" ] || [ -r "$body_file" ] || input_error "cannot read body file: $body_file"
 printf '%s' "$head_sha" | grep -Eq '^[0-9a-f]{40}$' || input_error "head SHA must be the full 40-character SHA: $head_sha"
 jq -e 'type == "array"' "$drafts_file" >/dev/null 2>&1 || input_error "drafts file is not a JSON array: $drafts_file"
 
@@ -225,8 +238,17 @@ while [ "$draft_index" -lt "$draft_count" ]; do
   draft_index=$((draft_index + 1))
 done
 
+review_file="$out_dir/review.json"
+review_body=""
+[ -z "$body_file" ] || review_body=$(cat "$body_file")
+jq -s --arg commit_id "$head_sha" --arg body "$review_body" '
+  {commit_id: $commit_id, event: "COMMENT", comments: map(del(.commit_id))}
+  + (if ($body | test("\\S")) then {body: $body} else {} end)
+' "${payload_files[@]}" > "$review_file"
+body_note=""
+[ "$(jq 'has("body")' "$review_file")" = true ] && body_note=", with a body"
+echo "wrote $review_file (one review, $draft_count comment(s)$body_note)"
+
 echo
-echo "Commands for the user to approve (not run):"
-for payload_file in "${payload_files[@]}"; do
-  echo "KC_REVIEW_POST_APPROVED=1 gh api repos/{owner}/{repo}/pulls/$pr_number/comments -X POST --input $(quote_path "$payload_file")"
-done
+echo "Command for the user to approve (not run):"
+echo "KC_REVIEW_POST_APPROVED=1 gh api repos/{owner}/{repo}/pulls/$pr_number/reviews -X POST --input $(quote_path "$review_file")"

@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Tests scripts/build-comment-payloads.sh with fixtures/build-comment-payloads/:
 # valid drafts (single line, range, old side, new file, context line) become
-# payloads plus approval commands; a line outside every hunk, a path not in the
+# checked comments gathered into one review payload plus one approval command,
+# with a body only when --body-file gives one; a line outside every hunk, a path not in the
 # diff and an empty body each fail alone, and a mixed file lists every failing
 # draft and writes nothing. No gh is on PATH: the script must never call it.
 set -euo pipefail
@@ -25,11 +26,27 @@ export PATH="$trap_bin:$PATH"
 out="$work_dir/out"
 bash "$builder" "$fixtures/valid.json" "$fixtures/review.diff" "$head_sha" --pr 12 --out-dir "$out" > "$work_dir/valid.txt"
 sed "s|{out}|$out|g" "$fixtures/expected-valid.txt" > "$work_dir/expected-valid.txt"
-expect_file "valid: one payload per draft and one approval command each" "$work_dir/expected-valid.txt" "$work_dir/valid.txt"
+expect_file "valid: one checked comment per draft, one review and one approval command" "$work_dir/expected-valid.txt" "$work_dir/valid.txt"
 expect_file "valid: a range payload carries start_line and start_side" "$fixtures/expected-comment-2.json" "$out/comment-2.json"
 expect_file "valid: an old-side payload keeps side LEFT" "$fixtures/expected-comment-3.json" "$out/comment-3.json"
 expect_eq "valid: a single-line payload has exactly the five fields" "body,commit_id,line,path,side" \
   "$(jq -r 'keys | join(",")' "$out/comment-1.json")"
+
+expect_eq "valid: the review is a COMMENT with every comment and no body" "COMMENT,5,false,1111111111111111111111111111111111111111" \
+  "$(jq -r '[.event, (.comments | length), has("body"), .commit_id] | map(tostring) | join(",")' "$out/review.json")"
+expect_eq "valid: review comments carry no commit_id of their own" "false" \
+  "$(jq -r '[.comments[] | has("commit_id")] | any | tostring' "$out/review.json")"
+expect_eq "valid: review comments keep their order and range fields" "3,2-4,2,1,5" \
+  "$(jq -r '[.comments[] | if .start_line then "\(.start_line)-\(.line)" else "\(.line)" end] | join(",")' "$out/review.json")"
+
+printf 'A note about the PR as a whole.\n' > "$work_dir/body.md"
+bash "$builder" "$fixtures/valid.json" "$fixtures/review.diff" "$head_sha" --pr 12 --body-file "$work_dir/body.md" --out-dir "$work_dir/out-body" > "$work_dir/body.txt"
+expect_eq "body: --body-file puts the body on the review" "A note about the PR as a whole." \
+  "$(jq -r '.body' "$work_dir/out-body/review.json")"
+expect_contains "body: the summary line says it has a body" "one review, 5 comment(s), with a body" "$(cat "$work_dir/body.txt")"
+printf '  \n' > "$work_dir/blank.md"
+bash "$builder" "$fixtures/valid.json" "$fixtures/review.diff" "$head_sha" --pr 12 --body-file "$work_dir/blank.md" --out-dir "$work_dir/out-blank" > /dev/null
+expect_eq "body: a blank body file adds no body" "false" "$(jq -r 'has("body") | tostring' "$work_dir/out-blank/review.json")"
 
 mkdir -p "$work_dir/tmp"
 TMPDIR="$work_dir/tmp" bash "$builder" "$fixtures/valid.json" "$fixtures/review.diff" "$head_sha" --pr 12 > /dev/null
@@ -93,6 +110,7 @@ check_status() {
 check_status "usage: no arguments exits 2" 2
 check_status "usage: missing --pr exits 2" 2 "$fixtures/valid.json" "$fixtures/review.diff" "$head_sha"
 check_status "usage: a short SHA exits 2" 2 "$fixtures/valid.json" "$fixtures/review.diff" 1111111 --pr 12
+check_status "usage: an unreadable body file exits 2" 2 "$fixtures/valid.json" "$fixtures/review.diff" "$head_sha" --pr 12 --body-file "$work_dir/missing.md"
 check_status "usage: a drafts file that is not an array exits 2" 2 "$fixtures/expected-comment-2.json" "$fixtures/review.diff" "$head_sha" --pr 12
 
 if [ -e "$work_dir/gh-called" ]; then
