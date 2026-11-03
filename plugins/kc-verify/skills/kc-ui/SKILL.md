@@ -22,7 +22,7 @@ This skill checks that it looks right. Whether a person can use it (the flows, w
 - **Spot checks are not QA.** Opening the screen you just changed and seeing that it renders is a smoke test. QA walks every state the screen can be in, the way a QA engineer works through a test plan, and does that every time, not only when asked.
 - **When there is a design, the design is the test plan.** Walk it state by state and compare the app to it. "It renders" and "it matches the design" are different claims.
 - **Trace a layout bug before parking it.** A reported layout defect (a gap, a bar, content past its background) is read in code first: the element's styles, then every ancestor up to the root layout (display, fixed sizes, overflow, backgrounds). "Needs a look in the browser" is not a status; reproduce it there with the same content size the report shows.
-- **Look at the shipped screen, not a stand-in.** A story, fixture page or test harness is not the app. Check the change where users see it, with its real configuration, and treat a probe as evidence only after it has been shown it can fail (see `kc-verify:kc-e2e`).
+- **Look at the shipped screen, not a stand-in.** A story, fixture page or test harness is not the app, and neither is reading the code or the author's screenshots: the code says what should render, and screenshots show only the states someone captured. Check the change where users see it, running its own code (every branch it needs, a server change included, on throwaway data when it migrates), with its real configuration, and never ask whether to run it: QA of someone else's change runs it the same as your own. Treat a probe as evidence only after it has been shown it can fail (see `kc-verify:kc-e2e`).
 
 ## Workflow
 
@@ -133,7 +133,7 @@ Do not report a UI change verified until every box is ticked:
 - [ ] When the work spans several branches or pull requests, the list covers every screen any of them changes, not only the one being worked on now.
 - [ ] If a design exists, the state matrix is written from it, covering every switch in both positions, every layout-changing option, every role, empty/one/many, and every drawer and dialog.
 - [ ] Every drawer and dialog was opened and filled in: empty, one item picked, several picked, and editing an existing item.
-- [ ] The app was put in every state of the matrix and compared to the design section by section, not only the state you happened to land in.
+- [ ] The app, running the change's own code (every branch it needs), was put in every state of the matrix and compared to the design section by section, not only the state you happened to land in; the code and the author's screenshots count for no state.
 - [ ] Every new or changed component was measured against its siblings on the same screen (title, subtitle, field labels, spacing).
 - [ ] Each finding is about structure or behaviour; cosmetic differences where the app has an existing pattern (titles, labels, casing, icons) follow the app.
 - [ ] Loading, empty and error states were each seen.
