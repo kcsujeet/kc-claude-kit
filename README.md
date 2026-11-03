@@ -66,7 +66,7 @@ Most skills trigger on their own:
 | "run this plan", "autopilot this" | `kc-autopilot:kc-run` |
 | (the topic comes up) | `kc-conventions:kc-<topic>` |
 
-One skill only runs when you type it: `/kc-autopilot:kc-init`. `/kc-gates:kc-post-review` also loads on its own whenever Claude drafts a PR comment or reply, so drafts follow its rules; posting still needs your explicit go-ahead.
+One skill only runs when you type it: `/kc-autopilot:kc-init`. `/kc-gates:kc-post-review` also loads on its own whenever Claude drafts a PR comment or reply, or a chat message or ticket comment you will send as yourself, so drafts follow its rules; posting still needs your explicit go-ahead.
 
 `kc-usage-band` has no skill: once installed, it draws its pills above the prompt in every session.
 
@@ -247,7 +247,7 @@ The run's evidence (criteria checks, review decisions, QA results) stays in `.au
 
 ## Posting review comments to GitHub
 
-The review never posts; its output stays in chat. To turn findings into PR comments, run `/kc-gates:kc-post-review`. Claude also loads it on its own before drafting any PR comment or reply, so drafts are never written from memory; posting still waits for your explicit signal and the approval token. It:
+The review never posts; its output stays in chat. To turn findings into PR comments, run `/kc-gates:kc-post-review`. Claude also loads it on its own before drafting any PR comment or reply, or any message you will send under your name, so drafts are never written from memory; posting still waits for your explicit signal and the approval token. It:
 
 1. Drafts the comments in Conventional Comments format, giving every `suggestion` a brief reason.
 2. Runs the drafts through `build-comment-payloads.sh`, which rejects any comment whose file or line is not in the diff.
