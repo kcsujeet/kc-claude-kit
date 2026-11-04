@@ -12,7 +12,7 @@ Round 2 is there to confirm, not to discover. What it used to find traces to two
 ## When it runs
 
 - **Once, at hand-off:** before marking a PR ready, opening it ready, requesting a reviewer, or moving its ticket to review. For a stack, once per PR, each against its own base.
-- **Not before:** commits and pushes on the way there run nothing. Run tests and lint as you work, as always.
+- **Not before:** commits and pushes on the way there run nothing, and neither does showing the person the change for approval: no `kc-code-review` fan-out and no QA walk while the code is still being built, since this pass repeats both. Run tests, lint and types as you work, as always. The order of work is in the working agreement's "Order of work on a task": assess, approval, build, draft PR, this pass, ready.
 - **Again only after a reviewer's round** that changed the code, on the new head.
 
 ## The pass

@@ -143,7 +143,7 @@ Each convention topic is one skill. It holds the rules to write against and the 
 | `performance` | source files | Filter and paginate in the data layer, no N+1, index with the query, measure and say what you measured |
 | `dependencies` | dependency manifests | Ask first, check maintenance signals, exact versions, nothing that duplicates what is installed |
 
-Plus `kc-working-agreement.md`, the one hand-written rule, loaded in every session: ask before assuming, report honestly, write corrections down where they belong.
+Plus `kc-working-agreement.md`, the one hand-written rule, loaded in every session: ask before assuming, the order of work on a task (assess, approval, build, draft PR, one review-and-QA pass, ready), report honestly, write corrections down where they belong.
 
 For React and TypeScript codebases, [bulletproof-react](https://github.com/alan2207/bulletproof-react/blob/master/docs/project-structure.md) is the canonical source for project structure, and the `structure` topic says so explicitly: where the two appear to disagree, that document wins and the rule is what gets corrected.
 

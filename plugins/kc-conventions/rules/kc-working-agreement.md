@@ -19,6 +19,19 @@ How to proceed when the task is not fully specified, and what to do with a corre
 - If you had to assume something you could not resolve, say so explicitly at the top of the summary, not buried in it.
 - Before writing code, read the convention rules for each topic the change touches and check the plan against them: how similar code already does the same job, the names, where the code lives. Review is the second check, not the first; code written without the rules comes back as a cleanup.
 
+## Order of work on a task
+
+An expensive check whose result later work will throw away runs once, on the finished work. A task goes in this order:
+
+1. **Assess.** Read the issue and everything it links (recordings, designs, logs), find the cause, and present the cause and the fix with the rules the fix follows. Stop for approval.
+2. **Build.** Make the change and its tests, running lint, types and the affected tests as you go; those are cheap and catch breakage early. No review fan-out and no walk through the running app yet: the code is still moving, so both would run again at the end.
+3. **Open the pull request as a draft,** once the person has approved committing and pushing when they ask to see changes first.
+4. **Review and QA once:** the one pass before a person reviews it (`kc-gates:kc-ready-for-review`), which reviews the whole diff and walks every state in the running app.
+5. **Mark it ready** and hand it to the reviewer.
+6. **Look back, then write the lessons.** Note each correction, review comment and QA finding as it arrives, and act on it in the work, but write no rule yet. Once the task is handed off, go through all of them together and write the lessons as one batch: a lesson written mid-task is often widened, merged or contradicted by the next piece of feedback, and writing it pulls the task off course.
+
+Examples of the class: a small two-file fix reviewed by every gate and walked in the app while uncommitted, then reviewed and walked again at hand-off, so review and QA took two-thirds of the time; screenshots for a pull request taken before the copy was final; a performance profile taken halfway through the refactor it was meant to judge.
+
 ## Answer the question asked
 
 - Keep answers short and to the point; length is not thoroughness. Write to engineers: lead with the point, state it accurately, and stop, with no stage-setting, no recap of what the reader already knows or what is already done, and no justification nobody asked for. This holds for chat answers, review comments, issue replies, PR descriptions, commit messages and write-ups of findings. Plain is not curt: grounded and humble ("I think", a real question), never a ruling or a show of politeness.
@@ -38,5 +51,5 @@ How to proceed when the task is not fully specified, and what to do with a corre
 - When a correction arrives, or something about the codebase turns out to be written down nowhere, add one line in the imperative describing the correct behaviour.
 - Keep it specific to that repo. General advice belongs in these portable rules, not in a project file.
 - If the fix is a procedure rather than a rule, it belongs in a skill, and the project file only links to it.
-- Include the change in the same commit as the fix, and mention it in the summary.
+- Write these lines at the end of the task, in the look-back (Order of work, step 6), with the task's other lessons, and mention them in the summary.
 - Auto memory already records corrections and preferences on its own. Do not hand-maintain a log of the same thing; write down what auto memory would not derive.

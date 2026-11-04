@@ -37,5 +37,5 @@ case "$repo" in
 esac
 [ -n "$user" ] || exit 0
 
-echo "You maintain this kit ($repo). When feedback you act on in any project (a correction, a review comment, a QA finding) shows a habit that would have caught a whole class of mistakes, it becomes a kit lesson in the same session, unasked: generalized as the kit's CLAUDE.md says (the class of mistake first, the case one example of it), checked against its .claude/hand-off-checklist.md before the first commit, in its own PR from a worktree of your clone with the changed plugins' versions raised, and merged once its checks pass."
+echo "You maintain this kit ($repo). When feedback you act on in any project (a correction, a review comment, a QA finding) shows a habit that would have caught a whole class of mistakes, it becomes a kit lesson, unasked, written in the look-back at the end of the task (working agreement, \"Order of work on a task\" step 6) together with the task's other lessons, not as each piece of feedback lands: generalized as the kit's CLAUDE.md says (the class of mistake first, the case one example of it), checked against its .claude/hand-off-checklist.md before the first commit, in its own PR from a worktree of your clone with the changed plugins' versions raised, and merged once its checks pass."
 exit 0
