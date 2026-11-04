@@ -1,6 +1,6 @@
 ---
 name: kc-testing
-description: "Testing conventions for test files and the code they cover in TypeScript, JavaScript and other languages: tests first, a test for every behavior and bug fix, exact assertions, no class-name assertions, gates tested both ways, local setup helpers, and tests placed beside their unit. Use when writing or reviewing tests, or any change that adds behavior or fixes a bug."
+description: "Testing conventions for test files and the code they cover in TypeScript, JavaScript and other languages: tests first, a test for every behavior and bug fix at the unit that owns it and nothing it didn't change, exact assertions, no class-name assertions, gates tested both ways, local setup helpers, and tests placed beside their unit. Use when writing or reviewing tests, or any change that adds behavior or fixes a bug."
 user-invocable: false
 paths:
   - "**/*.{ts,tsx,js,jsx,mjs,cjs,rb,py,swift,go,java,kt,php,cs,rs}"
@@ -38,8 +38,9 @@ The loop is not a formality at the end. A change is not done until it is green.
 - Tests live beside the code they cover, named after it.
 - Assert the exact value when you know it: `toBe(3)`, not `toBeGreaterThan(0)`. A tolerance is for values that are genuinely inexact, stated as one.
 - Assert what a user or caller observes (role, text, state, a returned value), not a class name standing in for it.
-- A condition that mounts or enables something is tested both ways, met and not met, so deleting it fails a test.
-- Setup repeated across tests becomes a local helper (`renderWidget(overrides?)`, `makeItem(id)`), not copy-paste.
+- Test what the change adds, once, at the unit that owns it. A shared unit's new behaviour is tested in the shared unit's tests; each caller's test covers only its own wiring (that it turns the option on, the values and names it passes). Behaviour the change didn't touch gets no new case. When the test diff dwarfs the code diff, cut it back to that.
+- A condition that mounts or enables something is tested both ways, met and not met, so deleting it fails a test. Two exceptions: the off side of an opt-in the change adds is every existing caller's unchanged behaviour, not a new one, and needs no new case; and a guard whose only job is to keep an absent optional input from crashing (`onChange?.(value)`) is not a gate.
+- Setup repeated across tests becomes a local helper (`renderWidget(overrides?)`, `makeItem(id)`), not copy-paste. Setup one test uses stays inline in it, and `describe` blocks stay flat: nest one only for a group that shares setup its siblings don't.
 - Cover the unhappy paths deliberately: the empty collection, the expired token, the duplicate submit, the interrupted write. The happy path is the one that already works.
 - When a bug is fixed, the regression test comes with it in the same change, and it must fail without the fix.
 - A form or request that saves user input is tested for every state that behaves differently (at least clearing a saved value), asserting the request body that goes out, not only that the save succeeded.
@@ -57,10 +58,10 @@ Detection criteria and per-box review failure modes live in the `## Review check
 
 The testing gate agent ticks every box against the diff. A box is FAIL if any matching construct violates the rule; the gate is FAIL if any box is FAIL. The whole gate is N/A only when the diff changes no behavior and touches no test file (state that).
 
-- [ ] §T1 Every new behavior (a feature, prop, option, branch, or bug fix) has a test that exercises it, and a bug fix's test fails without the fix. (N/A: no behavior change in diff)
+- [ ] §T1 Every new behavior (a feature, prop, option, branch, or bug fix) has a test that exercises it, and a bug fix's test fails without the fix. Each is tested once, at the unit that owns it: a test case the diff adds FAILS when it pins behaviour the diff didn't change, re-tests a shared unit's behaviour through a caller (the caller's test covers only its own wiring), or repeats a case the owning unit's tests already have. **Enumerate**: one line per test case the diff adds, naming the changed behaviour it pins and why this file owns it. (N/A: no behavior change and no test case added in the diff)
 - [ ] §T2 No assertion on a class name as the evidence that a state is correct; assert what the user or a consumer observes (role, text, accessible state, a data attribute, an emitted value). A class that is itself the contract (a `className`-style prop the component forwards) is exempt. **Enumerate with the `class-assertions.sh` sweep** (see below). (N/A: only when `class-assertions.sh` returns 0 hits, stated as `grepped class assertions: 0 hits`)
-- [ ] §T3 Every gate (a condition that mounts, enables, or routes something) is tested both ways: once with the condition met and once without, so deleting the gate fails a test. **Enumerate with the `surviving-mutants.sh` sweep's output** when the dispatch gives it: every surviving mutant, gate or not, gets its own verdict, the test that would fail on it, or no behaviour (the code changes nothing) and its deletion. Without it, or when it printed `not run`, each gate is named with the test covering each side. (N/A: no gating logic, condition or early exit added or changed)
-- [ ] §T4 Setup repeated across 2+ tests (the same render-plus-provider boilerplate, fixture literals, or datetime construction) is a local helper, not copy-paste. Setup means more than one plain expression: a repeated one-expression read stays inline at each test (simplicity §P11). (N/A: no repeated setup in the diff's tests)
+- [ ] §T3 Every gate (a condition that mounts, enables, or routes something) is tested both ways: once with the condition met and once without, so deleting the gate fails a test. **Enumerate with the `surviving-mutants.sh` sweep's output** when the dispatch gives it: every surviving mutant, gate or not, gets its own verdict, the test that would fail on it, or no behaviour (the code changes nothing) and its deletion. Without it, or when it printed `not run`, each gate is named with the test covering each side. Two sides need no new case, and their verdict says which applies: the off side of an opt-in the change adds (existing callers' unchanged default), and a guard that only keeps an absent optional input from crashing (`onChange?.(value)`). Neither is a reason to ask for a test. (N/A: no gating logic, condition or early exit added or changed)
+- [ ] §T4 Setup repeated across 2+ tests (the same render-plus-provider boilerplate, fixture literals, or datetime construction) is a local helper, not copy-paste. Setup means more than one plain expression: a repeated one-expression read stays inline at each test (simplicity §P11). The converse also FAILS: a helper, locator or lazy fixture the diff adds that only one test uses, and a nested `describe` whose group shares no setup its siblings lack. (N/A: no setup, helper or `describe` added in the diff's tests)
 - [ ] §T5 A new or moved test sits beside the unit it covers and is named after it. (N/A: no test file added or moved)
 - [ ] §T6 Assertions are exact when the value is known (`toBe(3)`, `toEqual([0, 25, 50])`), not bounds or truthiness that a wrong value also satisfies (`toBeGreaterThan(0)`, `toBeTruthy()`, `toBeDefined()`). A tolerance is fine where the value is genuinely inexact (floating point, measured geometry), stated as `toBeCloseTo`. **Enumerate with the `loose-assertions.sh` sweep** (see below). (N/A: only when `loose-assertions.sh` returns 0 hits, stated as `grepped loose assertions: 0 hits`)
 - [ ] §T7 A submit is tested per state: each form or request that saves user input has a test for every field state that behaves differently (at least clearing a saved value; see correctness §B5), and each test asserts the request body sent, not only the success path. (N/A: the diff adds or changes no submit of user input)
@@ -84,6 +85,31 @@ A change a user or caller can observe ships with a test that would fail if the c
 - A test that only covers the happy path of a change whose risk is on the unhappy one (empty input, a missing value, a duplicate submit).
 
 **Do not flag:** pure refactors with no observable change, when the existing tests already cover the behavior (name those tests in the evidence).
+
+**Once, where it lives.** The other way a change's tests go wrong is by saying too much. A test diff that restates behaviour the change didn't touch, re-tests a shared unit through each of its callers, and adds a case for every guard a reviewer can imagine ends up several times the size of the code change, and the reader can't find the cases that matter. Each behaviour the change adds is tested once, at the unit that owns it.
+
+- A shared formatter gains a `currency` option that the checkout page passes. The formatter's tests get a case per currency rule; the checkout page's test checks only that it passes the storefront's currency. Not: the default formatting again (unchanged), the formatting rules again through the checkout page, or a case for a missing option that falls back to the old default.
+- A shared table gains sortable columns, turned on by one list page. The table's tests sort; the list page's test checks that it marks the right columns sortable.
+- An endpoint gains a filter. The endpoint's tests filter; a client that calls it checks the parameter it sends, not the filtering.
+
+**Flag:**
+- A case for behaviour the diff didn't change (the old default, a click that already worked), unless the change could plausibly have broken it and no existing test pins it; then name why.
+- A caller's test that asserts the shared unit's behaviour (validation, submit handling, formatting) instead of what the caller passes it.
+- A case per imaginable guard: an optional callback called with `?.`, a fallback to the existing default. See §T3 for what is and isn't a gate.
+
+```tsx
+// Flag: the caller re-tests the shared form's Enter handling and validation
+it('submits once on Enter', ...)
+it('does not submit on Enter when the name is empty', ...)
+it('submits once when Create is clicked', ...)
+
+// Prefer: the caller's own wiring only
+it('saves the typed name on Enter', async () => {
+  renderOrderNoteForm({ onSave })
+  await user.type(screen.getByRole('textbox', { name: 'Note' }), 'Fragile{Enter}')
+  expect(onSave).toHaveBeenCalledWith({ note: 'Fragile' })
+})
+```
 
 ### §T2. No class-name assertions as a proxy for behavior
 
@@ -123,6 +149,13 @@ it('hides the editor outside edit mode', () => {
 
 Component-level tests of the gated thing in isolation do not satisfy this box; the gate lives in the parent, so the test has to mount the parent.
 
+**What needs no new case.** Both ways is for a condition that changes what someone gets. Two sides don't:
+
+- The off side of an opt-in the change adds. A new `sortable` option that defaults to off leaves every existing table as it was; the off side is old behaviour, so the met side's test is the new one, and §T1 says unchanged behaviour gets no new case.
+- A guard whose only job is to keep an absent optional input from crashing: `onChange?.(value)`, `if (logger) logger.info(...)`. Its not-met side is "nothing happens"; a test for it pins the language's optional call, not the code's behaviour.
+
+A surviving mutant on either gets that verdict, not a request for a test.
+
 ### §T4. Repeated setup becomes a local helper
 
 When 2+ tests repeat the same setup shape and vary one input, the repetition hides what each test is actually about. Extract a helper at the top of the file so each test reads as input and expected output.
@@ -140,6 +173,8 @@ render(<SomeProvider value={defaults}><Widget mode="b" /></SomeProvider>)
 const renderWidget = (overrides: Partial<WidgetProps> = {}) =>
   render(<SomeProvider value={defaults}><Widget mode="a" {...overrides} /></SomeProvider>)
 ```
+
+The converse holds too: setup that one test uses stays inline in it. A locator helper, a lazily built fixture or a nested `describe` that serves one case adds a layer the reader has to unwind for nothing. Keep `describe` blocks flat: one per unit, with a nested one only for a group that shares setup its siblings don't.
 
 Keep the helper local to the test file unless several files genuinely share it. Per-index assertion chains collapse the same way: `expect(result.map((item) => item.offset)).toEqual([0, 25, 50])` over three separate `expect` lines.
 
