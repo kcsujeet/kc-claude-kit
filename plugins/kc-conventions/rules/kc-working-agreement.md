@@ -28,6 +28,7 @@ An expensive check whose result later work will throw away runs once, on the fin
 3. **Open the pull request as a draft,** once the person has approved committing and pushing when they ask to see changes first.
 4. **Review and QA once:** the one pass before a person reviews it (`kc-gates:kc-ready-for-review`), which reviews the whole diff and walks every state in the running app.
 5. **Mark it ready** and hand it to the reviewer.
+6. **Look back, then write the lessons.** Note each correction, review comment and QA finding as it arrives, and act on it in the work, but write no rule yet. Once the task is handed off, go through all of them together and write the lessons as one batch: a lesson written mid-task is often widened, merged or contradicted by the next piece of feedback, and writing it pulls the task off course.
 
 Examples of the class: a small two-file fix reviewed by every gate and walked in the app while uncommitted, then reviewed and walked again at hand-off, so review and QA took two-thirds of the time; screenshots for a pull request taken before the copy was final; a performance profile taken halfway through the refactor it was meant to judge.
 
@@ -50,5 +51,5 @@ Examples of the class: a small two-file fix reviewed by every gate and walked in
 - When a correction arrives, or something about the codebase turns out to be written down nowhere, add one line in the imperative describing the correct behaviour.
 - Keep it specific to that repo. General advice belongs in these portable rules, not in a project file.
 - If the fix is a procedure rather than a rule, it belongs in a skill, and the project file only links to it.
-- Include the change in the same commit as the fix, and mention it in the summary.
+- Write these lines at the end of the task, in the look-back (Order of work, step 6), with the task's other lessons, and mention them in the summary.
 - Auto memory already records corrections and preferences on its own. Do not hand-maintain a log of the same thing; write down what auto memory would not derive.
