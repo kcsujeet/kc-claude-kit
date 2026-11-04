@@ -48,8 +48,13 @@ Examples of the class: a small two-file fix reviewed by every gate and walked in
 
 ## Keep the instructions current
 
-- When a correction arrives, or something about the codebase turns out to be written down nowhere, add one line in the imperative describing the correct behaviour.
-- Keep it specific to that repo. General advice belongs in these portable rules, not in a project file.
+- When a correction arrives, or something about the codebase turns out to be written down nowhere, add one line in the imperative describing the correct behaviour, in the repo file that acts on it:
+  - how to write, run or test code there: the repo's `CLAUDE.md`, or the instructions file it already uses;
+  - what a review there should flag or accept: `.claude/review-conventions.md`, which `kc-code-review`'s project-conventions gate grades every diff against;
+  - what a pull request must carry before hand-off (its description, the linked issue, paired pull requests, screenshots): `.claude/hand-off-checklist.md`, which `kc-ready-for-review` grades.
+
+  A rule a review can check goes in `review-conventions.md`: a line only in `CLAUDE.md` guides the writing but nothing grades it. Create the file when the repo has none. Examples: "run the type check with the strict config" in `CLAUDE.md`; "prices are formatted only through the shared money formatter" in `review-conventions.md`; "a pull request that changes an order email carries a screenshot of the sent email" in the hand-off checklist.
+- Keep it specific to that repo. General advice belongs in these portable rules, written by their maintainer; anyone else puts it in their own user instructions (`~/.claude/CLAUDE.md`), not in a project file.
 - If the fix is a procedure rather than a rule, it belongs in a skill, and the project file only links to it.
 - Write these lines at the end of the task, in the look-back (Order of work, step 6), with the task's other lessons, and mention them in the summary.
 - Auto memory already records corrections and preferences on its own. Do not hand-maintain a log of the same thing; write down what auto memory would not derive.
