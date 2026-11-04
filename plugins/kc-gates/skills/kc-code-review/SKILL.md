@@ -97,7 +97,7 @@ Each topic gate preloads its `kc-conventions:kc-<topic>` skill, so it already ho
 
 | Gate | Agent (`subagent_type`) | Dispatch note |
 |------|-------------------------|---------------|
-| verification | `kc-gates:verification-gate` | always; its prompt additionally includes every phase-1 gate's returned `GATE:`/`STATUS:`/`BOXES:`/`FINDINGS:` block verbatim, your `SCOPE:` block, and on a re-review your classification of each carried-over finding (Step 1) |
+| verification | `kc-gates:verification-gate` | always; its prompt additionally includes every phase-1 gate's returned `GATE:`/`STATUS:`/`BOXES:`/`FINDINGS:` block verbatim (copied, never summarized: a summary drops the sweep counts the verification gate audits, and it then fails boxes the gate passed, as when a testing gate's "0 hits" lines were left out of a one-line recap), your `SCOPE:` block, and on a re-review your classification of each carried-over finding (Step 1) |
 
 Every gate is dispatched even when it looks inapplicable. A gate whose rules don't apply returns `PASS (N/A)` **with the reason**; you do NOT skip dispatching it. "No hooks changed, so react is N/A" is a verdict the gate agent must produce after reading the diff, never an assumption you make on its behalf.
 

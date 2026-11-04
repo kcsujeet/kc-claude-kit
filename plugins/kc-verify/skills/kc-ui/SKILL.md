@@ -61,6 +61,8 @@ Sign in as a seeded local user without anyone's password. When sign-in goes thro
 - The build fails if the variable is set for a production build, rather than ignoring it.
 - The credential lives in the process environment, never in a committed file or in chat.
 
+When the app keeps its session in a cookie scoped to a parent domain (`.example.test`), a local port can't hold it, and signing in for QA in the browser the developer uses would replace their own session on every subdomain. Sign in from a separate headless browser instead: map a throwaway subdomain of that domain to the local server (Chrome's `--host-resolver-rules="MAP qa-abc-1.example.test 127.0.0.1"`), open the app on it, and trade the dev-only credential for the session cookie there. For example, a server-rendered admin page whose shell reads the session cookie, a storefront that shares a login cookie with its account pages, or a legacy page embedded in a newer app.
+
 ### Step 3 — walk the states
 
 For each surface, look at every state it can be in, not only the populated one:
@@ -115,7 +117,7 @@ The walkthrough:
 - **Box what to look at.** A red outline around the part that changes, with a short label inside it ("Archived item hidden"). Where the change is something missing, box what remains and say so ("Only the open item shows").
 - **Make it a video, not a GIF.** A GIF can't be paused or scrubbed, and a still first frame reads as an image, so people stop watching. Build a short MP4 (H.264, `yuv420p`, `+faststart`) with each frame held for a set time (about 5 seconds a case, 6 for the setup); the player's own controls let people pause on a case. With `ffmpeg`, give each image its own `-loop 1 -t <seconds>` input and join them with the `concat` filter: the concat demuxer's `duration` lines cut the first image short.
 - **Shape it like the screen people use.** Record in the aspect ratio of the device the product is mainly used on: 16:9 for a product used on laptops (a 1440×810 viewport at 2x gives 2880×1620), portrait only when the ticket is about phones. Full-page shots of a long page come out tall and shrink to nothing in a player, so frame each case on the part that changes and keep every frame the same size.
-- **Keep it sharp.** Capture each frame at 2x device pixels from a headless browser (Playwright's `deviceScaleFactor: 2`, a full-page or clipped `screenshot`), never from an agent tool's screenshot, which comes back downscaled and JPEG-compressed. Draw the captions and boxes into the page before the shot so they stay text, not scaled pixels, and encode at the frames' own size (`-crf 16 -tune stillimage`) without scaling down. Before sending it, pull a frame back out of the video and read small text at 100%.
+- **Keep it sharp.** Capture each frame at 2x device pixels from a headless browser (Playwright's `deviceScaleFactor: 2`, a full-page or clipped `screenshot`), never from an agent tool's screenshot, which comes back downscaled and JPEG-compressed. Draw the captions and boxes into the page before the shot so they stay text, not scaled pixels; to caption a screenshot already saved, load it into a page built from a string as a `data:` URL (such a page can't load `file://`), and don't count on the encoder to draw text, since builds without a font library have no text filter. Encode at the frames' own size (`-crf 16 -tune stillimage`) without scaling down. Before sending it, pull a frame back out of the video and read small text at 100%.
 - **Embed it as a player, and see it play.** Trackers render an attached video either as a block player or as an inline file chip, and the chip often won't play. A connector's "append this file inline" option tends to produce the chip, so write the block media node yourself, copying one from a ticket whose video already plays. Then have someone signed in open the ticket and press play before it goes to review: a successful upload says nothing about playback.
 
 ## Tools
@@ -130,6 +132,7 @@ Do not report a UI change verified until every box is ticked:
 
 - [ ] Every surface the diff reaches is listed, including other consumers of shared components.
 - [ ] The app was signed in through the project's dev-only credential, not someone's password; where it has none, the guarded path was proposed, and the user signed in only until it exists.
+- [ ] A session cookie scoped to a parent domain was set in a separate headless browser on a mapped throwaway subdomain, never in the browser the developer uses.
 - [ ] When the work spans several branches or pull requests, the list covers every screen any of them changes, not only the one being worked on now.
 - [ ] If a design exists, the state matrix is written from it, covering every switch in both positions, every layout-changing option, every role, empty/one/many, and every drawer and dialog.
 - [ ] Every drawer and dialog was opened and filled in: empty, one item picked, several picked, and editing an existing item.
