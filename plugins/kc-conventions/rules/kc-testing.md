@@ -15,8 +15,9 @@ The loop is not a formality at the end. A change is not done until it is green.
 - Tests live beside the code they cover, named after it.
 - Assert the exact value when you know it: `toBe(3)`, not `toBeGreaterThan(0)`. A tolerance is for values that are genuinely inexact, stated as one.
 - Assert what a user or caller observes (role, text, state, a returned value), not a class name standing in for it.
-- A condition that mounts or enables something is tested both ways, met and not met, so deleting it fails a test.
-- Setup repeated across tests becomes a local helper (`renderWidget(overrides?)`, `makeItem(id)`), not copy-paste.
+- Test what the change adds, once, at the unit that owns it. A shared unit's new behaviour is tested in the shared unit's tests; each caller's test covers only its own wiring (that it turns the option on, the values and names it passes). Behaviour the change didn't touch gets no new case. When the test diff dwarfs the code diff, cut it back to that.
+- A condition that mounts or enables something is tested both ways, met and not met, so deleting it fails a test. Two exceptions: the off side of an opt-in the change adds is every existing caller's unchanged behaviour, not a new one, and needs no new case; and a guard whose only job is to keep an absent optional input from crashing (`onChange?.(value)`) is not a gate.
+- Setup repeated across tests becomes a local helper (`renderWidget(overrides?)`, `makeItem(id)`), not copy-paste. Setup one test uses stays inline in it, and `describe` blocks stay flat: nest one only for a group that shares setup its siblings don't.
 - Cover the unhappy paths deliberately: the empty collection, the expired token, the duplicate submit, the interrupted write. The happy path is the one that already works.
 - When a bug is fixed, the regression test comes with it in the same change, and it must fail without the fix.
 - A form or request that saves user input is tested for every state that behaves differently (at least clearing a saved value), asserting the request body that goes out, not only that the save succeeded.

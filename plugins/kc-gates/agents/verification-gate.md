@@ -134,7 +134,7 @@ N/A: the sweep found no hit.
 
 ### Test files touched or behavior changed
 
-Owning gate: **testing** (§T2, §T3, §T6). Required receipts: `grepped class assertions: N hits` and `grepped loose assertions: N hits`, each with per-hit verdicts and `0 hits` stated when true. Then, when the dispatch gave the mutation sweep's output, its summary line for each area, with a verdict for each surviving mutant (the test that would fail on it, or no behaviour and its deletion) and for each line the time budget did not reach; a survivor count with no verdicts fails this box like any aggregated sweep. Otherwise, or when the sweep printed `not run`, for every gate the diff adds or changes, the condition named with the test that covers each side (`mode === Mode.EDIT: widget.test.tsx:40 (met), :52 (not met)`). "Gates are tested" without naming them fails this box.
+Owning gate: **testing** (§T2, §T3, §T6). Required receipts: `grepped class assertions: N hits` and `grepped loose assertions: N hits`, each with per-hit verdicts and `0 hits` stated when true. Then, when the dispatch gave the mutation sweep's output, its summary line for each area, with a verdict for each surviving mutant (the test that would fail on it, no behaviour and its deletion, or one of testing §T3's two sides that need no new case, named) and for each line the time budget did not reach; a survivor count with no verdicts fails this box like any aggregated sweep. Otherwise, or when the sweep printed `not run`, for every gate the diff adds or changes, the condition named with the test that covers each side (`mode === Mode.EDIT: widget.test.tsx:40 (met), :52 (not met)`). "Gates are tested" without naming them fails this box.
 
 N/A: no test file touched and no behavior change in the diff.
 
