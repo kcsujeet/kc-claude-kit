@@ -1,0 +1,4 @@
+# Scripts with no test of their own: `<path> <reason>`. check-test-coverage.sh reads this.
+plugins/kc-conventions/scripts/lib/diff-lines.sh sourced by every sweep; tests/run-sweeps.sh runs it through each sweep's fixtures
+plugins/kc-gates/scripts/lib/hook-input.sh sourced by the hook scripts; their tests feed it real hook payloads
+plugins/kc-conventions/scripts/build-rules.sh CI runs `build-rules.sh --check` against the real skills on every PR

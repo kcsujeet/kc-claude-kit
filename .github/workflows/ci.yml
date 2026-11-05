@@ -60,6 +60,11 @@ jobs:
       - name: Check rules/ against skills/
         run: bash plugins/kc-conventions/scripts/build-rules.sh --check
 
+      # Box ids unique, every rule detail has a box, every § citation and
+      # named script resolves (scripts/lint-rules.sh).
+      - name: Rules lint
+        run: bash scripts/lint-rules.sh
+
   scripts:
     name: Shell scripts and their tests
     runs-on: ubuntu-latest
@@ -72,6 +77,12 @@ jobs:
 
       - name: Version bump check tests
         run: bash scripts/tests/check-version-bumps.test.sh
+
+      - name: Rules lint and coverage check tests
+        run: bash scripts/tests/lint-rules.test.sh
+
+      - name: Every plugin script has a test
+        run: bash scripts/check-test-coverage.sh
 
       - name: Convention sweep fixtures
         run: bash plugins/kc-conventions/tests/run-sweeps.sh

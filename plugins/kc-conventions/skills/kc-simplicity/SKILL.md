@@ -25,10 +25,10 @@ paths:
   - §P12. Defaults carry the everyday case
   - §P13. Everything new conforms to how the codebase already does it
   - §P14. Handle the states the data can be in, not the ones a comment says it once was
-  - §P14. A caller the convention misses passes the value, not a smarter guess
   - §P15. Deferred work is done when its condition is met
   - §P16. The shape of the whole change is the simplest that works
   - §P17. A flow people know from other products works the way they know it
+  - §P18. A caller the convention misses passes the value, not a smarter guess
 
 ## Rules
 
@@ -68,10 +68,10 @@ The simplicity gate agent ticks every box against the diff. A box is FAIL if any
 - [ ] §P12 Defaults carry the everyday case: no new variant per scenario of a component, hook, util, fixture or test helper when the base unit could hold the common data or behavior with a default and the one differing caller could pass a prop, argument or override. A caller that depends on something being absent says so in its own override. (N/A: no new variant or scenario helper)
 - [ ] §P13 Everything new conforms: every new or reshaped unit in the diff (an endpoint, a data read, a class, function or hook, a file, a message, a test, an abstraction or technique) names the similar code read (about ten pieces that do the same job, or all there are when fewer) and matches it in shape, name, place and wording; each difference is a finding unless the diff says why. A file with a similar name is not precedent, and neither is an option a shared type declares but no caller passes, or a lone unit that does it differently from the rest. With no precedent, the finding is a `question` to the author (in a self-review, ask the developer before writing it). **Enumerate** the new and reshaped units with the similar code read for each. (N/A: nothing new or reshaped in the diff)
 - [ ] §P14 Every new branch, fallback or exception for a data state (blank, missing, legacy shape) cites evidence that the state can still occur: the writer that can still produce it, or a data query. A state that create-time defaults, validations or a completed backfill rule out FAILS; handle it in the backfill or the validation instead. (N/A: no new branch for a data state)
-- [ ] §P14 A value a shared unit derives by convention (a name built from another name, a default read from a string pattern) is not made cleverer for one caller it gets wrong (pluralization rules, another regex, a special case); that caller passes the value through an optional override, and every other caller keeps the old default. (N/A: no derived value changed or worked around in the diff)
 - [ ] §P15 Deferred work is done when its condition is met: grep the repo for the markers of the work this diff finishes (its feature or phase name, `once`, `after`, `remove when`); each one whose condition the diff meets FAILS unless the diff removes the code it guards. Each one left in place states what it still waits on. (N/A: the diff finishes no deferred work)
 - [ ] §P16 The shape of the whole change is the simplest that works: state the result the diff is after, then at least one other way to get it, and compare. A diff that runs two mechanisms for one job (two storage shapes, two lookups, a branch on a mode through every step), recomputes downstream what an earlier step already knew, or adds a layer an existing one could carry FAILS when the other way is materially simpler, and the finding describes that shape in a sentence or a short sketch. Line findings that shape would delete go under this one, not beside it. (N/A: never; even a one-line change has a goal another shape could meet)
 - [ ] §P17 Familiar flows stay familiar: every flow people go through that the diff adds or reshapes (sign-up, sign-in, password reset, checkout, account settings, navigation, or any other task most products run the same way) asks for things in the order, and behaves the way, people know from other products. A step dropped, merged, moved or added against that order to save a screen or a request FAILS; a departure the developer chose is fine only when the diff or the PR says so, and otherwise is a `question`. A flow that copies a departure the codebase already has is raised as one too, not taken as precedent (§P13). **Enumerate** each flow with its steps in order beside the order most products use. (N/A: the diff adds or reshapes no flow a person goes through)
+- [ ] §P18 A value a shared unit derives by convention (a name built from another name, a default read from a string pattern) is not made cleverer for one caller it gets wrong (pluralization rules, another regex, a special case); that caller passes the value through an optional override, and every other caller keeps the old default. (N/A: no derived value changed or worked around in the diff)
 
 ## Review detail
 
@@ -295,15 +295,6 @@ When moving data into a shared default breaks some callers, they were silently r
 
 Most of what this catches is not exotic. It is an ordinary thing built in a shape similar code does not have: an endpoint that trims what the caller asked for when no other endpoint does; a data read named for the one screen that uses it where every other is named for its resource; related data loaded up front in one place when similar code loads it on request; a record created on first use when records like it are created with their parent; an error message in a library's default words where the repo has its own. Each passes a line-by-line review, and similar code side by side shows the difference at once. The same holds for a fix to a review finding: the fix is new code, and it conforms too.
 
-### §P14. A caller the convention misses passes the value, not a smarter guess
-
-A shared unit that works a value out by convention is right for most callers and wrong for a few. Making the guess cleverer for one of them (a pluralization rule, a second regex, a special-cased name) changes the result for every caller, needs each one checked, and still misses the next odd name. An optional override is one line, changes nothing for anyone else, and says exactly what the caller needs.
-
-Example: a shared form autocomplete keeps picked records at `name` with `_ids` turned into `s`, so `tax_ids` lands at `taxs`. Teaching it that `x` takes `es` would also move every other `x_ids` field in the app. The fix was a `fieldName` prop, which the one form that needed it sets to `taxes`.
-
-This is not §P10's single-caller prop: the caller cannot own the behavior, because the shared unit is the one writing to the wrong place.
-
-
 ### §P14. Handle the states the data can be in, not the ones a comment says it once was
 
 Old comments outlive the data they describe: "the first store may have no name of its own" stays in the code after a backfill names every store and creation starts naming new ones. Code that trusts the comment grows a special case (a name may stay blank, but only if it was blank before) that guards a state nothing can produce any more, and every reader has to learn it. Before writing such a branch, find what could still produce the state: the create path, the update path, an import, a job. If none can, and a backfill has run, enforce the rule plainly (required, validated) and leave the old state to the backfill. If one still can, say which.
@@ -334,6 +325,15 @@ Example: a password reset asked for the new password first, then emailed a code 
 Others in the same family: a checkout that takes payment before the shipping address; a Back button inside a multi-step form that leaves the form instead of going back one step; a logo that does not lead home.
 
 Before designing a flow, write down how it usually goes, step by step, from products people already use, and start from that order. Each difference needs a reason a person going through the flow would care about; saving the developer a screen, a request or a table is not one. When the codebase already runs the flow its own way, and that way departs from the familiar one, raise it with the developer rather than copying it to a new place.
+
+### §P18. A caller the convention misses passes the value, not a smarter guess
+
+A shared unit that works a value out by convention is right for most callers and wrong for a few. Making the guess cleverer for one of them (a pluralization rule, a second regex, a special-cased name) changes the result for every caller, needs each one checked, and still misses the next odd name. An optional override is one line, changes nothing for anyone else, and says exactly what the caller needs.
+
+Example: a shared form autocomplete keeps picked records at `name` with `_ids` turned into `s`, so `tax_ids` lands at `taxs`. Teaching it that `x` takes `es` would also move every other `x_ids` field in the app. The fix was a `fieldName` prop, which the one form that needed it sets to `taxes`.
+
+This is not §P10's single-caller prop: the caller cannot own the behavior, because the shared unit is the one writing to the wrong place.
+
 
 ## Sweeps
 
