@@ -9,6 +9,7 @@ paths:
 The loop is not a formality at the end. A change is not done until it is green.
 
 - Write the failing test first. Watch it fail for the right reason, then make it pass. A test that passed the moment you wrote it proved nothing.
+- A test is written for a break it would catch in real use, never to make a suite or a coverage count green: it sets up a situation the code really meets and fails when that behaviour breaks. Code nothing real reaches is deleted, not tested.
 - Run the project's check and test commands after each meaningful edit, not once at the very end when the cause of a failure is buried under ten changes.
 - Never disable, skip, or narrow a test to reach green. If a test is wrong, say why before changing it, and change it as its own visible decision.
 - Do not start a long-running process to "verify" a change. A dev server or watcher never exits; use the one-shot check and test commands.

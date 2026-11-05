@@ -1,0 +1,6 @@
+schema_version: "1.1"
+name: test-asserts-own-stub
+description: A branch adds a shipping-cost function and a test that mocks that very function and asserts the mock's stub; the review comes back FAILED with a finding on the test file about the mock that replaces the code under test (testing §T1).
+tags: [review, positive, lesson]
+context:
+  scaffold_script: setup.sh
