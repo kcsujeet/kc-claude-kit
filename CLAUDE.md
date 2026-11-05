@@ -27,6 +27,7 @@ Before writing a lesson:
 1. Write the class of mistake in one sentence, then two or three other cases it would catch, from areas other than the one it came from. The rule is written for the class; the case that taught it is one example among those.
 2. Treat wording the request suggests, from the user or from another session, as a starting point, not the rule: it was written about the case.
 3. Grade the draft against `.claude/hand-off-checklist.md` before the first commit, not at hand-off, and fix what fails. The PR description states the class and the other cases.
+4. When the lesson changes what a review or QA skill catches, add one eval case that proves it: under the plugin's `evals/`, a scaffold with a small diff showing the case (in the neutral domain) and a grader for the finding, shaped like `plugins/kc-gates/evals/seeded-violations/`. Run that case alone, once, before merging (`claude plugin eval . --eval-dir plugins/<plugin>/evals --case <name> --ablation none --scaffold --allow-tools Bash Agent`; `--ablation none` skips the no-plugin arm, which would double the cost), and say in the PR whether it passed. A case costs model calls, so it is one per lesson, never a suite per lesson, and CI runs the suites only on demand. A wording-only change adds none.
 
 The checklist applies to draft PRs too (`drafts: true` in its front matter), so kc-gates' hand-off guard won't open even a draft PR here until its head commit has a checklist receipt (`ready-receipt.sh write <sha> --checklist`).
 

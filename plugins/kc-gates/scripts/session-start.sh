@@ -11,7 +11,7 @@
 
 set -u
 
-echo 'Before a PR of yours goes to a reviewer (marking it ready, opening it ready, requesting a reviewer, or moving its ticket to review), run /kc-gates:kc-ready-for-review on it once: two rounds, with one check of the fixes between them, then what is still open goes to the user. Nothing runs per commit or push.'
+echo 'Before a PR of yours goes to a reviewer (marking it ready, opening it ready, requesting a reviewer, or moving its ticket to review), run /kc-gates:kc-ready-for-review on it once: one round for a small, low-risk change, otherwise two with one check of the fixes between them, then what is still open goes to the user. Nothing runs per commit or push.'
 
 plugin_root=${CLAUDE_PLUGIN_ROOT:-$(cd "$(dirname "$0")/.." && pwd)}
 config=${CLAUDE_CONFIG_DIR:-$HOME/.claude}
