@@ -8,6 +8,7 @@ How to proceed when the task is not fully specified, and what to do with a corre
 - Sketch at least one other shape and compare it with the one in front of you before settling. Only then go line by line.
 - Be skeptical of the first idea, your own included. Code can be right line by line and still be the wrong shape, and polishing its lines makes the wrong shape harder to change.
 - In a review, a materially simpler design is the first finding. Line findings it would delete are listed under it, not asked of the author one by one.
+- Use the access you already have. Before starting work somewhere new (a helper process, agent or session in a folder never opened, a command that needs a new sandbox or network permission, a browser profile that needs a sign-in, a second tool that does what an installed one does), check whether the place and tools already permitted can do it, reaching other files by path. A route that needs a new permission stops the work until the person answers, and gains nothing when the existing one works. Example: a side session started inside a freshly made worktree raised a folder-trust prompt, when starting it in the already-trusted workspace and naming the worktree's path did the same job.
 
 ## Ask before assuming
 
