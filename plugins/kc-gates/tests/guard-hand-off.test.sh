@@ -48,6 +48,13 @@ if bash "$scripts/ready-receipt.sh" write "$reviewed" --rounds 3 --open 0 >/dev/
 else
   record "receipt: a third round is refused" ok
 fi
+sized_receipt=$(bash "$scripts/ready-receipt.sh" write "$(printf 'f%.0s' {1..40})" --rounds 1 --open 0 --size small && bash "$scripts/ready-receipt.sh" check "$(printf 'f%.0s' {1..40})")
+expect_contains "receipt: --size records the pass's size" "size=small" "$sized_receipt"
+if bash "$scripts/ready-receipt.sh" write "$(printf 'f%.0s' {1..40})" --rounds 1 --open 0 --size tiny >/dev/null 2>&1; then
+  record "receipt: an unknown size is refused" fail "it wrote one"
+else
+  record "receipt: an unknown size is refused" ok
+fi
 checklist_receipt=$(bash "$scripts/ready-receipt.sh" write "$(printf 'e%.0s' {1..40})" --checklist && bash "$scripts/ready-receipt.sh" check "$(printf 'e%.0s' {1..40})")
 expect_contains "receipt: --checklist records the walk" "checklist=walked" "$checklist_receipt"
 if bash "$scripts/ready-receipt.sh" check "$unreviewed" >/dev/null; then
