@@ -76,6 +76,8 @@ For each surface, look at every state it can be in, not only the populated one:
 
 A missing empty state and a missing loading state are the two most commonly shipped omissions, because the developer's data is always already there.
 
+When the surface finds or rewrites content people write (a signature or footer swapped when the sender changes, a template filled in, pasted text cleaned up), each shape of that content is a state too: plain, line breaks, several blocks, formatting or a link against other words, images beside text and alone, tables, empty and none. Put each through every action that moves it (insert, swap, remove, swap back) and look at what is left on screen, not only the shape the change was written for.
+
 Then fill a list or page taller than the viewport and check the background, footer and scrolling hold.
 
 ### Step 4 — vary the environment
@@ -140,6 +142,7 @@ Do not report a UI change verified until every box is ticked:
 - [ ] Every new or changed component was measured against its siblings on the same screen (title, subtitle, field labels, spacing).
 - [ ] Each finding is about structure or behaviour; cosmetic differences where the app has an existing pattern (titles, labels, casing, icons) follow the app.
 - [ ] Loading, empty and error states were each seen.
+- [ ] A surface that finds or rewrites content people write was walked with every shape of that content (plain, line breaks, several blocks, formatting against words, links, images, tables, empty, none) through every action that moves it, not only the shape the change was about.
 - [ ] Each create form was submitted for every option that changes it, and the new record's landing state (on or off, sections shown) was compared with the design.
 - [ ] A list or page was filled past the viewport, and the background, footer and scrolling held.
 - [ ] Every reported layout defect was traced through its ancestors in code and reproduced at the content size the report shows, in the renderer and version that produced it (named, with where that came from), before it was fixed or left open, and the fix was seen in that version and the current one.
