@@ -34,7 +34,7 @@ ruby_output=$(bash "$select_gates" "$work_dir/ruby/review.diff" "$work_dir/ruby/
 expect_eq "ruby: rails runs, react, datetime and i18n don't" \
   "GATES=naming,clarity,structure,simplicity,rails,testing,correctness" "$(printf '%s\n' "$ruby_output" | sed -n 1p)"
 expect_contains "ruby: react's N/A reason is printed" \
-  "react: N/A (no .jsx or .tsx file, and no changed JS or TS file imports React)" "$ruby_output"
+  "react: N/A (no .jsx or .tsx file, and no changed JS or TS file imports React or a React library or defines a hook)" "$ruby_output"
 expect_contains "ruby: rails names the file that triggered it" "rails: run (app/models/order.rb)" "$ruby_output"
 
 # --- a React change ----------------------------------------------------------
@@ -51,6 +51,24 @@ expect_eq "ts hook importing react: react runs" \
 make_case "$work_dir/plain-ts" 'export const sum = (a: number, b: number) => a + b' src/math.ts
 expect_eq "plain ts: react doesn't run" \
   "GATES=naming,clarity,structure,simplicity,testing,correctness" "$(gates_for "$work_dir/plain-ts")"
+
+# A read hook built on a React data library imports nothing from 'react' itself.
+make_case "$work_dir/query-hook" "import { useQuery } from '@tanstack/react-query'" src/orders/useOrders.ts
+expect_eq "hook on @tanstack/react-query: react runs" \
+  "GATES=naming,clarity,structure,simplicity,react,testing,correctness" "$(gates_for "$work_dir/query-hook")"
+
+# A hook that only calls other hooks imports no React library at all; in a React repo it is
+# still React code.
+make_case "$work_dir/composed-hook" 'export function useOrderCount() { return useOrders().data?.length ?? 0 }' src/orders/useOrderCount.ts
+printf '{ "dependencies": { "react": "^19.1.0" } }\n' > "$work_dir/composed-hook/repo/package.json"
+expect_eq "hook composing other hooks in a React repo: react runs" \
+  "GATES=naming,clarity,structure,simplicity,react,testing,correctness" "$(gates_for "$work_dir/composed-hook")"
+
+# The same shape in a Vue repo is a composable, not React.
+make_case "$work_dir/vue-composable" 'export function useOrderCount() { return computed(() => orders.value.length) }' src/composables/useOrderCount.ts
+printf '{ "dependencies": { "vue": "^3.5.0" } }\n' > "$work_dir/vue-composable/repo/package.json"
+expect_eq "use… function in a Vue repo: react doesn't run" \
+  "GATES=naming,clarity,structure,simplicity,testing,correctness" "$(gates_for "$work_dir/vue-composable")"
 
 # --- dates, translations, locale files, the repo's own conventions -----------
 make_case "$work_dir/dates" '  expires_at = 30.days.from_now' lib/orders/expiry.py

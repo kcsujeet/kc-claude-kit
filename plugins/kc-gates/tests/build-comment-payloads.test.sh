@@ -119,4 +119,12 @@ else
   record "gh was never called" ok
 fi
 
+# A draft anchored on a real line but written against kc-post-review's format gets no payload.
+jq '.[0:1] | .[0].body = "**suggestion:**\nCould we name this `widgetTotal` \u2014 it reads as a value?"' "$fixtures/valid.json" > "$work_dir/em-dash.json"
+format_status=0
+bash "$builder" "$work_dir/em-dash.json" "$fixtures/review.diff" "$head_sha" --pr 12 --out-dir "$work_dir/out-format" 2> "$work_dir/format.err" > /dev/null || format_status=$?
+expect_eq "format: a well-anchored draft with an em dash fails" 1 "$format_status"
+expect_contains "format: the em dash is named" "has an em dash" "$(cat "$work_dir/format.err")"
+expect_eq "format: nothing is written" "absent" "$([ -e "$work_dir/out-format/review.json" ] && echo present || echo absent)"
+
 finish

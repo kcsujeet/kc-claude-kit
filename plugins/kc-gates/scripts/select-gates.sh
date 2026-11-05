@@ -43,18 +43,37 @@ first_added_line() {
   printf '%s\n' "$added_lines" | grep -E "$1" | head -n 1 | sed -E 's/^\+[[:space:]]*//' | cut -c1-80 || true
 }
 
-# Prints the first changed JS or TS file that imports React, or nothing.
+# True when any package.json in the repo depends on React, so a `use…` function there is a React
+# hook rather than, say, a Vue composable.
+repo_uses_react() {
+  local manifest
+  while IFS= read -r manifest; do
+    grep -qE '"react"[[:space:]]*:' "$repo_root/$manifest" && return 0
+  done < <(cd "$repo_root" && { git ls-files '*package.json' 2>/dev/null || find . -name package.json -not -path '*/node_modules/*' | sed 's#^\./##'; })
+  return 1
+}
+
+# Prints the first changed JS or TS file that is React code, with why, or nothing: it imports
+# React or a React library (react-*, @tanstack/react-*, @scope/react*, next/*), or, in a repo
+# that depends on React, defines a hook (a `use…` function), which may call only other hooks.
 first_react_module() {
-  local source_path
+  local source_path uses_react=unknown
   while IFS= read -r source_path; do
     case "$source_path" in
       *.js | *.jsx | *.ts | *.tsx | *.mjs | *.cjs) ;;
       *) continue ;;
     esac
     [ -f "$repo_root/$source_path" ] || continue
-    if grep -qE "from ['\"]react['\"]|require\(['\"]react['\"]\)" "$repo_root/$source_path"; then
-      printf '%s\n' "$source_path"
+    if grep -qE "(from|require\\()[[:space:]]*['\"](react|react-dom|react-[^'\"]+|@[^/'\"]+/react[^'\"]*|next/[^'\"]+)['\"]" "$repo_root/$source_path"; then
+      printf '%s (imports React or a React library)\n' "$source_path"
       return
+    fi
+    if grep -qE "(function|const|let)[[:space:]]+use[A-Z][A-Za-z0-9_]*" "$repo_root/$source_path"; then
+      [ "$uses_react" != unknown ] || { if repo_uses_react; then uses_react=yes; else uses_react=no; fi; }
+      if [ "$uses_react" = yes ]; then
+        printf '%s (defines a hook in a React repo)\n' "$source_path"
+        return
+      fi
     fi
   done < "$changed_files"
 }
@@ -87,7 +106,7 @@ react_hit=$(first_changed_path '\.(jsx|tsx)$')
 if [ -n "$react_hit" ]; then
   run_gate react "$react_hit"
 else
-  skip_gate react "no .jsx or .tsx file, and no changed JS or TS file imports React"
+  skip_gate react "no .jsx or .tsx file, and no changed JS or TS file imports React or a React library or defines a hook"
 fi
 
 rails_hit=$(first_changed_path '\.(rb|rake|gemspec)$|(^|/)Gemfile(\.lock)?$|(^|/)db/')

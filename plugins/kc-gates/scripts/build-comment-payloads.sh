@@ -23,6 +23,7 @@
 #   - a range has start_line before line (the REST docs do not say a range must
 #     stay inside one hunk, so that is not checked);
 #   - `body` is not empty.
+#   - the body passes kc-post-review's format rules (scripts/check-draft-format.sh).
 # Every failing draft is listed on stderr, and nothing is written.
 #
 # Output: one checked comment per draft at <out-dir>/comment-<i>.json,
@@ -196,6 +197,12 @@ problems=$(jq -r --arg coverage "$coverage" '
       | $label + .
     end
 ' "$drafts_file")
+
+# kc-post-review's format rules (label line, no em dash, rule ids, emoji or praise opener, length).
+format_problems=$(bash "$(dirname "$0")/check-draft-format.sh" "$drafts_file") || true
+if [ -n "$format_problems" ]; then
+  problems=$(printf '%s\n%s\n' "$problems" "$format_problems" | grep . | sort -t' ' -k2,2n -s)
+fi
 
 if [ -n "$problems" ]; then
   failing_count=$(printf '%s\n' "$problems" | sed 's/^draft \([0-9]*\).*/\1/' | sort -u | wc -l | tr -d ' ')
