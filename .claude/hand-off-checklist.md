@@ -27,4 +27,4 @@ Read by `kc-gates:kc-ready-for-review` before a pull request here is opened or m
 
 ## It is proven
 
-- [ ] A lesson that changes what a review or QA skill catches adds one eval case for it (`CLAUDE.md`, Lessons step 4), run alone once before merging, and the PR says whether it passed. A wording-only change adds none.
+- [ ] A lesson that changes what a review gate catches adds a seeded file and a grader to that gate's `<gate>-boxes` fixture (a QA-skill lesson, its own case) per `CLAUDE.md` Lessons step 4, run once before merging, and the PR says whether it passed. A wording-only change adds none.

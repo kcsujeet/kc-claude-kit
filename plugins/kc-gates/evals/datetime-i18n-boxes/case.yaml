@@ -1,0 +1,6 @@
+schema_version: "1.1"
+name: datetime-i18n-boxes
+description: A branch seeded with one realistic datetime or i18n violation per file (hand-rolled day arithmetic, an instant sent truncated to a date, a hardcoded time zone, a hand-edited generated locale, a count without an ICU plural, a sentence glued from fragments, a key duplicating a shared one) and one unit formatting in the store's own settings, used with a shared ICU plural key by an existing caller; the review fails, flags each seeded file and raises nothing on the clean one.
+tags: [review, gate, datetime, i18n]
+context:
+  scaffold_script: setup.sh
