@@ -71,13 +71,15 @@ If a script fails, relay its message; fall back to the equivalent `gh`/`git` com
 - [ ] §G4 A diff too large to read in one pass (roughly 35KB or more) was read from the saved file in offset/limit chunks, every chunk; no hunk was skimmed. The gate agents get the saved path, not a truncated paste. (N/A: the diff was read whole)
 - [ ] §G5 The approach was questioned before the lines. The orchestrator wrote down the result the change is after, then at least one other way to get it, and compared them: fewer mechanisms, fewer places that know the same thing, less code. When another way is materially simpler, it is one design finding that leads the report and any drafted comment, and the line findings it would delete are folded under it instead of listed as separate asks. Evidence: the goal in one line, the alternative considered, and why it is or is not simpler. On a re-review it is walked again, and when this round finds a new case of a defect an earlier round fixed in the same code, the recurrence is the evidence: the approach comes back as a finding (a question citing the rounds), even when the author declined it before. (N/A: never; even a one-line change has a goal another shape could meet)
 
-### Step 2: dispatch the gate agents in two phases (mandatory: ALL gates, EVERY round)
+### Step 2: dispatch the gate agents in two phases (mandatory: every gate the diff needs, EVERY round)
 
-Dispatch each gate with the Agent tool, `subagent_type` set to the agent name below. Phase 1 runs in parallel: issue all eleven Agent calls in a single message. Phase 2 (verification) runs only after every phase-1 agent has returned, because it audits their returned verdict blocks rather than re-deriving findings.
+First decide which phase-1 gates this diff needs, by script, never by judgment: `bash "${CLAUDE_PLUGIN_ROOT}/scripts/select-gates.sh" "$DIFF_FILE" "$CHANGED_FILES"`, from the target repo's root. It prints `GATES=` (the gates to dispatch) and one line per gate saying why it runs or why it is N/A, read from the changed files and the added lines (a React gate only when the diff has `.jsx`/`.tsx` files or a changed module imports React, a Rails gate only for Ruby, rake, Gemfile or `db/` files, and so on).
+
+Dispatch each listed gate with the Agent tool, `subagent_type` set to the agent name below. Phase 1 runs in parallel: issue every listed gate's Agent call in a single message. Phase 2 (verification) runs only after every phase-1 agent has returned, because it audits their returned verdict blocks rather than re-deriving findings.
 
 Each topic gate preloads its `kc-conventions:kc-<topic>` skill, so it already holds that topic's `## Review checklist`, `## Review detail` and `## Sweeps`. You do not paste rules into the prompt.
 
-**Phase 1: dispatch these eleven in parallel.**
+**Phase 1: dispatch the gates `GATES=` lists, in parallel.**
 
 | Gate | Agent (`subagent_type`) | Dispatch note |
 |------|-------------------------|---------------|
@@ -85,21 +87,21 @@ Each topic gate preloads its `kc-conventions:kc-<topic>` skill, so it already ho
 | clarity | `kc-gates:clarity-gate` | always |
 | structure | `kc-gates:structure-gate` | always |
 | simplicity | `kc-gates:simplicity-gate` | always |
-| datetime | `kc-gates:datetime-gate` | agent returns PASS (N/A) if no date/time logic in diff |
-| react | `kc-gates:react-gate` | agent returns PASS (N/A) if no React/JSX UI code in diff |
-| rails | `kc-gates:rails-gate` | agent returns PASS (N/A) if no Ruby, rake, Gemfile or `db/` change in diff |
-| i18n | `kc-gates:i18n-gate` | agent returns PASS (N/A) if no locale files in diff |
-| testing | `kc-gates:testing-gate` | agent returns PASS (N/A) if the diff changes no behavior and touches no test file |
+| datetime | `kc-gates:datetime-gate` | when an added line has date or time code |
+| react | `kc-gates:react-gate` | when a `.jsx`/`.tsx` file changed or a changed JS/TS module imports React |
+| rails | `kc-gates:rails-gate` | when a Ruby, rake, Gemfile or `db/` file changed |
+| i18n | `kc-gates:i18n-gate` | when a locale file changed or an added line calls a translation |
+| testing | `kc-gates:testing-gate` | always; agent returns PASS (N/A) if the diff changes no behavior and touches no test file |
 | correctness | `kc-gates:correctness-gate` | always |
-| project-conventions | `kc-gates:project-conventions-gate` | agent returns PASS (N/A) if target repo has no `.claude/review-conventions.md` |
+| project-conventions | `kc-gates:project-conventions-gate` | when the target repo has `.claude/review-conventions.md` |
 
 **Phase 2: dispatch only after every phase-1 agent has returned.**
 
 | Gate | Agent (`subagent_type`) | Dispatch note |
 |------|-------------------------|---------------|
-| verification | `kc-gates:verification-gate` | always; its prompt additionally includes every phase-1 gate's returned `GATE:`/`STATUS:`/`BOXES:`/`FINDINGS:` block verbatim (copied, never summarized: a summary drops the sweep counts the verification gate audits, and it then fails boxes the gate passed, as when a testing gate's "0 hits" lines were left out of a one-line recap), your `SCOPE:` block, and on a re-review your classification of each carried-over finding (Step 1) |
+| verification | `kc-gates:verification-gate` | always; its prompt additionally includes `select-gates.sh`'s output, every dispatched phase-1 gate's returned `GATE:`/`STATUS:`/`BOXES:`/`FINDINGS:` block verbatim (copied, never summarized: a summary drops the sweep counts the verification gate audits, and it then fails boxes the gate passed, as when a testing gate's "0 hits" lines were left out of a one-line recap), your `SCOPE:` block, and on a re-review your classification of each carried-over finding (Step 1) |
 
-Every gate is dispatched even when it looks inapplicable. A gate whose rules don't apply returns `PASS (N/A)` **with the reason**; you do NOT skip dispatching it. "No hooks changed, so react is N/A" is a verdict the gate agent must produce after reading the diff, never an assumption you make on its behalf.
+Dispatch exactly the gates `GATES=` lists: never leave a listed gate out because it looks inapplicable, and never add or drop one by judgment. A gate the script leaves out is reported ⚪ N/A in the gate table with the script's reason, and the verification gate audits it from that line. A listed gate whose rules turn out not to apply once it reads the diff still returns `PASS (N/A)` **with the reason**; that verdict is the gate agent's, never an assumption you make on its behalf. When a review covers several diffs at once (a backend and a frontend PR, a stack), each diff gets its own `select-gates.sh` run, and one agent per gate can grade every diff that lists it, returning one block per diff.
 
 The `project-conventions` gate is how this skill stays repo-agnostic while still enforcing house rules: it reads the target repo's own `.claude/review-conventions.md` (if one exists) and grades the diff against whatever that file declares. A repo with no such file is legitimately N/A; it is not this skill's job to invent conventions for a repo that hasn't written any down. When a repo rule contradicts a built-in convention, the repo rule wins for that repo: the gate lists the override (its §X3), and you report the built-in box as overridden, citing the repo rule, instead of failing it.
 
@@ -265,7 +267,7 @@ This skill does not draft or post PR comments. To turn findings into comments, o
 
 ## What this skill is not
 
-- It is not a generic style linter substitute and it is not a security review. Stay focused on the eleven gates above plus any repo-declared conventions.
+- It is not a generic style linter substitute and it is not a security review. Stay focused on the gates above plus any repo-declared conventions.
 - It does not post to GitHub on its own.
 
 ## Notes for iteration
