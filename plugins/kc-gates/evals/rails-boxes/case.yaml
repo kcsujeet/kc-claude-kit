@@ -1,0 +1,6 @@
+schema_version: "1.1"
+name: rails-boxes
+description: A Rails branch seeded with one realistic Rails-rule violation per file (an association with no dependent option, a GET that writes, a serializer attribute that queries per record, a bulk insert with no unique_by, a check-then-create race) and one service shaped like its sibling; the review fails, flags each seeded file and raises nothing on the clean one.
+tags: [review, gate, rails]
+context:
+  scaffold_script: setup.sh
