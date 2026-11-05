@@ -4,9 +4,9 @@
 # ${KC_READY_DIR:-$HOME/.claude/kc-ready-for-review}. guard-hand-off.sh lets a
 # PR go to review only when its head commit has one.
 #
-#   ready-receipt.sh write <sha> --rounds <n> --open <n>
-#       After a pass: the rounds it ran (1 or 2) and the findings it left
-#       open for the user.
+#   ready-receipt.sh write <sha> --rounds <n> --open <n> [--size small|full]
+#       After a pass: the rounds it ran (1 or 2), the findings it left open
+#       for the user, and the size pass-size.sh gave it.
 #   ready-receipt.sh write <sha> --after <pass-sha>
 #       After commits that only apply fixes the user picked from that pass's
 #       open list. Refused unless <pass-sha> has a receipt.
@@ -29,13 +29,14 @@ is_full_sha() {
 }
 
 write_receipt() {
-  local sha=$1 rounds="" open="" after="" checklist=false
+  local sha=$1 rounds="" open="" after="" size="" checklist=false
   shift
   while [ "$#" -gt 0 ]; do
     case "$1" in
       --checklist) checklist=true; shift ;;
       --rounds) rounds=$2; shift 2 ;;
       --open) open=$2; shift 2 ;;
+      --size) size=$2; shift 2 ;;
       --after) after=$2; shift 2 ;;
       *) usage ;;
     esac
@@ -53,7 +54,11 @@ write_receipt() {
   else
     printf '%s' "$rounds" | grep -Eqx '[12]' || { echo "ready-receipt: --rounds is 1 or 2" >&2; exit 2; }
     printf '%s' "$open" | grep -Eqx '[0-9]+' || { echo "ready-receipt: --open is a count" >&2; exit 2; }
-    printf 'sha=%s\ndate=%s\nrounds=%s\nopen=%s\n' "$sha" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$rounds" "$open" > "$receipts_dir/$sha"
+    case "$size" in '' | small | full) ;; *) echo "ready-receipt: --size is small or full" >&2; exit 2 ;; esac
+    {
+      printf 'sha=%s\ndate=%s\nrounds=%s\nopen=%s\n' "$sha" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$rounds" "$open"
+      [ -z "$size" ] || printf 'size=%s\n' "$size"
+    } > "$receipts_dir/$sha"
   fi
   echo "receipt written: $receipts_dir/$sha"
 }

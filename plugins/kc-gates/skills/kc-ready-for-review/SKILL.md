@@ -19,12 +19,12 @@ Round 2 is there to confirm, not to discover. What it used to find traces to two
 
 ### Before round 1
 
-- **Size the pass.** Multi-round review pays off on large changes; on a small one it costs more than it finds. Read the size from the diff and say it in the report:
-  - **Small:** at most 5 changed files and about 200 changed lines, counting neither tests nor generated or locale files, and the merge risk (step 2) is low: no schema change or data migration, nothing in authentication, permissions, payments or a shared contract, nothing that deletes data. It runs round 1 only: steps 1, 2, 3 and 6, with step 5's list written but no agent dispatched to find the rest, then the typecheck, lint and specs, and QA on what the fixes changed. No fix check and no round 2; the receipt says `--rounds 1`.
-  - **Full:** anything else, the pass as written below.
+- **Size the pass, by script, never by judgment.** Multi-round review pays off on large changes; on a small one it costs more than it finds. Gather the diff (`gather-review.sh --branch <base> --out-dir <dir>`) and run `bash "${CLAUDE_PLUGIN_ROOT}/scripts/pass-size.sh" <dir>/review.diff <dir>/changed-files.txt` from the repo root. Follow its `SIZE=` and `MUTATION=` lines and copy its reasons into the report; never override them. A repo lists paths it treats as sensitive beyond the built-in ones in `.claude/sensitive-paths.txt`, one extended regex per line.
+  - **Small** (`SIZE=small`): at most 5 changed files and 200 changed lines, counting neither tests nor generated or locale files, and no sensitive path: no schema change or data migration, nothing in authentication, permissions, payments or a shared contract, nothing that deletes a file or data. It runs round 1 only: steps 1, 2, 3 and 6, with step 5's list written but no agent dispatched to find the rest, then the typecheck, lint and specs, and QA on what the fixes changed. No fix check and no round 2; the receipt says `--rounds 1 --size small`.
+  - **Full** (`SIZE=full`): anything else, the pass as written below, and the receipt says `--size full`.
 
   Example: a two-file fix to a form's validation that went through four review rounds and two app walks, two-thirds of the task's time, when one round would have caught everything they found.
-- **The mutation sweep runs once,** in round 1, and only when the diff adds a condition, an early return or another branch; a diff with no new branch has nothing for it to break. The fix check runs it again only when step 6 added or changed a test, and round 2 doesn't run it.
+- **The mutation sweep runs once,** in round 1, and only when `pass-size.sh` says `MUTATION=run` (an added code line has a condition or branch); a diff with no new branch has nothing for it to break. The fix check runs it again only when step 6 added or changed a test, and round 2 doesn't run it.
 - The tree is clean and HEAD is the branch's last commit, the one the PR shows or will show. Every review in the pass reads the local head in branch mode against the PR's base, each into its own directory (`gather-review.sh --branch <base> --out-dir <dir>`), and nothing is pushed until round 2 is done.
 - The test command: the specs that cover the changed files, as the project runs them, narrowed so one run takes seconds where it can (a page only an end-to-end spec covers takes that spec), plus the install command when a fresh checkout needs one. A review that runs the mutation sweep (see above) starts it with this command (`surviving-mutants.sh` on the whole diff, one run per area) before dispatching its gates, and dispatches the testing gate with the output when the sweep is done. The sweep runs in a throwaway checkout and the gates run no end-to-end specs, so nothing else holds the suite's port meanwhile.
 
@@ -33,7 +33,7 @@ Round 2 is there to confirm, not to discover. What it used to find traces to two
 1. **Review the code:** run `kc-gates:kc-code-review` on the whole diff with its optional inputs, edits and, when the sweep ran, the mutation output (its Step 3). It includes the project-conventions gate, which grades the repo's own `.claude/review-conventions.md`. Note round 1's head, `HEAD_SHA` in its `meta.env`.
 2. **Check the hand-off:** grade every box in the repo's `.claude/hand-off-checklist.md` against the PR as it will be read, not the diff: its title and description, the linked ticket, the paired or stacked PRs, the flags and tasks it names. No such file: check the description against the repo's PR template and say so.
    - **Merge risk.** Whatever the checklist says, the description carries a short **Risk** section, written from the diff you already have, with no agent dispatched for it:
-     - **Impact:** what the change reaches, naming any sensitive path (authentication, permissions, payments, a shared contract or public API, data deletion).
+     - **Impact:** what the change reaches, starting from `pass-size.sh`'s `risk:` lines, and naming any sensitive path (authentication, permissions, payments, a shared contract or public API, data deletion).
      - **Rollback:** a two-way door (reverting the PR undoes it) or a one-way door (a column or table dropped, data backfilled or deleted, messages or charges sent), with what undoing a one-way door takes.
      - **Detection:** how a failure would show (error reporting, logs, a failing job), or that nothing would.
 
@@ -76,7 +76,7 @@ When round 1 finds nothing, there is no fix check and no round 2.
 11. Push, check that the PR's head is HEAD (`gh pr view --json headRefOid`), then write the receipt for it. When the branch on the remote has moved but the pull request still shows the old head after a minute, the forge didn't apply the push to the pull request: save its base again unchanged (`gh api -X PATCH repos/<owner>/<repo>/pulls/<n> -f base=<base>`) and check again, rather than waiting it out. A push refused with a server-side error, not a rejection of the commits, is retried once.
 
    ```bash
-   bash "${CLAUDE_PLUGIN_ROOT}/scripts/ready-receipt.sh" write <full-sha> --rounds <1|2> --open <count>
+   bash "${CLAUDE_PLUGIN_ROOT}/scripts/ready-receipt.sh" write <full-sha> --rounds <1|2> --open <count> --size <small|full>
    ```
 
 12. **Fixes the user picks** from the open list: apply their edits, check them against the lessons and as in step 7 against the pass's head, run the specs and lint they touch, push, and write `ready-receipt.sh write <new-sha> --after <pass-sha>`. That is not a third round. Any other change after the pass needs a new pass.
