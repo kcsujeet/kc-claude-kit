@@ -76,6 +76,7 @@ Placement is covered by the `structure` skill, which defers to bulletproof-react
 - New state lives at the lowest common ancestor of its actual consumers, never lifted because a parent might want it later.
 - Two state updates whose order matters carry a one-line comment at the call site saying why.
 - A child that needs two or more props derived from one hook the parent called should call the hook itself.
+- What a render shows comes from a value that re-renders it when it changes (a watched form field, a store selector, state), never from a one-off read during render: a form's `getValues()`, a store's `getState()`, a ref's `.current`. A memoizing compiler or a `memo` can keep the first read, so the screen stops following the data; and a ref is still empty on the first render.
 
 Detection criteria and per-box review failure modes live in the `## Review checklist` of the `kc-react` skill (`kc-conventions:kc-react`), with the detail under its `## Review detail`. These rules are the statement of the convention; that checklist is how a diff gets graded against it.
 
@@ -120,6 +121,7 @@ The react gate agent ticks every box against the diff. A box is FAIL if any matc
 - [ ] §R35 An empty slot (an image, a file, an avatar, a list) reads as empty: muted styling the filled state doesn't share, and an icon that names what belongs there, matching 2 cited empty slots in the codebase. A placeholder styled like content, or an icon for something else (a person icon where a logo goes), FAILS. (N/A: no empty slot added or changed)
 - [ ] §R36 A field that picks a record is a picker component for that kind of record, in its own file, shaped like 2 cited existing pickers (the props they take, how they narrow, how they show an empty list). A form or field component that fetches records and builds the options itself FAILS. (N/A: no record picker added or changed)
 - [ ] §R37 Markup shared by two or more components is a component taking the differences as props. A hook or function whose return value carries JSX for callers to render FAILS, unless the codebase's API for that spot takes options with node labels and 2 cited similar call sites build them inline. (N/A: no shared markup added or moved)
+- [ ] §R38 Every value a render reads for what it shows or passes on comes from a subscription (a watched form field, a store selector, state, a hook's return value). A one-off read during render (`getValues()`, `getState()`, `ref.current`, a module variable that changes) FAILS: a memoizing compiler or `memo` can keep its first result, and a ref is unset on the first render; read it in an effect or event handler, or subscribe. (N/A: no render reads a form, store or ref)
 
 ## Review detail
 
@@ -327,7 +329,7 @@ The detail for §R11-§R13, §R21-§R23, §R27, §R28 and §R30 is in `${CLAUDE_
 
 ### Section 4 — Forms
 
-The detail for §R14, §R24-§R26, §R31, §R33 and §R34 is in `${CLAUDE_PLUGIN_ROOT}/skills/kc-react/references/forms.md`. Read it in full before grading any of them.
+The detail for §R14, §R24-§R26, §R31, §R33, §R34 and §R38 is in `${CLAUDE_PLUGIN_ROOT}/skills/kc-react/references/forms.md`. Read it in full before grading any of them.
 
 ---
 

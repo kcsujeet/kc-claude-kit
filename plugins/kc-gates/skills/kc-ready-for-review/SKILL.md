@@ -60,7 +60,7 @@ When round 1 finds nothing, there is no fix check and no round 2.
 
 ### Receipt
 
-11. Push, check that the PR's head is HEAD (`gh pr view --json headRefOid`), then write the receipt for it:
+11. Push, check that the PR's head is HEAD (`gh pr view --json headRefOid`), then write the receipt for it. When the branch on the remote has moved but the pull request still shows the old head after a minute, the forge didn't apply the push to the pull request: save its base again unchanged (`gh api -X PATCH repos/<owner>/<repo>/pulls/<n> -f base=<base>`) and check again, rather than waiting it out. A push refused with a server-side error, not a rejection of the commits, is retried once.
 
    ```bash
    bash "${CLAUDE_PLUGIN_ROOT}/scripts/ready-receipt.sh" write <full-sha> --rounds <1|2> --open <count>

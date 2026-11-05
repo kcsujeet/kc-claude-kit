@@ -102,3 +102,16 @@ Discard then only resets the form. Look for the codebase's own file field that a
 A section with Edit, Save and Discard has two faces. Out of edit mode it shows what is saved, as text, through the read-only display similar sections use (often a `readOnly` prop on the form inputs, or a label and value row). Inputs left on screen and only disabled read as "this can't be changed" rather than "this is what's saved", grey out the values, and show empty values as blank boxes instead of the codebase's empty marker.
 
 Check two similar sections in the same area and match them. When the codebase itself shows disabled inputs in view mode, follow it and leave a note for the developer instead of failing the box.
+
+## §R38. A render reads what it shows through a subscription
+
+A read that doesn't subscribe returns the value at that moment and tells React nothing when it changes. Re-rendering happened to fix that once; a memoizing compiler (or a `memo` around the component) keeps the first result instead, because nothing it can see changed. Examples, each a one-off read during render:
+
+```tsx
+const isOn = getValues(name) ?? false            // form value: stale after a reset
+const total = useCartStore.getState().total      // store value: never re-renders
+const { isScrolling } = useScrollIdle(scrollRef.current) // ref: null on the first render
+```
+
+Read the subscribed value instead: the field value a form controller or watch returns, a store selector hook, state. A ref's element is read in an effect (and kept in state when a render needs it). Tests often miss this because the test runner doesn't run the compiler: the defect shows only in a build, a second after a save. Example: a read-only switch showed its old value about a second after Save, until a reload; the read-only branch read `getValues()`, while the editable branch, which used the controller's value, was fine.
+

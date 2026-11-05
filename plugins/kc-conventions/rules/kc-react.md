@@ -58,5 +58,6 @@ Placement is covered by the `structure` skill, which defers to bulletproof-react
 - New state lives at the lowest common ancestor of its actual consumers, never lifted because a parent might want it later.
 - Two state updates whose order matters carry a one-line comment at the call site saying why.
 - A child that needs two or more props derived from one hook the parent called should call the hook itself.
+- What a render shows comes from a value that re-renders it when it changes (a watched form field, a store selector, state), never from a one-off read during render: a form's `getValues()`, a store's `getState()`, a ref's `.current`. A memoizing compiler or a `memo` can keep the first read, so the screen stops following the data; and a ref is still empty on the first render.
 
 Detection criteria and per-box review failure modes live in the `## Review checklist` of the `kc-react` skill (`kc-conventions:kc-react`), with the detail under its `## Review detail`. These rules are the statement of the convention; that checklist is how a diff gets graded against it.

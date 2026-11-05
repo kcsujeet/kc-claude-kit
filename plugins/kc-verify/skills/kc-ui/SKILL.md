@@ -80,6 +80,8 @@ When the surface finds or rewrites content people write (a signature or footer s
 
 Then fill a list or page taller than the viewport and check the background, footer and scrolling hold.
 
+A behaviour a person sets off is walked through every way they set it off, not only the one the report or the fix names: a click, a scroll by hand (slow and fast), the keyboard, a link that opens the page at a spot, a reload; while the page is still loading and once it has settled; on every page that shares the component. For example, a scroll-linked highlight fixed for clicks while scrolling by hand still skipped sections, a keyboard shortcut fixed for the button but not for its menu entry, and a deep link that lands on the right section before images above it load and then drifts.
+
 ### Step 4 — vary the environment
 
 - **Narrow and wide viewport.** The narrow one is where things break; check it first.
@@ -99,6 +101,7 @@ Scan each capture for these, by name, rather than glancing at it:
 - an image with no dimensions causing layout shift
 - contrast that fails in one theme but not the other
 - a background or border that stops before the content does (scroll to the very end of the page)
+- a new or changed field sized unlike its neighbours: a short picker as wide as the input beside it, a width set as a share of the row instead of by its content
 
 ### Step 6 — report
 
@@ -120,6 +123,7 @@ The walkthrough:
 - **Make it a video, not a GIF.** A GIF can't be paused or scrubbed, and a still first frame reads as an image, so people stop watching. Build a short MP4 (H.264, `yuv420p`, `+faststart`) with each frame held for a set time (about 5 seconds a case, 6 for the setup); the player's own controls let people pause on a case. With `ffmpeg`, give each image its own `-loop 1 -t <seconds>` input and join them with the `concat` filter: the concat demuxer's `duration` lines cut the first image short.
 - **Shape it like the screen people use.** Record in the aspect ratio of the device the product is mainly used on: 16:9 for a product used on laptops (a 1440×810 viewport at 2x gives 2880×1620), portrait only when the ticket is about phones. Full-page shots of a long page come out tall and shrink to nothing in a player, so frame each case on the part that changes and keep every frame the same size.
 - **Keep it sharp.** Capture each frame at 2x device pixels from a headless browser (Playwright's `deviceScaleFactor: 2`, a full-page or clipped `screenshot`), never from an agent tool's screenshot, which comes back downscaled and JPEG-compressed. Draw the captions and boxes into the page before the shot so they stay text, not scaled pixels; to caption a screenshot already saved, load it into a page built from a string as a `data:` URL (such a page can't load `file://`), and don't count on the encoder to draw text, since builds without a font library have no text filter. Encode at the frames' own size (`-crf 16 -tune stillimage`) without scaling down. Before sending it, pull a frame back out of the video and read small text at 100%.
+- **Drive it the way a person does, and read every frame whole.** Reach each state through the app's own controls (a click on the tab, not a script scrolling the page), since a script's own scroll or state change can leave the page in a state no person reaches. Then look at everything in each frame, not only the boxed part: a highlighted menu item, a stale badge, a dev overlay or a wrong active tab is what the viewer sees too. For example, a capture that scrolled a settings card into the middle of the page showed the side menu highlighting the next section, which the viewer caught and the recorder didn't.
 - **Embed it as a player, and see it play.** Trackers render an attached video either as a block player or as an inline file chip, and the chip often won't play. A connector's "append this file inline" option tends to produce the chip, so write the block media node yourself, copying one from a ticket whose video already plays. Then have someone signed in open the ticket and press play before it goes to review: a successful upload says nothing about playback.
 
 ## Tools
@@ -139,7 +143,8 @@ Do not report a UI change verified until every box is ticked:
 - [ ] If a design exists, the state matrix is written from it, covering every switch in both positions, every layout-changing option, every role, empty/one/many, and every drawer and dialog.
 - [ ] Every drawer and dialog was opened and filled in: empty, one item picked, several picked, and editing an existing item.
 - [ ] The app, running the change's own code (every branch it needs), was put in every state of the matrix and compared to the design section by section, not only the state you happened to land in; the code and the author's screenshots count for no state.
-- [ ] Every new or changed component was measured against its siblings on the same screen (title, subtitle, field labels, spacing).
+- [ ] Every new or changed component was measured against its siblings on the same screen (title, subtitle, field labels, spacing, and each field's width against what it holds).
+- [ ] Every behaviour the change touches was set off every way a person can (click, hand scroll, keyboard, deep link, reload), while loading and once settled, on every page that shares the component.
 - [ ] Each finding is about structure or behaviour; cosmetic differences where the app has an existing pattern (titles, labels, casing, icons) follow the app.
 - [ ] Loading, empty and error states were each seen.
 - [ ] A surface that finds or rewrites content people write was walked with every shape of that content (plain, line breaks, several blocks, formatting against words, links, images, tables, empty, none) through every action that moves it, not only the shape the change was about.
@@ -155,3 +160,4 @@ Do not report a UI change verified until every box is ticked:
 - [ ] The walkthrough is in the product's main device aspect ratio (16:9 for a laptop product, portrait only for a phone ticket), every frame the same size.
 - [ ] The walkthrough's frames were captured at 2x in a headless browser, not from a downscaled tool screenshot, encoded at their own size, and a frame pulled from the video reads sharp at 100%.
 - [ ] The walkthrough is embedded as a block player, not an inline file chip, and was seen playing on the ticket.
+- [ ] Each walkthrough state was reached through the app's own controls, and every frame was read whole (menus, highlights, badges, overlays), not only the boxed part, before it was sent.
