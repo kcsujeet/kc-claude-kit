@@ -170,7 +170,7 @@ Ask for a review of a PR, a branch or your working changes. `kc-gates:kc-code-re
 
 1. **Gathers the change:** saves the diff, the head SHA and the changed files.
 2. **Checks its scope:** is the PR stacked on another, does it do more than its title says, what constraints does the linked issue set, was a large diff read in full.
-3. **Dispatches every gate in parallel.** Each gate is a read-only agent (`Read, Grep, Glob, Bash`, plus `Skill` to recover a topic skill that did not preload) that preloads its conventions skill, runs that topic's scripts over the diff, walks every checklist box, and returns a per-box verdict with evidence. A gate whose topic the diff does not touch still runs and returns `PASS (N/A)` with its reason, so the report always shows every gate.
+3. **Dispatches the gates the diff needs, in parallel.** `scripts/select-gates.sh` picks them from the changed files and added lines (the "Applies when" column below), so a Ruby-only diff gets no React gate and a frontend diff no Rails gate; the rest still appear in the report as N/A with the script's reason. Each gate is a read-only agent (`Read, Grep, Glob, Bash`, plus `Skill` to recover a topic skill that did not preload) that preloads its conventions skill, runs that topic's scripts over the diff, walks every checklist box, and returns a per-box verdict with evidence.
 4. **Verifies the receipts:** the verification gate runs last and checks that every other gate produced the evidence its checklist demands.
 5. **Reports one verdict:** PASSED only when every gate passed.
 
