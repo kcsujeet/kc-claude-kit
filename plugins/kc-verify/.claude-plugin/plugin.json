@@ -1,7 +1,7 @@
 {
   "name": "kc-verify",
   "description": "Verification workflows: look at the UI and check a person can use it before calling it done, with realistic data and across the states and viewports that actually break",
-  "version": "2.2.3",
+  "version": "2.2.4",
   "author": {
     "name": "Sujeet Kc"
   }
