@@ -141,41 +141,20 @@ jobs:
           printf '%s\n' "$PR_BODY" > "$RUNNER_TEMP/pr-body.md"
           bash scripts/check-lesson-proof.sh "origin/$GITHUB_BASE_REF" --body-file "$RUNNER_TEMP/pr-body.md"
 
-  # Each eval case a pull request adds or changes runs once with its plugin and once without, and
-  # must pass every grader with it and fail every scored grader without it; unchanged cases cost nothing. With no ANTHROPIC_API_KEY
-  # secret, a change to a case fails here and says so, never skips.
+  # Each eval case a pull request adds or changes carries a proof.json from a local run of
+  # scripts/run-changed-evals.sh: passed with its plugin, failed without it, made from the case and
+  # plugin code at the head commit. Nothing runs here and no key is needed.
   changed-evals:
-    name: Changed eval cases pass with the kit and fail without it
+    name: Changed eval cases carry a passing run
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
-    env:
-      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
     steps:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
-      - name: List the eval cases this pull request adds or changes
-        id: cases
-        run: |
-          cases=$(bash scripts/run-changed-evals.sh "origin/$GITHUB_BASE_REF" --list)
-          printf '%s\n' "${cases:-none}"
-          if [ -n "$cases" ] && [ -n "$ANTHROPIC_API_KEY" ]; then
-            echo "install=true" >> "$GITHUB_OUTPUT"
-          fi
-
-      # bubblewrap and socat back the OS sandbox that Bash-granting cases need
-      # on Linux (https://code.claude.com/docs/en/plugin-evals).
-      - name: Install Claude Code and sandbox prerequisites
-        if: steps.cases.outputs.install == 'true'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y bubblewrap socat
-          curl -fsSL https://claude.ai/install.sh | bash
-          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
-
-      - name: Run each changed case with and without its plugin
-        run: bash scripts/run-changed-evals.sh "origin/$GITHUB_BASE_REF"
+      - name: Check each changed case's record
+        run: bash scripts/run-changed-evals.sh "origin/$GITHUB_BASE_REF" --check
 
   evals:
     name: Plugin evals
