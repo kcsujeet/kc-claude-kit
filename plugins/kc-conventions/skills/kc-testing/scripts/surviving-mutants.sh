@@ -222,11 +222,23 @@ list_mutants() {
     # Skipped when either side reads as a boolean (`order.isPaid`), or the op sits inside an
     # `if (`, `while (` or `until (` condition still open at it: there only truth counts, so the
     # order changes nothing. An unparenthesised condition (as in Ruby, `if a.b || c.d`) is not seen.
-    # How many of the `(` in s are still open at its end.
-    function count_open_parens(s,    opened, closed) {
-      opened = gsub(/[(]/, "(", s)
-      closed = gsub(/[)]/, ")", s)
-      return opened - closed
+    # True when the `(` that opens s is still open at its end: depth never falls back to zero,
+    # and brackets inside quoted text are not counted.
+    function is_paren_still_open(s,    i, c, depth, quote) {
+      depth = 0
+      quote = ""
+      for (i = 1; i <= length(s); i++) {
+        c = substr(s, i, 1)
+        if (quote != "") {
+          if (c == "\\") i++
+          else if (c == quote) quote = ""
+          continue
+        }
+        if (c == "\"" || c == "\047" || c == "`") quote = c
+        else if (c == "(") depth++
+        else if (c == ")" && --depth == 0) return 0
+      }
+      return depth > 0
     }
     function swap_operands(s, op,    at, boolean_read, condition_start, before, after, rest, condition, left, right, start, size, left_is_boolean, right_is_boolean) {
       at = find_token(s, op, 0)
@@ -240,7 +252,7 @@ list_mutants() {
         condition = substr(rest, RSTART + RLENGTH - 1)
         rest = substr(rest, RSTART + RLENGTH)
       }
-      if (condition != "" && count_open_parens(condition) > 0) return
+      if (condition != "" && is_paren_still_open(condition)) return
       if (!match(before, MEMBER_READ " *$")) return
       start = RSTART
       left = substr(before, RSTART); sub(/ +$/, "", left)

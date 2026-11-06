@@ -85,5 +85,17 @@ check allow "allowed: gh pr view" \
 check allow "allowed: non-gh command" \
   "git diff main...HEAD > /tmp/review.diff"
 
+# Without jq, in a UTF-8 locale, an escaped accented letter must decode to valid UTF-8: a stray
+# byte makes the splitting sed fail and the guard read no command at all.
+accented_output=$(printf '{"tool_input":{"command":"echo caf\\u00e9; gh pr comment 1 --body x"}}' \
+  | LC_ALL=en_US.UTF-8 KC_GUARD_NO_JQ=1 bash "$guard" 2>&1)
+if printf '%s' "$accented_output" | grep -q '"permissionDecision":"deny"'; then
+  echo "ok   [sed] blocked: a write after an escaped accented letter, in a UTF-8 locale"
+  passes=$((passes + 1))
+else
+  echo "FAIL [sed] blocked: a write after an escaped accented letter, in a UTF-8 locale: $accented_output"
+  failures=$((failures + 1))
+fi
+
 echo "$passes passed, $failures failed"
 [ "$failures" -eq 0 ]

@@ -146,7 +146,8 @@ expect_eq "no worktree is left registered" "1" "$(git -C "$work_dir/probe" workt
 # A value fallback whose order matters, one of `??`, a boolean `||` whose order doesn't, and an
 # optional element read (`?.[0]`), which is neither dropped nor swapped since it isn't a plain read.
 # A negated read, a literal, a pair with one boolean side and a pair inside an open `if (`
-# condition are never swapped; a pair after a closed one is.
+# condition (a `)` in a string doesn't close it) are never swapped; a pair after a closed one
+# is, inside a call or not.
 mkdir -p "$work_dir/fallback-files/src"
 cat > "$work_dir/fallback-files/src/contact.ts" <<'EOF'
 export const getContactEmail = (user) => user?.profile?.email || user?.email
@@ -158,10 +159,12 @@ export const getNoteText = (order) => order.note.text || 'none'
 export const getGiftFlag = (order) => order.isGift || order.gift.enabled
 export const getNoteLabel = (order) => { if (order.note.text || order.title.text) return 'noted' }
 export const getAltName = (user) => { if (user) return user.nickname.text || user.name.text }
+export const getCalledName = (user) => { if (user) return String(user.nickname.text || user.name.text) }
+export const getCode = (u) => { if (u.x === ")" && u.a.b || u.c.d) return 1 }
 EOF
 make_repo fallback
 expect_eq "a value fallback's sides are swapped, and its operands drop whole across \`?.\`" \
-"mutation: 28 mutants on 9 lines: 0 caught (0 timed out), 0 unviable, 28 survived, 0 lines not mutated; baseline runs: 1, slowest 0s; test: true
+"mutation: 41 mutants on 11 lines: 0 caught (0 timed out), 0 unviable, 41 survived, 0 lines not mutated; baseline runs: 1, slowest 0s; test: true
 src/contact.ts:1: \`||\` to \`&&\`: export const getContactEmail = (user) => user?.profile?.email || user?.email
 src/contact.ts:1: left of \`||\` dropped: export const getContactEmail = (user) => user?.profile?.email || user?.email
 src/contact.ts:1: right of \`||\` dropped: export const getContactEmail = (user) => user?.profile?.email || user?.email
@@ -190,6 +193,19 @@ src/contact.ts:9: left of \`||\` dropped: export const getAltName = (user) => { 
 src/contact.ts:9: right of \`||\` dropped: export const getAltName = (user) => { if (user) return user.nickname.text || user.name.text }
 src/contact.ts:9: sides of \`||\` swapped: export const getAltName = (user) => { if (user) return user.nickname.text || user.name.text }
 src/contact.ts:9: line deleted: export const getAltName = (user) => { if (user) return user.nickname.text || user.name.text }
+src/contact.ts:10: \`||\` to \`&&\`: export const getCalledName = (user) => { if (user) return String(user.nickname.text || user.name.text) }
+src/contact.ts:10: left of \`||\` dropped: export const getCalledName = (user) => { if (user) return String(user.nickname.text || user.name.text) }
+src/contact.ts:10: right of \`||\` dropped: export const getCalledName = (user) => { if (user) return String(user.nickname.text || user.name.text) }
+src/contact.ts:10: sides of \`||\` swapped: export const getCalledName = (user) => { if (user) return String(user.nickname.text || user.name.text) }
+src/contact.ts:10: line deleted: export const getCalledName = (user) => { if (user) return String(user.nickname.text || user.name.text) }
+src/contact.ts:11: \`&&\` to \`||\`: export const getCode = (u) => { if (u.x === \")\" && u.a.b || u.c.d) return 1 }
+src/contact.ts:11: \`||\` to \`&&\`: export const getCode = (u) => { if (u.x === \")\" && u.a.b || u.c.d) return 1 }
+src/contact.ts:11: \`===\` to \`!==\`: export const getCode = (u) => { if (u.x === \")\" && u.a.b || u.c.d) return 1 }
+src/contact.ts:11: left of \`&&\` dropped: export const getCode = (u) => { if (u.x === \")\" && u.a.b || u.c.d) return 1 }
+src/contact.ts:11: right of \`&&\` dropped: export const getCode = (u) => { if (u.x === \")\" && u.a.b || u.c.d) return 1 }
+src/contact.ts:11: left of \`||\` dropped: export const getCode = (u) => { if (u.x === \")\" && u.a.b || u.c.d) return 1 }
+src/contact.ts:11: right of \`||\` dropped: export const getCode = (u) => { if (u.x === \")\" && u.a.b || u.c.d) return 1 }
+src/contact.ts:11: line deleted: export const getCode = (u) => { if (u.x === \")\" && u.a.b || u.c.d) return 1 }
 exit 0" "$(run_in fallback --test true --runs 1)"
 # A test that only ever sets one side (the account address empty, a profile address set) passes
 # with the sides swapped; one that sets both and expects the profile address catches it.
@@ -199,7 +215,7 @@ expect_eq "the swap survives a test that can't tell the order" \
   "$(run_in fallback --runs 1 --paths 'contact' --test "$one_sided" | grep -oF "src/contact.ts:1: sides of \`||\` swapped" || true)"
 both_set='! grep -qF "user?.email || user?.profile?.email" src/contact.ts && ! grep -qF "order.billing.name ?? order.shipping.name" src/contact.ts'
 expect_eq "each swap writes the other side first, so a test that rejects that order catches both" \
-  "mutation: 28 mutants on 9 lines: 2 caught" \
+  "mutation: 41 mutants on 11 lines: 2 caught" \
   "$(run_in fallback --runs 1 --test "$both_set" | sed -n 1p | sed "s/ (0 timed out).*//")"
 
 mkdir -p "$work_dir/unviable-files"

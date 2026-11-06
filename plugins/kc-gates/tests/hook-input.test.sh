@@ -83,6 +83,10 @@ expect_eq "it decodes escaped quotes and backslashes" 'say "hi" to C:\shop' \
   "$(KC_GUARD_NO_JQ=1 extract_field "$(build_payload_with_command 'say \"hi\" to C:\\shop')" command)"
 expect_eq "it decodes a newline" "$(printf 'git status\ngit diff')" \
   "$(KC_GUARD_NO_JQ=1 extract_field "$(build_payload_with_command 'git status\ngit diff')" command)"
+expect_eq "it decodes an escaped accented letter to UTF-8" 'café résumé' \
+  "$(LC_ALL=en_US.UTF-8 KC_GUARD_NO_JQ=1 extract_field "$(build_payload_with_command 'caf\u00e9 r\u00e9sum\u00e9')" command)"
+expect_eq "and keeps a raw UTF-8 letter as it is" 'café' \
+  "$(LC_ALL=en_US.UTF-8 KC_GUARD_NO_JQ=1 extract_field "$(build_payload_with_command 'café')" command)"
 expect_eq "text it can't decode comes back as captured, not empty" 'gh pr ready 5 \ud800' \
   "$(KC_GUARD_NO_JQ=1 extract_field "$(build_payload_with_command 'gh pr ready 5 \ud800')" command)"
 expect_eq "a top-level field is read too" "/tmp/shop" \

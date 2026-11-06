@@ -22,13 +22,17 @@ extract_field() {
   fi
   # JSON strings hold no raw newlines, so joining lines is safe. The capture is
   # the field's JSON text, escapes and all, which perl's core JSON module decodes
-  # (`\\` and `\"` included, so a quoted body's escapes survive). Text it can't
-  # decode (a lone surrogate, an unknown escape) is printed as captured, so a
-  # guard still reads the command rather than an empty one.
+  # from UTF-8 and prints as UTF-8 (`\\`, `\"` and `\u00e9` included), so the sed
+  # that splits it never meets a stray byte. Text it can't decode (a lone
+  # surrogate, an unknown escape) is printed as captured, so a guard still reads
+  # the command rather than an empty one.
   printf '%s' "$input" \
     | tr '\n' ' ' \
     | sed -nE 's/.*"'"$field"'"[[:space:]]*:[[:space:]]*"(([^"\\]|\\.)*)".*/\1/p' \
-    | perl -MJSON::PP -0777 -ne 'chomp; my $value = eval { JSON::PP->new->allow_nonref->decode(qq("$_")) }; print defined $value ? $value : $_'
+    | perl -MJSON::PP -0777 -ne '
+        chomp;
+        my $value = eval { JSON::PP->new->utf8->allow_nonref->decode(qq("$_")) };
+        if (defined $value) { binmode STDOUT, ":encoding(UTF-8)"; print $value } else { print $_ }'
 }
 
 # Prints the command with the text that isn't shell syntax made inert, read the way bash reads
