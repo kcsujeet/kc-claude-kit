@@ -142,7 +142,7 @@ jobs:
           bash scripts/check-lesson-proof.sh "origin/$GITHUB_BASE_REF" --body-file "$RUNNER_TEMP/pr-body.md"
 
   # Each eval case a pull request adds or changes runs once with its plugin and once without, and
-  # must pass with it and fail without it; unchanged cases cost nothing. With no ANTHROPIC_API_KEY
+  # must pass every grader with it and fail every scored grader without it; unchanged cases cost nothing. With no ANTHROPIC_API_KEY
   # secret, a change to a case fails here and says so, never skips.
   changed-evals:
     name: Changed eval cases pass with the kit and fail without it

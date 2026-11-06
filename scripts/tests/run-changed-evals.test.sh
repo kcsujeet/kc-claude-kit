@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Tests scripts/run-changed-evals.sh in a throwaway repo, with a stand-in `claude` on PATH that
 # records its arguments and writes a canned result: only changed cases run, a case passes when it
-# passes with the plugin and fails without it, and CI without a key fails instead of skipping.
+# passes every grader with the plugin and fails every scored grader without it, and CI without a
+# key fails instead of skipping.
 set -euo pipefail
 
 script="$(cd "$(dirname "$0")/.." && pwd)/run-changed-evals.sh"
@@ -141,7 +142,18 @@ expect_output "it names the grader" "with the plugin, graders failed: finds-it"
 write_result totals true true
 run_check
 expect_status "a case that passes without the plugin fails" 1
-expect_output "it says why" "passes without the plugin too"
+expect_output "it says why" "graders passed too, so they prove nothing the kit adds: finds-it"
+
+# A format grader the baseline fails can't stand in for the rule's grader it passes.
+printf '{"cases":[{"name":"totals","arms":{"with":[{"error":null,"graders":[{"name":"finds-it","passed":true,"scored":true},{"name":"verdict","passed":true,"scored":true}]}],"without":[{"error":null,"graders":[{"name":"finds-it","passed":true,"scored":true},{"name":"verdict","passed":false,"scored":true}]}]}}]}\n' > "$results/totals.json"
+run_check
+expect_status "a baseline that passes one scored grader fails the case" 1
+expect_output "it names that grader" "prove nothing the kit adds: finds-it"
+
+printf '{"cases":[{"name":"totals","arms":{"with":[{"error":null,"graders":[{"name":"finds-it","passed":true,"scored":true}]}],"without":[{"error":null,"graders":[{"name":"skill-fired","passed":false,"scored":false}]}]}}]}\n' > "$results/totals.json"
+run_check
+expect_status "a baseline with no scored grader fails the case" 1
+expect_output "it says so" "the run without the plugin has no scored grader"
 
 write_result totals true none
 run_check
@@ -167,7 +179,7 @@ expect_output "it says so" "the run without the plugin errored"
 printf '{"cases":[{"name":"totals","arms":{"with":[{"error":null,"graders":[{"name":"finds-it","passed":true,"scored":true}]}],"without":[{"error":null,"graders":[{"name":"finds-it","passed":true,"scored":true},{"name":"skill-fired","passed":false,"scored":false}]}]}}]}\n' > "$results/totals.json"
 run_check
 expect_status "a baseline that fails only an unscored grader passes the case, so it fails here" 1
-expect_output "it says why" "passes without the plugin too"
+expect_output "it says why" "prove nothing the kit adds: finds-it"
 
 printf '{"cases":[]}\n' > "$results/totals.json"
 run_check

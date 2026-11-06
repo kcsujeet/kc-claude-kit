@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Runs every eval case a change since <base> adds or changes, once with its plugin and once in the
-# eval runner's baseline arm without it, and fails unless each case passes with the plugin and fails
-# without it. So a lesson's case is shown to catch what the kit teaches and what Claude misses
-# alone: the run is the proof, not a file naming the rule. A case tagged `negative` (the plugin must
+# eval runner's baseline arm without it, and fails unless each case passes every grader with the
+# plugin and fails every scored grader without it. So each grader is shown to catch what the kit
+# teaches and Claude misses alone: the run is the proof, not a file naming the rule. A grader the
+# baseline passes too proves nothing the kit adds, even beside one it fails (a verdict format). A case tagged `negative` (the plugin must
 # leave an unrelated request alone) needs only the first, since the baseline passes it by design.
 # Cases the change doesn't touch aren't run, so a change to no case costs nothing.
 #
@@ -115,7 +116,9 @@ while IFS= read -r case_dir; do
       elif $negative then "ok"
       elif ($without | length) == 0 then "no run without the plugin"
       elif any($without[]; .error != null) then "the run without the plugin errored"
-      elif any($without[]; all(.graders[] | select(.scored); .passed)) then "it passes without the plugin too, so it proves nothing the kit adds"
+      elif any($without[]; ([.graders[] | select(.scored)] | length) == 0) then "the run without the plugin has no scored grader"
+      elif any($without[]; any(.graders[] | select(.scored); .passed)) then
+        "without the plugin, graders passed too, so they prove nothing the kit adds: " + ([$without[].graders[] | select(.scored and .passed) | .name] | unique | join(", "))
       else "ok" end' "$result" 2>/dev/null || echo "its result has no case named $case_name")
   verdict=${verdict:-"its result has no case named $case_name"}
   if [ "$verdict" = ok ]; then
