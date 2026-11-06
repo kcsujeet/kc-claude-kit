@@ -49,7 +49,7 @@ EOF
       exit 0
     fi
   done <<EOF
-$(split_segments "$command")
+$(split_segments "$(mask_quoted_text "$command")")
 EOF
   exit 0
 }

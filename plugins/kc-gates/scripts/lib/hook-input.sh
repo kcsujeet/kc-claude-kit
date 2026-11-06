@@ -35,8 +35,12 @@ extract_field() {
 # it: escaped characters, `$'...'`, "..." (with `\"` inside) and '...' strings, `#` comments and
 # heredoc bodies. In that text `;`, `|`, `&` and newlines become spaces and a flag-like word after
 # a space gets an `x` in front (`-b "please --approve"` becomes `-b "please x--approve"`), so a
-# commit message or review body neither splits its command nor reads as one of its flags. A flag
-# quoted on its own (`'--approve'`) is still the flag, and an unclosed quote is left as it is.
+# review body neither splits its command nor reads as one of its flags. A flag quoted on its own
+# (`'--approve'`) is still the flag, and an unclosed quote is left as it is.
+#
+# Only for a hook whose miss is harmless (remind-look-back.sh). The guards split the raw command:
+# quoted text can be what runs (`bash -c "..."`, `eval`, `ssh host '...'`), and masking it would
+# hide a write from them.
 mask_quoted_text() {
   printf '%s\n' "$1" | perl -0777 -ne '
     sub as_text {
@@ -53,12 +57,19 @@ mask_quoted_text() {
       elsif (/\G("(?:[^"\\]|\\.)*")/gcs) { $masked .= as_text($1) }
       elsif (/\G(\x27[^\x27]*\x27)/gcs) { $masked .= as_text($1) }
       elsif (/\G(?<![^\s])(#[^\n]*)/gc) { $masked .= as_text($1) }
-      elsif (/\G(<<-?[ \t]*([\x27"]?)([A-Za-z_][A-Za-z0-9_]*)\2)/gc) { $masked .= $1; push @heredoc_ends, $3 }
+      # A heredoc body is masked only up to a line holding its end word, so a `<<` with none after
+      # it (`$((x << y))`, or one never closed) masks nothing. The end word runs to whitespace or
+      # an operator, as bash reads it (`<<MY-END`), and only `<<-` lets the end line start with tabs.
+      elsif (/\G(<<(-?)[ \t]*([\x27"]?)([^\s;&|<>()\x27"]+)\3)/gc) {
+        my ($opener, $dash, $end) = ($1, $2, $4);
+        push @heredoc_ends, [$dash ? "\t*" : "", $end];
+        $masked .= $opener;
+      }
       elsif (@heredoc_ends && /\G\n/gc) {
         $masked .= "\n";
-        for my $end (@heredoc_ends) {
-          if (/\G((?:[^\n]*\n)*?)([ \t]*\Q$end\E[ \t]*)(?=\n|\z)/gc) { $masked .= as_text($1) . $2 }
-          elsif (/\G(.+)/gcs) { $masked .= as_text($1) }
+        for my $heredoc (@heredoc_ends) {
+          my ($indent, $end) = @$heredoc;
+          $masked .= as_text($1) . $2 if /\G((?:[^\n]*\n)*?)($indent\Q$end\E)(?=\n|\z)/gc;
         }
         @heredoc_ends = ();
       }
@@ -69,10 +80,10 @@ mask_quoted_text() {
   '
 }
 
-# One shell segment per line: split on newlines, ;, &&, || and |, outside the text
-# mask_quoted_text makes inert.
+# One shell segment per line: split on newlines, ;, &&, || and |, quotes or not. Splitting
+# inside a quoted argument can only add segments, so a guard reading these sees every command.
 split_segments() {
-  mask_quoted_text "$1" | sed -e 's/&&/\
+  printf '%s\n' "$1" | sed -e 's/&&/\
 /g' -e 's/||/\
 /g' -e 's/;/\
 /g' -e 's/|/\

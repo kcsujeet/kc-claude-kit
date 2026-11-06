@@ -29,7 +29,7 @@ head_sha=$2
 git cat-file -e "$head_sha^{commit}" 2>/dev/null || exit 0
 
 # `draft-number<TAB>path:line<TAB>name` per suggested name, from drafts without a "names" reason.
-suggested=$(perl -MJSON::PP -CS -e '
+suggested_names=$(perl -MJSON::PP -CS -e '
   use strict; use warnings;
   # A shorter name reads as a word, not a typo of one.
   my $min_name_length = 4;
@@ -60,7 +60,7 @@ suggested=$(perl -MJSON::PP -CS -e '
 # still counts. A suggested name in the tree is a reference; one that isn't, and is one edit from
 # one that is, is reported.
 git grep -h -o -w -I -E '[A-Za-z_][A-Za-z0-9_]{2,}' "$head_sha" -- ':/' 2>/dev/null | sort -u |
-  KC_SUGGESTED="$suggested" perl -e '
+  KC_SUGGESTED="$suggested_names" perl -e '
     use strict; use warnings;
     my %known = map { chomp; $_ => 1 } <STDIN>;
     sub is_one_edit_apart {

@@ -65,6 +65,8 @@ check deny  "blocked: edit a posted comment" \
   "gh api repos/acme/widgets/pulls/comments/991 --method=PATCH --input /tmp/edit.json"
 check deny  "blocked: write chained after a read" \
   "gh pr view 12 && gh api repos/acme/widgets/issues/12/comments -X POST -f body='hi'"
+check deny  "blocked: a write run by bash -c" \
+  "bash -c 'gh api repos/shop/web/issues/1/comments -f body=hi'"
 check deny  "blocked: a write after an escaped apostrophe, which opens no quote" \
   "echo it\\\\'s; gh api repos/shop/web/pulls/5/comments -f body=x; gh api repos/shop/web/pulls/5/comments -X GET; echo 'z'"
 

@@ -219,23 +219,35 @@ list_mutants() {
     # Swaps the two sides of the first op outside quotes when both are member reads (`a.b`,
     # `a?.b.c`), the shape of a value fallback (`user?.nickname || user?.name`). A test whose
     # fixture leaves one side empty passes either way round, so the order it guards goes untested.
-    # Skipped when either side reads as a boolean (`order.isPaid`), or the op sits in an `if`,
-    # `while` or `until` condition: there only truth counts, so the order changes nothing.
-    function swap_operands(s, op,    at, member_read, boolean_read, condition_start, before, after, left, right, start, size, left_is_boolean, right_is_boolean) {
+    # Skipped when either side reads as a boolean (`order.isPaid`), or the op sits inside an
+    # `if (`, `while (` or `until (` condition still open at it: there only truth counts, so the
+    # order changes nothing. An unparenthesised condition (as in Ruby, `if a.b || c.d`) is not seen.
+    # How many of the `(` in s are still open at its end.
+    function count_open_parens(s,    opened, closed) {
+      opened = gsub(/[(]/, "(", s)
+      closed = gsub(/[)]/, ")", s)
+      return opened - closed
+    }
+    function swap_operands(s, op,    at, boolean_read, condition_start, before, after, rest, condition, left, right, start, size, left_is_boolean, right_is_boolean) {
       at = find_token(s, op, 0)
-      member_read = MEMBER_NAME "([?]?[.]" MEMBER_NAME ")+"
       boolean_read = "[.](is|has|can|should|was|did|will)[A-Z_][A-Za-z0-9_$]*$"
       condition_start = "(^|[^A-Za-z0-9_$])(if|while|until)[[:space:]]*[(]"
       before = substr(s, 1, at - 1)
       after = substr(s, at + length(op))
-      if (before ~ condition_start) return
-      if (!match(before, member_read " *$")) return
+      rest = before
+      condition = ""
+      while (match(rest, condition_start)) {
+        condition = substr(rest, RSTART + RLENGTH - 1)
+        rest = substr(rest, RSTART + RLENGTH)
+      }
+      if (condition != "" && count_open_parens(condition) > 0) return
+      if (!match(before, MEMBER_READ " *$")) return
       start = RSTART
       left = substr(before, RSTART); sub(/ +$/, "", left)
       # A read that is the tail of a longer expression (after a name, a member access, a call or
       # index, or a `!`) or the head of one (before a call or index) is no side of its own.
       if (substr(s, start - 1, 1) ~ /[A-Za-z0-9_$.?)\]!]/) return
-      if (!match(after, "^ *" member_read)) return
+      if (!match(after, "^ *" MEMBER_READ)) return
       size = RLENGTH
       if (substr(after, size + 1, 1) ~ /[A-Za-z0-9_$.?(\[]/) return
       right = substr(after, 1, size); sub(/^ +/, "", right)
@@ -247,6 +259,7 @@ list_mutants() {
     BEGIN {
       MEMBER_NAME = "[A-Za-z_$][A-Za-z0-9_$]*"
       MEMBER_CHAIN = MEMBER_NAME "([?]?[.]" MEMBER_NAME ")*"
+      MEMBER_READ = MEMBER_NAME "([?]?[.]" MEMBER_NAME ")+"
       text = ENVIRON["KC_LINE"]
       is_shell = path ~ /\.(sh|bash)$/
       is_python = path ~ /\.py$/
