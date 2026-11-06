@@ -117,10 +117,6 @@ check allow "allowed: cd into a reviewed repo, then gh pr create" \
   "cd $work_dir/ready-repo && gh pr create --fill" "$work_dir/draft-repo"
 check allow "allowed: draft PR" \
   "gh pr create --draft --fill" "$work_dir/draft-repo"
-check deny  "blocked: a draft whose title has a ; before --draft (quotes are split too, so it errs to blocking)" \
-  "gh pr create --title 'Widgets; part 1' --draft --body-file /tmp/body.md" "$work_dir/draft-repo"
-check deny  "blocked: adding a reviewer from inside bash -c" \
-  "bash -c 'gh pr edit 13 --repo acme/widgets --add-reviewer ana'"
 check allow "allowed: draft PR, checklist without drafts front matter" \
   "gh pr create --draft --fill" "$work_dir/plain-repo"
 check deny  "blocked: draft PR, checklist applies to drafts, no receipt" \

@@ -20,9 +20,11 @@ set -u
 # shellcheck source=lib/hook-input.sh
 . "$(dirname "$0")/lib/hook-input.sh"
 
-readonly REVIEWS_ENDPOINT='pulls/[0-9]+/reviews([^/[:alnum:]]|$)'
+# A PR's reviews, or one pending review's events (how a drafted review is submitted).
+readonly REVIEWS_ENDPOINT='pulls/[0-9]+/reviews(/[0-9]+/events)?([^/[:alnum:]]|$)'
 
-# True when the segment approves a PR. A relative --input path is read from <cwd>.
+# True when the segment approves a PR. A relative --input path is read from <cwd>, a `~/` one
+# from $HOME.
 is_approval_segment() {
   local segment=$1 cwd=$2 input_file
   if printf '%s' "$segment" | grep -Eq "${GH_COMMAND_START}pr[[:space:]]+review([[:space:]].*)?[[:space:]]["'"'"']?(--approve|-a)["'"'"']?([[:space:]]|$)"; then
@@ -35,7 +37,8 @@ is_approval_segment() {
   fi
   input_file=$(printf '%s' "$segment" | sed -nE 's/.*--input[[:space:]=]+["'"'"']?([^[:space:]"'"'"']+).*/\1/p')
   [ -n "$input_file" ] || return 1
-  case "$input_file" in /*) ;; *) input_file="$cwd/$input_file" ;; esac
+  # shellcheck disable=SC2088  # matches the literal `~/` the command held, not a path
+  case "$input_file" in /*) ;; "~/"*) input_file="$HOME/${input_file#"~/"}" ;; *) input_file="$cwd/$input_file" ;; esac
   [ -r "$input_file" ] && grep -Eq '"event"[[:space:]]*:[[:space:]]*"APPROVE"' "$input_file"
 }
 

@@ -5,12 +5,11 @@
 set -euo pipefail
 
 tests_dir=$(cd "$(dirname "$0")" && pwd)
+# shellcheck source=lib/harness.sh
+. "$tests_dir/lib/harness.sh"
 hook="$(dirname "$tests_dir")/scripts/remind-look-back.sh"
-work_dir=$(mktemp -d)
-trap 'rm -rf "$work_dir"' EXIT
-
-passes=0
-failures=0
+# `~/` in an --input path is read from $HOME.
+export HOME="$work_dir"
 
 # Wraps a shell command in the PostToolUse stdin payload: its double quotes escaped, and `\n` in
 # it left as JSON's newline escape.
@@ -38,13 +37,7 @@ expect_hook() {
     else
       verdict="unexpected output: $output"
     fi
-    if [ "$verdict" = "$expectation" ]; then
-      echo "ok   [$mode] $label"
-      passes=$((passes + 1))
-    else
-      echo "FAIL [$mode] $label: expected $expectation, got $verdict"
-      failures=$((failures + 1))
-    fi
+    expect_eq "[$mode] $label" "$expectation" "$verdict"
   done
 }
 
@@ -59,6 +52,8 @@ expect_hook remind "gh api with an --input file holding APPROVE" "gh api repos/s
 expect_hook remind "an approval after another command" "cd /tmp && gh pr review 12 --approve"
 expect_hook remind "a quoted event field" "gh api repos/shop/web/pulls/12/reviews -X POST -f 'event=APPROVE'"
 expect_hook remind "--approve quoted on its own" "gh pr review 12 '--approve'"
+expect_hook remind "a pending review submitted as APPROVE" "gh api repos/shop/web/pulls/12/reviews/7/events -X POST -f event=APPROVE"
+expect_hook remind "an --input file under ~/" "gh api repos/shop/web/pulls/12/reviews -X POST --input ~/approve.json"
 
 # --- not approvals -------------------------------------------------------------------------------
 expect_hook quiet "a comment review from its --input file" "gh api repos/shop/web/pulls/12/reviews -X POST --input comment.json"
@@ -69,16 +64,10 @@ expect_hook quiet "an approve event on another endpoint" "gh api repos/shop/web/
 expect_hook quiet "an --input file that isn't there" "gh api repos/shop/web/pulls/12/reviews -X POST --input missing.json"
 expect_hook quiet "APPROVE in a later command than the reviews read" "gh api repos/shop/web/pulls/12/reviews -q .id ; echo event=APPROVE"
 expect_hook quiet "an approve payload echoed, not sent" "echo repos/shop/web/pulls/12/reviews event=APPROVE"
+expect_hook quiet "a review's comments, not its events" "gh api repos/shop/web/pulls/12/reviews/7/comments -f event=APPROVE"
 expect_hook quiet "an unrelated command" "git status"
 
 stray_error=$(build_payload "gh api repos/shop/web/pulls/12/reviews -X POST --input" | bash "$hook" 2>&1 >/dev/null)
-if [ -z "$stray_error" ]; then
-  echo "ok   an --input with no path prints nothing on stderr"
-  passes=$((passes + 1))
-else
-  echo "FAIL an --input with no path prints nothing on stderr: $stray_error"
-  failures=$((failures + 1))
-fi
+expect_eq "an --input with no path prints nothing on stderr" "" "$stray_error"
 
-echo "$passes passed, $failures failed"
-[ "$failures" -eq 0 ]
+finish

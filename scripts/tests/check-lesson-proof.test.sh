@@ -109,6 +109,8 @@ expect_output "the reason is echoed for the reviewer" "wording only: the same ru
 expect_verdict pass "the marker in any case" $'WORDING-ONLY: typo fix'
 expect_verdict fail "the marker with no reason" $'wording-only:'
 expect_verdict fail "the marker with the placeholder left in" $'wording-only: <why>'
+expect_verdict fail "the placeholder with a carriage return, as a web edit leaves it" $'wording-only: <why>\r'
+expect_verdict fail "the placeholder with a trailing space" $'wording-only: <why> '
 expect_verdict fail "the marker with only spaces after it" $'wording-only:   '
 expect_verdict fail "the marker inside a sentence" $'This is not wording-only: it adds a rule.'
 expect_verdict fail "a description without the marker" $'Adds a rule about tax.'
