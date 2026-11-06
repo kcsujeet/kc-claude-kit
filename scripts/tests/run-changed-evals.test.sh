@@ -47,12 +47,13 @@ write_result() {
     "$case_name" "$with" "$without_arm" > "$results/$case_name.json"
 }
 
-# Runs the script on the current branch against main; keeps its output and exit status.
+# Runs the script on the current branch against main, outside CI unless <env> says otherwise;
+# keeps its output and exit status.
 last_output="" last_status=0
 run_check() {
   : > "$calls"
   last_status=0
-  last_output=$(cd "$repo" && env PATH="$stub_bin:$PATH" STUB_CALLS="$calls" STUB_RESULTS="$results" "$@" bash "$script" main 2>/dev/null) || last_status=$?
+  last_output=$(cd "$repo" && env -u GITHUB_ACTIONS -u ANTHROPIC_API_KEY PATH="$stub_bin:$PATH" STUB_CALLS="$calls" STUB_RESULTS="$results" "$@" bash "$script" main 2>/dev/null) || last_status=$?
 }
 
 expect_status() {
