@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Fails when a change since <base> edits a rule (a skill, a skill reference, an agent or the working
 # agreement) without proof that the rule catches something: an eval case or a script test changed in
-# the same change. A rule that only moves words says so in the pull request description, on a line
-# of its own: `wording-only: <why>`.
+# the same change. Every checklist box (`- [ ] §X1`) the change adds or rewrites is named, by its
+# id, in one of those eval or test files, so the proof is tied to that rule. A rule that only moves
+# words says so in the pull request description, on a line of its own: `wording-only: <why>`.
 #
 # CLAUDE.md's Lessons step 4 asks for that proof; a skip has to be stated here, so the reviewer
 # reads the reason.
@@ -28,8 +29,12 @@ if [ -n "$body_file" ] && [ ! -r "$body_file" ]; then
   exit 2
 fi
 
-merge_base=$(git merge-base "$base" HEAD)
-changed_files=$(git diff --name-only "$merge_base" HEAD)
+merge_base=$(git merge-base "$base" HEAD) || {
+  echo "$base and HEAD share no commit, so there is no change to check; check the base branch" >&2
+  exit 2
+}
+# Paths as they are, not quoted, so a non-ASCII name still matches the patterns.
+changed_files=$(git -c core.quotePath=false diff --name-only "$merge_base" HEAD)
 
 changed_rule_files=$(printf '%s\n' "$changed_files" | grep -E '^plugins/[^/]+/(skills/.+\.md|agents/[^/]+\.md|rules/kc-working-agreement\.md)$' || true)
 if [ -z "$changed_rule_files" ]; then
@@ -37,10 +42,43 @@ if [ -z "$changed_rule_files" ]; then
   exit 0
 fi
 
-changed_proof_files=$(printf '%s\n' "$changed_files" | grep -E '^(plugins/[^/]+/(evals|tests)/|scripts/tests/)' || true)
+# Eval and test files the change adds lines to: one it deletes, only takes lines from or only
+# renames proves nothing. With -z, numstat gives a rename's old and new path on lines of their own
+# after an empty path field; the new path is the one kept.
+changed_proof_files=$(git -c core.quotePath=false diff --numstat -z -M "$merge_base" HEAD | tr '\0' '\n' \
+  | awk -F '\t' '
+      paths_to_skip > 0 { paths_to_skip--; if (paths_to_skip == 0 && added > 0) print; next }
+      { added = $1 + 0 }
+      $3 == "" { paths_to_skip = 2; next }
+      added > 0 { print $3 }' \
+  | grep -E '^(plugins/[^/]+/(evals|tests)/|scripts/tests/)' || true)
+# Of those, the ones that can name a box id as its proof: a test script, or an eval's grader,
+# setup.sh or case.yaml. A fixture or other data file that only mentions the id proves nothing.
+id_proof_files=$(printf '%s\n' "$changed_proof_files" \
+  | grep -E '^(plugins/[^/]+/tests|scripts/tests)/[^/]+\.sh$|^plugins/[^/]+/evals/[^/]+/(graders/[^/]+|setup\.sh|case\.yaml)$' || true)
+
+# The ids of the checklist boxes the change adds or rewrites, and those no changed eval or test
+# file names. An id is letters, a number, any `.<number>` parts and an optional letter (§T1,
+# §RL6.1a); one followed by a letter, a digit or `.<digit>` is another id: §T1 is not §T12, and
+# §RL6 is not §RL6.1a. A period right after the id (`§B2. Text`) ends it.
 if [ -n "$changed_proof_files" ]; then
-  echo "ok   rules changed with proof: $(printf '%s\n' "$changed_proof_files" | wc -l | tr -d ' ') eval or test file(s)"
-  exit 0
+  rule_paths=()
+  while IFS= read -r path; do rule_paths+=("$path"); done <<< "$changed_rule_files"
+  proof_paths=()
+  while IFS= read -r path; do [ -z "$path" ] || proof_paths+=("$path"); done <<< "$id_proof_files"
+  changed_box_ids=$(git diff --unified=0 --no-color --no-ext-diff "$merge_base" HEAD -- "${rule_paths[@]}" \
+    | sed -nE 's/^\+[[:space:]]*- \[[ xX]\] (§[A-Z]+[0-9]+(\.[0-9]+)*[a-z]?)([^.0-9a-z].*|\.([^0-9].*)?)?$/\1/p' | sort -u)
+  unproven_box_ids=""
+  for box_id in $changed_box_ids; do
+    if [ "${#proof_paths[@]}" -eq 0 ] \
+      || ! git grep -qE "${box_id//./\\.}(\\.?[^.0-9a-z]|\\.?\$)" HEAD -- "${proof_paths[@]}" 2>/dev/null; then
+      unproven_box_ids="$unproven_box_ids $box_id"
+    fi
+  done
+  if [ -z "$unproven_box_ids" ]; then
+    echo "ok   rules changed with proof: $(printf '%s\n' "$changed_proof_files" | wc -l | tr -d ' ') eval or test file(s)"
+    exit 0
+  fi
 fi
 
 reason=""
@@ -54,8 +92,13 @@ if [ -n "$reason" ]; then
   exit 0
 fi
 
-echo "FAIL these rules changed with no eval case or script test beside them:"
-printf '%s\n' "$changed_rule_files" | sed 's/^/       /'
-echo "     Prove the rule catches its case (an eval under the plugin's evals/, or a script with a test),"
+if [ -n "$changed_proof_files" ]; then
+  echo "FAIL these checklist boxes changed with no changed eval case or script test naming them:$unproven_box_ids"
+  echo "     Name each box's id in the eval grader, the eval's setup.sh or the test that proves it,"
+else
+  echo "FAIL these rules changed with no eval case or script test beside them:"
+  printf '%s\n' "$changed_rule_files" | sed 's/^/       /'
+  echo "     Prove the rule catches its case (an eval under the plugin's evals/, or a script with a test),"
+fi
 echo "     or, when only the words move, add a line to the pull request description: wording-only: <why>"
 exit 1
