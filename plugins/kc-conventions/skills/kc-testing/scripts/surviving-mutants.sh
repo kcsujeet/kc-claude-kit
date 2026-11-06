@@ -27,7 +27,8 @@
 # removed, `true` and `false` swapped, bash's test flags flipped (`-n`/`-z`, `-eq`/`-ne`,
 # `-lt`/`-ge`, `-gt`/`-le`, `=`/`!=`), Ruby's `if` and `unless` swapped, and a one-line guard
 # (an exit and its condition on one line) deleted. Outside shell and Python, also: each plain
-# operand of `&&` and `||` dropped, a ternary forced to each branch, and a regex literal
+# operand of `&&` and `||` dropped, the two sides of a value fallback (`||` or `??` between two
+# member reads, `user?.nickname || user?.name`) swapped, a ternary forced to each branch, and a regex literal
 # weakened (`^` or `$` removed, `\w` widened to `.`). A mutant that a syntax check rejects
 # (`bash -n`, `node --check`, `ruby -c`, Python's parser, each used only when the original file
 # passes it) is unviable and not run.
@@ -197,25 +198,91 @@ list_mutants() {
     function drop_operand(s, op,    at, operand, before, after, start, spaces, size) {
       at = find_token(s, op, 0)
       if (at == 0) return
-      operand = "!?[A-Za-z_$][A-Za-z0-9_$.]*( *(===|!==|==|!=|<=|>=|<|>) *([A-Za-z0-9_$.]+|\047[^\047]*\047|\"[^\"]*\"))?"
+      operand = "!?" MEMBER_CHAIN "( *(===|!==|==|!=|<=|>=|<|>) *([A-Za-z0-9_$.]+|\047[^\047]*\047|\"[^\"]*\"))?"
       before = substr(s, 1, at - 1)
       after = substr(s, at + length(op))
       if (match(before, operand " *$")) {
         start = RSTART
         match(after, /^ */)
         spaces = RLENGTH
-        if (substr(s, start - 1, 1) !~ /[A-Za-z0-9_$.)\]]/)
+        if (substr(s, start - 1, 1) !~ /[A-Za-z0-9_$.?)\]]/)
           printf "%d\037%d\037\037left of `%s` dropped\n", start, at + length(op) + spaces - start, op
       }
       if (match(after, "^ *" operand)) {
         size = RLENGTH
-        if (substr(after, size + 1, 1) !~ /[A-Za-z0-9_$.(\[]/) {
+        if (substr(after, size + 1, 1) !~ /[A-Za-z0-9_$.?(\[]/) {
           match(before, / *$/)
           printf "%d\037%d\037\037right of `%s` dropped\n", RSTART, length(before) - RSTART + 1 + length(op) + size, op
         }
       }
     }
+    # True when the `(` that opens s is still open at its end: depth never falls back to zero,
+    # and brackets inside quoted text are not counted.
+    function is_paren_still_open(s,    i, c, depth, quote) {
+      depth = 0
+      quote = ""
+      for (i = 1; i <= length(s); i++) {
+        c = substr(s, i, 1)
+        if (quote != "") {
+          if (c == "\\") i++
+          else if (c == quote) quote = ""
+          continue
+        }
+        # A double quote, a single quote or a backtick opens quoted text.
+        if (index("\"\047`", c)) quote = c
+        else if (c == "(") depth++
+        else if (c == ")") {
+          depth--
+          if (depth == 0) return 0
+        }
+      }
+      return depth > 0
+    }
+    # Swaps the two sides of a value fallback (`user?.nickname || user?.name`), so a test whose
+    # fixture leaves one side empty shows as a survivor. The skips below mark pairs where only
+    # truth counts, or where a tighter operator takes one of the reads.
+    function swap_fallback_sides(s, op,    at, boolean_read, condition_start, tighter_operator, before, after, rest, condition, left, right, start, size, text_before_left, text_after_right, ends_in_arrow, ends_in_tighter_operator, left_is_boolean, right_is_boolean) {
+      at = find_token(s, op, 0)
+      boolean_read = "[.](is|has|can|should|was|did|will)[A-Z_][A-Za-z0-9_$]*$"
+      # Only a parenthesised condition is seen; one without (as in Ruby, `if a.b || c.d`) is not.
+      condition_start = "(^|[^A-Za-z0-9_$])(if|while|until)[[:space:]]*[(]"
+      tighter_operator = "(&&|==|!=|<=|>=|[-+*/%<>])"
+      before = substr(s, 1, at - 1)
+      after = substr(s, at + length(op))
+      rest = before
+      condition = ""
+      while (match(rest, condition_start)) {
+        condition = substr(rest, RSTART + RLENGTH - 1)
+        rest = substr(rest, RSTART + RLENGTH)
+      }
+      if (condition != "" && is_paren_still_open(condition)) return
+      if (!match(before, MEMBER_READ " *$")) return
+      start = RSTART
+      left = substr(before, RSTART); sub(/ +$/, "", left)
+      # A read that is the tail of a longer expression (after a name, a member access, a call or
+      # index, or a `!`) or the head of one (before a call or index) is no side of its own.
+      if (substr(s, start - 1, 1) ~ /[A-Za-z0-9_$.?)\]!]/) return
+      if (!match(after, "^ *" MEMBER_READ)) return
+      size = RLENGTH
+      if (substr(after, size + 1, 1) ~ /[A-Za-z0-9_$.?(\[]/) return
+      right = substr(after, 1, size); sub(/^ +/, "", right)
+      text_before_left = substr(s, 1, start - 1); sub(/[[:space:]]+$/, "", text_before_left)
+      # A trailing comment (`// note`, `/* note */`) is no division.
+      text_after_right = substr(after, size + 1); sub(/^[[:space:]]*\/[\/*].*$/, "", text_after_right)
+      # An arrow (`=>`) ends in `>` but binds looser than any op, so it is no tighter operator.
+      ends_in_arrow = text_before_left ~ /=>$/
+      ends_in_tighter_operator = text_before_left ~ tighter_operator "$"
+      if (!ends_in_arrow && ends_in_tighter_operator) return
+      if (text_after_right ~ "^[[:space:]]*" tighter_operator) return
+      left_is_boolean = left ~ boolean_read
+      right_is_boolean = right ~ boolean_read
+      if (left_is_boolean || right_is_boolean) return
+      printf "%d\037%d\037%s %s %s\037sides of `%s` swapped\n", start, at + length(op) + size - start, right, op, left, op
+    }
     BEGIN {
+      MEMBER_NAME = "[A-Za-z_$][A-Za-z0-9_$]*"
+      MEMBER_CHAIN = MEMBER_NAME "([?]?[.]" MEMBER_NAME ")*"
+      MEMBER_READ = MEMBER_NAME "([?]?[.]" MEMBER_NAME ")+"
       text = ENVIRON["KC_LINE"]
       is_shell = path ~ /\.(sh|bash)$/
       is_python = path ~ /\.py$/
@@ -251,6 +318,8 @@ list_mutants() {
       if (!is_shell && !is_python) {
         drop_operand(text, "&&")
         drop_operand(text, "||")
+        swap_fallback_sides(text, "||")
+        swap_fallback_sides(text, "??")
         at = find_token(text, " ? ", 0)
         if (at > 0 && text !~ /[[:space:]]extends[[:space:]]/) {
           emit(at, " ? ", " || true ? ", "ternary forced to its first branch")

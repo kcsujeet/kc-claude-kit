@@ -143,6 +143,96 @@ expect_eq "the mutated file in the repo is the committed one" "same" \
   "$(cmp -s "$work_dir/probe/src/order.ts" "$work_dir/order.ts.before" && echo same || echo changed)"
 expect_eq "no worktree is left registered" "1" "$(git -C "$work_dir/probe" worktree list | wc -l | tr -d ' ')"
 
+# Pins which reads are swapped: a plain value fallback is; a boolean pair, a negated read, a
+# literal, a read a tighter operator (`&&`, `+`, `===`) takes, and a pair inside an open `if (`
+# condition are not.
+mkdir -p "$work_dir/fallback-files/src"
+cat > "$work_dir/fallback-files/src/contact.ts" <<'EOF'
+export const getContactEmail = (user) => user?.profile?.email || user?.email
+export const getShippingName = (order) => order.shipping.name ?? order.billing.name
+export const isSettled = (order) => order.isPaid || order.isRefunded
+export const getFirstTag = (order) => order.note || order.tags?.[0]
+export const isNoteMissingOrTitled = (order) => !order.note.text || order.title.text
+export const getNoteText = (order) => order.note.text || 'none'
+export const getGiftFlag = (order) => order.isGift || order.gift.enabled
+export const getNoteLabel = (order) => { if (order.note.text || order.title.text) return 'noted' }
+export const getAltName = (user) => { if (user) return user.nickname.text || user.name.text }
+export const getCalledName = (user) => { if (user) return String(user.nickname.text || user.name.text) }
+export const getCode = (user) => { if (user.tag(")"), user.a.b || user.c.d) return 1 }
+export const pickNote = (order) => order.ready && order.note.text || order.title.text
+export const pickCount = (order) => order.count + order.extra.n || order.fallback.n
+export const pickTitle = (order) => order.name.text || order.title.text === order.label.text
+export const pickLabel = (order) => order.name.text || order.title.text // a trailing comment is no division
+EOF
+make_repo fallback
+expect_eq "a value fallback's sides are swapped, and its operands drop whole across \`?.\`" \
+"mutation: 54 mutants on 15 lines: 0 caught (0 timed out), 0 unviable, 54 survived, 0 lines not mutated; baseline runs: 1, slowest 0s; test: true
+src/contact.ts:1: \`||\` to \`&&\`: export const getContactEmail = (user) => user?.profile?.email || user?.email
+src/contact.ts:1: left of \`||\` dropped: export const getContactEmail = (user) => user?.profile?.email || user?.email
+src/contact.ts:1: right of \`||\` dropped: export const getContactEmail = (user) => user?.profile?.email || user?.email
+src/contact.ts:1: sides of \`||\` swapped: export const getContactEmail = (user) => user?.profile?.email || user?.email
+src/contact.ts:2: sides of \`??\` swapped: export const getShippingName = (order) => order.shipping.name ?? order.billing.name
+src/contact.ts:3: \`||\` to \`&&\`: export const isSettled = (order) => order.isPaid || order.isRefunded
+src/contact.ts:3: left of \`||\` dropped: export const isSettled = (order) => order.isPaid || order.isRefunded
+src/contact.ts:3: right of \`||\` dropped: export const isSettled = (order) => order.isPaid || order.isRefunded
+src/contact.ts:4: \`||\` to \`&&\`: export const getFirstTag = (order) => order.note || order.tags?.[0]
+src/contact.ts:4: left of \`||\` dropped: export const getFirstTag = (order) => order.note || order.tags?.[0]
+src/contact.ts:5: \`||\` to \`&&\`: export const isNoteMissingOrTitled = (order) => !order.note.text || order.title.text
+src/contact.ts:5: \`!\` removed: export const isNoteMissingOrTitled = (order) => !order.note.text || order.title.text
+src/contact.ts:5: left of \`||\` dropped: export const isNoteMissingOrTitled = (order) => !order.note.text || order.title.text
+src/contact.ts:5: right of \`||\` dropped: export const isNoteMissingOrTitled = (order) => !order.note.text || order.title.text
+src/contact.ts:6: \`||\` to \`&&\`: export const getNoteText = (order) => order.note.text || 'none'
+src/contact.ts:6: left of \`||\` dropped: export const getNoteText = (order) => order.note.text || 'none'
+src/contact.ts:7: \`||\` to \`&&\`: export const getGiftFlag = (order) => order.isGift || order.gift.enabled
+src/contact.ts:7: left of \`||\` dropped: export const getGiftFlag = (order) => order.isGift || order.gift.enabled
+src/contact.ts:7: right of \`||\` dropped: export const getGiftFlag = (order) => order.isGift || order.gift.enabled
+src/contact.ts:8: \`||\` to \`&&\`: export const getNoteLabel = (order) => { if (order.note.text || order.title.text) return 'noted' }
+src/contact.ts:8: left of \`||\` dropped: export const getNoteLabel = (order) => { if (order.note.text || order.title.text) return 'noted' }
+src/contact.ts:8: right of \`||\` dropped: export const getNoteLabel = (order) => { if (order.note.text || order.title.text) return 'noted' }
+src/contact.ts:8: line deleted: export const getNoteLabel = (order) => { if (order.note.text || order.title.text) return 'noted' }
+src/contact.ts:9: \`||\` to \`&&\`: export const getAltName = (user) => { if (user) return user.nickname.text || user.name.text }
+src/contact.ts:9: left of \`||\` dropped: export const getAltName = (user) => { if (user) return user.nickname.text || user.name.text }
+src/contact.ts:9: right of \`||\` dropped: export const getAltName = (user) => { if (user) return user.nickname.text || user.name.text }
+src/contact.ts:9: sides of \`||\` swapped: export const getAltName = (user) => { if (user) return user.nickname.text || user.name.text }
+src/contact.ts:9: line deleted: export const getAltName = (user) => { if (user) return user.nickname.text || user.name.text }
+src/contact.ts:10: \`||\` to \`&&\`: export const getCalledName = (user) => { if (user) return String(user.nickname.text || user.name.text) }
+src/contact.ts:10: left of \`||\` dropped: export const getCalledName = (user) => { if (user) return String(user.nickname.text || user.name.text) }
+src/contact.ts:10: right of \`||\` dropped: export const getCalledName = (user) => { if (user) return String(user.nickname.text || user.name.text) }
+src/contact.ts:10: sides of \`||\` swapped: export const getCalledName = (user) => { if (user) return String(user.nickname.text || user.name.text) }
+src/contact.ts:10: line deleted: export const getCalledName = (user) => { if (user) return String(user.nickname.text || user.name.text) }
+src/contact.ts:11: \`||\` to \`&&\`: export const getCode = (user) => { if (user.tag(\")\"), user.a.b || user.c.d) return 1 }
+src/contact.ts:11: left of \`||\` dropped: export const getCode = (user) => { if (user.tag(\")\"), user.a.b || user.c.d) return 1 }
+src/contact.ts:11: right of \`||\` dropped: export const getCode = (user) => { if (user.tag(\")\"), user.a.b || user.c.d) return 1 }
+src/contact.ts:11: line deleted: export const getCode = (user) => { if (user.tag(\")\"), user.a.b || user.c.d) return 1 }
+src/contact.ts:12: \`&&\` to \`||\`: export const pickNote = (order) => order.ready && order.note.text || order.title.text
+src/contact.ts:12: \`||\` to \`&&\`: export const pickNote = (order) => order.ready && order.note.text || order.title.text
+src/contact.ts:12: left of \`&&\` dropped: export const pickNote = (order) => order.ready && order.note.text || order.title.text
+src/contact.ts:12: right of \`&&\` dropped: export const pickNote = (order) => order.ready && order.note.text || order.title.text
+src/contact.ts:12: left of \`||\` dropped: export const pickNote = (order) => order.ready && order.note.text || order.title.text
+src/contact.ts:12: right of \`||\` dropped: export const pickNote = (order) => order.ready && order.note.text || order.title.text
+src/contact.ts:13: \`||\` to \`&&\`: export const pickCount = (order) => order.count + order.extra.n || order.fallback.n
+src/contact.ts:13: left of \`||\` dropped: export const pickCount = (order) => order.count + order.extra.n || order.fallback.n
+src/contact.ts:13: right of \`||\` dropped: export const pickCount = (order) => order.count + order.extra.n || order.fallback.n
+src/contact.ts:14: \`||\` to \`&&\`: export const pickTitle = (order) => order.name.text || order.title.text === order.label.text
+src/contact.ts:14: \`===\` to \`!==\`: export const pickTitle = (order) => order.name.text || order.title.text === order.label.text
+src/contact.ts:14: left of \`||\` dropped: export const pickTitle = (order) => order.name.text || order.title.text === order.label.text
+src/contact.ts:14: right of \`||\` dropped: export const pickTitle = (order) => order.name.text || order.title.text === order.label.text
+src/contact.ts:15: \`||\` to \`&&\`: export const pickLabel = (order) => order.name.text || order.title.text // a trailing comment is no division
+src/contact.ts:15: left of \`||\` dropped: export const pickLabel = (order) => order.name.text || order.title.text // a trailing comment is no division
+src/contact.ts:15: right of \`||\` dropped: export const pickLabel = (order) => order.name.text || order.title.text // a trailing comment is no division
+src/contact.ts:15: sides of \`||\` swapped: export const pickLabel = (order) => order.name.text || order.title.text // a trailing comment is no division
+exit 0" "$(run_in fallback --test true --runs 1)"
+# A test that only ever sets one side (the account address empty, a profile address set) passes
+# with the sides swapped; one that sets both and expects the profile address catches it.
+one_sided='grep -qF "user?.profile?.email" src/contact.ts && grep -qF "user?.email" src/contact.ts'
+expect_eq "the swap survives a test that can't tell the order" \
+  "src/contact.ts:1: sides of \`||\` swapped" \
+  "$(run_in fallback --runs 1 --paths 'contact' --test "$one_sided" | grep -oF "src/contact.ts:1: sides of \`||\` swapped" || true)"
+both_set='! grep -qF "user?.email || user?.profile?.email" src/contact.ts && ! grep -qF "order.billing.name ?? order.shipping.name" src/contact.ts'
+expect_eq "each swap writes the other side first, so a test that rejects that order catches both" \
+  "mutation: 54 mutants on 15 lines: 2 caught" \
+  "$(run_in fallback --runs 1 --test "$both_set" | sed -n 1p | sed "s/ (0 timed out).*//")"
+
 mkdir -p "$work_dir/unviable-files"
 cat > "$work_dir/unviable-files/input.sh" <<'EOF'
 check_input() {

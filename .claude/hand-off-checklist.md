@@ -28,3 +28,4 @@ Read by `kc-gates:kc-ready-for-review` before a pull request here is opened or m
 ## It is proven
 
 - [ ] A lesson that changes what a review gate catches adds a seeded file and a grader to that gate's `<gate>-boxes` fixture (a QA-skill lesson, its own case) per `CLAUDE.md` Lessons step 4, run once before merging, and the PR says whether it passed. A wording-only change adds none.
+- [ ] Each part of the lesson a script can decide (a draft check, a sweep, a mutant, a hook) is a script with a test, every new branch broken once to see a test fail. A PR that edits rules with neither an eval nor a test carries `wording-only: <why>` in its description, and the why holds (CI's `check-lesson-proof.sh` checks the line is there, not that it is true).

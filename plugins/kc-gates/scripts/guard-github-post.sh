@@ -21,7 +21,6 @@ set -u
 
 readonly APPROVAL_TOKEN='KC_REVIEW_POST_APPROVED=1'
 
-readonly GH_WORD='(^|[^[:alnum:]_.-])gh[[:space:]]+'
 readonly REVIEW_ENDPOINT='(pulls|issues)/([0-9]+/(comments|reviews)|comments/[0-9]+)'
 readonly WRITE_METHOD='(-X|--method)[[:space:]=]*["'"'"']?(POST|PATCH|PUT|DELETE)'
 readonly GET_METHOD='(-X|--method)[[:space:]=]*["'"'"']?GET([^[:alpha:]]|$)'
@@ -29,10 +28,10 @@ readonly FIELD_FLAG='(^|[[:space:]])(-f|-F|--field|--raw-field|--input)([[:space
 
 is_review_write_segment() {
   local segment="$1"
-  if printf '%s' "$segment" | grep -Eq "${GH_WORD}(pr[[:space:]]+(comment|review)|issue[[:space:]]+comment)([[:space:]]|$)"; then
+  if printf '%s' "$segment" | grep -Eq "${GH_COMMAND_START}(pr[[:space:]]+(comment|review)|issue[[:space:]]+comment)([[:space:]]|$)"; then
     return 0
   fi
-  if ! printf '%s' "$segment" | grep -Eq "${GH_WORD}api([[:space:]]|$)"; then
+  if ! printf '%s' "$segment" | grep -Eq "${GH_COMMAND_START}api([[:space:]]|$)"; then
     return 1
   fi
   if ! printf '%s' "$segment" | grep -Eq "$REVIEW_ENDPOINT"; then

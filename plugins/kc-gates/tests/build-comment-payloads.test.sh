@@ -127,4 +127,20 @@ expect_eq "format: a well-anchored draft with an em dash fails" 1 "$format_statu
 expect_contains "format: the em dash is named" "has an em dash" "$(cat "$work_dir/format.err")"
 expect_eq "format: nothing is written" "absent" "$([ -e "$work_dir/out-format/review.json" ] && echo present || echo absent)"
 
+# Run from the repo the comments are for, a suggested name one letter from an existing one gets
+# no payload either (check-draft-names.sh).
+names_repo="$work_dir/names-repo"
+mkdir -p "$names_repo"
+echo 'export const widgetTotals = (cart) => cart.widgets.length' > "$names_repo/widgets.ts"
+git -C "$names_repo" init -q
+git -C "$names_repo" add -A
+git -C "$names_repo" -c user.name=t -c user.email=t@example.com commit -q -m base
+names_sha=$(git -C "$names_repo" rev-parse HEAD)
+jq '.[0:1] | .[0].body = "**suggestion:**\nCould we name this `widgetTotal`? It reads as a value."' "$fixtures/valid.json" > "$work_dir/near-name.json"
+names_status=0
+(cd "$names_repo" && bash "$builder" "$work_dir/near-name.json" "$fixtures/review.diff" "$names_sha" --pr 12 --out-dir "$work_dir/out-names") 2> "$work_dir/names.err" > /dev/null || names_status=$?
+expect_eq "names: a draft suggesting a near twin of an existing name fails" 1 "$names_status"
+expect_contains "names: the existing name is given" "one letter from \`widgetTotals\`" "$(cat "$work_dir/names.err")"
+expect_eq "names: nothing is written" "absent" "$([ -e "$work_dir/out-names/review.json" ] && echo present || echo absent)"
+
 finish
