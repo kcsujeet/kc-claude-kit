@@ -222,7 +222,6 @@ list_mutants() {
     # Skipped when either side reads as a boolean (`order.isPaid`), where the order changes nothing.
     function swap_operands(s, op,    at, member_read, boolean_read, before, after, left, right, start, size, left_is_boolean, right_is_boolean) {
       at = find_token(s, op, 0)
-      if (at == 0) return
       member_read = "[A-Za-z_$][A-Za-z0-9_$]*([?]?[.][A-Za-z_$][A-Za-z0-9_$]*)+"
       boolean_read = "[.](is|has|can|should|was|did|will)[A-Z_][A-Za-z0-9_$]*$"
       before = substr(s, 1, at - 1)
