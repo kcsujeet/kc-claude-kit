@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Tests scripts/guard-hand-off.sh and scripts/ready-receipt.sh: handing a PR
-# to review is denied unless its head commit has a receipt, against the stub
-# gh in lib/ answering from fixtures/guard-hand-off/ (PR 12 and the --head
-# branch `feature` are at the reviewed commit, PR 13 is not). Each guard case
+# Tests scripts/guard-hand-off.sh: handing a PR to review is denied unless its
+# head commit has a ready-receipt.sh receipt, against the stub gh in lib/
+# answering from fixtures/guard-hand-off/ (PR 12 and the --head branch
+# `feature` are at the reviewed commit, PR 13 is not). Each guard case
 # runs twice, once with jq and once through the sed fallback.
 set -euo pipefail
 
@@ -15,7 +15,6 @@ use_gh_fixtures "$tests_dir/fixtures/guard-hand-off"
 export KC_READY_DIR="$work_dir/receipts"
 
 reviewed=$(printf 'a%.0s' {1..40})
-unreviewed=$(printf 'b%.0s' {1..40})
 # Two local repos for `gh pr create` without --head: one whose HEAD has a
 # receipt, one whose HEAD has none.
 make_repo() {
@@ -35,33 +34,12 @@ make_checklist_repo() {
 make_checklist_repo "$work_dir/lesson-repo" '---\ndrafts: true\n---\n\n# Hand-off checklist\n'
 make_checklist_repo "$work_dir/plain-repo" '# Hand-off checklist\n\n- [ ] drafts: true is not front matter here\n'
 
-receipt=$(bash "$scripts/ready-receipt.sh" write "$reviewed" --rounds 2 --open 1)
-expect_contains "receipt: written for the reviewed commit" "$KC_READY_DIR/$reviewed" "$receipt"
-bash "$scripts/ready-receipt.sh" write "$(git -C "$work_dir/ready-repo" rev-parse HEAD)" --rounds 1 --open 0 >/dev/null
-if bash "$scripts/ready-receipt.sh" write "$unreviewed" --after "$(printf 'c%.0s' {1..40})" >/dev/null 2>&1; then
-  record "receipt: --after refuses a pass with no receipt" fail "it wrote one"
-else
-  record "receipt: --after refuses a pass with no receipt" ok
-fi
-if bash "$scripts/ready-receipt.sh" write "$reviewed" --rounds 3 --open 0 >/dev/null 2>&1; then
-  record "receipt: a third round is refused" fail "it wrote one"
-else
-  record "receipt: a third round is refused" ok
-fi
-sized_receipt=$(bash "$scripts/ready-receipt.sh" write "$(printf 'f%.0s' {1..40})" --rounds 1 --open 0 --size small && bash "$scripts/ready-receipt.sh" check "$(printf 'f%.0s' {1..40})")
-expect_contains "receipt: --size records the pass's size" "size=small" "$sized_receipt"
-if bash "$scripts/ready-receipt.sh" write "$(printf 'f%.0s' {1..40})" --rounds 1 --open 0 --size tiny >/dev/null 2>&1; then
-  record "receipt: an unknown size is refused" fail "it wrote one"
-else
-  record "receipt: an unknown size is refused" ok
-fi
-checklist_receipt=$(bash "$scripts/ready-receipt.sh" write "$(printf 'e%.0s' {1..40})" --checklist && bash "$scripts/ready-receipt.sh" check "$(printf 'e%.0s' {1..40})")
-expect_contains "receipt: --checklist records the walk" "checklist=walked" "$checklist_receipt"
-if bash "$scripts/ready-receipt.sh" check "$unreviewed" >/dev/null; then
-  record "receipt: check fails for a commit without one" fail "check passed"
-else
-  record "receipt: check fails for a commit without one" ok
-fi
+# The guard reads receipts through `ready-receipt.sh check`; how a pass earns
+# one is ready-receipt.test.sh's to test, so these pass receipts are written
+# by hand.
+mkdir -p "$KC_READY_DIR"
+printf 'rounds=2\n' > "$KC_READY_DIR/$reviewed"
+printf 'rounds=2\n' > "$KC_READY_DIR/$(git -C "$work_dir/ready-repo" rev-parse HEAD)"
 
 # Wraps a shell command (no double quotes or backslashes in it) and a working
 # directory in the PreToolUse stdin payload.
@@ -125,6 +103,16 @@ check deny  "blocked: draft PR, checklist read from GitHub at the --head commit"
   "gh pr create --draft --repo acme/widgets --head lesson --fill"
 check allow "allowed: back to draft" \
   "gh pr ready 13 --undo"
+check deny  "blocked: --undo=false marks the PR ready" \
+  "gh pr ready 13 --undo=false"
+check deny  "blocked: --draft=false opens a ready PR" \
+  "gh pr create --draft=false --fill" "$work_dir/draft-repo"
+check allow "allowed: --draft=true opens a draft" \
+  "gh pr create --draft=true --fill" "$work_dir/draft-repo"
+check deny  "blocked: a draft that requests a reviewer" \
+  "gh pr create --draft --reviewer ana --fill" "$work_dir/draft-repo"
+check deny  "blocked: a draft that requests a reviewer, short flags" \
+  "gh pr create -d -r ana --fill" "$work_dir/draft-repo"
 check allow "allowed: edit without a reviewer" \
   "gh pr edit 13 --title 'Add widgets'"
 check allow "allowed: user said to skip the pass" \
@@ -142,5 +130,7 @@ check allow "allowed: draft PR once the checklist was walked" \
   "gh pr create --draft --fill" "$work_dir/lesson-repo"
 check allow "allowed: draft PR from GitHub once the checklist was walked" \
   "gh pr create --draft --repo acme/widgets --head lesson --fill"
+check deny  "blocked: a ready PR whose head has only the checklist's receipt" \
+  "gh pr create --repo acme/widgets --head lesson --fill"
 
 finish
