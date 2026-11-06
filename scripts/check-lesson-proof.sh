@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
 # Fails when a change since <base> edits a rule (a skill, a skill reference, an agent or the working
 # agreement) without proof that the rule catches something: an eval case or a script test changed in
-# the same change. Every checklist box (`- [ ] §X1`) the change adds or rewrites is named, by its
-# id, in one of those eval or test files, so the proof is tied to that rule. A rule that only moves
-# words says so in the pull request description, on a line of its own: `wording-only: <why>`.
+# the same change. A lesson is a checklist box (`- [ ] §X1`): every box the change adds or rewrites
+# is named, by its id, in one of those eval or test files, so the proof is tied to that rule, and a
+# rule file that gains lines with no box added or rewritten in it gained prose no gate walks. A file
+# with no boxes at all (an agent, the working agreement) is the same. Either way, a change that only
+# moves words says so in the pull request description, on a line of its own: `wording-only: <why>`.
 #
 # CLAUDE.md's Lessons step 4 asks for that proof; a skip has to be stated here, so the reviewer
 # reads the reason.
@@ -42,6 +44,17 @@ if [ -z "$changed_rule_files" ]; then
   exit 0
 fi
 
+# Rule files that gain lines, blank ones aside, none of them a checklist box: prose a test changed
+# elsewhere can't stand in for.
+prose_rule_files=""
+while IFS= read -r path; do
+  added_lines=$(git -c core.quotePath=false diff --unified=0 --no-color --no-ext-diff "$merge_base" HEAD -- "$path" \
+    | grep -E '^\+' | grep -vE '^\+\+\+ (b/|/dev/null)' | grep -vE '^\+[[:space:]]*$' || true)
+  if [ -n "$added_lines" ] && ! printf '%s\n' "$added_lines" | grep -qE '^\+[[:space:]]*- \[[ xX]\] §[A-Z]+[0-9]'; then
+    prose_rule_files="$prose_rule_files$path"$'\n'
+  fi
+done <<< "$changed_rule_files"
+
 # Eval and test files the change adds lines to: one it deletes, only takes lines from or only
 # renames proves nothing. With -z, numstat gives a rename's old and new path on lines of their own
 # after an empty path field; the new path is the one kept.
@@ -75,7 +88,7 @@ if [ -n "$changed_proof_files" ]; then
       unproven_box_ids="$unproven_box_ids $box_id"
     fi
   done
-  if [ -z "$unproven_box_ids" ]; then
+  if [ -z "$unproven_box_ids" ] && [ -z "$prose_rule_files" ]; then
     echo "ok   rules changed with proof: $(printf '%s\n' "$changed_proof_files" | wc -l | tr -d ' ') eval or test file(s)"
     exit 0
   fi
@@ -92,13 +105,20 @@ if [ -n "$reason" ]; then
   exit 0
 fi
 
-if [ -n "$changed_proof_files" ]; then
-  echo "FAIL these checklist boxes changed with no changed eval case or script test naming them:$unproven_box_ids"
-  echo "     Name each box's id in the eval grader, the eval's setup.sh or the test that proves it,"
-else
+if [ -z "$changed_proof_files" ]; then
   echo "FAIL these rules changed with no eval case or script test beside them:"
   printf '%s\n' "$changed_rule_files" | sed 's/^/       /'
   echo "     Prove the rule catches its case (an eval under the plugin's evals/, or a script with a test),"
+else
+  if [ -n "${unproven_box_ids:-}" ]; then
+    echo "FAIL these checklist boxes changed with no changed eval case or script test naming them:$unproven_box_ids"
+    echo "     Name each box's id in the eval grader, the eval's setup.sh or the test that proves it,"
+  fi
+  if [ -n "$prose_rule_files" ]; then
+    echo "FAIL these rule files gain lines but no checklist box:"
+    printf '%s' "$prose_rule_files" | sed 's/^/       /'
+    echo "     Write the lesson as a box on the file's checklist, proven by an eval or test naming its id,"
+  fi
 fi
 echo "     or, when only the words move, add a line to the pull request description: wording-only: <why>"
 exit 1

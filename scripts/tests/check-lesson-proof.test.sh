@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Tests scripts/check-lesson-proof.sh in a throwaway repo: a rule changed alone fails, and passes
 # with an eval or a script test beside it, or with a `wording-only:` reason in the description; a
-# checklist box added or rewritten passes only when a changed eval or test names its id.
+# checklist box added or rewritten passes only when a changed eval or test names its id; a rule file
+# that gains lines but no box passes only with a `wording-only:` reason.
 set -euo pipefail
 
 script="$(cd "$(dirname "$0")/.." && pwd)/check-lesson-proof.sh"
@@ -89,17 +90,17 @@ write_repo_file 'plugins/shop/skills/café/SKILL.md' 'Serve it hot.\n'
 commit_change "a rule in a folder with an accent, alone"
 expect_verdict fail "a rule in a path with an accent is a rule"
 
-for proof in plugins/shop/evals/totals/eval.yaml plugins/shop/tests/totals.test.sh scripts/tests/totals.test.sh; do
+for proof in plugins/shop/evals/totals/case.yaml plugins/shop/tests/totals.test.sh scripts/tests/totals.test.sh; do
   create_branch "with-${proof//\//-}"
-  echo "Include shipping." >> "$repo/plugins/shop/skills/checkout/SKILL.md"
-  write_repo_file "$proof" 'proof\n'
+  echo "- [ ] §T2 Totals include shipping." >> "$repo/plugins/shop/skills/checkout/references/rounding.md"
+  write_repo_file "$proof" 'proof of §T2\n'
   commit_change "rule with $proof"
   expect_verdict pass "a rule with $proof beside it"
 done
 expect_output "the proof is counted" "rules changed with proof: 1 eval or test file(s)"
 
 create_branch with-script-only
-echo "Include shipping." >> "$repo/plugins/shop/skills/checkout/SKILL.md"
+echo "- [ ] §T2 Totals include shipping." >> "$repo/plugins/shop/skills/checkout/references/rounding.md"
 write_repo_file plugins/shop/scripts/total.sh 'echo total\n'
 commit_change "rule with an untested script"
 expect_verdict fail "a script with no test is not proof"
@@ -182,6 +183,50 @@ expect_verdict fail "an id named only in a fixture is not proof"
 write_repo_file plugins/shop/evals/totals/graders/shipping.md 'pattern: shipping # §T2\n'
 commit_change "the eval's grader names it"
 expect_verdict pass "an id named in an eval grader is proof"
+
+# A lesson is a box: prose a rule file gains is wording only, whatever test changed beside it.
+create_branch prose-beside-a-test
+echo "Include shipping." >> "$repo/plugins/shop/skills/checkout/SKILL.md"
+write_repo_file plugins/shop/tests/totals.test.sh 'grep total\n'
+commit_change "prose added to a rule, with an unrelated test"
+expect_verdict fail "prose a rule file gains is not proven by an unrelated test"
+expect_output "the failure names the file" "plugins/shop/skills/checkout/SKILL.md"
+expect_output "the failure says why" "gain lines but no checklist box"
+expect_verdict pass "prose with a stated wording-only reason" 'wording-only: says when tax applies, a reminder with no new check'
+
+for boxless in agents/totals-gate.md rules/kc-working-agreement.md; do
+  create_branch "prose-in-${boxless//\//-}"
+  echo "Check shipping too." >> "$repo/plugins/shop/$boxless"
+  write_repo_file plugins/shop/tests/totals.test.sh 'grep shipping\n'
+  commit_change "prose added to $boxless, with a test"
+  expect_verdict fail "$boxless has no boxes, so what it gains is prose"
+done
+
+create_branch prose-here-box-there
+echo "Include shipping." >> "$repo/plugins/shop/skills/checkout/SKILL.md"
+echo "- [ ] §T2 Totals include shipping." >> "$repo/plugins/shop/skills/checkout/references/rounding.md"
+write_repo_file plugins/shop/tests/totals.test.sh 'grep shipping # §T2\n'
+commit_change "prose in one rule file, a proven box in another"
+expect_verdict fail "a box in one file doesn't cover prose another file gains"
+expect_output "the failure names only the file with no box" "       plugins/shop/skills/checkout/SKILL.md"
+
+create_branch prose-with-its-box
+printf 'Shipping counts as part of the total.\n\n- [ ] §T2 Totals include shipping.\n' >> "$repo/plugins/shop/skills/checkout/references/rounding.md"
+write_repo_file plugins/shop/tests/totals.test.sh 'grep shipping # §T2\n'
+commit_change "prose and its proven box in one file"
+expect_verdict pass "prose beside the box it explains, proven"
+
+create_branch lines-removed
+write_repo_file plugins/shop/skills/checkout/references/rounding.md '- [ ] §T1 Totals round half up.\n- [ ] §T12 Refunds round down.\n'
+write_repo_file plugins/shop/tests/totals.test.sh 'grep round\n'
+commit_change "a rule file that only loses a line, with a test"
+expect_verdict pass "a rule file that only loses lines gains no prose"
+
+create_branch blank-lines-only
+printf '\n\n' >> "$repo/plugins/shop/skills/checkout/SKILL.md"
+write_repo_file plugins/shop/tests/totals.test.sh 'grep total\n'
+commit_change "blank lines added to a rule, with a test"
+expect_verdict pass "blank lines are not prose"
 
 create_branch wording
 echo "A total includes tax, always." > "$repo/plugins/shop/skills/checkout/SKILL.md"
