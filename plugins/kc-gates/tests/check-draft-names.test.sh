@@ -6,7 +6,7 @@ set -euo pipefail
 tests_dir=$(cd "$(dirname "$0")" && pwd)
 # shellcheck source=lib/harness.sh
 . "$tests_dir/lib/harness.sh"
-check="$(dirname "$tests_dir")/scripts/check-draft-names.sh"
+names_script="$(dirname "$tests_dir")/scripts/check-draft-names.sh"
 require_jq
 
 repo="$work_dir/shop"
@@ -40,7 +40,7 @@ write_draft() {
 # Runs the check from <dir> on <file>; prints its output, or "clean" when it passes.
 run_names_check() {
   local dir=$1 file=$2 output status=0
-  output=$(cd "$dir" && bash "$check" "$file" "$head_sha") || status=$?
+  output=$(cd "$dir" && bash "$names_script" "$file" "$head_sha") || status=$?
   if [ "$status" -eq 0 ]; then echo clean; else printf '%s\n' "$output"; fi
 }
 
@@ -51,7 +51,7 @@ expect_eq "a key one letter from an existing key is flagged" \
   "$(run_names_check "$repo" "$work_dir/plural.json")"
 
 write_draft "$work_dir/swapped.json" $'**suggestion**:\n`giftMassage` would match the other getters.'
-expect_eq "it prints nothing on stderr, warnings included" "" "$(cd "$repo" && bash "$check" "$work_dir/plural.json" "$head_sha" 2>&1 >/dev/null || true)"
+expect_eq "it prints nothing on stderr, warnings included" "" "$(cd "$repo" && bash "$names_script" "$work_dir/plural.json" "$head_sha" 2>&1 >/dev/null || true)"
 
 expect_contains "a changed letter is flagged too" "suggests \`giftMassage\`, one letter from \`giftMessage\`" \
   "$(run_names_check "$repo" "$work_dir/swapped.json")"
@@ -83,20 +83,20 @@ expect_eq "away from the repo there is nothing to compare, so it passes" clean \
   "$(run_names_check "$work_dir/elsewhere" "$work_dir/plural.json")"
 
 status=0
-(cd "$repo" && bash "$check" "$work_dir/plural.json") >/dev/null 2>&1 || status=$?
+(cd "$repo" && bash "$names_script" "$work_dir/plural.json") >/dev/null 2>&1 || status=$?
 expect_eq "a missing head SHA is a usage error" 2 "$status"
 
 status=0
-unreadable_error=$(cd "$repo" && bash "$check" "$work_dir/no-such.json" "$head_sha" 2>&1 >/dev/null) || status=$?
+unreadable_error=$(cd "$repo" && bash "$names_script" "$work_dir/no-such.json" "$head_sha" 2>&1 >/dev/null) || status=$?
 expect_eq "an unreadable drafts file exits 2" 2 "$status"
 expect_contains "and says it can't read it" "cannot read $work_dir/no-such.json" "$unreadable_error"
 status=0
-(cd "$work_dir/elsewhere" && bash "$check" "$work_dir/no-such.json" "$head_sha") >/dev/null 2>&1 || status=$?
+(cd "$work_dir/elsewhere" && bash "$names_script" "$work_dir/no-such.json" "$head_sha") >/dev/null 2>&1 || status=$?
 expect_eq "it exits 2 even where the head SHA is no commit" 2 "$status"
 
 printf '{"body": "not a list"}' > "$work_dir/object.json"
 status=0
-(cd "$repo" && bash "$check" "$work_dir/object.json" "$head_sha") >/dev/null 2>&1 || status=$?
+(cd "$repo" && bash "$names_script" "$work_dir/object.json" "$head_sha") >/dev/null 2>&1 || status=$?
 expect_eq "a drafts file that isn't a JSON array exits 2" 2 "$status"
 
 finish

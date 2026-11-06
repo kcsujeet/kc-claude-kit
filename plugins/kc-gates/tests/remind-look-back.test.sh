@@ -61,6 +61,8 @@ expect_hook remind "a body with a semicolon before --approve" 'gh pr review 12 -
 expect_hook remind "a body with a pipe before --approve" "gh pr review 12 -b 'tests | lint pass' --approve"
 expect_hook remind "an api body with a newline before the event" 'gh api repos/shop/web/pulls/12/reviews -f body="Thanks.\nShip it" -f event=APPROVE'
 expect_hook remind "a quoted event field" "gh api repos/shop/web/pulls/12/reviews -X POST -f 'event=APPROVE'"
+expect_hook remind "a semicolon between escaped quotes in a body" 'gh pr review 12 -b "said \\"ship; it\\" today" --approve'
+expect_hook remind "--approve quoted on its own" "gh pr review 12 '--approve'"
 
 # --- not approvals -------------------------------------------------------------------------------
 expect_hook quiet "a comment review from its --input file" "gh api repos/shop/web/pulls/12/reviews -X POST --input comment.json"

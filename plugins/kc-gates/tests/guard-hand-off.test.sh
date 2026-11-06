@@ -117,6 +117,8 @@ check allow "allowed: cd into a reviewed repo, then gh pr create" \
   "cd $work_dir/ready-repo && gh pr create --fill" "$work_dir/draft-repo"
 check allow "allowed: draft PR" \
   "gh pr create --draft --fill" "$work_dir/draft-repo"
+check allow "allowed: draft PR whose title has a semicolon before --draft" \
+  "gh pr create --title 'Widgets; part 1' --draft --body-file /tmp/body.md" "$work_dir/draft-repo"
 check allow "allowed: draft PR, checklist without drafts front matter" \
   "gh pr create --draft --fill" "$work_dir/plain-repo"
 check deny  "blocked: draft PR, checklist applies to drafts, no receipt" \

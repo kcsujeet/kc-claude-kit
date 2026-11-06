@@ -145,39 +145,39 @@ expect_eq "no worktree is left registered" "1" "$(git -C "$work_dir/probe" workt
 
 # A value fallback whose order matters, one of `??`, a boolean `||` whose order doesn't, and an
 # optional element read (`?.[0]`), which is neither dropped nor swapped since it isn't a plain read.
-# A negated read, a literal, and a pair with one boolean side get the same drops as before, never a swap.
+# A negated read, a literal and a pair with one boolean side are never swapped.
 mkdir -p "$work_dir/fallback-files/src"
 cat > "$work_dir/fallback-files/src/contact.ts" <<'EOF'
-export const contactEmail = (user) => user?.profile?.email || user?.email
-export const shippingName = (order) => order.shipping.name ?? order.billing.name
+export const getContactEmail = (user) => user?.profile?.email || user?.email
+export const getShippingName = (order) => order.shipping.name ?? order.billing.name
 export const isSettled = (order) => order.isPaid || order.isRefunded
-export const firstTag = (order) => order.note || order.tags?.[0]
+export const getFirstTag = (order) => order.note || order.tags?.[0]
 export const hasNote = (order) => !order.note.text || order.title.text
-export const noteText = (order) => order.note.text || 'none'
-export const giftFlag = (order) => order.isGift || order.gift.enabled
+export const getNoteText = (order) => order.note.text || 'none'
+export const getGiftFlag = (order) => order.isGift || order.gift.enabled
 EOF
 make_repo fallback
 expect_eq "a value fallback's sides are swapped, and its operands drop whole across \`?.\`" \
 "mutation: 19 mutants on 7 lines: 0 caught (0 timed out), 0 unviable, 19 survived, 0 lines not mutated; baseline runs: 1, slowest 0s; test: true
-src/contact.ts:1: \`||\` to \`&&\`: export const contactEmail = (user) => user?.profile?.email || user?.email
-src/contact.ts:1: left of \`||\` dropped: export const contactEmail = (user) => user?.profile?.email || user?.email
-src/contact.ts:1: right of \`||\` dropped: export const contactEmail = (user) => user?.profile?.email || user?.email
-src/contact.ts:1: sides of \`||\` swapped: export const contactEmail = (user) => user?.profile?.email || user?.email
-src/contact.ts:2: sides of \`??\` swapped: export const shippingName = (order) => order.shipping.name ?? order.billing.name
+src/contact.ts:1: \`||\` to \`&&\`: export const getContactEmail = (user) => user?.profile?.email || user?.email
+src/contact.ts:1: left of \`||\` dropped: export const getContactEmail = (user) => user?.profile?.email || user?.email
+src/contact.ts:1: right of \`||\` dropped: export const getContactEmail = (user) => user?.profile?.email || user?.email
+src/contact.ts:1: sides of \`||\` swapped: export const getContactEmail = (user) => user?.profile?.email || user?.email
+src/contact.ts:2: sides of \`??\` swapped: export const getShippingName = (order) => order.shipping.name ?? order.billing.name
 src/contact.ts:3: \`||\` to \`&&\`: export const isSettled = (order) => order.isPaid || order.isRefunded
 src/contact.ts:3: left of \`||\` dropped: export const isSettled = (order) => order.isPaid || order.isRefunded
 src/contact.ts:3: right of \`||\` dropped: export const isSettled = (order) => order.isPaid || order.isRefunded
-src/contact.ts:4: \`||\` to \`&&\`: export const firstTag = (order) => order.note || order.tags?.[0]
-src/contact.ts:4: left of \`||\` dropped: export const firstTag = (order) => order.note || order.tags?.[0]
+src/contact.ts:4: \`||\` to \`&&\`: export const getFirstTag = (order) => order.note || order.tags?.[0]
+src/contact.ts:4: left of \`||\` dropped: export const getFirstTag = (order) => order.note || order.tags?.[0]
 src/contact.ts:5: \`||\` to \`&&\`: export const hasNote = (order) => !order.note.text || order.title.text
 src/contact.ts:5: \`!\` removed: export const hasNote = (order) => !order.note.text || order.title.text
 src/contact.ts:5: left of \`||\` dropped: export const hasNote = (order) => !order.note.text || order.title.text
 src/contact.ts:5: right of \`||\` dropped: export const hasNote = (order) => !order.note.text || order.title.text
-src/contact.ts:6: \`||\` to \`&&\`: export const noteText = (order) => order.note.text || 'none'
-src/contact.ts:6: left of \`||\` dropped: export const noteText = (order) => order.note.text || 'none'
-src/contact.ts:7: \`||\` to \`&&\`: export const giftFlag = (order) => order.isGift || order.gift.enabled
-src/contact.ts:7: left of \`||\` dropped: export const giftFlag = (order) => order.isGift || order.gift.enabled
-src/contact.ts:7: right of \`||\` dropped: export const giftFlag = (order) => order.isGift || order.gift.enabled
+src/contact.ts:6: \`||\` to \`&&\`: export const getNoteText = (order) => order.note.text || 'none'
+src/contact.ts:6: left of \`||\` dropped: export const getNoteText = (order) => order.note.text || 'none'
+src/contact.ts:7: \`||\` to \`&&\`: export const getGiftFlag = (order) => order.isGift || order.gift.enabled
+src/contact.ts:7: left of \`||\` dropped: export const getGiftFlag = (order) => order.isGift || order.gift.enabled
+src/contact.ts:7: right of \`||\` dropped: export const getGiftFlag = (order) => order.isGift || order.gift.enabled
 exit 0" "$(run_in fallback --test true --runs 1)"
 # A test that only ever sets one side (the account address empty, a profile address set) passes
 # with the sides swapped; one that sets both and expects the profile address catches it.

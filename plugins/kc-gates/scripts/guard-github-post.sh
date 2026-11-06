@@ -28,10 +28,10 @@ readonly FIELD_FLAG='(^|[[:space:]])(-f|-F|--field|--raw-field|--input)([[:space
 
 is_review_write_segment() {
   local segment="$1"
-  if printf '%s' "$segment" | grep -Eq "${GH_WORD}(pr[[:space:]]+(comment|review)|issue[[:space:]]+comment)([[:space:]]|$)"; then
+  if printf '%s' "$segment" | grep -Eq "${GH_COMMAND_START}(pr[[:space:]]+(comment|review)|issue[[:space:]]+comment)([[:space:]]|$)"; then
     return 0
   fi
-  if ! printf '%s' "$segment" | grep -Eq "${GH_WORD}api([[:space:]]|$)"; then
+  if ! printf '%s' "$segment" | grep -Eq "${GH_COMMAND_START}api([[:space:]]|$)"; then
     return 1
   fi
   if ! printf '%s' "$segment" | grep -Eq "$REVIEW_ENDPOINT"; then

@@ -62,21 +62,26 @@ git grep -h -o -w -I -E '[A-Za-z_][A-Za-z0-9_]{2,}' "$head_sha" -- ':/' 2>/dev/n
   KC_SUGGESTED="$suggested" perl -e '
     use strict; use warnings;
     my %known = map { chomp; $_ => 1 } <STDIN>;
-    # True when a and b differ by one letter added, dropped or changed.
-    sub one_edit {
-      my ($a, $b) = @_;
-      my ($la, $lb) = (length $a, length $b);
-      return 0 if abs($la - $lb) > 1;
-      if ($la == $lb) { my $d = () = ($a ^ $b) =~ /[^\0]/g; return $d == 1 }
-      ($a, $b) = ($b, $a) if $la > $lb;
-      for my $i (0 .. length($b) - 1) { return 1 if substr($b, 0, $i) . substr($b, $i + 1) eq $a }
+    # True when the two names differ by one letter added, dropped or changed.
+    sub is_one_edit_apart {
+      my ($suggested_name, $known_name) = @_;
+      my ($suggested_length, $known_length) = (length $suggested_name, length $known_name);
+      return 0 if abs($suggested_length - $known_length) > 1;
+      if ($suggested_length == $known_length) {
+        my $differing_letters = () = ($suggested_name ^ $known_name) =~ /[^\0]/g;
+        return $differing_letters == 1;
+      }
+      my ($shorter, $longer) = $suggested_length < $known_length ? ($suggested_name, $known_name) : ($known_name, $suggested_name);
+      for my $dropped_at (0 .. length($longer) - 1) {
+        return 1 if substr($longer, 0, $dropped_at) . substr($longer, $dropped_at + 1) eq $shorter;
+      }
       return 0;
     }
     my $problems = 0;
     for my $row (grep { length } split /\n/, $ENV{KC_SUGGESTED}) {
       my ($number, $where, $name) = split /\t/, $row;
       next if $known{$name};
-      my @near = sort grep { one_edit($name, $_) } keys %known;
+      my @near = sort grep { is_one_edit_apart($name, $_) } keys %known;
       next unless @near;
       my $near_list = join(", ", map { "`$_`" } @near);
       print "draft $number ($where): suggests `$name`, one letter from $near_list already in the repo; pick a name that differs more, or say why in \"names\"\n";

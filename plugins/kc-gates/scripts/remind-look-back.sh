@@ -18,15 +18,13 @@ set -u
 
 readonly REVIEWS_ENDPOINT='pulls/[0-9]+/reviews([^/[:alnum:]]|$)'
 
-# The command with each quoted string's separators (`;`, `|`, `&`, newlines) blanked and its
-# `--approve` and `-a` words broken, so a review body ("LGTM; ship it") neither splits the command
-# nor reads as a flag. A quoted value's other text stays: `-f 'event=APPROVE'`, `--input "a.json"`.
-mask_quoted_text() {
+# The command with `--approve` and `-a` broken where they sit inside a longer quoted string, so a
+# review body ("please --approve once CI passes") doesn't read as the flag; a flag quoted on its
+# own (`'--approve'`) is still the flag. split_segments keeps the body's separators from splitting it.
+mask_quoted_flags() {
   printf '%s' "$1" | perl -0777 -pe '
-    s{("[^"]*"|\x27[^\x27]*\x27)}{
-      my $quoted = $1;
-      $quoted =~ s/[;|&\n]/ /g;
-      $quoted =~ s/(^|[\s"\x27])(--approve|-a)(?=[\s"\x27]|$)/$1x$2/g;
+    s{("(?:[^"\\]|\\.)*"|\x27[^\x27]*\x27)}{
+      (my $quoted = $1) =~ s/(\s)(--approve|-a)(?=[\s"\x27])/$1x$2/g;
       $quoted
     }ge'
 }
@@ -34,10 +32,10 @@ mask_quoted_text() {
 # True when the segment approves a PR. A relative --input path is read from <cwd>.
 is_approval_segment() {
   local segment=$1 cwd=$2 input_file
-  if printf '%s' "$segment" | grep -Eq "${GH_WORD}pr[[:space:]]+review([[:space:]].*)?[[:space:]](--approve|-a)([[:space:]]|$)"; then
+  if printf '%s' "$segment" | grep -Eq "${GH_COMMAND_START}pr[[:space:]]+review([[:space:]].*)?[[:space:]]["'"'"']?(--approve|-a)["'"'"']?([[:space:]]|$)"; then
     return 0
   fi
-  printf '%s' "$segment" | grep -Eq "${GH_WORD}api([[:space:]]|$)" || return 1
+  printf '%s' "$segment" | grep -Eq "${GH_COMMAND_START}api([[:space:]]|$)" || return 1
   printf '%s' "$segment" | grep -Eq "$REVIEWS_ENDPOINT" || return 1
   if printf '%s' "$segment" | grep -Eq 'event["'"'"']?[[:space:]]*[=:][[:space:]]*["'"'"']?APPROVE'; then
     return 0
@@ -51,7 +49,7 @@ is_approval_segment() {
 main() {
   local input command cwd segment
   input="$(cat)"
-  command="$(mask_quoted_text "$(extract_field "$input" command)")"
+  command="$(mask_quoted_flags "$(extract_field "$input" command)")"
   cwd="$(extract_field "$input" cwd)"
   [ -n "$cwd" ] || cwd=$PWD
   while IFS= read -r segment; do

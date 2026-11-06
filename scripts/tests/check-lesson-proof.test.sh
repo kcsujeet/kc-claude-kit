@@ -31,10 +31,10 @@ expect_verdict() {
 
 # Checks that the last run's output holds <text>.
 expect_output() {
-  local label=$1 text=$2
+  local label=$1 expected_text=$2
   case "$last_output" in
-    *"$text"*) echo "ok   $label"; passes=$((passes + 1)) ;;
-    *) echo "FAIL $label (no \"$text\" in: $last_output)"; failures=$((failures + 1)) ;;
+    *"$expected_text"*) echo "ok   $label"; passes=$((passes + 1)) ;;
+    *) echo "FAIL $label (no \"$expected_text\" in: $last_output)"; failures=$((failures + 1)) ;;
   esac
 }
 
