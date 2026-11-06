@@ -238,16 +238,13 @@ list_mutants() {
       }
       return depth > 0
     }
-    # Swaps the two sides of the first op outside quotes when both are member reads (`a.b`,
-    # `a?.b.c`), the shape of a value fallback (`user?.nickname || user?.name`). A test whose
-    # fixture leaves one side empty passes either way round, so the order it guards goes untested.
-    # Skipped when either side reads as a boolean (`order.isPaid`), when an operator that binds
-    # tighter sits beside a side (`a && b.c || d.e`, `b.c || d.e + 1`: that read is its operand),
-    # or when the op sits inside an `if (`, `while (` or `until (` condition still open at it:
-    # there only truth counts. An unparenthesised condition (as in Ruby, `if a.b || c.d`) is not seen.
-    function swap_operands(s, op,    at, boolean_read, condition_start, tighter_operator, before, after, rest, condition, left, right, start, size, text_before_left, text_after_right, left_is_boolean, right_is_boolean) {
+    # Swaps the two sides of a value fallback (`user?.nickname || user?.name`), so a test whose
+    # fixture leaves one side empty shows as a survivor. The skips below mark pairs where only
+    # truth counts, or where a tighter operator takes one of the reads.
+    function swap_operands(s, op,    at, boolean_read, condition_start, tighter_operator, before, after, rest, condition, left, right, start, size, text_before_left, text_after_right, ends_in_arrow, ends_in_tighter_operator, left_is_boolean, right_is_boolean) {
       at = find_token(s, op, 0)
       boolean_read = "[.](is|has|can|should|was|did|will)[A-Z_][A-Za-z0-9_$]*$"
+      # Only a parenthesised condition is seen; one without (as in Ruby, `if a.b || c.d`) is not.
       condition_start = "(^|[^A-Za-z0-9_$])(if|while|until)[[:space:]]*[(]"
       tighter_operator = "(&&|==|!=|<=|>=|[-+*/%<>])"
       before = substr(s, 1, at - 1)
@@ -269,10 +266,13 @@ list_mutants() {
       size = RLENGTH
       if (substr(after, size + 1, 1) ~ /[A-Za-z0-9_$.?(\[]/) return
       right = substr(after, 1, size); sub(/^ +/, "", right)
-      # An arrow (`=>`) ends in `>` but binds looser than any op, so it is no tighter operator.
       text_before_left = substr(s, 1, start - 1); sub(/[[:space:]]+$/, "", text_before_left)
-      text_after_right = substr(after, size + 1)
-      if (text_before_left !~ /=>$/ && text_before_left ~ tighter_operator "$") return
+      # A trailing comment (`// note`, `/* note */`) is no division.
+      text_after_right = substr(after, size + 1); sub(/^[[:space:]]*\/[\/*].*$/, "", text_after_right)
+      # An arrow (`=>`) ends in `>` but binds looser than any op, so it is no tighter operator.
+      ends_in_arrow = text_before_left ~ /=>$/
+      ends_in_tighter_operator = text_before_left ~ tighter_operator "$"
+      if (!ends_in_arrow && ends_in_tighter_operator) return
       if (text_after_right ~ "^[[:space:]]*" tighter_operator) return
       left_is_boolean = left ~ boolean_read
       right_is_boolean = right ~ boolean_read

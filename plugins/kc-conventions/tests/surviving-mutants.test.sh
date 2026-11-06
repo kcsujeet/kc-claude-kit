@@ -164,10 +164,11 @@ export const getCode = (u) => { if (u.tag(")"), u.a.b || u.c.d) return 1 }
 export const pickNote = (o) => o.ready && o.note.text || o.title.text
 export const pickCount = (o) => o.count + o.extra.n || o.fallback.n
 export const pickTitle = (o) => o.name.text || o.title.text === o.label.text
+export const pickLabel = (o) => o.name.text || o.title.text // a trailing comment is no division
 EOF
 make_repo fallback
 expect_eq "a value fallback's sides are swapped, and its operands drop whole across \`?.\`" \
-"mutation: 50 mutants on 14 lines: 0 caught (0 timed out), 0 unviable, 50 survived, 0 lines not mutated; baseline runs: 1, slowest 0s; test: true
+"mutation: 54 mutants on 15 lines: 0 caught (0 timed out), 0 unviable, 54 survived, 0 lines not mutated; baseline runs: 1, slowest 0s; test: true
 src/contact.ts:1: \`||\` to \`&&\`: export const getContactEmail = (user) => user?.profile?.email || user?.email
 src/contact.ts:1: left of \`||\` dropped: export const getContactEmail = (user) => user?.profile?.email || user?.email
 src/contact.ts:1: right of \`||\` dropped: export const getContactEmail = (user) => user?.profile?.email || user?.email
@@ -218,6 +219,10 @@ src/contact.ts:14: \`||\` to \`&&\`: export const pickTitle = (o) => o.name.text
 src/contact.ts:14: \`===\` to \`!==\`: export const pickTitle = (o) => o.name.text || o.title.text === o.label.text
 src/contact.ts:14: left of \`||\` dropped: export const pickTitle = (o) => o.name.text || o.title.text === o.label.text
 src/contact.ts:14: right of \`||\` dropped: export const pickTitle = (o) => o.name.text || o.title.text === o.label.text
+src/contact.ts:15: \`||\` to \`&&\`: export const pickLabel = (o) => o.name.text || o.title.text // a trailing comment is no division
+src/contact.ts:15: left of \`||\` dropped: export const pickLabel = (o) => o.name.text || o.title.text // a trailing comment is no division
+src/contact.ts:15: right of \`||\` dropped: export const pickLabel = (o) => o.name.text || o.title.text // a trailing comment is no division
+src/contact.ts:15: sides of \`||\` swapped: export const pickLabel = (o) => o.name.text || o.title.text // a trailing comment is no division
 exit 0" "$(run_in fallback --test true --runs 1)"
 # A test that only ever sets one side (the account address empty, a profile address set) passes
 # with the sides swapped; one that sets both and expects the profile address catches it.
@@ -227,7 +232,7 @@ expect_eq "the swap survives a test that can't tell the order" \
   "$(run_in fallback --runs 1 --paths 'contact' --test "$one_sided" | grep -oF "src/contact.ts:1: sides of \`||\` swapped" || true)"
 both_set='! grep -qF "user?.email || user?.profile?.email" src/contact.ts && ! grep -qF "order.billing.name ?? order.shipping.name" src/contact.ts'
 expect_eq "each swap writes the other side first, so a test that rejects that order catches both" \
-  "mutation: 50 mutants on 14 lines: 2 caught" \
+  "mutation: 54 mutants on 15 lines: 2 caught" \
   "$(run_in fallback --runs 1 --test "$both_set" | sed -n 1p | sed "s/ (0 timed out).*//")"
 
 mkdir -p "$work_dir/unviable-files"

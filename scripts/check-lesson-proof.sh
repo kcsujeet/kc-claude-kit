@@ -46,7 +46,7 @@ fi
 reason=""
 [ -z "$body_file" ] || reason=$(sed -nE 's/^[[:space:]]*wording-only:[[:space:]]*(.*)$/\1/Ip' "$body_file" | head -n 1)
 # A description edited on the web ends its lines in `\r`, and may leave trailing spaces.
-reason=$(printf '%s' "$reason" | tr -d '\r' | sed -E 's/[[:space:]]+$//')
+reason=$(printf '%s' "$reason" | sed -E 's/[[:space:]]+$//')
 # The placeholder from the checklist and this script's own hint (`<why>`) is no reason.
 case "$reason" in "<"*">") reason="" ;; esac
 if [ -n "$reason" ]; then
