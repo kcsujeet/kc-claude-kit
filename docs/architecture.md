@@ -7,7 +7,7 @@ How the kit is laid out and why. Every decision cites the Claude Code documentat
 ```
 kc-claude-kit/
 ├── .claude-plugin/marketplace.json      # plugin entries carry no "version"
-├── .github/workflows/ci.yml             # validate, rules sync, script tests; evals on demand
+├── .github/workflows/ci.yml             # validate, rules sync, script tests, eval records
 ├── scripts/export-agent-skills.sh       # copy every skill into another tool's skills directory
 ├── docs/architecture.md                 # this file
 ├── CHANGELOG.md
@@ -155,7 +155,7 @@ Measured on Claude Code 2.1.292 unless stated.
 
 ### Tests
 
-`claude plugin validate --strict` and the script tests run on every PR. `claude plugin eval` suites live in each plugin's `evals/` and run each case with and without the plugin ([plugin evals](https://code.claude.com/docs/en/plugin-evals)); they cost model calls, so CI runs them on demand, with the models pinned and a cost ceiling.
+`claude plugin validate --strict` and the script tests run on every PR. `claude plugin eval` suites live in each plugin's `evals/` and run each case with and without the plugin ([plugin evals](https://code.claude.com/docs/en/plugin-evals)); they cost model calls, so they run locally on your own login, and CI runs no model: it checks the `proof.json` each changed case commits (`scripts/run-changed-evals.sh`).
 
 ### Other agents
 

@@ -347,7 +347,7 @@ claude plugin validate . --strict
 for p in plugins/*/; do claude plugin validate "$p" --strict; done
 ```
 
-Evals run each case with and without the plugin and cost model calls, so CI only runs them on demand (the `evals` job, `workflow_dispatch`). Locally:
+Evals run each case with and without the plugin and cost model calls. A pull request that adds or changes a case runs it locally first, once with the plugin and once without (`bash scripts/run-changed-evals.sh main`, on your own login): a case must pass every grader with the plugin and fail every scored grader without it, and the outcome goes in the case's `proof.json`, committed with the change. CI's `changed-evals` job runs no model; it checks that record against the case and plugin code at the head commit. Whole suites run locally, on demand:
 
 ```bash
 claude plugin eval plugins/kc-conventions
