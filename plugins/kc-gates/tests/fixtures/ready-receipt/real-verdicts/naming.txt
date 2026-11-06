@@ -1,0 +1,39 @@
+GATE: naming
+STATUS: FAIL
+BOXES:
+- [PASS] §N1: no `data`/`result`/`temp`-shaped names on behavior-bearing values. Locals such as `changed_rule_files`, `unproven_box_ids`, `base_commit` and `head_commit` carry their role.
+- [PASS] §N2: grepped &&/||: 68 hits, every hit read. No chain has 3 or more unnamed operands.
+  - guard-lesson-proof.sh:70 has 2 negated `has_word` predicates and mirrors guard-hand-off.sh `is_draft_create`.
+  - guard-lesson-proof.sh:139 is two plain emptiness tests.
+  - guard-lesson-proof.sh:174 is an emptiness test plus one named predicate.
+  - The other hits in ready-receipt.sh:152-198 and check-lesson-proof.sh:25-91 are `|| true`, `|| return` or `|| problem` guards with at most 2 operands.
+  - The hits in the test files are fixture strings or 2-operand guards.
+- [N/A] §N3: no domain check is added 3 or more times. The `gh pr` subcommand match has 2 copies (guard-hand-off.sh `is_hand_off` and guard-lesson-proof.sh `is_checked_command`), each a `case` on one string.
+- [FAIL] §N4: guard-lesson-proof.sh:64 `is_checked_command` does not say what checks it. `main` reads `! is_checked_command "$rest"` far from the declaration (finding 2).
+- [FAIL] §N5: grepped bare-word declarations: 175 hits.
+  - The short-scope locals (`base`, `head`, `command`, `dir`, `rest`, `words`, `target`, `output`, `status`, `reason`) are read beside their declaration and mirror guard-hand-off.sh, so they pass.
+  - `gh_words`, `has_word` and `flag_value` mirror the sibling by the user's decision, so they pass.
+  - name-collisions run for `put`, `problem`, `local_commit`, `path_pattern`, `review_head`, `added_lines`, `finding_lines` and `gate_block` found no unrelated shell collision. The one exception is `added_lines` as a local in kc-structure nested-ifs.sh and in select-gates.sh:34.
+  - FAIL: check-lesson-proof.test.sh:32 `put` is a bare verb with no subject (finding 6).
+  - FAIL: ready-receipt.sh:58 `problem` is a bare noun (finding 4).
+- [FAIL] §N6: grepped unverbed functions: 29 hits.
+  - FAIL: guard-lesson-proof.sh:79 `local_commit`.
+  - FAIL: check-lesson-proof.sh:48 `path_pattern`.
+  - FAIL: ready-receipt.sh:58 `problem`.
+  - FAIL: ready-receipt.sh:164 `review_head`, :170 `added_lines`, :178 `finding_lines`, :192 `widened_footprint`.
+  - FAIL: ready-receipt.test.sh:57 `gate_block`.
+  - PASS (repo precedent, `usage`): build-comment-payloads.sh:47, gather-review.sh:27, pass-size.sh:28, review-threads.sh:31, review-tally.sh:21.
+  - PASS (sibling, `main`): guard-hand-off.sh:163, guard-github-post.sh:67.
+  - PASS (verb-led, or mirrors a sibling): `gh_words`, `flag_value`, `has_word`, `print_deny`, `describe_pr`, `summarize_blocks`, `check_*`, `write_pass_receipt`, `expect_*`, `commit_*`, `save_*`, `build_*`, `edit_scope`, `add_finding`, `git_in`, `finds_on_fix_lines`.
+- [PASS] §N7: checked new file names: 5 files, 0 collisions. The old scripts/check-lesson-proof.sh and its test are deleted in the same diff.
+- [PASS] §N8: siblings are guard-hand-off.sh and guard-github-post.sh (guard-<subject>.sh), check-draft-names.sh and check-draft-format.sh (check-<subject>.sh), and tests/guard-github-post.test.sh and check-draft-names.test.sh (<script>.test.sh). The new files follow the casing, suffix and folders.
+- [PASS] §N9: `check-lesson-proof.sh` and `guard-lesson-proof.sh` carry kind (check, guard) and owner (lesson-proof), as the siblings do.
+- [N/A] §N10: the diff adds no family of sibling parts.
+- [N/A] §N11: the diff changes no existing thing's cardinality or kind.
+FINDINGS:
+- 🟡 plugins/kc-gates/scripts/guard-lesson-proof.sh:79@67d1eb0: `local_commit` is a noun phrase for a function that finds (and may fetch) a commit. The sibling `resolve_head` in guard-hand-off.sh:122 is verb-led. EDIT: SEARCH `local_commit() {`, REPLACE `resolve_local_commit() {`. SEARCH `base_commit=$(local_commit "$root" "$base")`, REPLACE `base_commit=$(resolve_local_commit "$root" "$base")`. SEARCH `head_commit=$(local_commit "$root" "$head")`, REPLACE `head_commit=$(resolve_local_commit "$root" "$head")`.
+- 🟡 plugins/kc-gates/scripts/guard-lesson-proof.sh:64@67d1eb0: `is_checked_command` reads as "checked by what?" at the call in `main`. It matches only the commands the lesson-proof check guards. Rename it to `is_lesson_proof_guarded_command`, in the definition and the call on line 174.
+- 🟡 plugins/kc-gates/scripts/check-lesson-proof.sh:48@67d1eb0: `path_pattern` is a noun phrase for a function that prints a regex. Rename it to `get_path_pattern`, in the definition and the calls on lines 58 and 64.
+- 🟡 plugins/kc-gates/scripts/ready-receipt.sh:58@67d1eb0: `problem` is a noun and is bare at its call sites (`problem "$review: ..."`). Rename it to `record_problem`, in the definition and at every call in the file.
+- 🟡 plugins/kc-gates/scripts/ready-receipt.sh:164@67d1eb0 (`review_head`), :170 (`added_lines`), :178 (`finding_lines`), :192 (`widened_footprint`): noun-phrase function names read as variables at their call sites. Rename to `get_review_head`, `list_added_lines`, `list_finding_lines` and `get_widened_footprint`, at the definitions and every call. The new `added_lines` name also avoids a clash with the local of that name in select-gates.sh:34.
+- 🟡 plugins/kc-gates/tests/check-lesson-proof.test.sh:32@67d1eb0 and plugins/kc-gates/tests/ready-receipt.test.sh:57@67d1eb0: `put` is a bare verb with no subject, used as `put path content` at many sites. Rename it to `write_repo_file`. `gate_block` is a noun for a builder. Rename it to `build_gate_block`. Change each at its definition and every call.

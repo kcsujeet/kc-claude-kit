@@ -3,14 +3,17 @@
 # kc-ready-for-review has passed its head commit.
 #
 # A hand-off is `gh pr ready` (not --undo), `gh pr create` without
-# -d/--draft, `gh pr edit` with --add-reviewer, or a `gh api` write to a PR's
-# requested_reviewers. The guard finds the PR's head commit (gh pr view for
+# -d/--draft or with a reviewer, `gh pr edit` with --add-reviewer, or a
+# `gh api` write to a PR's requested_reviewers. A boolean flag counts as gh
+# reads it: bare or set true, the last one winning, so `--draft=false` is not
+# a draft. The guard finds the PR's head commit (gh pr view for
 # an existing PR; for a new one the --head branch on GitHub, or HEAD of the
 # directory the command runs in, following any `cd` before it) and passes
 # only when ready-receipt.sh has a receipt for it. A command containing the
 # literal KC_READY_SKIP=1 passes: the skill adds it only when the user has
 # said to skip the pass for that PR.
 #
+# A hand-off needs a pass receipt; one for the checklist alone doesn't count.
 # A draft `gh pr create` is checked too when the repo's hand-off checklist,
 # read at the PR's head commit, opens with front matter holding
 # `drafts: true`: the head commit then needs a receipt, which
@@ -54,6 +57,25 @@ has_word() {
   return 1
 }
 
+# Succeeds when the last of the given boolean flags in the remaining words
+# turns it on: bare, or `=` a value gh's flag parser reads as true.
+is_flag_on() {
+  local short=$1 long=$2 word on=false
+  shift 2
+  for word in "$@"; do
+    case "$word" in
+      "$short" | "$long") on=true ;;
+      "$short"=* | "$long"=*)
+        case "${word#*=}" in
+          1 | t | T | true | TRUE | True) on=true ;;
+          *) on=false ;;
+        esac
+        ;;
+    esac
+  done
+  $on
+}
+
 # Prints the value of the first of the given flags (`--flag value` or
 # `--flag=value`) in the remaining words.
 flag_value() {
@@ -76,8 +98,8 @@ is_hand_off() {
   read -ra words <<< "$rest"
   [ "${#words[@]}" -ge 2 ] || return 1
   case "${words[0]} ${words[1]}" in
-    "pr ready") ! has_word --undo "${words[@]}" ;;
-    "pr create") ! has_word -d "${words[@]}" && ! has_word --draft "${words[@]}" ;;
+    "pr ready") ! is_flag_on --undo --undo "${words[@]}" ;;
+    "pr create") ! is_flag_on -d --draft "${words[@]}" || names_reviewer "${words[@]}" ;;
     "pr edit") has_word --add-reviewer "${words[@]}" ;;
     api*)
       printf '%s' "$rest" | grep -Eq "$REVIEWERS_ENDPOINT" || return 1
@@ -87,11 +109,16 @@ is_hand_off() {
   esac
 }
 
+# A draft that asks for a review hands the PR over all the same.
+names_reviewer() {
+  has_word -r "$@" || has_word --reviewer "$@"
+}
+
 is_draft_create() {
   local words
   read -ra words <<< "$1"
   [ "${#words[@]}" -ge 2 ] && [ "${words[0]} ${words[1]}" = "pr create" ] || return 1
-  has_word -d "${words[@]}" || has_word --draft "${words[@]}"
+  is_flag_on -d --draft "${words[@]}" && ! names_reviewer "${words[@]}"
 }
 
 # Prints the repo's hand-off checklist at <sha>: from the local clone when it
@@ -204,7 +231,7 @@ main() {
       print_deny "this command hands a PR to review, but the guard could not find the PR's head commit (run it from the repo, or name the PR number and --repo), so it cannot check for a review receipt."
       exit 0
     fi
-    if ! bash "$scripts_dir/ready-receipt.sh" check "$head" >/dev/null 2>&1; then
+    if ! bash "$scripts_dir/ready-receipt.sh" check "$head" --pass >/dev/null 2>&1; then
       print_deny "this command hands a PR to review, and its head commit $head has no kc-ready-for-review receipt."
       exit 0
     fi
