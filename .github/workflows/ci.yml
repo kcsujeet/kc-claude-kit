@@ -81,6 +81,9 @@ jobs:
       - name: Lesson proof check tests
         run: bash scripts/tests/check-lesson-proof.test.sh
 
+      - name: Changed-eval runner tests
+        run: bash scripts/tests/run-changed-evals.test.sh
+
       - name: Rules lint and coverage check tests
         run: bash scripts/tests/lint-rules.test.sh
 
@@ -127,7 +130,8 @@ jobs:
         with:
           fetch-depth: 0
 
-      # A rule edit needs an eval case or a script test beside it, or a `wording-only: <why>` line
+      # A rule edit needs an eval case or a script test beside it, each changed box an eval or test
+      # naming its id, and a rule file that gains lines a box, or else a `wording-only: <why>` line
       # in the description. Edited descriptions re-run it on the next push. The body goes through
       # an environment variable, never into the script text.
       - name: Check rule edits against evals, tests and the description
@@ -136,6 +140,42 @@ jobs:
         run: |
           printf '%s\n' "$PR_BODY" > "$RUNNER_TEMP/pr-body.md"
           bash scripts/check-lesson-proof.sh "origin/$GITHUB_BASE_REF" --body-file "$RUNNER_TEMP/pr-body.md"
+
+  # Each eval case a pull request adds or changes runs once with its plugin and once without, and
+  # must pass with it and fail without it; unchanged cases cost nothing. With no ANTHROPIC_API_KEY
+  # secret, a change to a case fails here and says so, never skips.
+  changed-evals:
+    name: Changed eval cases pass with the kit and fail without it
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    env:
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: List the eval cases this pull request adds or changes
+        id: cases
+        run: |
+          cases=$(bash scripts/run-changed-evals.sh "origin/$GITHUB_BASE_REF" --list)
+          printf '%s\n' "${cases:-none}"
+          if [ -n "$cases" ] && [ -n "$ANTHROPIC_API_KEY" ]; then
+            echo "install=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      # bubblewrap and socat back the OS sandbox that Bash-granting cases need
+      # on Linux (https://code.claude.com/docs/en/plugin-evals).
+      - name: Install Claude Code and sandbox prerequisites
+        if: steps.cases.outputs.install == 'true'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y bubblewrap socat
+          curl -fsSL https://claude.ai/install.sh | bash
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Run each changed case with and without its plugin
+        run: bash scripts/run-changed-evals.sh "origin/$GITHUB_BASE_REF"
 
   evals:
     name: Plugin evals
