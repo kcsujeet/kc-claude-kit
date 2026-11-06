@@ -16,8 +16,20 @@ set -u
 # shellcheck source=lib/hook-input.sh
 . "$(dirname "$0")/lib/hook-input.sh"
 
-readonly GH_WORD='(^|[^[:alnum:]_.-])gh[[:space:]]+'
 readonly REVIEWS_ENDPOINT='pulls/[0-9]+/reviews([^/[:alnum:]]|$)'
+
+# The command with each quoted string's separators (`;`, `|`, `&`, newlines) blanked and its
+# `--approve` and `-a` words broken, so a review body ("LGTM; ship it") neither splits the command
+# nor reads as a flag. A quoted value's other text stays: `-f 'event=APPROVE'`, `--input "a.json"`.
+mask_quoted_text() {
+  printf '%s' "$1" | perl -0777 -pe '
+    s{("[^"]*"|\x27[^\x27]*\x27)}{
+      my $quoted = $1;
+      $quoted =~ s/[;|&\n]/ /g;
+      $quoted =~ s/(^|[\s"\x27])(--approve|-a)(?=[\s"\x27]|$)/$1x$2/g;
+      $quoted
+    }ge'
+}
 
 # True when the segment approves a PR. A relative --input path is read from <cwd>.
 is_approval_segment() {
@@ -39,8 +51,7 @@ is_approval_segment() {
 main() {
   local input command cwd segment
   input="$(cat)"
-  command="$(extract_field "$input" command)"
-  [ -n "$command" ] || exit 0
+  command="$(mask_quoted_text "$(extract_field "$input" command)")"
   cwd="$(extract_field "$input" cwd)"
   [ -n "$cwd" ] || cwd=$PWD
   while IFS= read -r segment; do

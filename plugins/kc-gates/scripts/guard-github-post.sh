@@ -21,7 +21,6 @@ set -u
 
 readonly APPROVAL_TOKEN='KC_REVIEW_POST_APPROVED=1'
 
-readonly GH_WORD='(^|[^[:alnum:]_.-])gh[[:space:]]+'
 readonly REVIEW_ENDPOINT='(pulls|issues)/([0-9]+/(comments|reviews)|comments/[0-9]+)'
 readonly WRITE_METHOD='(-X|--method)[[:space:]=]*["'"'"']?(POST|PATCH|PUT|DELETE)'
 readonly GET_METHOD='(-X|--method)[[:space:]=]*["'"'"']?GET([^[:alpha:]]|$)'

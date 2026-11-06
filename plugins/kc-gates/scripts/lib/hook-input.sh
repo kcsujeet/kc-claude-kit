@@ -1,7 +1,12 @@
 # shellcheck shell=bash
-# Reads a PreToolUse payload for the Bash guards. Sourced, never executed.
+# Reads a Bash hook's payload (PreToolUse or PostToolUse) for the kit's hooks. Sourced, never
+# executed.
 #
 # KC_GUARD_NO_JQ=1 forces the sed fallback (used by the tests).
+
+# Where a `gh` command starts in a segment: `gh` as a whole word, then its subcommand.
+# shellcheck disable=SC2034  # read by the hooks that source this file
+readonly GH_WORD='(^|[^[:alnum:]_.-])gh[[:space:]]+'
 
 # Prints a top-level or tool_input string field of the payload: `command`
 # comes from tool_input, `cwd` from the top level.

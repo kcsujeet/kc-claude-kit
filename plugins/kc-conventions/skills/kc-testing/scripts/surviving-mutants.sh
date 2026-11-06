@@ -220,21 +220,24 @@ list_mutants() {
     # `a?.b.c`), the shape of a value fallback (`user?.nickname || user?.name`). A test whose
     # fixture leaves one side empty passes either way round, so the order it guards goes untested.
     # Skipped when either side reads as a boolean (`order.isPaid`), where the order changes nothing.
-    function swap_operands(s, op,    at, read, before, after, left, right, start, size) {
+    function swap_operands(s, op,    at, member_read, boolean_read, before, after, left, right, start, size, left_is_boolean, right_is_boolean) {
       at = find_token(s, op, 0)
       if (at == 0) return
-      read = "[A-Za-z_$][A-Za-z0-9_$]*([?]?[.][A-Za-z_$][A-Za-z0-9_$]*)+"
+      member_read = "[A-Za-z_$][A-Za-z0-9_$]*([?]?[.][A-Za-z_$][A-Za-z0-9_$]*)+"
+      boolean_read = "[.](is|has|can|should|was|did|will)[A-Z_][A-Za-z0-9_$]*$"
       before = substr(s, 1, at - 1)
       after = substr(s, at + length(op))
-      if (!match(before, read " *$")) return
+      if (!match(before, member_read " *$")) return
       start = RSTART
       left = substr(before, RSTART); sub(/ +$/, "", left)
       if (substr(s, start - 1, 1) ~ /[A-Za-z0-9_$.?)\]!]/) return
-      if (!match(after, "^ *" read)) return
+      if (!match(after, "^ *" member_read)) return
       size = RLENGTH
       if (substr(after, size + 1, 1) ~ /[A-Za-z0-9_$.?(\[]/) return
       right = substr(after, 1, size); sub(/^ +/, "", right)
-      if (left ~ /[.](is|has|can|should|was|did|will)[A-Z_][A-Za-z0-9_$]*$/ || right ~ /[.](is|has|can|should|was|did|will)[A-Z_][A-Za-z0-9_$]*$/) return
+      left_is_boolean = left ~ boolean_read
+      right_is_boolean = right ~ boolean_read
+      if (left_is_boolean || right_is_boolean) return
       printf "%d\037%d\037%s %s %s\037sides of `%s` swapped\n", start, at + length(op) + size - start, right, op, left, op
     }
     BEGIN {

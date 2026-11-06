@@ -1,6 +1,5 @@
 ---
 type: regex
 target: last_message
-pattern: "\\bfail"
-flags: i
+pattern: FAILED
 ---

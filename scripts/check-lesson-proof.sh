@@ -4,9 +4,8 @@
 # the same change. A rule that only moves words says so in the pull request description, on a line
 # of its own: `wording-only: <why>`.
 #
-# A lesson that lives only in prose is graded by whoever wrote it, so the CLAUDE.md step that asks
-# for proof (Lessons, step 4) was skippable. This makes it a check: the skip has to be stated, and
-# the reviewer reads the reason.
+# CLAUDE.md's Lessons step 4 asks for that proof; a skip has to be stated here, so the reviewer
+# reads the reason.
 #
 # Usage: scripts/check-lesson-proof.sh <base-ref> [--body-file <file>]
 #   <base-ref>    the branch the change merges into
@@ -24,7 +23,10 @@ while [ "$#" -gt 0 ]; do
     *) usage ;;
   esac
 done
-[ -z "$body_file" ] || [ -r "$body_file" ] || { echo "cannot read $body_file" >&2; exit 2; }
+if [ -n "$body_file" ] && [ ! -r "$body_file" ]; then
+  echo "cannot read $body_file" >&2
+  exit 2
+fi
 
 merge_base=$(git merge-base "$base" HEAD)
 changed=$(git diff --name-only "$merge_base" HEAD)

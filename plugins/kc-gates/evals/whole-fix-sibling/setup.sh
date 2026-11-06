@@ -46,7 +46,7 @@ import type { CarrierList } from './carriers'
 import type { Order } from './types'
 
 /** The carrier shown on an order's card, or nothing until the carriers can be told apart. */
-export function carrierBadgeLabel(order: Order, list: CarrierList): string | null {
+export function getCarrierBadgeLabel(order: Order, list: CarrierList): string | null {
   if (!order.carrierId) return null
   // Until the carriers load, or when they fail to, a removed carrier can't be told from a working one.
   if (list.isLoading || list.isError) return null
@@ -65,11 +65,11 @@ export interface CarrierOption {
 }
 
 /** The options of the order form's Carrier field, keeping the saved carrier even once it's removed. */
-export function carrierOptions(order: Order, list: CarrierList): CarrierOption[] {
+export function getCarrierOptions(order: Order, list: CarrierList): CarrierOption[] {
   const options = list.carriers.map((carrier) => ({ value: carrier.id, label: carrier.name }))
-  const isSavedCarrierMissing = Boolean(order.carrierId) && !list.carriers.some((each) => each.id === order.carrierId)
+  const isSavedCarrierListed = list.carriers.some((each) => each.id === order.carrierId)
 
-  if (order.carrierId && isSavedCarrierMissing) {
+  if (order.carrierId && !isSavedCarrierListed) {
     options.push({ value: order.carrierId, label: list.isLoading ? '' : 'Carrier removed' })
   }
 
