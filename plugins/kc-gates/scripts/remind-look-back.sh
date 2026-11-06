@@ -6,6 +6,10 @@
 # An approval is `gh pr review --approve` (or `-a`), or a `gh api` write to a PR's reviews whose
 # event is APPROVE: given as a field (`-f event=APPROVE`), inline, or in the `--input` file.
 #
+# It splits the command as the guards do, quotes or not, so a review body holding `;` or
+# `--approve` can cost a reminder or add one. A reminder is harmless either way, and a shell
+# parser here would be more code than the reminder is worth.
+#
 # Output: PostToolUse JSON with the reminder as additionalContext after an approval, nothing
 # otherwise. Always exits 0. Hook schema: https://code.claude.com/docs/en/hooks
 #
@@ -49,7 +53,7 @@ EOF
       exit 0
     fi
   done <<EOF
-$(split_segments "$(mask_quoted_text "$command")")
+$(split_segments "$command")
 EOF
   exit 0
 }

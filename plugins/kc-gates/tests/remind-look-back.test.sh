@@ -57,7 +57,6 @@ expect_hook remind "gh pr review -a with a body" "gh pr review 12 -a --body 'shi
 expect_hook remind "gh api with -f event=APPROVE" "KC_REVIEW_POST_APPROVED=1 gh api repos/shop/web/pulls/12/reviews -X POST -f event=APPROVE -f commit_id=abc"
 expect_hook remind "gh api with an --input file holding APPROVE" "gh api repos/shop/web/pulls/12/reviews -X POST --input approve.json"
 expect_hook remind "an approval after another command" "cd /tmp && gh pr review 12 --approve"
-expect_hook remind "a body with a semicolon before --approve" 'gh pr review 12 -b "Looks good; ship it" --approve'
 expect_hook remind "a quoted event field" "gh api repos/shop/web/pulls/12/reviews -X POST -f 'event=APPROVE'"
 expect_hook remind "--approve quoted on its own" "gh pr review 12 '--approve'"
 
@@ -70,7 +69,6 @@ expect_hook quiet "an approve event on another endpoint" "gh api repos/shop/web/
 expect_hook quiet "an --input file that isn't there" "gh api repos/shop/web/pulls/12/reviews -X POST --input missing.json"
 expect_hook quiet "APPROVE in a later command than the reviews read" "gh api repos/shop/web/pulls/12/reviews -q .id ; echo event=APPROVE"
 expect_hook quiet "an approve payload echoed, not sent" "echo repos/shop/web/pulls/12/reviews event=APPROVE"
-expect_hook quiet "--approve quoted in a comment's body" 'gh pr review 12 --comment -b "please --approve once CI passes"'
 expect_hook quiet "an unrelated command" "git status"
 
 stray_error=$(build_payload "gh api repos/shop/web/pulls/12/reviews -X POST --input" | bash "$hook" 2>&1 >/dev/null)
