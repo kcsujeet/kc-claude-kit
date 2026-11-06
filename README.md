@@ -304,8 +304,9 @@ The deterministic steps are scripts, each with fixture tests, so the model runs 
 | `gather-review.sh (<pr> \| --branch [<base>])` | Saves the diff and changed-file list for a PR or a local branch (base: `origin/HEAD`, then `main`, then `master`) and prints `meta.env` with `HEAD_SHA`, `BASE`, `TITLE`, `DIFF_FILE` and `CHANGED_FILES`; prints the fetch command when the local checkout is not the PR head |
 | `scope-facts.sh <pr>` | Prints the facts the scope checks need: author, base, commit and file counts, the author's other open PRs, and each linked issue, with the PR description and issue bodies saved to files |
 | `review-threads.sh <pr> [--mine <login>]` | Prints every review comment thread, root then replies, and with `--mine` marks the threads you started and whether the author replied after you (requires `jq`) |
-| `build-comment-payloads.sh <drafts.json> <diff> <sha> --pr <n>` | Used by `kc-post-review`: checks each drafted comment's path and line against the diff's hunks, writes one payload per comment, and prints the approval-token commands for you to approve; never posts (requires `jq`) |
+| `build-comment-payloads.sh <drafts.json> <diff> <sha> --pr <n>` | Used by `kc-post-review`: checks each drafted comment's path and line against the diff's hunks, its format (`check-draft-format.sh`) and, run from the repo, that no name it suggests is one letter from a name already there (`check-draft-names.sh`); writes one payload per comment, and prints the approval-token commands for you to approve; never posts (requires `jq`) |
 | `guard-github-post.sh` | The `PreToolUse` hook that blocks GitHub review writes without the approval token |
+| `remind-look-back.sh` | The `PostToolUse` hook that, after a command approving a pull request, reminds Claude the review's look-back is due |
 | `ready-receipt.sh (write <sha> (--rounds <n> --open <n> \| --after <pass-sha> \| --checklist) \| check <sha>)` | Used by `kc-ready-for-review`: writes or checks the receipt for the commit a pass ended on, under `~/.claude/kc-ready-for-review/` (`KC_READY_DIR` overrides) |
 | `guard-hand-off.sh` | The `PreToolUse` hook that blocks handing a PR to review until its head commit has a receipt, and a draft PR too where the hand-off checklist says `drafts: true` |
 | `update-marketplace.sh` | The background `UserPromptSubmit` hook that, at most every ten minutes, updates the marketplace this copy came from and its user-scope plugins when the branch its clone follows has moved, under Claude Code's auto-update switches |
@@ -316,7 +317,7 @@ The deterministic steps are scripts, each with fixture tests, so the model runs 
 | Script | Does |
 |---|---|
 | `skills/kc-<topic>/scripts/*.sh <diff>` | The sweeps: each prints the added lines that match one check (ternaries, `as` casts, `&&`/`||` chains, nested `if`s, class-name assertions, bare numbers, and so on) as `path:line: text` |
-| `skills/kc-testing/scripts/surviving-mutants.sh <diff> --test <command>` | The mutation sweep: in a throwaway checkout of HEAD, breaks each condition and early exit the diff adds, runs the tests, and prints each break no test noticed; the review's caller runs it, once per area, and the testing gate grades its output |
+| `skills/kc-testing/scripts/surviving-mutants.sh <diff> --test <command>` | The mutation sweep: in a throwaway checkout of HEAD, breaks each condition and early exit the diff adds (and swaps the two sides of a value fallback), runs the tests, and prints each break no test noticed; the review's caller runs it, once per area, and the testing gate grades its output |
 | `scripts/added-lines.sh <diff>` | The citation map: every added line with its line number in the source file |
 | `skills/kc-naming/scripts/name-collisions.sh <name>` | A name's whole-word hits in the tracked files |
 | `skills/kc-i18n/scripts/locale-duplicates.sh <locale-dir> <value> <leaf-key>` | The two duplicate greps a new locale key needs |

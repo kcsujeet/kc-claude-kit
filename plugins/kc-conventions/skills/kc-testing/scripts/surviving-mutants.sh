@@ -27,7 +27,8 @@
 # removed, `true` and `false` swapped, bash's test flags flipped (`-n`/`-z`, `-eq`/`-ne`,
 # `-lt`/`-ge`, `-gt`/`-le`, `=`/`!=`), Ruby's `if` and `unless` swapped, and a one-line guard
 # (an exit and its condition on one line) deleted. Outside shell and Python, also: each plain
-# operand of `&&` and `||` dropped, a ternary forced to each branch, and a regex literal
+# operand of `&&` and `||` dropped, the two sides of a value fallback (`||` or `??` between two
+# member reads, `user?.nickname || user?.name`) swapped, a ternary forced to each branch, and a regex literal
 # weakened (`^` or `$` removed, `\w` widened to `.`). A mutant that a syntax check rejects
 # (`bash -n`, `node --check`, `ruby -c`, Python's parser, each used only when the original file
 # passes it) is unviable and not run.
@@ -197,25 +198,47 @@ list_mutants() {
     function drop_operand(s, op,    at, operand, before, after, start, spaces, size) {
       at = find_token(s, op, 0)
       if (at == 0) return
-      operand = "!?[A-Za-z_$][A-Za-z0-9_$.]*( *(===|!==|==|!=|<=|>=|<|>) *([A-Za-z0-9_$.]+|\047[^\047]*\047|\"[^\"]*\"))?"
+      operand = "!?" MEMBER_CHAIN "( *(===|!==|==|!=|<=|>=|<|>) *([A-Za-z0-9_$.]+|\047[^\047]*\047|\"[^\"]*\"))?"
       before = substr(s, 1, at - 1)
       after = substr(s, at + length(op))
       if (match(before, operand " *$")) {
         start = RSTART
         match(after, /^ */)
         spaces = RLENGTH
-        if (substr(s, start - 1, 1) !~ /[A-Za-z0-9_$.)\]]/)
+        if (substr(s, start - 1, 1) !~ /[A-Za-z0-9_$.?)\]]/)
           printf "%d\037%d\037\037left of `%s` dropped\n", start, at + length(op) + spaces - start, op
       }
       if (match(after, "^ *" operand)) {
         size = RLENGTH
-        if (substr(after, size + 1, 1) !~ /[A-Za-z0-9_$.(\[]/) {
+        if (substr(after, size + 1, 1) !~ /[A-Za-z0-9_$.?(\[]/) {
           match(before, / *$/)
           printf "%d\037%d\037\037right of `%s` dropped\n", RSTART, length(before) - RSTART + 1 + length(op) + size, op
         }
       }
     }
+    # Swaps the two sides of the first op outside quotes when both are member reads (`a.b`,
+    # `a?.b.c`), the shape of a value fallback (`user?.nickname || user?.name`). A test whose
+    # fixture leaves one side empty passes either way round, so the order it guards goes untested.
+    # Skipped when either side reads as a boolean (`order.isPaid`), where the order changes nothing.
+    function swap_operands(s, op,    at, read, before, after, left, right, start, size) {
+      at = find_token(s, op, 0)
+      if (at == 0) return
+      read = "[A-Za-z_$][A-Za-z0-9_$]*([?]?[.][A-Za-z_$][A-Za-z0-9_$]*)+"
+      before = substr(s, 1, at - 1)
+      after = substr(s, at + length(op))
+      if (!match(before, read " *$")) return
+      start = RSTART
+      left = substr(before, RSTART); sub(/ +$/, "", left)
+      if (substr(s, start - 1, 1) ~ /[A-Za-z0-9_$.?)\]!]/) return
+      if (!match(after, "^ *" read)) return
+      size = RLENGTH
+      if (substr(after, size + 1, 1) ~ /[A-Za-z0-9_$.?(\[]/) return
+      right = substr(after, 1, size); sub(/^ +/, "", right)
+      if (left ~ /[.](is|has|can|should|was|did|will)[A-Z_][A-Za-z0-9_$]*$/ || right ~ /[.](is|has|can|should|was|did|will)[A-Z_][A-Za-z0-9_$]*$/) return
+      printf "%d\037%d\037%s %s %s\037sides of `%s` swapped\n", start, at + length(op) + size - start, right, op, left, op
+    }
     BEGIN {
+      MEMBER_CHAIN = "[A-Za-z_$][A-Za-z0-9_$]*([?]?[.][A-Za-z_$][A-Za-z0-9_$]*)*"
       text = ENVIRON["KC_LINE"]
       is_shell = path ~ /\.(sh|bash)$/
       is_python = path ~ /\.py$/
@@ -251,6 +274,8 @@ list_mutants() {
       if (!is_shell && !is_python) {
         drop_operand(text, "&&")
         drop_operand(text, "||")
+        swap_operands(text, "||")
+        swap_operands(text, "??")
         at = find_token(text, " ? ", 0)
         if (at > 0 && text !~ /[[:space:]]extends[[:space:]]/) {
           emit(at, " ? ", " || true ? ", "ternary forced to its first branch")

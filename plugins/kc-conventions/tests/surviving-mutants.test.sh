@@ -143,6 +143,40 @@ expect_eq "the mutated file in the repo is the committed one" "same" \
   "$(cmp -s "$work_dir/probe/src/order.ts" "$work_dir/order.ts.before" && echo same || echo changed)"
 expect_eq "no worktree is left registered" "1" "$(git -C "$work_dir/probe" worktree list | wc -l | tr -d ' ')"
 
+# A value fallback whose order matters, one of `??`, a boolean `||` whose order doesn't, and an
+# optional element read (`?.[0]`), which is neither dropped nor swapped since it isn't a plain read.
+mkdir -p "$work_dir/fallback-files/src"
+cat > "$work_dir/fallback-files/src/sender.ts" <<'EOF'
+export const senderEmail = (user) => user?.sender?.email || user?.email
+export const shippingName = (order) => order.shipping.name ?? order.billing.name
+export const isSettled = (order) => order.isPaid || order.isRefunded
+export const firstTag = (order) => order.note || order.tags?.[0]
+EOF
+make_repo fallback
+expect_eq "a value fallback's sides are swapped, and its operands drop whole across \`?.\`" \
+"mutation: 10 mutants on 4 lines: 0 caught (0 timed out), 0 unviable, 10 survived, 0 lines not mutated; baseline runs: 1, slowest 0s; test: true
+src/sender.ts:1: \`||\` to \`&&\`: export const senderEmail = (user) => user?.sender?.email || user?.email
+src/sender.ts:1: left of \`||\` dropped: export const senderEmail = (user) => user?.sender?.email || user?.email
+src/sender.ts:1: right of \`||\` dropped: export const senderEmail = (user) => user?.sender?.email || user?.email
+src/sender.ts:1: sides of \`||\` swapped: export const senderEmail = (user) => user?.sender?.email || user?.email
+src/sender.ts:2: sides of \`??\` swapped: export const shippingName = (order) => order.shipping.name ?? order.billing.name
+src/sender.ts:3: \`||\` to \`&&\`: export const isSettled = (order) => order.isPaid || order.isRefunded
+src/sender.ts:3: left of \`||\` dropped: export const isSettled = (order) => order.isPaid || order.isRefunded
+src/sender.ts:3: right of \`||\` dropped: export const isSettled = (order) => order.isPaid || order.isRefunded
+src/sender.ts:4: \`||\` to \`&&\`: export const firstTag = (order) => order.note || order.tags?.[0]
+src/sender.ts:4: left of \`||\` dropped: export const firstTag = (order) => order.note || order.tags?.[0]
+exit 0" "$(run_in fallback --test true --runs 1)"
+# A test that only ever sets one side (the login address empty, a sending address set) passes
+# with the sides swapped; one that sets both and expects the sending address catches it.
+one_sided='grep -qF "user?.sender?.email" src/sender.ts && grep -qF "user?.email" src/sender.ts'
+expect_eq "the swap survives a test that can't tell the order" \
+  "src/sender.ts:1: sides of \`||\` swapped" \
+  "$(run_in fallback --runs 1 --paths 'sender' --test "$one_sided" | grep -oF "src/sender.ts:1: sides of \`||\` swapped" || true)"
+both_set='! grep -qF "user?.email || user?.sender?.email" src/sender.ts && ! grep -qF "order.billing.name ?? order.shipping.name" src/sender.ts'
+expect_eq "each swap writes the other side first, so a test that rejects that order catches both" \
+  "mutation: 10 mutants on 4 lines: 2 caught" \
+  "$(run_in fallback --runs 1 --test "$both_set" | sed -n 1p | sed "s/ (0 timed out).*//")"
+
 mkdir -p "$work_dir/unviable-files"
 cat > "$work_dir/unviable-files/input.sh" <<'EOF'
 check_input() {

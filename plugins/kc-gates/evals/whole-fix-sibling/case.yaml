@@ -1,0 +1,6 @@
+schema_version: "1.1"
+name: whole-fix-sibling
+description: A branch adds two views of an order's carrier that read the same carrier list; the status badge hides its label when the list fails to load, and the edit field does not, so it calls a working carrier "Carrier removed". The review comes back FAILED with a finding on the field's failed-load case, not only on the badge it already handles (kc-code-review, "A finding asks for the whole fix").
+tags: [review, positive, lesson]
+context:
+  scaffold_script: setup.sh

@@ -23,7 +23,9 @@
 #   - a range has start_line before line (the REST docs do not say a range must
 #     stay inside one hunk, so that is not checked);
 #   - `body` is not empty.
-#   - the body passes kc-post-review's format rules (scripts/check-draft-format.sh).
+#   - the body passes kc-post-review's format rules (scripts/check-draft-format.sh);
+#   - no name the body suggests is one letter from a name already in the repo
+#     (scripts/check-draft-names.sh, when run from inside the repo).
 # Every failing draft is listed on stderr, and nothing is written.
 #
 # Output: one checked comment per draft at <out-dir>/comment-<i>.json,
@@ -202,6 +204,11 @@ problems=$(jq -r --arg coverage "$coverage" '
 format_problems=$(bash "$(dirname "$0")/check-draft-format.sh" "$drafts_file") || true
 if [ -n "$format_problems" ]; then
   problems=$(printf '%s\n%s\n' "$problems" "$format_problems" | grep . | sort -t' ' -k2,2n -s)
+fi
+# A suggested name one letter from a name already in the repo (run from the repo; skipped elsewhere).
+name_problems=$(bash "$(dirname "$0")/check-draft-names.sh" "$drafts_file" "$head_sha") || true
+if [ -n "$name_problems" ]; then
+  problems=$(printf '%s\n%s\n' "$problems" "$name_problems" | grep . | sort -t' ' -k2,2n -s)
 fi
 
 if [ -n "$problems" ]; then

@@ -78,6 +78,9 @@ jobs:
       - name: Version bump check tests
         run: bash scripts/tests/check-version-bumps.test.sh
 
+      - name: Lesson proof check tests
+        run: bash scripts/tests/check-lesson-proof.test.sh
+
       - name: Rules lint and coverage check tests
         run: bash scripts/tests/lint-rules.test.sh
 
@@ -114,6 +117,25 @@ jobs:
       # reaches anyone.
       - name: Compare each changed plugin's version with the base branch
         run: bash scripts/check-version-bumps.sh "origin/$GITHUB_BASE_REF"
+
+  lesson-proof:
+    name: Rule changes carry proof
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      # A rule edit needs an eval case or a script test beside it, or a `wording-only: <why>` line
+      # in the description. Edited descriptions re-run it on the next push. The body goes through
+      # an environment variable, never into the script text.
+      - name: Check rule edits against evals, tests and the description
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          printf '%s\n' "$PR_BODY" > "$RUNNER_TEMP/pr-body.md"
+          bash scripts/check-lesson-proof.sh "origin/$GITHUB_BASE_REF" --body-file "$RUNNER_TEMP/pr-body.md"
 
   evals:
     name: Plugin evals
