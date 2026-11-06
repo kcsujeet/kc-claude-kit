@@ -70,21 +70,25 @@ changed_proof_files=$(git -c core.quotePath=false diff --numstat -z -M "$merge_b
 id_proof_files=$(printf '%s\n' "$changed_proof_files" \
   | grep -E '^(plugins/[^/]+/tests|scripts/tests)/[^/]+\.sh$|^plugins/[^/]+/evals/[^/]+/(graders/[^/]+|setup\.sh|case\.yaml)$' || true)
 
-# The ids of the checklist boxes the change adds or rewrites, and those no changed eval or test
-# file names. An id is letters, a number, any `.<number>` parts and an optional letter (§T1,
+# The ids of the checklist boxes the change adds or rewrites, and those no line a changed eval or
+# test file gains names. An id is letters, a number, any `.<number>` parts and an optional letter (§T1,
 # §RL6.1a); one followed by a letter, a digit or `.<digit>` is another id: §T1 is not §T12, and
 # §RL6 is not §RL6.1a. A period right after the id (`§B2. Text`) ends it.
 if [ -n "$changed_proof_files" ]; then
   rule_paths=()
   while IFS= read -r path; do rule_paths+=("$path"); done <<< "$changed_rule_files"
-  proof_paths=()
-  while IFS= read -r path; do [ -z "$path" ] || proof_paths+=("$path"); done <<< "$id_proof_files"
+  # The lines those files gain, read with renames followed, so an id a file already held before the
+  # change, or brought along in a rename, is no proof of a box the change adds.
+  added_proof_lines=$(git -c core.quotePath=false diff --unified=0 -M --no-color --no-ext-diff "$merge_base" HEAD \
+    | PROOF_FILES="$id_proof_files" awk '
+        BEGIN { count = split(ENVIRON["PROOF_FILES"], list, "\n"); for (i = 1; i <= count; i++) if (list[i] != "") kept[list[i]] = 1 }
+        /^\+\+\+ / { in_kept_file = (substr($0, 7) in kept); next }
+        /^\+/ && in_kept_file { print substr($0, 2) }')
   changed_box_ids=$(git diff --unified=0 --no-color --no-ext-diff "$merge_base" HEAD -- "${rule_paths[@]}" \
     | sed -nE 's/^\+[[:space:]]*- \[[ xX]\] (§[A-Z]+[0-9]+(\.[0-9]+)*[a-z]?)([^.0-9a-z].*|\.([^0-9].*)?)?$/\1/p' | sort -u)
   unproven_box_ids=""
   for box_id in $changed_box_ids; do
-    if [ "${#proof_paths[@]}" -eq 0 ] \
-      || ! git grep -qE "${box_id//./\\.}(\\.?[^.0-9a-z]|\\.?\$)" HEAD -- "${proof_paths[@]}" 2>/dev/null; then
+    if ! printf '%s\n' "$added_proof_lines" | grep -qE "${box_id//./\\.}(\\.?[^.0-9a-z]|\\.?\$)"; then
       unproven_box_ids="$unproven_box_ids $box_id"
     fi
   done

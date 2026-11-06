@@ -168,6 +168,27 @@ write_repo_file plugins/shop/tests/renamed.test.sh 'grep tax\ngrep total # §T2\
 commit_change "a box with a renamed test that gains a case naming it"
 expect_verdict pass "a renamed test that gains lines naming the box is proof"
 
+create_branch id-already-in-test
+echo "- [ ] §T2 Totals include shipping." >> "$repo/plugins/shop/skills/checkout/references/rounding.md"
+echo "grep shipping" >> "$repo/plugins/shop/tests/old.test.sh"
+commit_change "a box whose id the test held before, with an unrelated line added to it"
+expect_verdict fail "an id the test already named before the change is not proof"
+expect_output "the failure names that box" "naming them: §T2"
+
+create_branch ticked-box
+echo "- [x] §T5 Totals include shipping." >> "$repo/plugins/shop/skills/checkout/references/rounding.md"
+write_repo_file plugins/shop/tests/shipping.test.sh 'grep shipping\n'
+commit_change "a ticked box no test names"
+expect_verdict fail "a ticked box is a box too"
+expect_output "the failure names it" "naming them: §T5"
+
+create_branch letter-suffix
+echo "- [ ] §RL6.1 Backfill in batches." >> "$repo/plugins/shop/skills/checkout/references/rounding.md"
+write_repo_file plugins/shop/tests/backfills.test.sh 'grep batch # §RL6.1a\n'
+commit_change "a box whose id only a longer id with a letter names"
+expect_verdict fail "an id with a letter after it is another id"
+expect_output "the failure names the box" "naming them: §RL6.1"
+
 create_branch box-dot-after-id
 echo "- [ ] §T2. Totals include shipping." >> "$repo/plugins/shop/skills/checkout/references/rounding.md"
 write_repo_file plugins/shop/tests/shipping.test.sh 'grep shipping\n'
@@ -246,6 +267,16 @@ expect_exit_2 "an unreadable description exits 2" main --body-file no-such.md
 expect_exit_2 "no arguments exit 2"
 expect_exit_2 "--body-file with no value exits 2" main --body-file
 expect_exit_2 "an unknown flag exits 2" main --unknown
+
+# The base moving on after the branch was cut changes nothing the branch did.
+create_branch base-moves-on
+echo "- notes" >> "$repo/CHANGELOG.md"
+commit_change "changelog only"
+git -C "$repo" checkout -q main
+echo "Round to the cent." >> "$repo/plugins/shop/skills/checkout/SKILL.md"
+commit_change "a rule edited on main after the branch"
+git -C "$repo" checkout -q base-moves-on
+expect_verdict pass "a rule edited on the base after the branch is not the branch's change"
 
 git -C "$repo" checkout -q --orphan unrelated
 git -C "$repo" rm -rqf .

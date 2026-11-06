@@ -109,6 +109,7 @@ while IFS= read -r case_dir; do
     | ($case.arms.without // []) as $without
     | if ($with | length) == 0 then "no run with the plugin"
       elif any($with[]; .error != null) then "the run with the plugin errored"
+      elif any($with[]; (.graders // []) | length == 0) then "the run with the plugin has no graders, so it checks nothing"
       elif any($with[]; any(.graders[]; .passed | not)) then
         "with the plugin, graders failed: " + ([$with[].graders[] | select(.passed | not) | .name] | unique | join(", "))
       elif $negative then "ok"

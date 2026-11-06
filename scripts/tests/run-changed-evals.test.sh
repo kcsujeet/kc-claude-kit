@@ -157,6 +157,17 @@ run_check
 expect_status "a run that errors fails" 1
 expect_output "it says so" "the run with the plugin errored"
 
+printf '{"cases":[{"name":"totals","arms":{"with":[{"error":null,"graders":[{"name":"finds-it","passed":true,"scored":true}]}],"without":[{"error":"timed out","graders":[{"name":"finds-it","passed":false,"scored":true}]}]}}]}\n' > "$results/totals.json"
+run_check
+expect_status "an errored baseline run fails" 1
+expect_output "it says so" "the run without the plugin errored"
+
+# Without the plugin a skill-fired grader fails by nature; only the scored graders count.
+printf '{"cases":[{"name":"totals","arms":{"with":[{"error":null,"graders":[{"name":"finds-it","passed":true,"scored":true}]}],"without":[{"error":null,"graders":[{"name":"finds-it","passed":true,"scored":true},{"name":"skill-fired","passed":false,"scored":false}]}]}}]}\n' > "$results/totals.json"
+run_check
+expect_status "a baseline that fails only an unscored grader passes the case, so it fails here" 1
+expect_output "it says why" "passes without the plugin too"
+
 printf '{"cases":[]}\n' > "$results/totals.json"
 run_check
 expect_status "a result without the case fails" 1
@@ -169,6 +180,11 @@ write_result greeting true true
 run_check
 expect_status "a negative case may pass without the plugin" 0
 expect_output "it says why" "a negative case"
+
+printf '{"cases":[{"name":"greeting","arms":{"with":[{"error":null,"graders":[]}],"without":[]}}]}\n' > "$results/greeting.json"
+run_check
+expect_status "a run with no graders fails, negative or not" 1
+expect_output "it says so" "has no graders, so it checks nothing"
 
 create_branch beside-another-plugin
 write_repo_file plugins/gates/evals/whole-fix/prompt.md '---\nplugins: ["../..", "../../../shop"]\n---\nReview my branch.\n'
@@ -193,6 +209,17 @@ expect_status "one failing case fails the run" 1
 expect_calls "each changed case runs once" 2
 expect_output "the passing case is reported" "ok   plugins/shop/evals/totals"
 expect_output "the failing case is reported" "FAIL plugins/gates/evals/whole-fix"
+
+# The base moving on after the branch was cut changes nothing the branch did.
+create_branch base-moves-on
+write_repo_file plugins/shop/skills/checkout/SKILL.md 'A total includes tax and shipping.\n'
+commit_change "a rule, no eval"
+git -C "$repo" checkout -q main
+write_repo_file plugins/shop/evals/totals/graders/finds-it.md 'pattern: cents\n'
+commit_change "a case edited on main after the branch"
+git -C "$repo" checkout -q base-moves-on
+run_check
+expect_output "a case edited on the base after the branch isn't run" "no eval case changed"
 
 status=0
 (cd "$repo" && bash "$script" >/dev/null 2>&1) || status=$?
