@@ -21,7 +21,7 @@ set -u
 . "$(dirname "$0")/lib/hook-input.sh"
 
 # A PR's reviews, or one pending review's events (how a drafted review is submitted).
-readonly REVIEW_APPROVAL_ENDPOINT='pulls/[0-9]+/reviews(/[0-9]+/events)?([^/[:alnum:]]|$)'
+readonly PR_REVIEWS_ENDPOINT='pulls/[0-9]+/reviews(/[0-9]+/events)?([^/[:alnum:]]|$)'
 
 # True when the segment approves a PR. A relative --input path is read from <cwd>, a `~/` one
 # from $HOME.
@@ -31,7 +31,7 @@ is_approval_segment() {
     return 0
   fi
   printf '%s' "$segment" | grep -Eq "${GH_COMMAND_START}api([[:space:]]|$)" || return 1
-  printf '%s' "$segment" | grep -Eq "$REVIEW_APPROVAL_ENDPOINT" || return 1
+  printf '%s' "$segment" | grep -Eq "$PR_REVIEWS_ENDPOINT" || return 1
   if printf '%s' "$segment" | grep -Eq 'event["'"'"']?[[:space:]]*[=:][[:space:]]*["'"'"']?APPROVE'; then
     return 0
   fi

@@ -72,7 +72,15 @@ stray_error=$(build_payload "gh api repos/shop/web/pulls/12/reviews -X POST --in
 expect_eq "an --input with no path prints nothing on stderr" "" "$stray_error"
 
 # A payload with no cwd reads a relative --input path from the directory the hook runs in.
-no_cwd_output=$(cd "$work_dir" && printf '{"tool_input":{"command":"gh api repos/shop/web/pulls/12/reviews -X POST --input approve.json"}}' | bash "$hook")
-expect_contains "a payload with no cwd reads the --input path from where the hook runs" "this approved a pull request" "$no_cwd_output"
+no_cwd_payload='{"tool_input":{"command":"gh api repos/shop/web/pulls/12/reviews -X POST --input approve.json"}}'
+for mode in jq sed; do
+  if [ "$mode" = jq ] && ! command -v jq >/dev/null 2>&1; then
+    continue
+  fi
+  no_jq=0
+  [ "$mode" = sed ] && no_jq=1
+  no_cwd_output=$(cd "$work_dir" && printf '%s' "$no_cwd_payload" | KC_GUARD_NO_JQ=$no_jq bash "$hook")
+  expect_contains "[$mode] a payload with no cwd reads the --input path from where the hook runs" "this approved a pull request" "$no_cwd_output"
+done
 
 finish
