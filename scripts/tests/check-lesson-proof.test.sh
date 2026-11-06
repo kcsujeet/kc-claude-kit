@@ -29,7 +29,6 @@ expect_verdict() {
   fi
 }
 
-# Checks that the last run's output holds <text>.
 expect_output() {
   local label=$1 expected_text=$2
   case "$last_output" in
@@ -43,7 +42,6 @@ commit_change() {
   git -C "$repo" -c user.name=t -c user.email=t@example.test commit -q -m "$1"
 }
 
-# Starts a branch named <name> off main.
 create_branch() { git -C "$repo" checkout -q main && git -C "$repo" checkout -q -b "$1"; }
 
 git -C "$repo" init -q -b main
@@ -110,6 +108,7 @@ expect_verdict pass "a stated wording-only reason" $'Rewords the tax rule.\n\nwo
 expect_output "the reason is echoed for the reviewer" "wording only: the same rule, said plainer"
 expect_verdict pass "the marker in any case" $'WORDING-ONLY: typo fix'
 expect_verdict fail "the marker with no reason" $'wording-only:'
+expect_verdict fail "the marker with the placeholder left in" $'wording-only: <why>'
 expect_verdict fail "the marker with only spaces after it" $'wording-only:   '
 expect_verdict fail "the marker inside a sentence" $'This is not wording-only: it adds a rule.'
 expect_verdict fail "a description without the marker" $'Adds a rule about tax.'

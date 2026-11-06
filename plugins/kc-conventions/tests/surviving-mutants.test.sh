@@ -145,7 +145,8 @@ expect_eq "no worktree is left registered" "1" "$(git -C "$work_dir/probe" workt
 
 # A value fallback whose order matters, one of `??`, a boolean `||` whose order doesn't, and an
 # optional element read (`?.[0]`), which is neither dropped nor swapped since it isn't a plain read.
-# A negated read, a literal and a pair with one boolean side are never swapped.
+# A negated read, a literal, a pair with one boolean side and a pair in an `if` condition are
+# never swapped.
 mkdir -p "$work_dir/fallback-files/src"
 cat > "$work_dir/fallback-files/src/contact.ts" <<'EOF'
 export const getContactEmail = (user) => user?.profile?.email || user?.email
@@ -155,10 +156,11 @@ export const getFirstTag = (order) => order.note || order.tags?.[0]
 export const hasNote = (order) => !order.note.text || order.title.text
 export const getNoteText = (order) => order.note.text || 'none'
 export const getGiftFlag = (order) => order.isGift || order.gift.enabled
+export const getNoteLabel = (order) => { if (order.note.text || order.title.text) return 'noted' }
 EOF
 make_repo fallback
 expect_eq "a value fallback's sides are swapped, and its operands drop whole across \`?.\`" \
-"mutation: 19 mutants on 7 lines: 0 caught (0 timed out), 0 unviable, 19 survived, 0 lines not mutated; baseline runs: 1, slowest 0s; test: true
+"mutation: 23 mutants on 8 lines: 0 caught (0 timed out), 0 unviable, 23 survived, 0 lines not mutated; baseline runs: 1, slowest 0s; test: true
 src/contact.ts:1: \`||\` to \`&&\`: export const getContactEmail = (user) => user?.profile?.email || user?.email
 src/contact.ts:1: left of \`||\` dropped: export const getContactEmail = (user) => user?.profile?.email || user?.email
 src/contact.ts:1: right of \`||\` dropped: export const getContactEmail = (user) => user?.profile?.email || user?.email
@@ -178,6 +180,10 @@ src/contact.ts:6: left of \`||\` dropped: export const getNoteText = (order) => 
 src/contact.ts:7: \`||\` to \`&&\`: export const getGiftFlag = (order) => order.isGift || order.gift.enabled
 src/contact.ts:7: left of \`||\` dropped: export const getGiftFlag = (order) => order.isGift || order.gift.enabled
 src/contact.ts:7: right of \`||\` dropped: export const getGiftFlag = (order) => order.isGift || order.gift.enabled
+src/contact.ts:8: \`||\` to \`&&\`: export const getNoteLabel = (order) => { if (order.note.text || order.title.text) return 'noted' }
+src/contact.ts:8: left of \`||\` dropped: export const getNoteLabel = (order) => { if (order.note.text || order.title.text) return 'noted' }
+src/contact.ts:8: right of \`||\` dropped: export const getNoteLabel = (order) => { if (order.note.text || order.title.text) return 'noted' }
+src/contact.ts:8: line deleted: export const getNoteLabel = (order) => { if (order.note.text || order.title.text) return 'noted' }
 exit 0" "$(run_in fallback --test true --runs 1)"
 # A test that only ever sets one side (the account address empty, a profile address set) passes
 # with the sides swapped; one that sets both and expects the profile address catches it.
@@ -187,7 +193,7 @@ expect_eq "the swap survives a test that can't tell the order" \
   "$(run_in fallback --runs 1 --paths 'contact' --test "$one_sided" | grep -oF "src/contact.ts:1: sides of \`||\` swapped" || true)"
 both_set='! grep -qF "user?.email || user?.profile?.email" src/contact.ts && ! grep -qF "order.billing.name ?? order.shipping.name" src/contact.ts'
 expect_eq "each swap writes the other side first, so a test that rejects that order catches both" \
-  "mutation: 19 mutants on 7 lines: 2 caught" \
+  "mutation: 23 mutants on 8 lines: 2 caught" \
   "$(run_in fallback --runs 1 --test "$both_set" | sed -n 1p | sed "s/ (0 timed out).*//")"
 
 mkdir -p "$work_dir/unviable-files"

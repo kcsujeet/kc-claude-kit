@@ -10,7 +10,7 @@ guard="$(dirname "$tests_dir")/scripts/guard-github-post.sh"
 passes=0
 failures=0
 
-# Wraps a shell command (no double quotes or backslashes in it) in the
+# Wraps a shell command (no double quotes in it; a backslash is written as JSON's \\) in the
 # PreToolUse stdin payload.
 build_payload() {
   printf '{"session_id":"s","hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"%s","description":"test"},"tool_use_id":"t"}' "$1"
@@ -65,6 +65,8 @@ check deny  "blocked: edit a posted comment" \
   "gh api repos/acme/widgets/pulls/comments/991 --method=PATCH --input /tmp/edit.json"
 check deny  "blocked: write chained after a read" \
   "gh pr view 12 && gh api repos/acme/widgets/issues/12/comments -X POST -f body='hi'"
+check deny  "blocked: a write after an escaped apostrophe, which opens no quote" \
+  "echo it\\\\'s; gh api repos/shop/web/pulls/5/comments -f body=x; gh api repos/shop/web/pulls/5/comments -X GET; echo 'z'"
 
 check allow "allowed: token in the same command" \
   "KC_REVIEW_POST_APPROVED=1 gh api repos/acme/widgets/pulls/12/reviews -X POST --input /tmp/review-12.json"

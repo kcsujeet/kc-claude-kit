@@ -22,18 +22,57 @@ extract_field() {
   fi
   # JSON strings hold no raw newlines, so joining lines is safe. The capture is
   # the field's JSON text, escapes and all, which perl's core JSON module decodes
-  # (`\\` and `\"` included, so a quoted body's escapes survive).
+  # (`\\` and `\"` included, so a quoted body's escapes survive). Text it can't
+  # decode (a lone surrogate, an unknown escape) is printed as captured, so a
+  # guard still reads the command rather than an empty one.
   printf '%s' "$input" \
     | tr '\n' ' ' \
     | sed -nE 's/.*"'"$field"'"[[:space:]]*:[[:space:]]*"(([^"\\]|\\.)*)".*/\1/p' \
-    | perl -MJSON::PP -0777 -ne 'chomp; my $value = eval { JSON::PP->new->allow_nonref->decode(qq("$_")) }; print $value if defined $value'
+    | perl -MJSON::PP -0777 -ne 'chomp; my $value = eval { JSON::PP->new->allow_nonref->decode(qq("$_")) }; print defined $value ? $value : $_'
 }
 
-# One shell segment per line: split on newlines, ;, &&, || and |, outside quotes. Inside a quoted
-# string (a commit message, a review body, `\"` escapes included) those characters are blanked
-# first, so "LGTM; ship it" stays in its command's segment.
+# Prints the command with the text that isn't shell syntax made inert, read the way bash reads
+# it: escaped characters, `$'...'`, "..." (with `\"` inside) and '...' strings, `#` comments and
+# heredoc bodies. In that text `;`, `|`, `&` and newlines become spaces and a flag-like word after
+# a space gets an `x` in front (`-b "please --approve"` becomes `-b "please x--approve"`), so a
+# commit message or review body neither splits its command nor reads as one of its flags. A flag
+# quoted on its own (`'--approve'`) is still the flag, and an unclosed quote is left as it is.
+mask_quoted_text() {
+  printf '%s\n' "$1" | perl -0777 -ne '
+    sub as_text {
+      my ($span) = @_;
+      $span =~ s/[;|&\n]/ /g;
+      $span =~ s/(\s)(-{1,2}[A-Za-z])/$1x$2/g;
+      return $span;
+    }
+    my $masked = "";
+    my @heredoc_ends;
+    while (1) {
+      if (/\G(\\.)/gcs) { $masked .= as_text($1) }
+      elsif (/\G(\$\x27(?:[^\x27\\]|\\.)*\x27)/gcs) { $masked .= as_text($1) }
+      elsif (/\G("(?:[^"\\]|\\.)*")/gcs) { $masked .= as_text($1) }
+      elsif (/\G(\x27[^\x27]*\x27)/gcs) { $masked .= as_text($1) }
+      elsif (/\G(?<![^\s])(#[^\n]*)/gc) { $masked .= as_text($1) }
+      elsif (/\G(<<-?[ \t]*([\x27"]?)([A-Za-z_][A-Za-z0-9_]*)\2)/gc) { $masked .= $1; push @heredoc_ends, $3 }
+      elsif (@heredoc_ends && /\G\n/gc) {
+        $masked .= "\n";
+        for my $end (@heredoc_ends) {
+          if (/\G((?:[^\n]*\n)*?)([ \t]*\Q$end\E[ \t]*)(?=\n|\z)/gc) { $masked .= as_text($1) . $2 }
+          elsif (/\G(.+)/gcs) { $masked .= as_text($1) }
+        }
+        @heredoc_ends = ();
+      }
+      elsif (/\G(.)/gcs) { $masked .= $1 }
+      else { last }
+    }
+    print $masked;
+  '
+}
+
+# One shell segment per line: split on newlines, ;, &&, || and |, outside the text
+# mask_quoted_text makes inert.
 split_segments() {
-  printf '%s\n' "$1" | perl -0777 -pe 's{("(?:[^"\\]|\\.)*"|\x27[^\x27]*\x27)}{ (my $quoted = $1) =~ s/[;|&\n]/ /g; $quoted }ge' | sed -e 's/&&/\
+  mask_quoted_text "$1" | sed -e 's/&&/\
 /g' -e 's/||/\
 /g' -e 's/;/\
 /g' -e 's/|/\

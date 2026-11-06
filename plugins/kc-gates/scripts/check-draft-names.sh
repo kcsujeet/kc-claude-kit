@@ -56,24 +56,24 @@ suggested=$(perl -MJSON::PP -CS -e '
 ' "$drafts_file")
 
 # Every identifier in the head commit's tree, whatever folder this runs from (`:/` is the repo's
-# top). A suggested name in it is a reference; one that isn't, and is one edit from one that is,
-# is reported.
+# top), three letters or longer: a suggested name has at least four, so a name one letter shorter
+# still counts. A suggested name in the tree is a reference; one that isn't, and is one edit from
+# one that is, is reported.
 git grep -h -o -w -I -E '[A-Za-z_][A-Za-z0-9_]{2,}' "$head_sha" -- ':/' 2>/dev/null | sort -u |
   KC_SUGGESTED="$suggested" perl -e '
     use strict; use warnings;
     my %known = map { chomp; $_ => 1 } <STDIN>;
-    # True when the two names differ by one letter added, dropped or changed.
     sub is_one_edit_apart {
       my ($suggested_name, $known_name) = @_;
-      my ($suggested_length, $known_length) = (length $suggested_name, length $known_name);
-      return 0 if abs($suggested_length - $known_length) > 1;
-      if ($suggested_length == $known_length) {
+      if (length $suggested_name == length $known_name) {
+        # Xor of two equal-length strings leaves a non-NUL byte where their letters differ.
         my $differing_letters = () = ($suggested_name ^ $known_name) =~ /[^\0]/g;
         return $differing_letters == 1;
       }
-      my ($shorter, $longer) = $suggested_length < $known_length ? ($suggested_name, $known_name) : ($known_name, $suggested_name);
+      my ($shorter, $longer) = sort { length($a) <=> length($b) } ($suggested_name, $known_name);
       for my $dropped_at (0 .. length($longer) - 1) {
-        return 1 if substr($longer, 0, $dropped_at) . substr($longer, $dropped_at + 1) eq $shorter;
+        my $longer_without_letter = substr($longer, 0, $dropped_at) . substr($longer, $dropped_at + 1);
+        return 1 if $longer_without_letter eq $shorter;
       }
       return 0;
     }

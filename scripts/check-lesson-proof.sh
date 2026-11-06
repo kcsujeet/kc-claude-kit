@@ -29,29 +29,31 @@ if [ -n "$body_file" ] && [ ! -r "$body_file" ]; then
 fi
 
 merge_base=$(git merge-base "$base" HEAD)
-changed=$(git diff --name-only "$merge_base" HEAD)
+changed_files=$(git diff --name-only "$merge_base" HEAD)
 
-rules=$(printf '%s\n' "$changed" | grep -E '^plugins/[^/]+/(skills/.+\.md|agents/[^/]+\.md|rules/kc-working-agreement\.md)$' || true)
-if [ -z "$rules" ]; then
+changed_rule_files=$(printf '%s\n' "$changed_files" | grep -E '^plugins/[^/]+/(skills/.+\.md|agents/[^/]+\.md|rules/kc-working-agreement\.md)$' || true)
+if [ -z "$changed_rule_files" ]; then
   echo "ok   no rule changed"
   exit 0
 fi
 
-proof=$(printf '%s\n' "$changed" | grep -E '^(plugins/[^/]+/(evals|tests)/|scripts/tests/)' || true)
-if [ -n "$proof" ]; then
-  echo "ok   rules changed with proof: $(printf '%s\n' "$proof" | wc -l | tr -d ' ') eval or test file(s)"
+changed_proof_files=$(printf '%s\n' "$changed_files" | grep -E '^(plugins/[^/]+/(evals|tests)/|scripts/tests/)' || true)
+if [ -n "$changed_proof_files" ]; then
+  echo "ok   rules changed with proof: $(printf '%s\n' "$changed_proof_files" | wc -l | tr -d ' ') eval or test file(s)"
   exit 0
 fi
 
 reason=""
 [ -z "$body_file" ] || reason=$(sed -nE 's/^[[:space:]]*wording-only:[[:space:]]*(.*)$/\1/Ip' "$body_file" | head -n 1)
+# The placeholder from the checklist and this script's own hint (`<why>`) is no reason.
+case "$reason" in "<"*">") reason="" ;; esac
 if [ -n "$reason" ]; then
   echo "ok   rules changed, wording only: $reason"
   exit 0
 fi
 
 echo "FAIL these rules changed with no eval case or script test beside them:"
-printf '%s\n' "$rules" | sed 's/^/       /'
+printf '%s\n' "$changed_rule_files" | sed 's/^/       /'
 echo "     Prove the rule catches its case (an eval under the plugin's evals/, or a script with a test),"
 echo "     or, when only the words move, add a line to the pull request description: wording-only: <why>"
 exit 1
