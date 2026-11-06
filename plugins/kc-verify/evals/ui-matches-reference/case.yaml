@@ -1,0 +1,6 @@
+schema_version: "1.1"
+name: ui-matches-reference
+description: A storefront page claims every product photo sits in the marketplace's frame; all photos load and every frame draws, but two photos sit off their frames by a few pixels. The QA report names both, with a measured offset.
+tags: [qa, ui, positive, lesson]
+context:
+  scaffold_script: setup.sh
