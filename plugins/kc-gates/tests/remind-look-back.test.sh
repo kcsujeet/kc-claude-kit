@@ -63,6 +63,7 @@ check quiet "reading the reviews" "gh api repos/shop/web/pulls/12/reviews -q '.[
 check quiet "an approve event on another endpoint" "gh api repos/shop/web/issues/12/comments -f event=APPROVE"
 check quiet "an --input file that isn't there" "gh api repos/shop/web/pulls/12/reviews -X POST --input missing.json"
 check quiet "APPROVE in a later command than the reviews read" "gh api repos/shop/web/pulls/12/reviews -q .id ; echo event=APPROVE"
+check quiet "an approve payload echoed, not sent" "echo repos/shop/web/pulls/12/reviews event=APPROVE"
 check quiet "an unrelated command" "git status"
 
 echo "$passes passed, $failures failed"

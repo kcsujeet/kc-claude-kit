@@ -100,5 +100,9 @@ check fail "the marker with only spaces after it" $'wording-only:   '
 check fail "the marker inside a sentence" $'This is not wording-only: it adds a rule.'
 check fail "a description without the marker" $'Adds a rule about tax.'
 
+status=0
+(cd "$repo" && bash "$script" main --body-file no-such.md >/dev/null 2>&1) || status=$?
+if [ "$status" -eq 2 ]; then echo "ok   an unreadable description exits 2"; passes=$((passes + 1)); else echo "FAIL an unreadable description exits 2 (got $status)"; failures=$((failures + 1)); fi
+
 echo "$passes passed, $failures failed"
 [ "$failures" -eq 0 ]

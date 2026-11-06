@@ -82,4 +82,13 @@ status=0
 (cd "$repo" && bash "$check" "$work_dir/plural.json") >/dev/null 2>&1 || status=$?
 expect_eq "a missing head SHA is a usage error" 2 "$status"
 
+status=0
+(cd "$repo" && bash "$check" "$work_dir/no-such.json" "$head_sha") >/dev/null 2>&1 || status=$?
+expect_eq "an unreadable drafts file exits 2" 2 "$status"
+
+printf '{"body": "not a list"}' > "$work_dir/object.json"
+status=0
+(cd "$repo" && bash "$check" "$work_dir/object.json" "$head_sha") >/dev/null 2>&1 || status=$?
+expect_eq "a drafts file that isn't a JSON array exits 2" 2 "$status"
+
 finish
