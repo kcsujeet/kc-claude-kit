@@ -50,6 +50,9 @@ expect_eq "a key one letter from an existing key is flagged" \
   "draft 1 (src/receipt.ts:1): suggests \`customersEmail\`, one letter from \`customerEmail\` already in the repo; pick a name that differs more, or say why in \"names\"" \
   "$(run_names_check "$repo" "$work_dir/plural.json")"
 
+write_draft "$work_dir/repeated.json" $'**suggestion**:\nMaybe `customersEmail`, so `customersEmail` reads like the template?'
+expect_eq "a name the draft repeats is reported once" 1 "$(run_names_check "$repo" "$work_dir/repeated.json" | grep -c customersEmail)"
+
 write_draft "$work_dir/swapped.json" $'**suggestion**:\n`giftMassage` would match the other getters.'
 expect_eq "it prints nothing on stderr, warnings included" "" "$(cd "$repo" && bash "$names_script" "$work_dir/plural.json" "$head_sha" 2>&1 >/dev/null || true)"
 

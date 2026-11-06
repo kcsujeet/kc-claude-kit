@@ -57,8 +57,7 @@ suggested_names=$(perl -MJSON::PP -CS -e '
 
 # Every identifier in the head commit's tree, whatever folder this runs from (`:/` is the repo's
 # top), three letters or longer: a suggested name has at least four, so a name one letter shorter
-# still counts. A suggested name in the tree is a reference; one that isn't, and is one edit from
-# one that is, is reported.
+# still counts.
 git grep -h -o -w -I -E '[A-Za-z_][A-Za-z0-9_]{2,}' "$head_sha" -- ':/' 2>/dev/null | sort -u |
   KC_SUGGESTED="$suggested_names" perl -e '
     use strict; use warnings;

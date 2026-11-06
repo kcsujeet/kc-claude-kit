@@ -54,6 +54,7 @@ expect_hook remind "a quoted event field" "gh api repos/shop/web/pulls/12/review
 expect_hook remind "--approve quoted on its own" "gh pr review 12 '--approve'"
 expect_hook remind "a pending review submitted as APPROVE" "gh api repos/shop/web/pulls/12/reviews/7/events -X POST -f event=APPROVE"
 expect_hook remind "an --input file under ~/" "gh api repos/shop/web/pulls/12/reviews -X POST --input ~/approve.json"
+expect_hook remind "an --input file by absolute path, as the payload builder prints it" "gh api repos/shop/web/pulls/12/reviews -X POST --input $work_dir/approve.json"
 
 # --- not approvals -------------------------------------------------------------------------------
 expect_hook quiet "a comment review from its --input file" "gh api repos/shop/web/pulls/12/reviews -X POST --input comment.json"
@@ -69,5 +70,9 @@ expect_hook quiet "an unrelated command" "git status"
 
 stray_error=$(build_payload "gh api repos/shop/web/pulls/12/reviews -X POST --input" | bash "$hook" 2>&1 >/dev/null)
 expect_eq "an --input with no path prints nothing on stderr" "" "$stray_error"
+
+# A payload with no cwd reads a relative --input path from the directory the hook runs in.
+no_cwd_output=$(cd "$work_dir" && printf '{"tool_input":{"command":"gh api repos/shop/web/pulls/12/reviews -X POST --input approve.json"}}' | bash "$hook")
+expect_contains "a payload with no cwd reads the --input path from where the hook runs" "this approved a pull request" "$no_cwd_output"
 
 finish

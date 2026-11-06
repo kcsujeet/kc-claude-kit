@@ -51,7 +51,7 @@ export function getCarrierBadgeLabel(order: Order, list: CarrierList): string | 
   // Until the carriers load, or when they fail to, a removed carrier can't be told from a working one.
   if (list.isLoading || list.isError) return null
 
-  const carrier = list.carriers.find((each) => each.id === order.carrierId)
+  const carrier = list.carriers.find((listedCarrier) => listedCarrier.id === order.carrierId)
   return carrier ? carrier.name : 'Carrier removed'
 }
 TS
@@ -67,7 +67,7 @@ export interface CarrierOption {
 /** The options of the order form's Carrier field, keeping the saved carrier even once it's removed. */
 export function getCarrierOptions(order: Order, list: CarrierList): CarrierOption[] {
   const options = list.carriers.map((carrier) => ({ value: carrier.id, label: carrier.name }))
-  const isSavedCarrierListed = list.carriers.some((each) => each.id === order.carrierId)
+  const isSavedCarrierListed = list.carriers.some((listedCarrier) => listedCarrier.id === order.carrierId)
 
   if (order.carrierId && !isSavedCarrierListed) {
     options.push({ value: order.carrierId, label: list.isLoading ? '' : 'Carrier removed' })

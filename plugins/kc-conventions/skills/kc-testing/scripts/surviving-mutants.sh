@@ -241,7 +241,7 @@ list_mutants() {
     # Swaps the two sides of a value fallback (`user?.nickname || user?.name`), so a test whose
     # fixture leaves one side empty shows as a survivor. The skips below mark pairs where only
     # truth counts, or where a tighter operator takes one of the reads.
-    function swap_operands(s, op,    at, boolean_read, condition_start, tighter_operator, before, after, rest, condition, left, right, start, size, text_before_left, text_after_right, ends_in_arrow, ends_in_tighter_operator, left_is_boolean, right_is_boolean) {
+    function swap_fallback_sides(s, op,    at, boolean_read, condition_start, tighter_operator, before, after, rest, condition, left, right, start, size, text_before_left, text_after_right, ends_in_arrow, ends_in_tighter_operator, left_is_boolean, right_is_boolean) {
       at = find_token(s, op, 0)
       boolean_read = "[.](is|has|can|should|was|did|will)[A-Z_][A-Za-z0-9_$]*$"
       # Only a parenthesised condition is seen; one without (as in Ruby, `if a.b || c.d`) is not.
@@ -318,8 +318,8 @@ list_mutants() {
       if (!is_shell && !is_python) {
         drop_operand(text, "&&")
         drop_operand(text, "||")
-        swap_operands(text, "||")
-        swap_operands(text, "??")
+        swap_fallback_sides(text, "||")
+        swap_fallback_sides(text, "??")
         at = find_token(text, " ? ", 0)
         if (at > 0 && text !~ /[[:space:]]extends[[:space:]]/) {
           emit(at, " ? ", " || true ? ", "ternary forced to its first branch")
