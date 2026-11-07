@@ -1,0 +1,6 @@
+schema_version: "1.1"
+name: uses-break
+description: Correctness §B8, every use of a changed thing still works. A branch moves the shop's price formatter from dollars to cents and updates the one caller it touches, while two callers in files the branch never touches still pass dollars, so they show prices a hundred times too small; it also adds a cents parser that is correct. The review fails, flags both untouched callers and raises nothing on the parser.
+tags: [review, gate, correctness]
+context:
+  scaffold_script: setup.sh
