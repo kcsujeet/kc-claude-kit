@@ -1,7 +1,7 @@
 ---
 type: regex
 target: last_message
-pattern: "(^|\\n)- (🔴|🟠|🟡)[^\\n]*parseCents\\.ts"
+pattern: "(^|\\n)- (🔴|🟠|🟡)[^\\n]*summary\\.ts"
 flags: i
 match: not_contains
 ---
