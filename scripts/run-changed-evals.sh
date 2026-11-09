@@ -7,6 +7,13 @@
 # even beside one it fails (a verdict format). A case tagged `negative` (the plugin must leave an
 # unrelated request alone) needs only the first, since the baseline passes it by design.
 #
+# When the change also edits rules (a skill, an agent or a rule file) in a plugin the case loads,
+# the case runs a third time, with the plugin as it is at HEAD except those rule files, which are
+# put back as the base has them. It must fail a scored grader there: a case that passes with the
+# rule edits taken out shows what the kit already did, not what this change adds. A case tagged
+# `guard` says so itself (it holds behaviour the kit already has, against a later regression) and
+# skips that run; it can't stand as the proof of a box, which a test or another case then names.
+#
 # With --check, which CI runs, nothing is run and no key is needed: each changed case must carry a
 # proof.json whose run passed, made from the case's files and the code of every plugin it loads as
 # they are at HEAD. A later edit to either makes the record stale, and the case runs again. The
@@ -20,7 +27,10 @@
 set -euo pipefail
 
 readonly PROOF_FILE=proof.json
-readonly MODEL=claude-sonnet-5
+# Model names, not versions: the run uses whichever version the name points at when it runs, and
+# the record says which claude ran it.
+readonly MODEL=sonnet
+readonly JUDGE_MODEL=haiku
 
 usage() { echo "usage: scripts/run-changed-evals.sh <base-ref> [--check]" >&2; exit 2; }
 [ "$#" -ge 1 ] || usage
@@ -87,6 +97,17 @@ hash_plugins() {
   done | git hash-object --stdin
 }
 
+# Prints the rule files the change edits under the plugin folders given.
+list_changed_rules() {
+  git -c core.quotePath=false diff --name-only "$merge_base" HEAD -- "$@" \
+    | grep -E '^plugins/[^/]+/(skills/.+\.md|agents/[^/]+\.md|rules/[^/]+\.md)$' || true
+}
+
+# True when <case_dir>'s tags hold <tag>.
+has_tag() {
+  print_case_files "$1" | grep -E '^tags:' | tr -c 'a-z-' '\n' | grep -qx "$2"
+}
+
 if $check_only; then
   failures=0
   while IFS= read -r case_dir; do
@@ -132,9 +153,7 @@ while IFS= read -r case_dir; do
   name_field=$(print_case_files "$case_dir" | sed -nE "s/^name:[[:space:]]*['\"]?([^'\"]+)['\"]?[[:space:]]*$/\\1/p" | head -n 1)
   [ -z "$name_field" ] || case_name=$name_field
   negative=false
-  if print_case_files "$case_dir" | grep -E '^tags:' | tr -c 'a-z-' '\n' | grep -qx negative; then
-    negative=true
-  fi
+  if has_tag "$case_dir" negative; then negative=true; fi
   plugin_dirs=()
   while IFS= read -r loaded_dir; do plugin_dirs+=("$loaded_dir"); done < <(list_case_plugins "$case_dir")
   # A case that loads a plugin beside its own runs from the repo root with --eval-dir: the runner
@@ -154,7 +173,7 @@ while IFS= read -r case_dir; do
     --scaffold \
     --json "$result" \
     --model "$MODEL" \
-    --judge-model claude-haiku-4-5 \
+    --judge-model "$JUDGE_MODEL" \
     --no-publish \
     --max-cost-usd 10 \
     --allow-tools Bash Agent >&2 || true
@@ -180,6 +199,50 @@ while IFS= read -r case_dir; do
         else "ok" end' "$result" 2>/dev/null || true)
     verdict=${verdict:-"its result has no case named $case_name"}
   fi
+  # The third run: the same case with this change's rule edits taken out.
+  base_result=$results_dir/${case_dir//\//_}.base.json
+  printf '{}\n' > "$base_result"
+  changed_rules=$(list_changed_rules "${plugin_dirs[@]}")
+  proves="fails without it"
+  if [ "$verdict" = ok ] && ! $negative && [ -n "$changed_rules" ]; then
+    if has_tag "$case_dir" guard; then
+      proves="fails without it (a guard case: it holds what the kit already did, and proves no rule this change edits)"
+    else
+      base_tree=$results_dir/base-rules
+      git worktree add -q --detach "$base_tree" HEAD
+      while IFS= read -r rule_path; do
+        if git cat-file -e "$merge_base:$rule_path" 2>/dev/null; then
+          git -C "$base_tree" checkout -q "$merge_base" -- "$rule_path"
+        else
+          rm -f "$base_tree/$rule_path"
+        fi
+      done <<< "$changed_rules"
+      echo "run  $case_dir, without this change's rule edits"
+      ( cd "$base_tree" && claude plugin eval "${target[@]}" \
+          --case "$case_name" \
+          --runs 1 \
+          --ablation none \
+          --trust-plugin \
+          --scaffold \
+          --json "$base_result" \
+          --model "$MODEL" \
+          --judge-model "$JUDGE_MODEL" \
+          --no-publish \
+          --max-cost-usd 10 \
+          --allow-tools Bash Agent >&2 ) || true
+      git worktree remove --force "$base_tree"
+      [ -s "$base_result" ] || printf '{}\n' > "$base_result"
+      verdict=$(jq -r --arg name "$case_name" '
+        ([(.cases // [])[] | select(.name == $name) | .arms.with // []] | first // []) as $runs
+        | if ($runs | length) == 0 then "the run without this change'"'"'s rule edits wrote no result"
+          elif any($runs[]; .error != null) then "the run without this change'"'"'s rule edits errored"
+          elif all($runs[]; all((.graders // [])[] | select(.scored); .passed)) then
+            "with this change'"'"'s rule edits taken out every grader still passes, so the case does not prove them; a case that holds what the kit already did is tagged guard"
+          else "ok" end' "$base_result" 2>/dev/null || true)
+      verdict=${verdict:-"the run without this change's rule edits wrote no result"}
+      proves="fails without it, and fails with this change's rule edits taken out"
+    fi
+  fi
   jq -n \
     --arg case "$case_dir" \
     --arg name "$case_name" \
@@ -190,16 +253,19 @@ while IFS= read -r case_dir; do
     --arg model "$MODEL" \
     --arg verdict "$verdict" \
     --slurpfile result "$result" \
+    --slurpfile base "$base_result" \
     '{case: $case, commit: $commit, case_hash: $case_hash, plugins_hash: $plugins_hash, claude: $claude,
       model: $model, verdict: $verdict,
-      runs: ([($result[0].cases // [])[] | select(.name == $name) | .arms
-              | map_values(map({error, graders: [(.graders // [])[] | {name, passed, scored}]}))] | first)}' \
+      runs: (([($result[0].cases // [])[] | select(.name == $name) | .arms
+              | map_values(map({error, graders: [(.graders // [])[] | {name, passed, scored}]}))] | first)
+             + ([($base[0].cases // [])[] | select(.name == $name)
+                 | {base_rules: (.arms.with // [] | map({error, graders: [(.graders // [])[] | {name, passed, scored}]}))}] | first // {}))}' \
     > "$case_dir/$PROOF_FILE"
   if [ "$verdict" = ok ]; then
     if $negative; then
       echo "ok   $case_dir: passes with the plugin (a negative case, so the baseline may pass too)"
     else
-      echo "ok   $case_dir: passes with the plugin, fails without it"
+      echo "ok   $case_dir: passes with the plugin, $proves"
     fi
   else
     echo "FAIL $case_dir: $verdict"

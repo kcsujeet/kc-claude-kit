@@ -117,7 +117,9 @@ write_repo_file plugins/shop/evals/totals/shipping.md 'pattern: shipping\n'
 commit_change "a box with an eval that does not name it"
 expect_verdict fail "an added box no changed eval or test names"
 expect_output "the failure names the box" "naming them: §T2"
-expect_verdict pass "an unnamed box with a stated wording-only reason" 'wording-only: moves an existing rule into a box'
+expect_verdict fail "an unnamed box is new text: wording-only alone is refused" 'wording-only: moves an existing rule into a box'
+expect_output "it counts the lines" "gain 1 lines and lose 0"
+expect_verdict pass "an unnamed box held by a file the change adds to" $'wording-only: the eval covers it\nheld-by: plugins/shop/evals/totals/shipping.md'
 
 create_branch box-rewritten
 write_repo_file plugins/shop/skills/checkout/references/rounding.md 'Round half up.\n\n- [ ] §T1 Totals round half up, per line.\n- [ ] §T12 Refunds round down.\n'
@@ -213,7 +215,16 @@ commit_change "prose added to a rule, with an unrelated test"
 expect_verdict fail "prose a rule file gains is not proven by an unrelated test"
 expect_output "the failure names the file" "plugins/shop/skills/checkout/SKILL.md"
 expect_output "the failure says why" "gain lines but no checklist box"
-expect_verdict pass "prose with a stated wording-only reason" 'wording-only: says when tax applies, a reminder with no new check'
+expect_verdict fail "new prose with only a wording-only reason is refused" 'wording-only: says when tax applies, a reminder with no new check'
+expect_output "it asks what holds the text" "held-by: <path>"
+expect_verdict pass "new prose held by a test the change adds to" $'wording-only: the script holds it\nheld-by: plugins/shop/tests/totals.test.sh'
+expect_output "the holder is echoed for the reviewer" "held by: plugins/shop/tests/totals.test.sh"
+expect_verdict pass "a held-by path in backticks, any case, with a carriage return" $'wording-only: the script holds it\nHeld-By: `plugins/shop/tests/totals.test.sh`\r'
+expect_verdict fail "a held-by file the change does not touch" $'wording-only: held elsewhere\nheld-by: plugins/shop/tests/old.test.sh'
+expect_output "it names the file" "not test or eval files the change adds lines to: plugins/shop/tests/old.test.sh"
+expect_verdict fail "one good holder beside one the change does not touch" $'wording-only: x\nheld-by: plugins/shop/tests/totals.test.sh\nheld-by: plugins/shop/tests/old.test.sh'
+expect_verdict fail "a held-by that names a rule file" $'wording-only: x\nheld-by: plugins/shop/skills/checkout/SKILL.md'
+expect_verdict fail "a held-by with no path" $'wording-only: x\nheld-by:'
 
 for boxless in agents/totals-gate.md rules/kc-working-agreement.md; do
   create_branch "prose-in-${boxless//\//-}"
