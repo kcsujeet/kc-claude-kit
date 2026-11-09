@@ -9,14 +9,11 @@ tests_dir=$(cd "$(dirname "$0")" && pwd)
 check="$(dirname "$tests_dir")/scripts/check-draft-format.sh"
 require_jq
 
-# Writes one draft with <body> (and an optional "long" reason) to <file>.
+# Writes one draft with <body> to <file>, plus the fields of the jq object <extra> (default: an
+# "n/a" run record, which an issue or suggestion needs).
 draft() {
-  local file=$1 body=$2 long=${3:-}
-  if [ -n "$long" ]; then
-    jq -n --arg body "$body" --arg long "$long" '[{path: "src/cart/total.ts", line: 12, body: $body, long: $long}]' > "$file"
-  else
-    jq -n --arg body "$body" '[{path: "src/cart/total.ts", line: 12, body: $body}]' > "$file"
-  fi
+  local file=$1 body=$2 extra=${3:-'{ran: "n/a: asks for no behaviour change"}'}
+  jq -n --arg body "$body" "[{path: \"src/cart/total.ts\", line: 12, body: \$body} + $extra]" > "$file"
 }
 
 # Runs the check on <file>; prints its output, or "clean" when it passes.
@@ -37,7 +34,7 @@ draft "$work_dir/cc-layout.json" $'**suggestion (non-blocking):**\nCould this re
 expect_eq "the Conventional Comments layout the skill's examples use is clean" clean "$(result "$work_dir/cc-layout.json")"
 
 long_body=$'**issue**:\nThis retries forever when the payment provider is down. Each retry opens a new charge attempt. A customer can be charged twice if the first one lands late. The provider docs say to reuse the idempotency key on retries.'
-draft "$work_dir/long-ok.json" "$long_body" "explains a double charge the author can't see from the diff"
+draft "$work_dir/long-ok.json" "$long_body" '{ran: "n/a: asks for an outcome, not code", long: "explains a double charge the author cannot see from the diff"}'
 expect_eq "four sentences with a stated reason in \"long\" are clean" clean "$(result "$work_dir/long-ok.json")"
 
 # --- slips the checklist exists for ---------------------------------------------------------
@@ -75,6 +72,22 @@ jq '.[0].code = "the author asked for the code"' "$work_dir/long-code.json" > "$
 expect_eq "three lines of code with a reason in \"code\" are clean" clean "$(result "$work_dir/long-code-ok.json")"
 draft "$work_dir/two-blocks.json" $'**suggestion**:\nThe two totals could share one sum.\n```ts\nconst total = sum(items)\n```\nAnd here.\n```ts\nconst shown = sum(items)\n\nconst kept = sum(items)\n```'
 expect_contains "code lines are counted across blocks, blank lines left out" "has 3 lines of code" "$(result "$work_dir/two-blocks.json")"
+
+# A change asked for in a review is run before it is asked for (kc-post-review's "Verified before
+# suggested", correctness §B15, verification §V8): an issue or suggestion carries a "ran" record.
+run_fix=$'**issue**:\nA stored draft opened before the storefront list loads gets the footer twice. Could the swap run only when the person picks another storefront?'
+draft "$work_dir/no-ran.json" "$run_fix" '{}'
+expect_contains "an issue with no \"ran\" is flagged" "asks for a change with no \"ran\"" "$(result "$work_dir/no-ran.json")"
+draft "$work_dir/no-ran-suggestion.json" $'**suggestion (non-blocking):**\nCould the fallback apply only to saved store credit?' '{}'
+expect_contains "a suggestion with no \"ran\" is flagged, in either label layout" "asks for a change with no \"ran\"" "$(result "$work_dir/no-ran-suggestion.json")"
+draft "$work_dir/blank-ran.json" "$run_fix" '{ran: "  "}'
+expect_contains "a blank \"ran\" is flagged" "asks for a change with no \"ran\"" "$(result "$work_dir/blank-ran.json")"
+draft "$work_dir/bare-na.json" "$run_fix" '{ran: "n/a"}'
+expect_contains "\"ran\": n/a with no reason is flagged" "n/a with no reason" "$(result "$work_dir/bare-na.json")"
+draft "$work_dir/ran.json" "$run_fix" '{ran: "applied on a scratch copy: new test for a draft opened before the list loads, and the suite, pass"}'
+expect_eq "an issue with a run record is clean" clean "$(result "$work_dir/ran.json")"
+draft "$work_dir/question-no-ran.json" $'**question:**\nIs the swap meant to run on the first pass too?' '{}'
+expect_eq "a question needs no \"ran\"" clean "$(result "$work_dir/question-no-ran.json")"
 
 printf 'not json' > "$work_dir/broken.json"
 status=0

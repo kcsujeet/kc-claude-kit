@@ -5,7 +5,10 @@
 # Usage: check-draft-format.sh <drafts.json>
 #   <drafts.json>  the JSON array of {path, line, body, ...} that build-comment-payloads.sh takes;
 #                  a draft may carry "long": "<reason>" when its length is the stated exception,
-#                  and "code": "<reason>" when its code is
+#                  and "code": "<reason>" when its code is; an `issue` or `suggestion` draft carries
+#                  "ran": what its asked-for change was run against and the result, or
+#                  "n/a: <why>" when it asks for no behaviour change, or asks for an outcome and a
+#                  test rather than code
 #
 # Each body must:
 #   - open with a label from kc-post-review's Labels table on its own line
@@ -16,7 +19,10 @@
 #   - outside code blocks, have at most 3 sentences and none over 25 words, unless "long" says why;
 #   - hold at most 2 non-blank lines of code across its code blocks, unless "code" says why: a
 #     comment says what is wrong and what should happen, and the author, who knows the code,
-#     writes the fix.
+#     writes the fix;
+#   - when it is an `issue` or a `suggestion`, carry a "ran" record: a change asked for in a
+#     review is code the author writes on the reviewer's word, so it is run before it is asked
+#     for, not only read (kc-post-review's "Verified before suggested"). An "n/a" needs a reason.
 #
 # Prints one line per problem (`draft <n> (<path>:<line>): <problem>`) and exits 1 when there is
 # any, 0 when every draft passes, 2 on a usage error or unreadable input.
@@ -67,6 +73,15 @@ perl -MJSON::PP -CS -e '
     while ($rest =~ /```[^\n]*\n(.*?)```/gs) { $code_lines += () = $1 =~ /^[ \t]*\S/mg }
     if ($code_lines > 2 && !(defined $draft->{code} && $draft->{code} =~ /\S/)) {
       push @found, "has $code_lines lines of code; describe the problem and the behaviour expected, with code only for a one- or two-line fix, or say why in \"code\"";
+    }
+    if ($first =~ /^\*\*(issue|suggestion)\b/) {
+      my $ran = $draft->{ran} // "";
+      $ran = "" if ref $ran;
+      if ($ran !~ /\S/) {
+        push @found, "asks for a change with no \"ran\": run it on a scratch copy and say what it passed, or \"n/a: <why>\"";
+      } elsif ($ran =~ m{^\s*n/?a\W*$}i) {
+        push @found, "says \"ran\": n/a with no reason; give the why";
+      }
     }
     for my $problem (@found) { print "$where: $problem\n"; $problems++ }
   }
