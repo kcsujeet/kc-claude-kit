@@ -1,8 +1,8 @@
 {
   "case": "plugins/kc-gates/evals/late-load-state",
-  "commit": "e95b2d3af4172be1477ef190d228f97e2245771b",
-  "case_hash": "7c1d324c6304e13005f9a45caadd9ad12c187ddb",
-  "plugins_hash": "31c11908d1b6e8c3e3828e3f6963bb926a39f38b",
+  "commit": "7aaf8b916c598f958411d1a0c2a5c627b2b75a29",
+  "case_hash": "d7f7e0aafde4e22f0e61b255d6b31b17be123cea",
+  "plugins_hash": "60e0d3a7b6583130fac84e8301cc80b3d5b229d5",
   "claude": "2.1.317 (Claude Code)",
   "model": "sonnet",
   "verdict": "ok",
@@ -19,7 +19,7 @@
           {
             "name": "verdict-failed",
             "passed": true,
-            "scored": true
+            "scored": false
           }
         ]
       }
@@ -31,28 +31,6 @@
           {
             "name": "flags-late-list",
             "passed": false,
-            "scored": true
-          },
-          {
-            "name": "verdict-failed",
-            "passed": false,
-            "scored": true
-          }
-        ]
-      }
-    ],
-    "base_rules": [
-      {
-        "error": null,
-        "graders": [
-          {
-            "name": "flags-late-list",
-            "passed": false,
-            "scored": true
-          },
-          {
-            "name": "verdict-failed",
-            "passed": true,
             "scored": true
           }
         ]
