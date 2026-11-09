@@ -24,7 +24,7 @@ A plugin here works in any repo that installs it, with nothing added to that rep
 
 ## Lessons
 
-Lessons arrive from the maintainer's other work: a correction, a review comment or a QA finding that would have been caught by a habit. Each becomes its own PR here, written to the two sections above, and is merged once its checks pass, so installs get it on their next update. Installs update only with auto-update on for this marketplace and, where `DISABLE_AUTOUPDATER=1` is set (desktop app sessions have been seen with it set), `FORCE_AUTOUPDATE_PLUGINS=1` in `~/.claude/settings.json`; the README's "Staying up to date" says how. kc-gates also updates installs during a session, and each plugin tells Claude when the session runs an older version of it than is installed, so Claude asks the person to type `/reload-plugins`. When a lesson still doesn't show up, check `claude plugin list` before assuming it loaded.
+Lessons arrive from the maintainer's other work: a correction, a review comment or a QA finding that would have been caught by a habit. Each becomes its own PR here, written to the two sections above, and is merged once its checks pass, so installs get it on their next update. Installs update only with auto-update on for this marketplace and, where `DISABLE_AUTOUPDATER=1` is set (desktop app sessions have been seen with it set), `FORCE_AUTOUPDATE_PLUGINS=1` in `~/.claude/settings.json`; `docs/reference.md`'s "Staying up to date" says how. kc-gates also updates installs during a session, and each plugin tells Claude when the session runs an older version of it than is installed, so Claude asks the person to type `/reload-plugins`. When a lesson still doesn't show up, check `claude plugin list` before assuming it loaded.
 
 Before writing a lesson:
 
@@ -51,4 +51,4 @@ Run `/kc-gates:kc-ready-for-review`: it walks `.claude/hand-off-checklist.md`, w
 
 ## Developing
 
-Layout, conventions and release steps are in the README's "Developing" section and in `docs/architecture.md`.
+Layout, conventions and release steps are in `docs/reference.md`'s "Developing" section and in `docs/architecture.md`. The README stays short: what each plugin and skill is for and how they connect; detail goes in `docs/reference.md`.
