@@ -109,13 +109,18 @@ reason=$(printf '%s' "$reason" | sed -E 's/[[:space:]]+$//')
 # The placeholder from the checklist and this script's own hint (`<why>`) is no reason.
 case "$reason" in "<"*">") reason="" ;; esac
 if [ -n "$reason" ]; then
-  # Lines the rule files gain and lose, blank ones aside: more gained than lost is new text.
-  rule_paths=()
-  while IFS= read -r path; do rule_paths+=("$path"); done <<< "$changed_rule_files"
-  rule_diff=$(git -c core.quotePath=false diff --unified=0 --no-color --no-ext-diff "$merge_base" HEAD -- "${rule_paths[@]}")
-  gained=$(printf '%s\n' "$rule_diff" | grep -E '^\+' | grep -vE '^\+\+\+ (b/|/dev/null)' | grep -cvE '^\+[[:space:]]*$' || true)
-  lost=$(printf '%s\n' "$rule_diff" | grep -E '^-' | grep -vE '^--- (a/|/dev/null)' | grep -cvE '^-[[:space:]]*$' || true)
-  if [ "$gained" -le "$lost" ]; then
+  # Lines each rule file gains and loses, blank ones aside: a file that gains more than it loses
+  # holds new text, whatever another file in the change lost. The files read are the ones with
+  # prose and no box; when the change's only gap is a box no test names, every changed rule file.
+  grown_files=""
+  while IFS= read -r path; do
+    [ -n "$path" ] || continue
+    rule_diff=$(git -c core.quotePath=false diff --unified=0 --no-color --no-ext-diff "$merge_base" HEAD -- "$path")
+    gained=$(printf '%s\n' "$rule_diff" | grep -E '^\+' | grep -vE '^\+\+\+ (b/|/dev/null)' | grep -cvE '^\+[[:space:]]*$' || true)
+    lost=$(printf '%s\n' "$rule_diff" | grep -E '^-' | grep -vE '^--- (a/|/dev/null)' | grep -cvE '^-[[:space:]]*$' || true)
+    [ "$gained" -le "$lost" ] || grown_files="$grown_files       $path (gains $gained lines, loses $lost)"$'\n'
+  done <<< "${prose_rule_files:-$changed_rule_files}"
+  if [ -z "$grown_files" ]; then
     echo "ok   rules changed, wording only: $reason"
     exit 0
   fi
@@ -130,7 +135,8 @@ if [ -n "$reason" ]; then
     echo "ok   rules changed, wording only: $reason; held by: $(printf '%s' "$holders" | tr '\n' ' ')"
     exit 0
   fi
-  echo "FAIL the rule files gain $gained lines and lose $lost, so this adds a rule, not only words."
+  echo "FAIL these rule files gain more lines than they lose, so this adds a rule, not only words:"
+  printf '%s' "$grown_files"
   if [ -n "$missing_holders" ]; then
     echo "     These held-by files are not test or eval files the change adds lines to:$missing_holders"
   fi

@@ -118,7 +118,7 @@ commit_change "a box with an eval that does not name it"
 expect_verdict fail "an added box no changed eval or test names"
 expect_output "the failure names the box" "naming them: §T2"
 expect_verdict fail "an unnamed box is new text: wording-only alone is refused" 'wording-only: moves an existing rule into a box'
-expect_output "it counts the lines" "gain 1 lines and lose 0"
+expect_output "it counts the lines" "rounding.md (gains 1 lines, loses 0)"
 expect_verdict pass "an unnamed box held by a file the change adds to" $'wording-only: the eval covers it\nheld-by: plugins/shop/evals/totals/shipping.md'
 
 create_branch box-rewritten
@@ -225,6 +225,16 @@ expect_output "it names the file" "not test or eval files the change adds lines 
 expect_verdict fail "one good holder beside one the change does not touch" $'wording-only: x\nheld-by: plugins/shop/tests/totals.test.sh\nheld-by: plugins/shop/tests/old.test.sh'
 expect_verdict fail "a held-by that names a rule file" $'wording-only: x\nheld-by: plugins/shop/skills/checkout/SKILL.md'
 expect_verdict fail "a held-by with no path" $'wording-only: x\nheld-by:'
+
+# Lines another rule file loses don't pay for the prose this one gains.
+create_branch prose-beside-a-removal
+echo "Include shipping." >> "$repo/plugins/shop/skills/checkout/SKILL.md"
+printf 'Round half up.\n' > "$repo/plugins/shop/skills/checkout/references/rounding.md"
+write_repo_file plugins/shop/tests/totals.test.sh 'grep total\n'
+commit_change "prose in one rule file, lines removed from another"
+expect_verdict fail "another file's removals don't make new prose a reword" 'wording-only: tidies the rounding reference'
+expect_output "it names the file that grew" "plugins/shop/skills/checkout/SKILL.md (gains 1 lines, loses 0)"
+expect_verdict pass "the grown file held by a test" $'wording-only: tidies\nheld-by: plugins/shop/tests/totals.test.sh'
 
 for boxless in agents/totals-gate.md rules/kc-working-agreement.md; do
   create_branch "prose-in-${boxless//\//-}"
