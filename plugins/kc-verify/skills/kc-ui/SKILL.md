@@ -40,6 +40,7 @@ Before opening the app, walk the design (mockup, prototype, spec) and write down
 - with and without each optional piece of data (no items, one item, many)
 - every drawer, dialog, menu and confirmation the screen opens, with its exact wording, in each state of filling it in: empty, one item picked, several picked, and editing an existing item (what appears after a pick is where drawers differ most)
 - what each choice in a create form adds to the form (picking one option can reveal a required field), and the state the new record lands in after create: switched on or off, which sections show
+- every record the screen edits both fresh and saved, then reopened after a reload (a draft, a saved form, an edited item, a cart): what loads back runs a path a new record never does, so a footer added on open can be added twice, or a default can overwrite what was saved
 
 Then put the app in each state and diff it against the design: which sections, fields, columns and actions appear, in which states, and what they do. Each difference in structure or behaviour is a finding, unless the ticket or the product owner decided otherwise; name that decision when you skip one.
 
@@ -144,7 +145,7 @@ Do not report a UI change verified until every box is ticked:
 - [ ] Every drawer and dialog was opened and filled in: empty, one item picked, several picked, and editing an existing item.
 - [ ] The app, running the change's own code (every branch it needs), was put in every state of the matrix and compared to the design section by section, not only the state you happened to land in; the code and the author's screenshots count for no state; and where a screen shows items matching a reference (a template, a guide, a total, a sheet), each item was measured against it in numbers, with the measurement kept as a test that fails when an item moves off it.
 - [ ] Every new or changed component was measured against its siblings on the same screen (title, subtitle, field labels, spacing, and each field's width against what it holds).
-- [ ] Every behaviour the change touches was set off every way a person can (click, hand scroll, keyboard, deep link, reload), while loading and once settled, on every page that shares the component.
+- [ ] Every behaviour the change touches was set off every way a person can (click, hand scroll, keyboard, deep link, reload), while loading and once settled, on a fresh record and on a saved one reopened after a reload, on every page that shares the component.
 - [ ] Each finding is about structure or behaviour; cosmetic differences where the app has an existing pattern (titles, labels, casing, icons) follow the app.
 - [ ] Loading, empty and error states were each seen.
 - [ ] A surface that finds or rewrites content people write was walked with every shape of that content (plain, line breaks, several blocks, formatting against words, links, images, tables, empty, none) through every action that moves it, not only the shape the change was about.

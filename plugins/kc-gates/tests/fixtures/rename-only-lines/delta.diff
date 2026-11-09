@@ -1,0 +1,38 @@
+diff --git a/src/orders/summary.ts b/src/orders/summary.ts
+--- a/src/orders/summary.ts
++++ b/src/orders/summary.ts
+@@ -10,8 +10,9 @@ export function summary(order: Order) {
+   const lines = order.lines
+-  const target = pickStore(order)
+-  const label = target ? target.name : 'Online'
++  const store = pickStore(order)
++  const label = store ? store.name : 'Online'
+-  const total = sum(lines)
++  const total = sum(lines) + order.shipping
+-  return `${label}: ${total}`
++  const shown = formatPrice(total)
++  return `${label}: ${shown}`
+ }
+@@ -30,3 +31,3 @@ export function count(order: Order) {
+-  return order.lines.length
++  return order.lines.size
+ }
+-const limit = 10
++const limit = 20
+diff --git a/src/orders/totals.ts b/src/orders/totals.ts
+--- a/src/orders/totals.ts
++++ b/src/orders/totals.ts
+@@ -5,9 +5,8 @@ export function totals(order: Order) {
+-  const net = gross
++  const total = gross - discount
+   const keep = 1
+-  const twice = price + price
++  const double = cost + amount
+   const keep2 = 2
+-  const label = order.name
++  const title = order?.name
+   const keep3 = 3
+-  const first = 1
+-  const second = 2
++  const only = 1
+ }

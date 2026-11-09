@@ -6,7 +6,7 @@
 # sender changes. A saved storefront draft, whose body already ends with the storefront's footer,
 # opened before the list loads: the first refresh signs it as the shop and appends the shop's
 # footer; the next, with the list, swaps that for the storefront's, so it shows twice. The branch
-# also adds subjectLine, which handles its edge cases and draws no finding.
+# also adds longestFooter, which handles an empty list and draws no finding.
 set -euo pipefail
 
 git init -q -b main
@@ -83,16 +83,14 @@ export class DraftEditor {
 }
 TS
 
-# Clean: a subject line that handles a missing order number and a long storefront name.
-cat > src/drafts/subject.ts <<'TS'
-import type { OrderDraft, Sender } from './types'
+# Clean: the longest footer among some senders, handling an empty list.
+cat > src/drafts/footers.ts <<'TS'
+import type { Sender } from './types'
 
-const MAX_SENDER_LENGTH = 40
-
-export function subjectLine(draft: OrderDraft, sender: Sender): string {
-  const name = sender.name.length > MAX_SENDER_LENGTH ? `${sender.name.slice(0, MAX_SENDER_LENGTH - 1)}…` : sender.name
-  return draft.orderNumber ? `Your order ${draft.orderNumber} from ${name}` : `Your order from ${name}`
+export function longestFooter(senders: Sender[]): string | null {
+  if (senders.length === 0) return null
+  return senders.reduce((longest, sender) => (sender.footer.length > longest.length ? sender.footer : longest), senders[0].footer)
 }
 TS
 git add -A
-git commit -q -m "Keep an order email's footer in step with its sender; add its subject line"
+git commit -q -m "Keep an order email's footer in step with its sender; add longestFooter"
