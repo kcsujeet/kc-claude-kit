@@ -198,6 +198,15 @@ expect_write refused "a box with no evidence is refused" "$fixed_head" --rounds 
 expect_said "it counts the bare box" "GATE: naming has 1 box(es) with no verdict or no evidence"
 
 build_pass
+printf 'GATE: naming\nSTATUS: PASS\nBOXES:\n- [PASS] §N1 Every new name conforms. Each unit, read:\n  - shop/total.sh `order_total` matches `order_tax`\n- [PASS] §N2: 0 hits\nFINDINGS:\n- none\n' > "$pass_dir/round-1/verdicts/naming.txt"
+expect_write written "a box whose evidence is in bullets under it is no bad box" "$fixed_head" --rounds 1 --open 0 --pass "$pass_dir"
+
+build_pass
+printf 'GATE: naming\nSTATUS: PASS\nBOXES:\n- [PASS] §N1 Every new name conforms:\n- [PASS] §N2: 0 hits\nFINDINGS:\n  - none\n' > "$pass_dir/round-1/verdicts/naming.txt"
+expect_write refused "a bare box followed by the next box, not bullets, is refused" "$fixed_head" --rounds 1 --open 0 --pass "$pass_dir"
+expect_said "it counts the bare box before the next one" "GATE: naming has 1 box(es) with no verdict or no evidence"
+
+build_pass
 printf 'GATE: naming\nSTATUS: PASS\nBOXES:\n- [PASS] §N1: 0 hits in shop/total.sh\n  and shop/tax.sh\n\n- [PASS] §N2: 0 hits\nFINDINGS:\n' > "$pass_dir/round-1/verdicts/naming.txt"
 expect_write written "a box whose evidence wraps, or a blank line between boxes, is no bad box" "$fixed_head" --rounds 1 --open 0 --pass "$pass_dir"
 
