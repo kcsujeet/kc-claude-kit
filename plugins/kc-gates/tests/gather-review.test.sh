@@ -98,6 +98,31 @@ case "$matching_output" in
   *) record "pr: no FETCH when the local HEAD is the PR head" ok ;;
 esac
 
+# --- a re-review: --since saves only what changed from the head reviewed last time ---------
+since_output=$(cd "$repo" && bash "$gather" 12 --since "$base_sha" --out-dir "$work_dir/out-since")
+expect_contains "since: meta.env names the commit it started from" "SINCE=$base_sha" "$since_output"
+expect_eq "since: the changed files are the delta's, not the whole PR's" "a.txt
+b.txt" "$(cat "$work_dir/out-since/changed-files.txt")"
+expect_contains "since: the diff is the delta" "+two" "$(cat "$work_dir/out-since/review.diff")"
+expect_eq "since: the whole PR's diff is not saved" "" "$(grep -F 'src/widgets' "$work_dir/out-since/review.diff" || true)"
+
+side_sha=$(git -C "$repo" commit-tree -m side "$(git -C "$repo" rev-parse 'main^{tree}')")
+rebased_output=$(cd "$repo" && bash "$gather" 12 --since "$side_sha" --out-dir "$work_dir/out-rebased")
+expect_contains "since: a commit outside the head's history falls back to the whole diff" "the branch was rebased" "$rebased_output"
+expect_contains "since: the fallback saves the whole PR" "src/widgets/list.ts" "$(cat "$work_dir/out-rebased/changed-files.txt")"
+case "$rebased_output" in
+  *SINCE=*) record "since: no SINCE line on a fallback" fail "$rebased_output" ;;
+  *) record "since: no SINCE line on a fallback" ok ;;
+esac
+
+missing_output=$(cd "$repo" && bash "$gather" 12 --since 2222222222222222222222222222222222222222 --out-dir "$work_dir/out-missing")
+expect_contains "since: a commit the clone lacks falls back" "is not in this clone" "$missing_output"
+
+use_gh_fixtures "$fixtures"
+unfetched_output=$(cd "$repo" && bash "$gather" 12 --since "$base_sha" --out-dir "$work_dir/out-unfetched")
+expect_contains "since: an unfetched PR head falls back and says to fetch" "run the FETCH command" "$unfetched_output"
+use_gh_fixtures "$matching_fixtures"
+
 # --- usage errors -------------------------------------------------------------
 check_status() {
   local label=$1 expected=$2 status
@@ -113,5 +138,7 @@ check_status "usage: a non-numeric PR exits 2" 2 abc
 check_status "usage: a PR and --branch together exit 2" 2 12 --branch
 check_status "usage: an unknown base exits 2" 2 --branch no-such-branch
 check_status "usage: --out-dir without a value exits 2" 2 --branch --out-dir
+check_status "usage: --since with --branch exits 2" 2 --branch --since abc
+check_status "usage: --since without a value exits 2" 2 12 --since
 
 finish

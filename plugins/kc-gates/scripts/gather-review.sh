@@ -2,11 +2,18 @@
 # Step 1 of kc-code-review: saves the diff under review, its changed-file list and
 # its metadata to one directory, so every gate reads the same files.
 #
-# Usage: gather-review.sh (<pr-number> | --branch [<base>]) [--out-dir <dir>]
+# Usage: gather-review.sh (<pr-number> [--since <sha>] | --branch [<base>]) [--out-dir <dir>]
 #
 #   <pr-number>      PR mode: `gh pr view <n> --json headRefOid,baseRefName,
 #                    title,files,url` and `gh pr diff <n>`, for the repository
 #                    of the current directory.
+#   --since <sha>    PR mode, for a re-review: save only what changed from <sha>,
+#                    the head reviewed last time, to the PR's head, so the
+#                    gates read the new commits and not the whole PR again.
+#                    Needs both commits in the local clone and <sha> in the
+#                    head's history; otherwise (not fetched yet, or the author
+#                    rebased) it saves the whole diff and adds SINCE_SKIPPED=
+#                    with the reason. When used, meta.env has SINCE=<sha>.
 #   --branch [base]  Branch mode: `git diff <base>...HEAD` in the current repo.
 #                    The base is <base> when given, else origin/HEAD, else
 #                    main, else master.
@@ -25,7 +32,7 @@ set -euo pipefail
 
 script_name=$(basename "$0")
 usage() {
-  echo "usage: $script_name (<pr-number> | --branch [<base>]) [--out-dir <dir>]" >&2
+  echo "usage: $script_name (<pr-number> [--since <sha>] | --branch [<base>]) [--out-dir <dir>]" >&2
   exit 2
 }
 fail() {
@@ -49,6 +56,8 @@ pr_number=""
 branch_mode=false
 base_arg=""
 out_dir=""
+since_sha=""
+since_skipped=""
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --branch)
@@ -57,6 +66,11 @@ while [ "$#" -gt 0 ]; do
         base_arg=$2
         shift
       fi
+      ;;
+    --since)
+      if [ "$#" -lt 2 ] || [ -z "$2" ]; then usage; fi
+      since_sha=$2
+      shift
       ;;
     --out-dir)
       if [ "$#" -lt 2 ] || [ -z "$2" ]; then usage; fi
@@ -73,6 +87,7 @@ while [ "$#" -gt 0 ]; do
 done
 if [ "$branch_mode" = true ] && [ -n "$pr_number" ]; then usage; fi
 if [ "$branch_mode" = false ] && [ -z "$pr_number" ]; then usage; fi
+if [ "$branch_mode" = true ] && [ -n "$since_sha" ]; then usage; fi
 
 tmp_root=${TMPDIR:-/tmp}
 tmp_root=${tmp_root%/}
@@ -122,6 +137,19 @@ else
   if [ "$local_head" != "$head_sha" ]; then
     fetch_command="git fetch origin pull/$pr_number/head:pr-$pr_number"
   fi
+  if [ -n "$since_sha" ]; then
+    if ! git cat-file -e "$head_sha^{commit}" 2>/dev/null; then
+      since_skipped="the PR's head is not in this clone yet: run the FETCH command, then gather again"
+    elif ! git cat-file -e "$since_sha^{commit}" 2>/dev/null; then
+      since_skipped="$since_sha is not in this clone (rebased away, or never fetched)"
+    elif ! git merge-base --is-ancestor "$since_sha" "$head_sha" 2>/dev/null; then
+      since_skipped="$since_sha is not in the head's history: the branch was rebased"
+    else
+      since_sha=$(git rev-parse "$since_sha^{commit}")
+      git diff --no-color --no-ext-diff --src-prefix=a/ --dst-prefix=b/ "$since_sha" "$head_sha" > "$diff_tmp"
+      git diff --no-ext-diff --name-only "$since_sha" "$head_sha" > "$files_tmp"
+    fi
+  fi
 fi
 
 [ -n "$out_dir" ] || out_dir="$tmp_root/kc-review-$head_sha"
@@ -144,6 +172,11 @@ cp "$files_tmp" "$changed_files"
   print_env_line DIFF_FILE "$diff_file"
   print_env_line CHANGED_FILES "$changed_files"
   if [ -n "$fetch_command" ]; then print_env_line FETCH "$fetch_command"; fi
+  if [ -n "$since_skipped" ]; then
+    print_env_line SINCE_SKIPPED "$since_skipped"
+  elif [ -n "$since_sha" ]; then
+    print_env_line SINCE "$since_sha"
+  fi
 } > "$meta_file"
 
 cat "$meta_file"
