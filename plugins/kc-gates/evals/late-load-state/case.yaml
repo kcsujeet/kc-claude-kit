@@ -1,6 +1,6 @@
 schema_version: "1.1"
 name: late-load-state
-description: A change that breaks only when an input arrives late, the state a reviewer's table leaves out when it lists values but not when they arrive (correctness §B15). A branch keeps an order email's footer in step with its sender, swapping the old footer for the new one whenever the sender changes. A saved draft opened before the storefront list loads is signed as the shop on the first pass, so it gains the shop's footer; when the list arrives its sender "changes" to the storefront and that footer is swapped for the storefront's, which the body already ends with, so the storefront footer shows twice. The review fails and flags the editor's swap on the late list.
-tags: [review, gate, correctness]
+description: A guard for what the kit already does, a review catches a change that breaks only when an input arrives late, the state a reviewer's table leaves out when it lists values but not when they arrive (correctness §B15). A branch keeps an order email's footer in step with its sender, swapping the old footer for the new one whenever the sender changes. A saved draft opened before the storefront list loads is signed as the shop on the first pass, so it gains the shop's footer; when the list arrives its sender "changes" to the storefront and that footer is swapped for the storefront's, which the body already ends with, so the storefront footer shows twice. The review fails and flags the editor's swap on the late list.
+tags: [review, gate, correctness, guard]
 context:
   scaffold_script: setup.sh
