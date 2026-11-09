@@ -1,6 +1,0 @@
-schema_version: "1.1"
-name: qa-reopens-saved
-description: QA walks a saved record reopened after a reload, not only a fresh one (kc-ui §UI1). An order email page adds the sender's footer and swaps it when the storefront changes, and every fresh path (new email, storefront switch, save) looks right. A saved draft reopened after a reload gains the footer again, so it shows twice, and switching storefront then swaps only one of them. The QA report names the doubled footer on the reopened draft.
-tags: [qa, ui, positive, lesson]
-context:
-  scaffold_script: setup.sh

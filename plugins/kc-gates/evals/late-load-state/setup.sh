@@ -6,7 +6,8 @@
 # sender changes. A saved storefront draft, whose body already ends with the storefront's footer,
 # opened before the list loads: the first refresh signs it as the shop and appends the shop's
 # footer; the next, with the list, swaps that for the storefront's, so it shows twice. The branch
-# also adds longestFooter, which handles an empty list and draws no finding.
+# also adds withFooter, which the editor uses and which handles trailing whitespace and a body that
+# already ends with the footer; it draws no finding.
 set -euo pipefail
 
 git init -q -b main
@@ -49,7 +50,16 @@ git commit -q -m "Add order drafts and their sender"
 
 git checkout -q -b feature/sender-footer
 
+cat > src/drafts/footers.ts <<'TS'
+/** Ends a body with a footer once, whatever whitespace the body ends with. */
+export function withFooter(body: string, footer: string): string {
+  const trimmed = body.trimEnd()
+  return trimmed.endsWith(footer) ? trimmed : `${trimmed}\n\n${footer}`
+}
+TS
+
 cat > src/drafts/editor.ts <<'TS'
+import { withFooter } from './footers'
 import { senderFor } from './sender'
 import type { OrderDraft, Sender, Shop, Storefront } from './types'
 
@@ -66,9 +76,7 @@ export class DraftEditor {
   refresh(storefronts: Storefront[] | undefined): OrderDraft {
     const next = senderFor(this.draft, storefronts, this.shop)
     if (this.sender === null) {
-      if (!this.draft.body.endsWith(next.footer)) {
-        this.draft = { ...this.draft, body: `${this.draft.body}\n\n${next.footer}` }
-      }
+      this.draft = { ...this.draft, body: withFooter(this.draft.body, next.footer) }
     } else if (next.footer !== this.sender.footer) {
       this.draft = { ...this.draft, body: this.draft.body.replace(this.sender.footer, next.footer) }
     }
@@ -82,15 +90,5 @@ export class DraftEditor {
   }
 }
 TS
-
-# Clean: the longest footer among some senders, handling an empty list.
-cat > src/drafts/footers.ts <<'TS'
-import type { Sender } from './types'
-
-export function longestFooter(senders: Sender[]): string | null {
-  if (senders.length === 0) return null
-  return senders.reduce((longest, sender) => (sender.footer.length > longest.length ? sender.footer : longest), senders[0].footer)
-}
-TS
 git add -A
-git commit -q -m "Keep an order email's footer in step with its sender; add longestFooter"
+git commit -q -m "Keep an order email's footer in step with its sender; add withFooter"
