@@ -301,7 +301,7 @@ The deterministic steps are scripts, each with fixture tests, so the model runs 
 
 | Script | Does |
 |---|---|
-| `gather-review.sh (<pr> [--since <sha>] \| --branch [<base>])` | Saves the diff and changed-file list for a PR or a local branch (base: `origin/HEAD`, then `main`, then `master`) and prints `meta.env` with `HEAD_SHA`, `BASE`, `TITLE`, `DIFF_FILE` and `CHANGED_FILES`; prints the fetch command when the local checkout is not the PR head |
+| `gather-review.sh (<pr> [--since <sha> \| --whole] \| --branch [<base>])` | Saves the diff and changed-file list for a PR or a local branch (base: `origin/HEAD`, then `main`, then `master`) and prints `meta.env` with `HEAD_SHA`, `BASE`, `TITLE`, `DIFF_FILE` and `CHANGED_FILES`; prints the fetch command when the local checkout is not the PR head |
 | `scope-facts.sh <pr>` | Prints the facts the scope checks need: author, base, commit and file counts, the author's other open PRs, and each linked issue, with the PR description and issue bodies saved to files |
 | `review-threads.sh <pr> [--mine <login>]` | Prints every review comment thread, root then replies, and with `--mine` marks the threads you started and whether the author replied after you (requires `jq`) |
 | `check-gate-fixes.sh <verdicts-dir>` | Used by `kc-ready-for-review`: lists which of the gates' edits are mechanical (applied as written) and which are the caller's to write from the finding |

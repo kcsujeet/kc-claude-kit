@@ -2,7 +2,7 @@
 # Step 1 of kc-code-review: saves the diff under review, its changed-file list and
 # its metadata to one directory, so every gate reads the same files.
 #
-# Usage: gather-review.sh (<pr-number> [--since <sha>] | --branch [<base>]) [--out-dir <dir>]
+# Usage: gather-review.sh (<pr-number> [--since <sha> | --whole] | --branch [<base>]) [--out-dir <dir>]
 #
 #   <pr-number>      PR mode: `gh pr view <n> --json headRefOid,baseRefName,
 #                    title,files,url` and `gh pr diff <n>`, for the repository
@@ -10,6 +10,11 @@
 #   --since <sha>    PR mode, for a re-review: save only what changed from <sha>,
 #                    the head reviewed last time, to the PR's head, so the
 #                    gates read the new commits and not the whole PR again.
+#                    Without it, the script looks for the last review the
+#                    signed-in gh user submitted on the PR and uses the commit
+#                    that review read, so a re-review is a delta without anyone
+#                    remembering to ask; a first review finds none and saves
+#                    the whole diff. --whole turns the lookup off.
 #                    Needs both commits in the local clone and <sha> in the
 #                    head's history; otherwise (not fetched yet, or the author
 #                    rebased) it saves the whole diff and adds SINCE_SKIPPED=
@@ -32,7 +37,7 @@ set -euo pipefail
 
 script_name=$(basename "$0")
 usage() {
-  echo "usage: $script_name (<pr-number> [--since <sha>] | --branch [<base>]) [--out-dir <dir>]" >&2
+  echo "usage: $script_name (<pr-number> [--since <sha> | --whole] | --branch [<base>]) [--out-dir <dir>]" >&2
   exit 2
 }
 fail() {
@@ -58,6 +63,7 @@ base_arg=""
 out_dir=""
 since_sha=""
 since_skipped=""
+whole_diff=false
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --branch)
@@ -72,6 +78,7 @@ while [ "$#" -gt 0 ]; do
       since_sha=$2
       shift
       ;;
+    --whole) whole_diff=true ;;
     --out-dir)
       if [ "$#" -lt 2 ] || [ -z "$2" ]; then usage; fi
       out_dir=$2
@@ -87,7 +94,8 @@ while [ "$#" -gt 0 ]; do
 done
 if [ "$branch_mode" = true ] && [ -n "$pr_number" ]; then usage; fi
 if [ "$branch_mode" = false ] && [ -z "$pr_number" ]; then usage; fi
-if [ "$branch_mode" = true ] && [ -n "$since_sha" ]; then usage; fi
+if [ "$branch_mode" = true ] && { [ -n "$since_sha" ] || [ "$whole_diff" = true ]; }; then usage; fi
+if [ "$whole_diff" = true ] && [ -n "$since_sha" ]; then usage; fi
 
 tmp_root=${TMPDIR:-/tmp}
 tmp_root=${tmp_root%/}
@@ -136,6 +144,16 @@ else
   local_head=$(git rev-parse HEAD 2>/dev/null || true)
   if [ "$local_head" != "$head_sha" ]; then
     fetch_command="git fetch origin pull/$pr_number/head:pr-$pr_number"
+  fi
+  if [ -z "$since_sha" ] && [ "$whole_diff" = false ]; then
+    # The commit the signed-in user's last review of this PR read, when there is
+    # one and the head has moved since. No login or no review: a first review.
+    reviewer=$(gh api user --jq .login 2>/dev/null || true)
+    if [ -n "$reviewer" ]; then
+      since_sha=$(gh pr view "$pr_number" --json reviews \
+        --jq "[.reviews[] | select(.author.login == \"$reviewer\") | .commit.oid] | last // empty" 2>/dev/null || true)
+      if [ "$since_sha" = "$head_sha" ]; then since_sha=""; fi
+    fi
   fi
   if [ -n "$since_sha" ]; then
     if ! git cat-file -e "$head_sha^{commit}" 2>/dev/null; then
