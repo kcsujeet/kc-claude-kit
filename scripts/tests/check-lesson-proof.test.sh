@@ -227,6 +227,7 @@ expect_verdict fail "a held-by that names a rule file" $'wording-only: x\nheld-b
 expect_verdict fail "a held-by with no path" $'wording-only: x\nheld-by:'
 
 # Lines another rule file loses don't pay for the prose this one gains.
+rm -f "$repo/.body"
 create_branch prose-beside-a-removal
 echo "Include shipping." >> "$repo/plugins/shop/skills/checkout/SKILL.md"
 printf 'Round half up.\n' > "$repo/plugins/shop/skills/checkout/references/rounding.md"
