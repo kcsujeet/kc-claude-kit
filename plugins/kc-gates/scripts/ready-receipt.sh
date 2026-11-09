@@ -112,7 +112,7 @@ summarize_blocks() {
     /^STATUS:/ { settle_bare_box(0); status = strip_label($0); next }
     /^BOXES:/ { settle_bare_box(0); section = "boxes"; next }
     /^FINDINGS:/ { settle_bare_box(0); section = "findings"; next }
-    awaiting_evidence && /^[[:space:]]+- [^[]/ { settle_bare_box(1); next }
+    awaiting_evidence && /^[[:space:]]+- / && !/^[[:space:]]+- \[(PASS|FAIL|N\/A)\]/ { settle_bare_box(1); next }
     section == "boxes" && /^[[:space:]]*- \[/ {
       settle_bare_box(0)
       line = $0

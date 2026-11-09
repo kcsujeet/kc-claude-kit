@@ -66,6 +66,19 @@ expect_contains "policy file: permissions risk" "risk: authentication or permiss
 make_case "$work_dir/pay" 'x = 1' src/checkout/summary.ts
 expect_contains "checkout folder: payments risk" "risk: payments (src/checkout/summary.ts)" "$(size_of "$work_dir/pay")"
 
+# A public or guest path makes kc-ready-for-review's signed-out walk required (§H6).
+make_case "$work_dir/guest-flag" '  const canEditFooter = !isPublic && !locked' src/orders/OrderFooter.tsx
+expect_contains "an added public flag: signed-out walk" "risk: public or guest path, walk it signed out in a fresh browser profile (const canEditFooter = !isPublic && !locked)" "$(size_of "$work_dir/guest-flag")"
+
+make_case "$work_dir/guest-route" 'x = 1' src/app/public/orders/page.tsx
+expect_contains "a page under a public route: signed-out walk" "risk: public or guest path, walk it signed out in a fresh browser profile (src/app/public/orders/page.tsx)" "$(size_of "$work_dir/guest-route")"
+
+make_case "$work_dir/public-spec" 'x = 1' src/app/public/orders/page.test.tsx
+expect_contains "a test under a public route: no signed-out walk" "risk: none" "$(size_of "$work_dir/public-spec")"
+
+make_case "$work_dir/public-asset" 'x' public/images/logo.svg
+expect_contains "a static asset under public/: no signed-out walk" "risk: none" "$(size_of "$work_dir/public-asset")"
+
 make_case "$work_dir/drop" '    remove_column :orders, :legacy_code' lib/tasks/cleanup.rb
 expect_contains "added remove_column: deletes data" "risk: deletes data (remove_column :orders, :legacy_code)" "$(size_of "$work_dir/drop")"
 

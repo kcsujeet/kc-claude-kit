@@ -16,7 +16,8 @@
 #   MUTATION=run|skip
 #   files: <n> counted (<n> test, locale or generated left out)
 #   lines: <n> changed in counted files
-#   risk: none | <reason>        one line per sensitive hit
+#   risk: none | <reason>        one line per sensitive hit; a public or guest path or flag gets
+#                                one too, which makes the QA step walk the page signed out
 #   mutation: <why>
 #
 # Small means at most KC_SMALL_FILES files (default 5) and KC_SMALL_LINES changed lines
@@ -92,6 +93,11 @@ deleted_file=$(awk '/^--- a\// { from = substr($0, 7) } /^\+\+\+ \/dev\/null/ { 
 [ -z "$deleted_file" ] || risk_lines+=("risk: deletes a file ($deleted_file)")
 data_delete=$(printf '%s\n' "$added_code" | grep -E -i '\b(drop_table|remove_column|drop table|drop column|delete from|truncate|destroy_all|delete_all)\b' | head -n 1 | sed -E 's/^[[:space:]]+//' | cut -c1-80 || true)
 [ -z "$data_delete" ] || risk_lines+=("risk: deletes data ($data_delete)")
+# A page a signed-out visitor reaches is walked signed out in a fresh browser profile.
+public_path=$(grep -vE "$uncounted_paths" "$changed_files" | grep -E '(^|/)(public|guests?|anonymous)/.*\.(ts|tsx|js|jsx|vue|svelte|rb|erb|py|go|php|html)$' | head -n 1 || true)
+public_code=$(printf '%s\n' "$added_code" | grep -E '\b(is_?[Pp]ublic|is_?[Gg]uest|guest_?[Tt]oken|[Aa]nonymous|[Uu]nauthenticated|[Ss]igned_?[Oo]ut|AllowAnonymous|permitAll)\b|skip_before_action[[:space:]]+:authenticate|/public/' | head -n 1 | sed -E 's/^[[:space:]]+//' | cut -c1-80 || true)
+public_hit=${public_path:-$public_code}
+[ -z "$public_hit" ] || risk_lines+=("risk: public or guest path, walk it signed out in a fresh browser profile ($public_hit)")
 
 code_lines=$(printf '%s\n' "$added_code" | grep -vE '^[[:space:]]*(#|//|/\*|\*|--)' || true)
 branch_line=$(printf '%s\n' "$code_lines" | grep -E '\b(if|elsif|elif|else|unless|case|when|switch|while|until|rescue|catch|except|guard)\b|&&|\|\||\?\?|[[:space:]]\?[[:space:]]|\b(and|or)\b[[:space:]]' | head -n 1 | sed -E 's/^[[:space:]]+//' | cut -c1-80 || true)
