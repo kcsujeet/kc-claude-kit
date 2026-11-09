@@ -88,12 +88,20 @@ print_verdicts() {
 # Prints one line per block in the verdict text on stdin:
 #   block<TAB><GATE name|SCOPE><TAB><status><TAB><boxes with evidence><TAB><malformed boxes>
 # and one line per SCOPE box: scope<TAB><id><TAB><verdict><TAB><evidence>.
-# Code fences around a pasted block are ignored.
+# Code fences around a pasted block are ignored. A box whose line ends at its
+# colon counts when its evidence follows as indented bullets under it.
 summarize_blocks() {
   awk '
     function trim(s) { sub(/^[[:space:]]+/, "", s); sub(/[[:space:]]+$/, "", s); return s }
     function strip_label(s) { sub(/^[A-Z]+:/, "", s); return trim(s) }
+    function settle_bare_box(has_nested_evidence) {
+      if (!awaiting_evidence) return
+      if (has_nested_evidence) boxes++
+      else bad++
+      awaiting_evidence = 0
+    }
     function emit_block() {
+      settle_bare_box(0)
       if (kind != "") printf "block\t%s\t%s\t%d\t%d\n", name, (status == "" ? "-" : status), boxes, bad
       kind = ""
     }
@@ -101,10 +109,12 @@ summarize_blocks() {
     /^GATE:/ { emit_block(); kind = "gate"; name = strip_label($0); status = ""; boxes = 0; bad = 0; section = ""; next }
     /^SCOPE:/ { emit_block(); kind = "scope"; name = "SCOPE"; status = "-"; boxes = 0; bad = 0; section = "boxes"; next }
     kind == "" { next }
-    /^STATUS:/ { status = strip_label($0); next }
-    /^BOXES:/ { section = "boxes"; next }
-    /^FINDINGS:/ { section = "findings"; next }
+    /^STATUS:/ { settle_bare_box(0); status = strip_label($0); next }
+    /^BOXES:/ { settle_bare_box(0); section = "boxes"; next }
+    /^FINDINGS:/ { settle_bare_box(0); section = "findings"; next }
+    awaiting_evidence && /^[[:space:]]+- / && !/^[[:space:]]+- \[(PASS|FAIL|N\/A)\]/ { settle_bare_box(1); next }
     section == "boxes" && /^[[:space:]]*- \[/ {
+      settle_bare_box(0)
       line = $0
       sub(/^[[:space:]]*- \[/, "", line)
       verdict = substr(line, 1, index(line, "]") - 1)
@@ -122,6 +132,8 @@ summarize_blocks() {
       if (is_known_verdict && has_id && has_evidence) {
         boxes++
         if (kind == "scope") printf "scope\t%s\t%s\t%s\n", id, verdict, evidence
+      } else if (is_known_verdict && has_id && kind == "gate") {
+        awaiting_evidence = 1
       } else {
         bad++
       }
