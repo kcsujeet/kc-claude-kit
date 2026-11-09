@@ -23,18 +23,25 @@ mkdir -p "$stub_bin" "$results"
 cat > "$stub_bin/claude" <<'STUB'
 #!/usr/bin/env bash
 # Stand-in for claude: `--version` prints one; `plugin eval` logs its arguments and copies
-# $STUB_RESULTS/<case>.json to the --json path, when there is one.
+# $STUB_RESULTS/<case>.json to the --json path, when there is one. A run with `--ablation none`,
+# the one made with the change's rule edits taken out, gets <case>.base.json instead, and logs the
+# rule file it sees, so a test can tell which text the run read.
 if [ "${1:-}" = --version ]; then echo "9.9.9 (Claude Code)"; exit 0; fi
 printf '%s\n' "$*" >> "$STUB_CALLS"
-case_name="" json=""
+case_name="" json="" suffix=""
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --case) case_name=$2; shift 2 ;;
     --json) json=$2; shift 2 ;;
+    --ablation) [ "$2" != none ] || suffix=.base; shift 2 ;;
     *) shift ;;
   esac
 done
-[ ! -f "$STUB_RESULTS/$case_name.json" ] || cp "$STUB_RESULTS/$case_name.json" "$json"
+if [ -n "$suffix" ]; then
+  { cat plugins/shop/skills/checkout/SKILL.md 2>/dev/null || echo "no rule file"; } > "$STUB_CALLS.rule-seen"
+  ls plugins/shop/skills/checkout/extra.md > "$STUB_CALLS.extra-seen" 2>&1 || true
+fi
+[ ! -f "$STUB_RESULTS/$case_name$suffix.json" ] || cp "$STUB_RESULTS/$case_name$suffix.json" "$json"
 STUB
 chmod +x "$stub_bin/claude"
 
@@ -335,6 +342,65 @@ commit_change "a case edited on main after the branch"
 git -C "$repo" checkout -q base-moves-on
 run_script --check
 expect_output "a case edited on the base after the branch isn't checked" "no eval case changed"
+
+# A change that edits a rule beside its case: the case runs a third time with the rule edits
+# taken out, and must fail there.
+write_base_result() {
+  printf '{"cases":[{"name":"totals","arms":{"with":[{"error":%s,"graders":[{"name":"finds-it","passed":%s,"scored":true},{"name":"skill-fired","passed":true,"scored":false}]}]}}]}\n' \
+    "${2:-null}" "$1" > "$results/totals.base.json"
+}
+create_branch rule-and-case
+write_repo_file plugins/shop/skills/checkout/SKILL.md 'A total includes tax and shipping.\n'
+write_repo_file plugins/shop/skills/checkout/extra.md 'A new rule file.\n'
+write_repo_file plugins/shop/evals/totals/graders/finds-it.md 'pattern: shipping\n# new\n'
+commit_change "a rule edit with its case"
+write_result totals true false
+write_base_result false
+run_script
+expect_status "a case that fails with the rule edits taken out passes" 0
+expect_output "it says all three" "fails without it, and fails with this change's rule edits taken out"
+expect_calls "two eval runs" 2
+if [ "$(cat "$calls.rule-seen")" = "A total includes tax." ]; then pass "the third run reads the base's rule text"; else fail "the third run reads the base's rule text (saw: $(cat "$calls.rule-seen"))"; fi
+if grep -q "No such file" "$calls.extra-seen"; then pass "a rule file the change adds is gone in the third run"; else fail "a rule file the change adds is gone in the third run (saw: $(cat "$calls.extra-seen"))"; fi
+if [ "$(cat "$repo/plugins/shop/skills/checkout/SKILL.md")" = "A total includes tax and shipping." ]; then pass "the checkout keeps the change"; else fail "the checkout keeps the change"; fi
+expect_record "the record keeps the third run" plugins/shop/evals/totals/proof.json '.runs.base_rules[0].graders[0].passed' false
+if [ -z "$(git -C "$repo" worktree list | sed 1d)" ]; then pass "the scratch worktree is removed"; else fail "the scratch worktree is removed"; fi
+reset_tree
+
+write_base_result true
+run_script
+expect_status "a case that still passes with the rule edits taken out fails" 1
+expect_output "it says the case does not prove them" "every grader still passes, so the case does not prove them"
+expect_record "the record says why" plugins/shop/evals/totals/proof.json .verdict "with this change's rule edits taken out every grader still passes, so the case does not prove them; a case that holds what the kit already did is tagged guard"
+reset_tree
+
+write_base_result false '"boom"'
+run_script
+expect_status "a third run that errored fails" 1
+expect_output "it says so" "the run without this change's rule edits errored"
+reset_tree
+
+rm "$results/totals.base.json"
+run_script
+expect_status "a third run with no result fails" 1
+expect_output "it says so" "rule edits wrote no result"
+reset_tree
+
+write_result totals false false
+write_base_result false
+run_script
+expect_calls "a case that fails with the plugin gets no third run" 1
+reset_tree
+
+write_repo_file plugins/shop/evals/totals/case.yaml 'name: totals\ntags: [review, guard]\n'
+commit_change "tag it a guard"
+write_result totals true false
+write_base_result true
+run_script
+expect_status "a guard case needs no third run" 0
+expect_calls "one eval run for a guard" 1
+expect_output "it says what a guard proves" "a guard case"
+reset_tree
 
 status=0
 (cd "$repo" && bash "$script" >/dev/null 2>&1) || status=$?

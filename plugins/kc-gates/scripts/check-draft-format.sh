@@ -4,7 +4,8 @@
 #
 # Usage: check-draft-format.sh <drafts.json>
 #   <drafts.json>  the JSON array of {path, line, body, ...} that build-comment-payloads.sh takes;
-#                  a draft may carry "long": "<reason>" when its length is the stated exception
+#                  a draft may carry "long": "<reason>" when its length is the stated exception,
+#                  and "code": "<reason>" when its code is
 #
 # Each body must:
 #   - open with a label from kc-post-review's Labels table on its own line
@@ -12,7 +13,10 @@
 #     Conventional Comments `**suggestion:**`, `**nitpick (non-blocking):**`), and use no `(blocking)`;
 #   - hold no em dash, no `§` rule citation, no emoji, and not open with a praise phrase
 #     (Good catch, Good call, Fair, Real bug, Nice find);
-#   - outside code blocks, have at most 3 sentences and none over 25 words, unless "long" says why.
+#   - outside code blocks, have at most 3 sentences and none over 25 words, unless "long" says why;
+#   - hold at most 2 non-blank lines of code across its code blocks, unless "code" says why: a
+#     comment says what is wrong and what should happen, and the author, who knows the code,
+#     writes the fix.
 #
 # Prints one line per problem (`draft <n> (<path>:<line>): <problem>`) and exits 1 when there is
 # any, 0 when every draft passes, 2 on a usage error or unreadable input.
@@ -58,6 +62,11 @@ perl -MJSON::PP -CS -e '
           last;
         }
       }
+    }
+    my $code_lines = 0;
+    while ($rest =~ /```[^\n]*\n(.*?)```/gs) { $code_lines += () = $1 =~ /^[ \t]*\S/mg }
+    if ($code_lines > 2 && !(defined $draft->{code} && $draft->{code} =~ /\S/)) {
+      push @found, "has $code_lines lines of code; describe the problem and the behaviour expected, with code only for a one- or two-line fix, or say why in \"code\"";
     }
     for my $problem (@found) { print "$where: $problem\n"; $problems++ }
   }

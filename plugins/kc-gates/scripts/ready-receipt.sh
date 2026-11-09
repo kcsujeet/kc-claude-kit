@@ -4,14 +4,14 @@
 # ${KC_READY_DIR:-$HOME/.claude/kc-ready-for-review}. guard-hand-off.sh lets a
 # PR go to review only when its head commit has one.
 #
-#   ready-receipt.sh write <sha> --rounds <n> --open <n> --pass <dir>
+#   ready-receipt.sh write <sha> --rounds 1 --open <n> --pass <dir>
 #                    [--size small|full] [--scope-approved "<the user's words>"]
-#       After a pass: the rounds it ran (1 or 2), the findings it left open
-#       for the user, the pass folder, and the size pass-size.sh gave it.
+#       After a pass: its one gate round, the findings it left open for the
+#       user, the pass folder, and the size pass-size.sh gave it.
 #       Refused unless the pass folder shows the pass ran (see below).
 #   ready-receipt.sh write <sha> --after <pass-sha>
-#       After commits that only apply fixes the user picked from that pass's
-#       open list. Refused unless <pass-sha> has a pass or --after receipt and
+#       After commits that only hold fixes to that pass: the ones the user
+#       picked from its open list, or a reviewer asked for. Refused unless <pass-sha> has a pass or --after receipt and
 #       <sha> descends from it. Run it from the repo root.
 #   ready-receipt.sh write <sha> --checklist
 #       After walking the repo's hand-off checklist alone, before opening a
@@ -21,28 +21,38 @@
 #       --pass, a receipt for the checklist alone doesn't count: handing a PR
 #       to review needs the pass.
 #
-# The pass folder holds one folder per review, each gather-review.sh's
-# --out-dir for it (review.diff, changed-files.txt, meta.env) plus a
-# verdicts/ folder with the blocks that review's agents returned, copied
-# verbatim, and the orchestrator's SCOPE: block. The review's diff is made
-# again from git, BASE...HEAD_SHA as meta.env names them, so the gates it
-# needs come from the real change, not from a saved file:
+# The pass folder holds round-1/, gather-review.sh's --out-dir for the one
+# gate round (review.diff, changed-files.txt, meta.env) plus a verdicts/
+# folder with the blocks its agents returned, copied verbatim, and the
+# orchestrator's SCOPE: block. The review's diff is made again from git,
+# BASE...HEAD_SHA as meta.env names them, so the gates it needs come from the
+# real change, not from a saved file. When <sha> is past round 1's head, or a
+# finding is left open, the folder also holds fixes.txt, one tab-separated line per round-1 finding:
 #
-#   round-1/    always
-#   fix-check/  when --rounds is 2 (phase-1 gate blocks only)
-#   round-2/    when --rounds is 2
+#   fixed<TAB><finding><TAB><test file>   a fix, and the test that fails when
+#                                         it is broken
+#   mechanical<TAB><finding>              a fix that changes no behaviour (a
+#                                         rename, deletion, move or comment),
+#                                         held by lint and types
+#   open<TAB><finding><TAB><why>          left for the user: fails safe, needs
+#                                         a decision, or pre-existing
+#
+# A pass has one gate round: a second one reviews code written while fixing
+# the first, finds something in it, and so on. --rounds 2 is refused.
 #
 # A write after a pass is refused unless:
-#   - each round has a well-formed block (GATE:, STATUS:, BOXES: with evidence
+#   - the round has a well-formed block (GATE:, STATUS:, BOXES: with evidence
 #     on every box) for every gate select-gates.sh lists for its diff (the
 #     project-conventions gate only when .claude/review-conventions.md was in
 #     the repo at that review's head: a pass can add the file midway), and for
 #     verification, and a SCOPE: block marking §G1-§G5 each once, PASS, FAIL
-#     or N/A, with evidence; the fix check has a block per gate it lists;
-#   - <sha> descends from round 1's head, and a two-round pass ends on round
-#     2's head (it fixes nothing after round 2);
-#   - when the fix commits (round 1's head to <sha>) touch a file outside round
-#     1's diff, or bring a risk pass-size.sh reports that round 1's diff did
+#     or N/A, with evidence;
+#   - <sha> descends from round 1's head;
+#   - when there are fix commits (round 1's head to <sha>), fixes.txt has a
+#     well-formed line per finding, each `fixed` line names a test file those
+#     commits added or changed, and its `open` lines number --open;
+#   - when the fix commits touch a file outside round
+#     1's diff that is not a test, or bring a risk pass-size.sh reports that round 1's diff did
 #     not have (a new kind: payments, data deletion), --scope-approved carries
 #     the user's words approving that.
 # It checks presence and shape, not whether the verdicts are true. Run it from
@@ -181,8 +191,7 @@ get_review_base_commit() {
     || true
 }
 
-# Every review but the fix check is a round and also needs verification and a
-# SCOPE: block. The project-conventions gate is needed only when the repo had
+# The round needs every gate its diff lists, verification and a SCOPE: block. The project-conventions gate is needed only when the repo had
 # .claude/review-conventions.md at the review's head.
 check_review() {
   local review=$1 dir=$pass_dir/$1 summary gate_report gates gate required head base_commit
@@ -218,10 +227,49 @@ check_review() {
   for gate in ${gates//,/ }; do
     check_gate_block "$review" "$summary" "$gate"
   done
-  if [ "$review" != fix-check ]; then
-    check_gate_block "$review" "$summary" verification
-    check_scope_block "$review" "$summary"
+  check_gate_block "$review" "$summary" verification
+  check_scope_block "$review" "$summary"
+}
+
+# Paths of test files, as the conventions' sweeps read them.
+readonly TEST_PATHS='(\.(test|spec)\.[A-Za-z0-9]+$|_(test|spec)\.[A-Za-z0-9]+$|(^|/)test_[^/]*\.py$|(^|/)(test|tests|spec|__tests__|e2e)/)'
+
+# Checks fixes.txt, the record of what became of each round-1 finding, against
+# the fix commits (round 1's head to <sha>) and --open.
+check_fixes_record() {
+  local round_one_head=$1 open=$2 record=$pass_dir/fixes.txt fix_files line_number=0 open_lines=0 status finding detail
+  if [ ! -f "$record" ]; then
+    record_problem "no fixes.txt in the pass folder: the commits since round 1 hold fixes, and each needs its line (fixed, mechanical or open)"
+    return
   fi
+  fix_files=$(git -C "$repo_root" -c core.quotePath=false diff --name-only "$round_one_head" "$sha")
+  while IFS=$'\t' read -r status finding detail || [ -n "$status" ]; do
+    line_number=$((line_number + 1))
+    [ -n "$status" ] || continue
+    if [ -z "$finding" ]; then
+      record_problem "fixes.txt line $line_number: no finding after '$status'"
+      continue
+    fi
+    case "$status" in
+      fixed)
+        if [ -z "$detail" ]; then
+          record_problem "fixes.txt line $line_number: a fix names the test that fails when it is broken"
+        elif ! printf '%s\n' "$detail" | grep -Eq "$TEST_PATHS"; then
+          record_problem "fixes.txt line $line_number: $detail is not a test file"
+        elif ! printf '%s\n' "$fix_files" | grep -qxF "$detail"; then
+          record_problem "fixes.txt line $line_number: the fix commits don't add or change $detail"
+        fi ;;
+      mechanical) ;;
+      open)
+        open_lines=$((open_lines + 1))
+        case "$detail" in
+          'fails safe' | 'needs a decision' | 'pre-existing') ;;
+          *) record_problem "fixes.txt line $line_number: an open finding says why: fails safe, needs a decision or pre-existing" ;;
+        esac ;;
+      *) record_problem "fixes.txt line $line_number: '$status' is not fixed, mechanical or open" ;;
+    esac
+  done < "$record"
+  [ "$open_lines" = "$open" ] || record_problem "fixes.txt has $open_lines open line(s), --open says $open"
 }
 
 # Prints the kinds of risk pass-size.sh reports for <diff> and <changed-files>,
@@ -237,7 +285,8 @@ list_risk_kinds() {
 }
 
 # Prints what the fix commits (round 1's head to <sha>) add to round 1's
-# footprint: files outside its diff, and kinds of risk its diff didn't have.
+# footprint: files outside its diff that are not tests (a fix brings its test),
+# and kinds of risk its diff didn't have.
 # A fix inside an auth or payments change asks nothing new. Paths are quoted as
 # gather-review.sh quotes round 1's list.
 get_widened_footprint() {
@@ -246,7 +295,7 @@ get_widened_footprint() {
   fix_files=$(mktemp)
   git -C "$repo_root" diff --no-color --no-ext-diff --src-prefix=a/ --dst-prefix=b/ "$round_one_head" "$sha" > "$fix_diff"
   git -C "$repo_root" diff --name-only "$round_one_head" "$sha" > "$fix_files"
-  outside=$(grep -vxF -f "$round_one_files" "$fix_files")
+  outside=$(grep -vxF -f "$round_one_files" "$fix_files" | grep -vE "$TEST_PATHS")
   round_one_risks=$(list_risk_kinds "$regenerated_dir/round-1.diff" "$round_one_files")
   fix_risks=$(list_risk_kinds "$fix_diff" "$fix_files")
   new_risks=$(comm -13 <(printf '%s\n' "$round_one_risks") <(printf '%s\n' "$fix_risks"))
@@ -256,9 +305,9 @@ get_widened_footprint() {
 }
 
 write_pass_receipt() {
-  local rounds=$1 open=$2 size=$3 scope_approved=$4 reviews review line round_one_head round_two_head
+  local rounds=$1 open=$2 size=$3 scope_approved=$4 line round_one_head
   local widened=""
-  printf '%s' "$rounds" | grep -Eqx '[12]' || { echo "ready-receipt: --rounds is 1 or 2" >&2; exit 2; }
+  [ "$rounds" = 1 ] || { echo "ready-receipt: --rounds is 1: a pass has one gate round, and its fixes are held by fixes.txt, not by another round" >&2; exit 2; }
   printf '%s' "$open" | grep -Eqx '[0-9]+' || { echo "ready-receipt: --open is a count" >&2; exit 2; }
   case "$size" in '' | small | full) ;; *) echo "ready-receipt: --size is small or full" >&2; exit 2 ;; esac
   [ -n "$pass_dir" ] || { echo "ready-receipt: --pass <dir> is required: the folder of the pass's reviews and verdict blocks" >&2; exit 2; }
@@ -267,20 +316,15 @@ write_pass_receipt() {
   regenerated_dir=$(mktemp -d)
   trap 'rm -rf "$regenerated_dir"' EXIT
 
-  if [ "$rounds" = 2 ]; then reviews=(round-1 fix-check round-2); else reviews=(round-1); fi
-  for review in "${reviews[@]}"; do
-    check_review "$review"
-  done
+  check_review round-1
   git -C "$repo_root" cat-file -e "$sha^{commit}" 2>/dev/null || record_problem "commit $sha is not in this clone"
   if [ "${#problems[@]}" -eq 0 ]; then
     round_one_head=$(get_review_head round-1)
     git -C "$repo_root" merge-base --is-ancestor "$round_one_head" "$sha" 2>/dev/null \
       || record_problem "$sha does not descend from round 1's head (a rebase or reset since): round 1 reviewed another diff; run the pass again"
-    if [ "$rounds" = 2 ]; then
-      round_two_head=$(get_review_head round-2)
-      [ "$round_two_head" = "$sha" ] \
-        || record_problem "round-2 reviewed $round_two_head, not $sha: write this receipt for round 2's head, then --after it for fixes the user picked"
-    fi
+  fi
+  if [ "${#problems[@]}" -eq 0 ] && { [ "$round_one_head" != "$sha" ] || [ "$open" != 0 ]; }; then
+    check_fixes_record "$round_one_head" "$open"
   fi
   if [ "${#problems[@]}" -eq 0 ]; then
     widened=$(get_widened_footprint "$round_one_head")

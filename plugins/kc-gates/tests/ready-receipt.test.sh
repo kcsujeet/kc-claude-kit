@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
 # Tests scripts/ready-receipt.sh: a pass's receipt is written only when its
-# pass folder shows each round's gate, verification and SCOPE: blocks (real
-# gate replies, fences and all, among them); when the fixes reach past round
-# 1's diff or bring a kind of risk it didn't have, only with the user's words;
-# and only for the history round 1 reviewed. Each case builds a throwaway
-# repo: round 1 changes shop/total.sh and adds shop/tax.sh, round 1's fixes
-# append a line to total.sh, and the fix check's fixes append one to tax.sh.
+# pass folder shows the one round's gate, verification and SCOPE: blocks (real
+# gate replies, fences and all, among them) and a line in fixes.txt for each
+# finding, a fix naming a test its commits changed; when the fixes reach past
+# round 1's diff or bring a kind of risk it didn't have, only with the user's
+# words; and only for the history round 1 reviewed. Each case builds a
+# throwaway repo: round 1 changes shop/total.sh and adds shop/tax.sh, and its
+# fixes append a line to each and add shop/total.test.sh.
 set -euo pipefail
 
 tests_dir=$(cd "$(dirname "$0")" && pwd)
@@ -51,9 +52,10 @@ build_repo() {
   [ "$variant" != widen ] || printf '#!/bin/sh\necho ship\n' > "$repo/shop/ship.sh"
   [ "$variant" != sensitive ] || printf 'echo refund\n' >> "$repo/shop/payments/charge.sh"
   [ "$variant" != deletes-data ] || printf 'psql -c "DELETE FROM orders"\n' >> "$repo/shop/total.sh"
-  fix_check=$(commit_all "round 1 fixes")
   printf 'echo f2\n' >> "$repo/shop/tax.sh"
-  round_two=$(commit_all "fix check fixes")
+  # shellcheck disable=SC2016 # the fixture test's own $(...), written as text.
+  printf '#!/bin/sh\ntest "$(sh shop/total.sh)" = f1\n' > "$repo/shop/total.test.sh"
+  fixed_head=$(commit_all "round 1 fixes")
 }
 
 # Saves one review's gather-review output: the diff <from>..<to>, its files
@@ -86,19 +88,13 @@ save_verdicts() {
   fi
 }
 
-# Builds a complete pass folder for the repo: one round, or two with the fix
-# check between them.
+# Builds a complete pass folder for the repo: the round, and the record of its
+# fixes (one fix with its test, one rename).
 build_pass() {
-  local rounds=$1
   pass_dir="$work_dir/pass-$RANDOM$RANDOM"
   save_review round-1 "$base" "$round_one"
   save_verdicts round-1 scope
-  if [ "$rounds" = 2 ]; then
-    save_review fix-check "$round_one" "$fix_check"
-    save_verdicts fix-check no-scope
-    save_review round-2 "$base" "$round_two"
-    save_verdicts round-2 scope
-  fi
+  printf 'fixed\tshop/total.sh:4 prints nothing for f1\tshop/total.test.sh\nmechanical\tshop/tax.sh:2 unclear name\n' > "$pass_dir/fixes.txt"
 }
 
 # Edits a round's SCOPE: block with a sed script, leaving no backup file
@@ -118,137 +114,168 @@ expect_write() {
 }
 expect_said() { expect_contains "$1" "$2" "$last_output"; }
 
-# Both kinds of pass, complete, are written.
+# A pass with fixes, and one with none, are written.
 build_repo
-build_pass 2
-expect_write written "a full pass with every block is written" "$round_two" --rounds 2 --open 0 --size full --pass "$pass_dir"
-expect_contains "the receipt names its pass folder" "pass=$pass_dir" "$(bash "$scripts/ready-receipt.sh" check "$round_two")"
-written_pass_head=$round_two
-expect_write written "a one-round pass with every block is written" "$round_one" --rounds 1 --open 0 --size small --pass "$pass_dir"
+build_pass
+expect_write written "a pass with every block and a record of its fixes is written" "$fixed_head" --rounds 1 --open 0 --size full --pass "$pass_dir"
+expect_contains "the receipt names its pass folder" "pass=$pass_dir" "$(bash "$scripts/ready-receipt.sh" check "$fixed_head")"
+written_pass_head=$fixed_head
+rm "$pass_dir/fixes.txt"
+expect_write written "a pass that found nothing needs no fixes record" "$round_one" --rounds 1 --open 0 --size small --pass "$pass_dir"
 expect_contains "the receipt records the pass's size" "size=small" "$(bash "$scripts/ready-receipt.sh" check "$round_one")"
-expect_eq "a one-round pass reads no fix check: it prints only the receipt line" "receipt written: $KC_READY_DIR/$round_one" "$last_output"
+expect_eq "it prints only the receipt line" "receipt written: $KC_READY_DIR/$round_one" "$last_output"
+
+# One gate round (§H1): a second is refused. The fixes are held by their record: a fix names a
+# test its commits changed (§H4), and what is left open says why and numbers --open (§H3).
+build_pass
+expect_write refused "a second round is refused" "$fixed_head" --rounds 2 --open 0 --pass "$pass_dir"
+expect_said "it says the fixes are held by the record" "a pass has one gate round"
+
+rm "$pass_dir/fixes.txt"
+expect_write refused "fix commits with no fixes.txt are refused" "$fixed_head" --rounds 1 --open 0 --pass "$pass_dir"
+expect_said "it asks for the record" "no fixes.txt in the pass folder"
+expect_write refused "an open finding with no fixes.txt is refused" "$round_one" --rounds 1 --open 1 --pass "$pass_dir"
+
+write_fixes() { printf '%b' "$1" > "$pass_dir/fixes.txt"; }
+write_fixes 'fixed\tshop/total.sh:4 prints nothing\n'
+expect_write refused "a fix with no test is refused" "$fixed_head" --rounds 1 --open 0 --pass "$pass_dir"
+expect_said "it asks for the test" "a fix names the test that fails when it is broken"
+
+write_fixes 'fixed\tshop/total.sh:4 prints nothing\tshop/total.sh\n'
+expect_write refused "a fix whose proof is not a test file is refused" "$fixed_head" --rounds 1 --open 0 --pass "$pass_dir"
+expect_said "it names the file" "shop/total.sh is not a test file"
+
+write_fixes 'fixed\tshop/total.sh:4 prints nothing\tshop/tax.test.sh\n'
+expect_write refused "a fix naming a test its commits never touched is refused" "$fixed_head" --rounds 1 --open 0 --pass "$pass_dir"
+expect_said "it names the untouched test" "the fix commits don't add or change shop/tax.test.sh"
+
+write_fixes 'skipped\tshop/total.sh:4 prints nothing\n'
+expect_write refused "an unknown status is refused" "$fixed_head" --rounds 1 --open 0 --pass "$pass_dir"
+expect_said "it names the status" "'skipped' is not fixed, mechanical or open"
+
+write_fixes 'mechanical\n'
+expect_write refused "a line with no finding is refused" "$fixed_head" --rounds 1 --open 0 --pass "$pass_dir"
+expect_said "it names the line" "fixes.txt line 1: no finding"
+
+write_fixes 'mechanical\tshop/tax.sh:2 unclear name\nopen\tshop/tax.sh:3 refuses a blank rate\tfails safe\n'
+expect_write written "an open finding with its reason is written" "$fixed_head" --rounds 1 --open 1 --pass "$pass_dir"
+expect_write refused "an --open that differs from the open lines is refused" "$fixed_head" --rounds 1 --open 0 --pass "$pass_dir"
+expect_said "it gives both counts" "fixes.txt has 1 open line(s), --open says 0"
+
+write_fixes 'open\tshop/tax.sh:3 refuses a blank rate\tlater\n'
+expect_write refused "an open finding with no listed reason is refused" "$fixed_head" --rounds 1 --open 1 --pass "$pass_dir"
+expect_said "it lists the reasons" "fails safe, needs a decision or pre-existing"
 
 # The pass folder must show every gate, verification and SCOPE:.
-expect_write refused "no --pass is refused" "$round_two" --rounds 2 --open 0
+expect_write refused "no --pass is refused" "$fixed_head" --rounds 1 --open 0
 expect_said "it asks for the pass folder" "--pass <dir> is required"
-expect_write refused "a --pass folder that is not there is refused" "$round_two" --rounds 2 --open 0 --pass "$work_dir/no-such-pass"
+expect_write refused "a --pass folder that is not there is refused" "$fixed_head" --rounds 1 --open 0 --pass "$work_dir/no-such-pass"
 expect_said "it names the folder" "no pass folder $work_dir/no-such-pass"
 
-build_pass 2
-rm "$pass_dir/round-2/verdicts/testing.txt"
-expect_write refused "a listed gate with no block is refused" "$round_two" --rounds 2 --open 0 --pass "$pass_dir"
-expect_said "it names the round and the gate" "round-2: no GATE: testing block"
+build_pass
+rm "$pass_dir/round-1/verdicts/testing.txt"
+expect_write refused "a listed gate with no block is refused" "$fixed_head" --rounds 1 --open 0 --pass "$pass_dir"
+expect_said "it names the round and the gate" "round-1: no GATE: testing block"
 
-build_pass 2
+build_pass
 rm "$pass_dir/round-1/verdicts/verification.txt"
-expect_write refused "a round with no verification block is refused" "$round_two" --rounds 2 --open 0 --pass "$pass_dir"
+expect_write refused "a round with no verification block is refused" "$fixed_head" --rounds 1 --open 0 --pass "$pass_dir"
 expect_said "it names the verification gate" "round-1: no GATE: verification block"
 
-build_pass 2
+build_pass
 printf 'GATE: naming\nBOXES:\n- [PASS] §N1: 0 hits\n' > "$pass_dir/round-1/verdicts/naming.txt"
-expect_write refused "a block with no STATUS: is refused" "$round_two" --rounds 2 --open 0 --pass "$pass_dir"
+expect_write refused "a block with no STATUS: is refused" "$fixed_head" --rounds 1 --open 0 --pass "$pass_dir"
 expect_said "it names the missing status" "GATE: naming has no STATUS:"
 
-build_pass 2
+build_pass
 printf 'GATE: naming\nSTATUS: PASS\nFINDINGS:\n' > "$pass_dir/round-1/verdicts/naming.txt"
-expect_write refused "a block with no boxes is refused" "$round_two" --rounds 2 --open 0 --pass "$pass_dir"
+expect_write refused "a block with no boxes is refused" "$fixed_head" --rounds 1 --open 0 --pass "$pass_dir"
 expect_said "it names the missing boxes" "GATE: naming has no BOXES: line with a box"
 
-build_pass 2
+build_pass
 printf 'GATE: naming\nSTATUS: PASS\nBOXES:\n- [PASS] §N1: 0 hits\n- [PASS] §N2:\n' > "$pass_dir/round-1/verdicts/naming.txt"
-expect_write refused "a box with no evidence is refused" "$round_two" --rounds 2 --open 0 --pass "$pass_dir"
+expect_write refused "a box with no evidence is refused" "$fixed_head" --rounds 1 --open 0 --pass "$pass_dir"
 expect_said "it counts the bare box" "GATE: naming has 1 box(es) with no verdict or no evidence"
 
-build_pass 2
+build_pass
 printf 'GATE: naming\nSTATUS: PASS\nBOXES:\n- [PASS] §N1: 0 hits in shop/total.sh\n  and shop/tax.sh\n\n- [PASS] §N2: 0 hits\nFINDINGS:\n' > "$pass_dir/round-1/verdicts/naming.txt"
-expect_write written "a box whose evidence wraps, or a blank line between boxes, is no bad box" "$round_two" --rounds 2 --open 0 --pass "$pass_dir"
+expect_write written "a box whose evidence wraps, or a blank line between boxes, is no bad box" "$fixed_head" --rounds 1 --open 0 --pass "$pass_dir"
 
-build_pass 2
+build_pass
 printf 'GATE: naming\nSTATUS: PASS\nBOXES:\n- [PASS] §N1: 0 hits\nFINDINGS:\n- none' > "$pass_dir/round-1/verdicts/a-naming.txt"
 rm "$pass_dir/round-1/verdicts/naming.txt"
-expect_write written "a block saved with no trailing newline keeps the next file's block" "$round_two" --rounds 2 --open 0 --pass "$pass_dir"
+expect_write written "a block saved with no trailing newline keeps the next file's block" "$fixed_head" --rounds 1 --open 0 --pass "$pass_dir"
 
-build_pass 2
+build_pass
 build_gate_block naming >> "$pass_dir/round-1/verdicts/clarity.txt"
-expect_write refused "two blocks for one gate are refused" "$round_two" --rounds 2 --open 0 --pass "$pass_dir"
+expect_write refused "two blocks for one gate are refused" "$fixed_head" --rounds 1 --open 0 --pass "$pass_dir"
 expect_said "it names the repeated gate" "2 GATE: naming blocks"
 
-build_pass 2
-rm "$pass_dir/round-2/verdicts/scope.txt"
-expect_write refused "a round with no SCOPE: block is refused" "$round_two" --rounds 2 --open 0 --pass "$pass_dir"
-expect_said "it names the missing scope" "round-2: no SCOPE: block"
+build_pass
+rm "$pass_dir/round-1/verdicts/scope.txt"
+expect_write refused "a round with no SCOPE: block is refused" "$fixed_head" --rounds 1 --open 0 --pass "$pass_dir"
+expect_said "it names the missing scope" "round-1: no SCOPE: block"
 
-build_pass 2
+build_pass
 edit_scope round-1 '/§G4/d'
-expect_write refused "a SCOPE: block missing a box is refused" "$round_two" --rounds 2 --open 0 --pass "$pass_dir"
+expect_write refused "a SCOPE: block missing a box is refused" "$fixed_head" --rounds 1 --open 0 --pass "$pass_dir"
 expect_said "it names the missing box" "SCOPE: has no §G4 box"
 
-build_pass 2
+build_pass
 edit_scope round-1 's/^- \[N\/A\] §G4: .*/- [N\/A] §G2: also/'
-expect_write refused "a SCOPE: box marked twice is refused" "$round_two" --rounds 2 --open 0 --pass "$pass_dir"
+expect_write refused "a SCOPE: box marked twice is refused" "$fixed_head" --rounds 1 --open 0 --pass "$pass_dir"
 expect_said "it names the twice-marked box" "marks §G2 2 times"
 
-build_pass 2
+build_pass
 edit_scope round-1 's/^- \[N\/A\] §G3: .*/- [N\/A] §G3:/'
-expect_write refused "a SCOPE: box with no evidence is refused" "$round_two" --rounds 2 --open 0 --pass "$pass_dir"
+expect_write refused "a SCOPE: box with no evidence is refused" "$fixed_head" --rounds 1 --open 0 --pass "$pass_dir"
 expect_said "it counts the bare scope box" "SCOPE: has 1 box(es) with no verdict or no evidence"
 
-build_pass 2
+build_pass
 edit_scope round-1 's/§G1:/§G1 Stacking:/'
-expect_write written "a SCOPE: box id with a title is that box" "$round_two" --rounds 2 --open 0 --pass "$pass_dir"
+expect_write written "a SCOPE: box id with a title is that box" "$fixed_head" --rounds 1 --open 0 --pass "$pass_dir"
 
-build_pass 2
+build_pass
 # An id with one more digit, built so the rules lint doesn't read it as a citation.
 extra_digit=0
 edit_scope round-1 "s/§G1:/§G1${extra_digit}:/"
-expect_write refused "a longer SCOPE: id is another box" "$round_two" --rounds 2 --open 0 --pass "$pass_dir"
+expect_write refused "a longer SCOPE: id is another box" "$fixed_head" --rounds 1 --open 0 --pass "$pass_dir"
 expect_said "it names the missing box" "SCOPE: has no §G1 box"
 
-build_pass 2
-rm -r "$pass_dir/fix-check"
-expect_write refused "two rounds with no fix check are refused" "$round_two" --rounds 2 --open 0 --pass "$pass_dir"
-expect_said "it names the missing review" "fix-check: no fix-check/ folder"
+build_pass
+rm "$pass_dir/round-1/verdicts/"*
+expect_write refused "a review with no verdict blocks is refused" "$fixed_head" --rounds 1 --open 0 --pass "$pass_dir"
+expect_said "it names the empty verdicts folder" "round-1: no verdict blocks"
 
-build_pass 2
-rm "$pass_dir/fix-check/verdicts/"*
-expect_write refused "a review with no verdict blocks is refused" "$round_two" --rounds 2 --open 0 --pass "$pass_dir"
-expect_said "it names the empty verdicts folder" "fix-check: no verdict blocks"
+build_pass
+rm "$pass_dir/round-1/meta.env"
+expect_write refused "a review with no meta.env is refused" "$fixed_head" --rounds 1 --open 0 --pass "$pass_dir"
+expect_said "it names the missing file" "round-1: no meta.env"
 
-build_pass 2
-rm "$pass_dir/round-2/meta.env"
-expect_write refused "a review with no meta.env is refused" "$round_two" --rounds 2 --open 0 --pass "$pass_dir"
-expect_said "it names the missing file" "round-2: no meta.env"
+build_pass
+printf 'HEAD_SHA=%s\n' "$(make_fake_sha d)" > "$pass_dir/round-1/meta.env"
+expect_write refused "a review whose head the clone lacks is refused" "$fixed_head" --rounds 1 --open 0 --pass "$pass_dir"
+expect_said "it names the review" "round-1: meta.env names no HEAD_SHA this clone has"
 
-build_pass 2
-printf 'HEAD_SHA=%s\n' "$(make_fake_sha d)" > "$pass_dir/round-2/meta.env"
-expect_write refused "a review whose head the clone lacks is refused" "$round_two" --rounds 2 --open 0 --pass "$pass_dir"
-expect_said "it names the review" "round-2: meta.env names no HEAD_SHA this clone has"
-
-build_pass 2
-expect_write refused "a commit the clone lacks is refused" "$(make_fake_sha c)" --rounds 2 --open 0 --pass "$pass_dir"
+build_pass
+expect_write refused "a commit the clone lacks is refused" "$(make_fake_sha c)" --rounds 1 --open 0 --pass "$pass_dir"
 expect_said "it names the commit" "is not in this clone"
 
 # The gates come from the tree each review read, not from today's checkout.
-build_pass 2
+build_pass
 mkdir -p "$repo/.claude"
 printf -- '- [ ] §X1 A house rule.\n' > "$repo/.claude/review-conventions.md"
-expect_write written "a conventions file only in today's checkout adds no gate to the reviews" "$round_two" --rounds 2 --open 0 --pass "$pass_dir"
+expect_write written "a conventions file only in today's checkout adds no gate to the reviews" "$fixed_head" --rounds 1 --open 0 --pass "$pass_dir"
 
 build_repo conventions
-build_pass 2
+build_pass
 rm "$pass_dir/round-1/verdicts/project-conventions.txt"
-expect_write refused "conventions the repo had at a review's head need their gate" "$round_two" --rounds 2 --open 0 --pass "$pass_dir"
+expect_write refused "conventions the repo had at a review's head need their gate" "$fixed_head" --rounds 1 --open 0 --pass "$pass_dir"
 expect_said "it names the conventions gate" "round-1: no GATE: project-conventions block"
 
-# The reviews read one history in order, and a two-round pass ends on round 2's head.
+# The receipt is for the history round 1 reviewed.
 build_repo
-build_pass 2
-printf 'echo late\n' >> "$repo/shop/total.sh"
-expect_write refused "a commit past round 2's head is refused" "$(commit_all "a change after round 2")" --rounds 2 --open 0 --pass "$pass_dir"
-expect_said "it names the commit round 2 reviewed" "round-2 reviewed $round_two"
-
-build_repo
-build_pass 1
+build_pass
 run_git checkout -q -b rebased "$base"
 printf 'echo rebased\n' >> "$repo/shop/total.sh"
 expect_write refused "a commit that does not descend from round 1's head is refused" "$(commit_all "rebased")" --rounds 1 --open 0 --pass "$pass_dir"
@@ -256,33 +283,33 @@ expect_said "it says round 1 reviewed another diff" "does not descend from round
 
 # Fixes past round 1's diff, or bringing a risk it didn't have, need the user's words.
 build_repo widen
-build_pass 2
-expect_write refused "fixes adding a file outside round 1's diff are refused" "$round_two" --rounds 2 --open 0 --pass "$pass_dir"
+build_pass
+expect_write refused "fixes adding a file outside round 1's diff are refused" "$fixed_head" --rounds 1 --open 0 --pass "$pass_dir"
 expect_said "it lists the file" "outside round 1: shop/ship.sh"
-expect_write refused "an empty approval is refused" "$round_two" --rounds 2 --open 0 --pass "$pass_dir" --scope-approved ""
-expect_write written "the user's words let it through" "$round_two" --rounds 2 --open 0 --pass "$pass_dir" --scope-approved "yes, add the shipping script"
-expect_contains "the receipt keeps the user's words" "scope_approved=yes, add the shipping script" "$(bash "$scripts/ready-receipt.sh" check "$round_two")"
+expect_write refused "an empty approval is refused" "$fixed_head" --rounds 1 --open 0 --pass "$pass_dir" --scope-approved ""
+expect_write written "the user's words let it through" "$fixed_head" --rounds 1 --open 0 --pass "$pass_dir" --scope-approved "yes, add the shipping script"
+expect_contains "the receipt keeps the user's words" "scope_approved=yes, add the shipping script" "$(bash "$scripts/ready-receipt.sh" check "$fixed_head")"
 
 build_repo sensitive
-build_pass 2
-expect_write written "a fix to a payments change round 1 already had needs no approval" "$round_two" --rounds 2 --open 0 --pass "$pass_dir"
+build_pass
+expect_write written "a fix to a payments change round 1 already had needs no approval" "$fixed_head" --rounds 1 --open 0 --pass "$pass_dir"
 
 build_repo deletes-data
-build_pass 2
-expect_write refused "fixes bringing a risk round 1 didn't have are refused" "$round_two" --rounds 2 --open 0 --pass "$pass_dir"
+build_pass
+expect_write refused "fixes bringing a risk round 1 didn't have are refused" "$fixed_head" --rounds 1 --open 0 --pass "$pass_dir"
 expect_said "it names the new kind of risk" "new risk: deletes data"
-expect_write written "the user's words let a new risk through" "$round_two" --rounds 2 --open 0 --pass "$pass_dir" --scope-approved "go ahead"
+expect_write written "the user's words let a new risk through" "$fixed_head" --rounds 1 --open 0 --pass "$pass_dir" --scope-approved "go ahead"
 
 # A file round 1 touched, quoted the way gather-review.sh lists it, is inside round 1's diff.
 build_repo accented
-build_pass 2
-expect_write written "a fix to a non-ASCII-named round-1 file needs no approval" "$round_two" --rounds 2 --open 0 --pass "$pass_dir"
+build_pass
+expect_write written "a fix to a non-ASCII-named round-1 file needs no approval" "$fixed_head" --rounds 1 --open 0 --pass "$pass_dir"
 
 # Real gate replies, as a pass saved them: one bare with nested evidence, one
 # fenced. They stand in for those gates' blocks; a change in a gate's format
 # fails here first.
 build_repo
-build_pass 1
+build_pass
 cp "$tests_dir/fixtures/ready-receipt/real-verdicts/"*.txt "$pass_dir/round-1/verdicts/"
 expect_write written "a pass folder with real gate replies is written" "$round_one" --rounds 1 --open 0 --pass "$pass_dir"
 summary=$(cat "$tests_dir/fixtures/ready-receipt/real-verdicts/"*.txt | grep -cE '^GATE:')
@@ -290,7 +317,7 @@ expect_eq "each real reply holds one block" 2 "$summary"
 
 # The gates come from the change git holds, not from the folder's saved diff.
 build_repo ruby
-build_pass 1
+build_pass
 : > "$pass_dir/round-1/review.diff"
 : > "$pass_dir/round-1/changed-files.txt"
 rm "$pass_dir/round-1/verdicts/"*
@@ -298,25 +325,24 @@ save_verdicts round-1 scope
 expect_write refused "a folder whose saved diff leaves a file out still needs that file's gate" "$round_one" --rounds 1 --open 0 --pass "$pass_dir"
 expect_said "it names the gate the real change needs" "round-1: no GATE: rails block"
 
-build_pass 1
+build_pass
 printf 'HEAD_SHA=%s\n' "$round_one" > "$pass_dir/round-1/meta.env"
 expect_write refused "a review with no BASE is refused" "$round_one" --rounds 1 --open 0 --pass "$pass_dir"
 expect_said "it names the missing base" "round-1: meta.env names no BASE this clone has"
 
-# The other receipts, the flags and the usage.
+# The other receipts (fixes after the pass go --after, with no round: §H5), the flags and the usage.
 build_repo
-build_pass 2
-expect_write written "a pass to follow is written" "$round_two" --rounds 2 --open 0 --pass "$pass_dir"
-pass_head=$round_two
+build_pass
+expect_write written "a pass to follow is written" "$fixed_head" --rounds 1 --open 0 --pass "$pass_dir"
+pass_head=$fixed_head
 printf 'echo picked\n' >> "$repo/shop/total.sh"
 picked_fix=$(commit_all "a fix the user picked")
 expect_write refused "--after refuses a pass with no receipt" "$picked_fix" --after "$(make_fake_sha c)"
 expect_write written "--after follows a pass with a receipt" "$picked_fix" --after "$pass_head"
 expect_write refused "--after refuses a commit that does not descend from the pass" "$base" --after "$pass_head"
 expect_said "it says why" "does not descend from $pass_head"
-expect_write refused "a third round is refused" "$round_two" --rounds 3 --open 0 --pass "$pass_dir"
-expect_write refused "an unknown size is refused" "$round_two" --rounds 2 --open 0 --size tiny --pass "$pass_dir"
-expect_write refused "an --open that is no count is refused" "$round_two" --rounds 2 --open some --pass "$pass_dir"
+expect_write refused "an unknown size is refused" "$fixed_head" --rounds 1 --open 0 --size tiny --pass "$pass_dir"
+expect_write refused "an --open that is no count is refused" "$fixed_head" --rounds 1 --open some --pass "$pass_dir"
 expect_said "it asks for a count" "--open is a count"
 expect_write written "--checklist needs no pass folder" "$(make_fake_sha e)" --checklist
 expect_contains "--checklist records the walk" "checklist=walked" "$(bash "$scripts/ready-receipt.sh" check "$(make_fake_sha e)")"
@@ -326,7 +352,7 @@ if bash "$scripts/ready-receipt.sh" check "$(make_fake_sha e)" --pass >/dev/null
 else
   record "check --pass refuses a checklist receipt" ok
 fi
-expect_contains "check --pass prints a pass receipt" "rounds=2" "$(bash "$scripts/ready-receipt.sh" check "$written_pass_head" --pass)"
+expect_contains "check --pass prints a pass receipt" "rounds=1" "$(bash "$scripts/ready-receipt.sh" check "$written_pass_head" --pass)"
 check_status=0
 bash "$scripts/ready-receipt.sh" check "$(make_fake_sha e)" --other >/dev/null 2>&1 || check_status=$?
 expect_eq "check with anything but --pass after the SHA prints the usage" 2 "$check_status"
@@ -336,7 +362,7 @@ else
   record "check fails for a commit without a receipt" ok
 fi
 usage_text=$(bash "$scripts/ready-receipt.sh" 2>&1 || true)
-expect_contains "no arguments print the usage" "ready-receipt.sh write <sha> --rounds <n> --open <n> --pass <dir>" "$usage_text"
+expect_contains "no arguments print the usage" "ready-receipt.sh write <sha> --rounds 1 --open <n> --pass <dir>" "$usage_text"
 expect_eq "the usage has the header's lines without their comment marks" 0 "$(printf '%s\n' "$usage_text" | grep -c '^#' || true)"
 
 finish

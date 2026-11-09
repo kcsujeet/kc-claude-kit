@@ -85,7 +85,8 @@ expect_file "pr: review.diff is gh pr diff's output" "$fixtures/pr.diff" "$pr_ou
 expect_eq "pr: changed files from gh pr view" "src/widgets/list.ts
 src/widgets/header.tsx" "$(cat "$pr_out/changed-files.txt")"
 expect_eq "pr: only read calls reached gh" "pr view 12 --json headRefOid,baseRefName,title,files,url
-pr diff 12 --color never" "$(cat "$KC_GH_LOG")"
+pr diff 12 --color never
+api user" "$(cat "$KC_GH_LOG")"
 
 # When the local HEAD is the PR head, no FETCH line.
 matching_fixtures="$work_dir/fixtures-matching"
@@ -97,6 +98,72 @@ case "$matching_output" in
   *FETCH=*) record "pr: no FETCH when the local HEAD is the PR head" fail "$matching_output" ;;
   *) record "pr: no FETCH when the local HEAD is the PR head" ok ;;
 esac
+
+# --- a re-review: --since saves only what changed from the head reviewed last time ---------
+since_output=$(cd "$repo" && bash "$gather" 12 --since "$base_sha" --out-dir "$work_dir/out-since")
+expect_contains "since: meta.env names the commit it started from" "SINCE=$base_sha" "$since_output"
+expect_eq "since: the changed files are the delta's, not the whole PR's" "a.txt
+b.txt" "$(cat "$work_dir/out-since/changed-files.txt")"
+expect_contains "since: the diff is the delta" "+two" "$(cat "$work_dir/out-since/review.diff")"
+expect_eq "since: the whole PR's diff is not saved" "" "$(grep -F 'src/widgets' "$work_dir/out-since/review.diff" || true)"
+
+side_sha=$(git -C "$repo" commit-tree -m side "$(git -C "$repo" rev-parse 'main^{tree}')")
+rebased_output=$(cd "$repo" && bash "$gather" 12 --since "$side_sha" --out-dir "$work_dir/out-rebased")
+expect_contains "since: a commit outside the head's history falls back to the whole diff" "the branch was rebased" "$rebased_output"
+expect_contains "since: the fallback saves the whole PR" "src/widgets/list.ts" "$(cat "$work_dir/out-rebased/changed-files.txt")"
+case "$rebased_output" in
+  *SINCE=*) record "since: no SINCE line on a fallback" fail "$rebased_output" ;;
+  *) record "since: no SINCE line on a fallback" ok ;;
+esac
+
+missing_output=$(cd "$repo" && bash "$gather" 12 --since 2222222222222222222222222222222222222222 --out-dir "$work_dir/out-missing")
+expect_contains "since: a commit the clone lacks falls back" "is not in this clone" "$missing_output"
+
+use_gh_fixtures "$fixtures"
+unfetched_output=$(cd "$repo" && bash "$gather" 12 --since "$base_sha" --out-dir "$work_dir/out-unfetched")
+expect_contains "since: an unfetched PR head falls back and says to fetch" "run the FETCH command" "$unfetched_output"
+use_gh_fixtures "$matching_fixtures"
+
+# --- a re-review needs no flag: the signed-in user's last review names the commit ----------
+reviewed_fixtures="$work_dir/fixtures-reviewed"
+mkdir -p "$reviewed_fixtures"
+cp "$matching_fixtures/pr-view.json" "$fixtures/pr.diff" "$reviewed_fixtures/"
+printf '{"login":"sam"}\n' > "$reviewed_fixtures/user.json"
+write_reviews() { printf '{"reviews":[%s]}\n' "$1" > "$reviewed_fixtures/reviews.json"; }
+review_by() { printf '{"author":{"login":"%s"},"commit":{"oid":"%s"}}' "$1" "$2"; }
+{
+  cat "$fixtures/routes.tsv"
+  printf 'api user\tuser.json\n'
+  printf 'pr view 12 --json reviews\treviews.json\n'
+} > "$reviewed_fixtures/routes.tsv"
+use_gh_fixtures "$reviewed_fixtures"
+
+write_reviews "$(review_by sam "$side_sha"),$(review_by sam "$base_sha"),$(review_by alex "$side_sha")"
+auto_output=$(cd "$repo" && bash "$gather" 12 --out-dir "$work_dir/out-auto")
+expect_contains "auto: the user's last review sets the delta's start" "SINCE=$base_sha" "$auto_output"
+expect_eq "auto: the changed files are the delta's" "a.txt
+b.txt" "$(cat "$work_dir/out-auto/changed-files.txt")"
+
+whole_output=$(cd "$repo" && bash "$gather" 12 --whole --out-dir "$work_dir/out-whole")
+case "$whole_output" in
+  *SINCE*) record "auto: --whole saves the whole diff" fail "$whole_output" ;;
+  *) record "auto: --whole saves the whole diff" ok ;;
+esac
+
+write_reviews "$(review_by alex "$base_sha")"
+other_output=$(cd "$repo" && bash "$gather" 12 --out-dir "$work_dir/out-other")
+case "$other_output" in
+  *SINCE*) record "auto: someone else's review is not a re-review" fail "$other_output" ;;
+  *) record "auto: someone else's review is not a re-review" ok ;;
+esac
+
+write_reviews "$(review_by sam "$head_sha")"
+same_output=$(cd "$repo" && bash "$gather" 12 --out-dir "$work_dir/out-same")
+case "$same_output" in
+  *SINCE*) record "auto: a review of the current head leaves the whole diff" fail "$same_output" ;;
+  *) record "auto: a review of the current head leaves the whole diff" ok ;;
+esac
+use_gh_fixtures "$matching_fixtures"
 
 # --- usage errors -------------------------------------------------------------
 check_status() {
@@ -113,5 +180,9 @@ check_status "usage: a non-numeric PR exits 2" 2 abc
 check_status "usage: a PR and --branch together exit 2" 2 12 --branch
 check_status "usage: an unknown base exits 2" 2 --branch no-such-branch
 check_status "usage: --out-dir without a value exits 2" 2 --branch --out-dir
+check_status "usage: --since with --branch exits 2" 2 --branch --since abc
+check_status "usage: --since without a value exits 2" 2 12 --since
+check_status "usage: --since and --whole together exit 2" 2 12 --whole --since abc
+check_status "usage: --whole with --branch exits 2" 2 --branch --whole
 
 finish

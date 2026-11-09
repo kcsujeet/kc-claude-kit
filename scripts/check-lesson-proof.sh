@@ -6,13 +6,17 @@
 # rule file that gains lines with no box added or rewritten in it gained prose no gate walks. A file
 # with no boxes at all (an agent, the working agreement) is the same. Either way, a change that only
 # moves words says so in the pull request description, on a line of its own: `wording-only: <why>`.
+# That line alone covers a reword or a removal. When the rule files gain more lines than they lose,
+# the change adds something, and the description also names what holds it, one or more lines
+# `held-by: <path>`, each a test script or eval file the change adds lines to. So no lesson is
+# merged as prose with nothing a machine runs behind it.
 #
 # CLAUDE.md's Lessons step 4 asks for that proof; a skip has to be stated here, so the reviewer
 # reads the reason.
 #
 # Usage: scripts/check-lesson-proof.sh <base-ref> [--body-file <file>]
 #   <base-ref>    the branch the change merges into
-#   --body-file   the pull request description, for its `wording-only:` line
+#   --body-file   the pull request description, for its `wording-only:` and `held-by:` lines
 set -euo pipefail
 
 usage() { echo "usage: scripts/check-lesson-proof.sh <base-ref> [--body-file <file>]" >&2; exit 2; }
@@ -105,8 +109,40 @@ reason=$(printf '%s' "$reason" | sed -E 's/[[:space:]]+$//')
 # The placeholder from the checklist and this script's own hint (`<why>`) is no reason.
 case "$reason" in "<"*">") reason="" ;; esac
 if [ -n "$reason" ]; then
-  echo "ok   rules changed, wording only: $reason"
-  exit 0
+  # Lines each rule file gains and loses, blank ones aside: a file that gains more than it loses
+  # holds new text, whatever another file in the change lost. The files read are the ones with
+  # prose and no box; when the change's only gap is a box no test names, every changed rule file.
+  grown_files=""
+  while IFS= read -r path; do
+    [ -n "$path" ] || continue
+    rule_diff=$(git -c core.quotePath=false diff --unified=0 --no-color --no-ext-diff "$merge_base" HEAD -- "$path")
+    gained=$(printf '%s\n' "$rule_diff" | grep -E '^\+' | grep -vE '^\+\+\+ (b/|/dev/null)' | grep -cvE '^\+[[:space:]]*$' || true)
+    lost=$(printf '%s\n' "$rule_diff" | grep -E '^-' | grep -vE '^--- (a/|/dev/null)' | grep -cvE '^-[[:space:]]*$' || true)
+    [ "$gained" -le "$lost" ] || grown_files="$grown_files       $path (gains $gained lines, loses $lost)"$'\n'
+  done <<< "${prose_rule_files:-$changed_rule_files}"
+  if [ -z "$grown_files" ]; then
+    echo "ok   rules changed, wording only: $reason"
+    exit 0
+  fi
+  # shellcheck disable=SC2016 # the backticks are literal: a path may be written in them.
+  holders=$(sed -nE 's/^[[:space:]]*held-by:[[:space:]]*(.*)$/\1/Ip' "$body_file" | sed -E 's/[[:space:]]+$//; s/^`(.*)`$/\1/' | grep -v '^$' || true)
+  missing_holders=""
+  while IFS= read -r holder; do
+    [ -n "$holder" ] || continue
+    printf '%s\n' "$changed_proof_files" | grep -qxF "$holder" || missing_holders="$missing_holders $holder"
+  done <<< "$holders"
+  if [ -n "$holders" ] && [ -z "$missing_holders" ]; then
+    echo "ok   rules changed, wording only: $reason; held by: $(printf '%s' "$holders" | tr '\n' ' ')"
+    exit 0
+  fi
+  echo "FAIL these rule files gain more lines than they lose, so this adds a rule, not only words:"
+  printf '%s' "$grown_files"
+  if [ -n "$missing_holders" ]; then
+    echo "     These held-by files are not test or eval files the change adds lines to:$missing_holders"
+  fi
+  echo "     Name what holds the new text, a test script or eval file this change adds lines to,"
+  echo "     in the pull request description: held-by: <path>"
+  exit 1
 fi
 
 if [ -z "$changed_proof_files" ]; then

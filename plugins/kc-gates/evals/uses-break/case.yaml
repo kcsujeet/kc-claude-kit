@@ -1,0 +1,6 @@
+schema_version: "1.1"
+name: uses-break
+description: A guard for what the kit already does, a review reaches the uses of a changed thing in files the diff never touches. A branch moves the shop's price formatter from dollars to cents and updates five of its six callers; the sixth, a receipt email the branch never touches that imports the formatter under another name, still passes dollars, so it shows prices a hundred times too small. The review fails, flags the receipt email and raises nothing on the cart summary, a caller the branch updated correctly.
+tags: [review, gate, correctness, guard]
+context:
+  scaffold_script: setup.sh
