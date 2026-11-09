@@ -31,8 +31,9 @@
 #
 #   fixed<TAB><finding><TAB><test file>   a fix, and the test that fails when
 #                                         it is broken
-#   mechanical<TAB><finding>              a rename, deletion or move, held by
-#                                         lint and types
+#   mechanical<TAB><finding>              a fix that changes no behaviour (a
+#                                         rename, deletion, move or comment),
+#                                         held by lint and types
 #   open<TAB><finding><TAB><why>          left for the user: fails safe, needs
 #                                         a decision, or pre-existing
 #
