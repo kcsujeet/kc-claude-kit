@@ -10,6 +10,8 @@
 # except at identifier positions (a letter or `_`, then letters, digits or `_`), each old
 # identifier maps to one new one throughout the pair, and at least one identifier differs. Runs of
 # unequal length, and lines whose punctuation, literals or token count moved, are not listed.
+# A hunk runs for the line counts its `@@` header gives, so a hunk line whose text starts `-- ` or
+# `++ ` is read as a line, not as a file header.
 #
 # Prints one `path:line: old -> new[, old -> new]` per rename-only line, `line` on the new side,
 # and exits 0, hits or none; 2 on a usage error or unreadable input.
@@ -24,35 +26,38 @@ fi
 
 perl -e '
   use strict; use warnings;
-  my ($path, $new_line, @removed, @added) = ("", 0);
+  my ($path, $new_line, $old_left, $new_left, @removed, @added) = ("", 0, 0, 0);
   my $identifier = qr/[A-Za-z_][A-Za-z0-9_]*/;
 
-  sub tokens { my ($text) = @_; return grep { length } split /($identifier)/, $text }
+  sub split_tokens { my ($text) = @_; return grep { length } split /($identifier)/, $text }
 
-  sub flush {
+  # Returns the "old -> new" renames that turn <old> into <new>, or nothing when anything else changed.
+  sub renames_between {
+    my ($old_text, $new_text) = @_;
+    my @old = split_tokens($old_text);
+    my @new = split_tokens($new_text);
+    return () unless @old == @new;
+    my (%map, @order);
+    for my $position (0 .. $#old) {
+      my ($was, $now) = ($old[$position], $new[$position]);
+      if ($was !~ /\A$identifier\z/ || $now !~ /\A$identifier\z/) {
+        return () if $was ne $now;
+        next;
+      }
+      # A name kept in one place and renamed in another is not a rename.
+      return () if exists $map{$was} && $map{$was} ne $now;
+      next if exists $map{$was};
+      $map{$was} = $now;
+      push @order, $was if $was ne $now;
+    }
+    return map { "$_ -> $map{$_}" } @order;
+  }
+
+  sub report_renamed_pairs {
     if (@removed && @removed == @added) {
       for my $index (0 .. $#added) {
-        my @old = tokens($removed[$index]);
-        my @new = tokens($added[$index]->[1]);
-        next unless @old == @new;
-        my (%map, @order, $ok);
-        $ok = 1;
-        for my $position (0 .. $#old) {
-          my ($was, $now) = ($old[$position], $new[$position]);
-          if ($was !~ /\A$identifier\z/ || $now !~ /\A$identifier\z/) {
-            if ($was ne $now) { $ok = 0; last }
-            next;
-          }
-          # A name kept in one place and renamed in another is not a rename.
-          if (exists $map{$was}) {
-            if ($map{$was} ne $now) { $ok = 0; last }
-          } else {
-            $map{$was} = $now;
-            push @order, $was if $was ne $now;
-          }
-        }
-        next unless $ok && @order;
-        printf "%s:%d: %s\n", $path, $added[$index]->[0], join(", ", map { "$_ -> $map{$_}" } @order);
+        my @renames = renames_between($removed[$index], $added[$index]->[1]);
+        printf "%s:%d: %s\n", $path, $added[$index]->[0], join(", ", @renames) if @renames;
       }
     }
     @removed = (); @added = ();
@@ -60,13 +65,21 @@ perl -e '
 
   while (my $line = <>) {
     chomp $line;
-    if ($line =~ /^\+\+\+ (?:b\/)?(.*)$/) { flush(); $path = $1; $path =~ s/\t.*$//; next }
-    if ($line =~ /^--- /) { flush(); next }
-    if ($line =~ /^@@ -\d+(?:,\d+)? \+(\d+)/) { flush(); $new_line = $1; next }
-    if ($line =~ /^-(.*)$/) { flush() if @added; push @removed, $1; next }
-    if ($line =~ /^\+(.*)$/) { push @added, [$new_line, $1]; $new_line++; next }
-    flush();
-    $new_line++ if $line =~ /^ /;
+    # A hunk line whose text starts "-- " or "++ " reads "--- " or "+++ ": it is a header only once
+    # the line counts in the hunk header are used up.
+    my $in_hunk = $old_left > 0 || $new_left > 0;
+    if (!$in_hunk && $line =~ /^\+\+\+ (?:b\/)?(.*)$/) { report_renamed_pairs(); $path = $1; $path =~ s/\t.*$//; next }
+    if (!$in_hunk && $line =~ /^--- /) { report_renamed_pairs(); next }
+    if ($line =~ /^@@ -\d+(?:,(\d+))? \+(\d+)(?:,(\d+))? @@/) {
+      report_renamed_pairs();
+      ($old_left, $new_line, $new_left) = ($1 // 1, $2, $3 // 1);
+      next;
+    }
+    if ($line =~ /^-(.*)$/) { report_renamed_pairs() if @added; push @removed, $1; $old_left--; next }
+    if ($line =~ /^\+(.*)$/) { push @added, [$new_line, $1]; $new_line++; $new_left--; next }
+    report_renamed_pairs();
+    next unless $line =~ /^ /;
+    $new_line++; $old_left--; $new_left--;
   }
-  flush();
+  report_renamed_pairs();
 ' "$1"
