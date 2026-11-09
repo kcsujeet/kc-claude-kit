@@ -73,8 +73,8 @@ expect_eq "three lines of code with a reason in \"code\" are clean" clean "$(res
 draft "$work_dir/two-blocks.json" $'**suggestion**:\nThe two totals could share one sum.\n```ts\nconst total = sum(items)\n```\nAnd here.\n```ts\nconst shown = sum(items)\n\nconst kept = sum(items)\n```'
 expect_contains "code lines are counted across blocks, blank lines left out" "has 3 lines of code" "$(result "$work_dir/two-blocks.json")"
 
-# A change asked for in a review is run before it is asked for (kc-post-review's "Verified before
-# suggested", correctness §B15, verification §V8): an issue or suggestion carries a "ran" record.
+# A change asked for in a review is run before it is asked for (kc-post-review §PC2, correctness
+# §B15, verification §V8): an issue or suggestion carries a "ran" record.
 run_fix=$'**issue**:\nA stored draft opened before the storefront list loads gets the footer twice. Could the swap run only when the person picks another storefront?'
 draft "$work_dir/no-ran.json" "$run_fix" '{}'
 expect_contains "an issue with no \"ran\" is flagged" "asks for a change with no \"ran\"" "$(result "$work_dir/no-ran.json")"
