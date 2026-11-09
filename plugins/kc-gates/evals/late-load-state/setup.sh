@@ -5,9 +5,7 @@
 # DraftEditor that appends the sender's footer on the first refresh and swaps footers whenever the
 # sender changes. A saved storefront draft, whose body already ends with the storefront's footer,
 # opened before the list loads: the first refresh signs it as the shop and appends the shop's
-# footer; the next, with the list, swaps that for the storefront's, so it shows twice. The branch
-# also adds withFooter, which the editor uses and which handles trailing whitespace and a body that
-# already ends with the footer; it draws no finding.
+# footer; the next, with the list, swaps that for the storefront's, so it shows twice.
 set -euo pipefail
 
 git init -q -b main
@@ -50,16 +48,7 @@ git commit -q -m "Add order drafts and their sender"
 
 git checkout -q -b feature/sender-footer
 
-cat > src/drafts/footers.ts <<'TS'
-/** Ends a body with a footer once, whatever whitespace the body ends with. */
-export function withFooter(body: string, footer: string): string {
-  const trimmed = body.trimEnd()
-  return trimmed.endsWith(footer) ? trimmed : `${trimmed}\n\n${footer}`
-}
-TS
-
 cat > src/drafts/editor.ts <<'TS'
-import { withFooter } from './footers'
 import { senderFor } from './sender'
 import type { OrderDraft, Sender, Shop, Storefront } from './types'
 
@@ -76,7 +65,9 @@ export class DraftEditor {
   refresh(storefronts: Storefront[] | undefined): OrderDraft {
     const next = senderFor(this.draft, storefronts, this.shop)
     if (this.sender === null) {
-      this.draft = { ...this.draft, body: withFooter(this.draft.body, next.footer) }
+      if (!this.draft.body.endsWith(next.footer)) {
+        this.draft = { ...this.draft, body: `${this.draft.body}\n\n${next.footer}` }
+      }
     } else if (next.footer !== this.sender.footer) {
       this.draft = { ...this.draft, body: this.draft.body.replace(this.sender.footer, next.footer) }
     }
@@ -91,4 +82,4 @@ export class DraftEditor {
 }
 TS
 git add -A
-git commit -q -m "Keep an order email's footer in step with its sender; add withFooter"
+git commit -q -m "Keep an order email's footer in step with its sender"
