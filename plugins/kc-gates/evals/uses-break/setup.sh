@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # A shop repo whose feature branch moves formatPrice from dollars to cents and updates five of its
 # six callers. The order receipt email, which the branch never touches and which imports the
-# formatter under another name, still passes dollars (§B8): its prices now show a hundred times too
+# formatter under another name, still passes dollars: its prices now show a hundred times too
 # small. The cart summary, one of the callers the branch updates, is correct and draws no finding.
 set -euo pipefail
 

@@ -125,7 +125,8 @@ expect_write written "a pass that found nothing needs no fixes record" "$round_o
 expect_contains "the receipt records the pass's size" "size=small" "$(bash "$scripts/ready-receipt.sh" check "$round_one")"
 expect_eq "it prints only the receipt line" "receipt written: $KC_READY_DIR/$round_one" "$last_output"
 
-# One gate round: a second is refused, and the fixes are held by their record.
+# One gate round (§H1): a second is refused. The fixes are held by their record: a fix names a
+# test its commits changed (§H4), and what is left open says why and numbers --open (§H3).
 build_pass
 expect_write refused "a second round is refused" "$fixed_head" --rounds 2 --open 0 --pass "$pass_dir"
 expect_said "it says the fixes are held by the record" "a pass has one gate round"
@@ -329,7 +330,7 @@ printf 'HEAD_SHA=%s\n' "$round_one" > "$pass_dir/round-1/meta.env"
 expect_write refused "a review with no BASE is refused" "$round_one" --rounds 1 --open 0 --pass "$pass_dir"
 expect_said "it names the missing base" "round-1: meta.env names no BASE this clone has"
 
-# The other receipts, the flags and the usage.
+# The other receipts (fixes after the pass go --after, with no round: §H5), the flags and the usage.
 build_repo
 build_pass
 expect_write written "a pass to follow is written" "$fixed_head" --rounds 1 --open 0 --pass "$pass_dir"

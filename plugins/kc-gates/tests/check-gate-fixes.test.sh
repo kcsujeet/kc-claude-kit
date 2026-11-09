@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Tests scripts/check-gate-fixes.sh against gate verdict blocks written in a scratch directory.
+# Tests scripts/check-gate-fixes.sh against gate verdict blocks written in a scratch directory:
+# which edits kc-ready-for-review may apply as written, and which are the caller's to write (§H2).
 set -euo pipefail
 
 tests_dir=$(cd "$(dirname "$0")" && pwd)

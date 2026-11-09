@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # Tests scripts/trace-uses.sh against a small shop repo and a sibling storefront repo, both built
-# in a scratch directory and changed by a real commit, so the diff is git's own.
+# in a scratch directory and changed by a real commit, so the diff is git's own. The list is what
+# correctness §B8 has the gate judge, one verdict per use, so a use the list misses is one no gate
+# is asked about.
 set -euo pipefail
 
 tests_dir=$(cd "$(dirname "$0")" && pwd)

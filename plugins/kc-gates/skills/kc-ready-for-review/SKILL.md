@@ -67,6 +67,16 @@ The pass runs the gates once and ends. A second round mostly found code written 
 
 9. **Fixes after the pass,** the ones the user picks from the open list or a reviewer's comments ask for: write each as step 6 does (uses checked, a test that fails when it is broken, lint and types), push, and write `ready-receipt.sh write <new-sha> --after <pass-sha>`, which refuses a commit that doesn't descend from the pass. No gate round runs on them. New work after the pass needs a new pass.
 
+## Gate checklist
+
+What the pass must show before its receipt. Each box is held by a script: the receipt refuses a pass that breaks it, or a check lists what breaks it.
+
+- [ ] §H1 One gate round: the pass ran `kc-code-review` once on the whole diff, and no gate ran on code written while fixing. The receipt is written with `--rounds 1`; it refuses a second round. (N/A: never)
+- [ ] §H2 One writer: only a gate's mechanical edits (a rename, a deletion, a move) were applied as written, the ones `check-gate-fixes.sh` prints as `apply`; every edit it prints as `write` was written by you from the finding. (N/A: round 1 found nothing, or the gates wrote no edits)
+- [ ] §H3 Only what lets something wrong through was fixed: each finding that only refuses too much or fails safe is an `open` line in `fixes.txt` with its reason (fails safe, needs a decision, pre-existing), and the open lines number the receipt's `--open`. (N/A: round 1 found nothing)
+- [ ] §H4 Each fix that changes behaviour has a test that fails when the fix is broken, and its `fixed` line in `fixes.txt` names that test file, one the fix commits added or changed; a fix that changes no behaviour is a `mechanical` line. (N/A: no fix commits)
+- [ ] §H5 Fixes after the pass (the user's picks, a reviewer's comments) were written the same way and recorded with `--after`, with no gate round on them; only new work got a new pass. (N/A: nothing changed after the pass)
+
 ## The guard
 
 `scripts/guard-hand-off.sh` blocks `gh pr ready`, `gh pr create` without `--draft` or with a reviewer, `gh pr edit --add-reviewer` and a write to a PR's `requested_reviewers` until the PR's head commit has a receipt.

@@ -67,6 +67,7 @@ expect_contains "four sentences with no reason are flagged" "has 4 sentences" "$
 draft "$work_dir/run-on.json" $'**suggestion**:\nSince the total is computed before the archived filter runs and the list applies that filter after loading every item from the cart service the two numbers drift apart whenever anything is archived.'
 expect_contains "a sentence over 25 words is flagged" "word sentence" "$(result "$work_dir/run-on.json")"
 
+# A comment carries at most two lines of code (kc-post-review §PC1).
 three_line_fix=$'**issue**:\nAn empty cart still shows the old total, since nothing resets it.\n```ts\nif (items.length === 0) {\n  return 0\n}\n```'
 draft "$work_dir/long-code.json" "$three_line_fix"
 expect_contains "three lines of code are flagged" "has 3 lines of code" "$(result "$work_dir/long-code.json")"
