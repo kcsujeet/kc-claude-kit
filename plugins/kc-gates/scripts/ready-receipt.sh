@@ -21,6 +21,9 @@
 #       list's output) and ledger.tsv (a verdict per item), which must pass
 #       feedback-ledger.sh check against this PR's diff from the default
 #       branch, plus any *.diff in the folder (a lesson PR in another repo).
+#       A `covered` verdict is checked against the rules as they were at the
+#       merge-base, plus each folder inside the ledger folder (another repo's
+#       rules as they were). --ledger without --checklist is a usage error.
 #   ready-receipt.sh check <sha> [--pass]
 #       Exits 0 and prints the receipt when there is one, 1 otherwise. With
 #       --pass, a receipt for the checklist alone doesn't count: handing a PR
@@ -380,24 +383,27 @@ check_receipt() {
 
 # Succeeds when the repo's hand-off checklist opens with front matter holding
 # `ledger: true`.
-checklist_wants_ledger() {
+is_ledger_required() {
   local checklist
   checklist="$(git rev-parse --show-toplevel 2>/dev/null)/.claude/hand-off-checklist.md"
   [ -r "$checklist" ] || return 1
-  awk 'NR == 1 && $0 != "---" { exit }
-       NR > 1 && $0 == "---" { exit }
-       NR > 1 && /^ledger:[[:space:]]*true[[:space:]]*$/ { found = 1; exit }
+  awk '{ is_first_line = (NR == 1); is_delimiter = ($0 == "---") }
+       is_first_line && !is_delimiter { exit }
+       is_first_line { next }
+       is_delimiter { exit }
+       /^ledger:[[:space:]]*true[[:space:]]*$/ { found = 1; exit }
        END { exit !found }' "$checklist"
 }
 
 # Refuses the checklist receipt unless the look-back's ledger passes: every
 # piece of feedback the session got has a verdict, and each lesson's rule is
-# added by this PR (or a *.diff beside the ledger). Needed when the checklist
-# asks for it; checked whenever one is given.
+# added by this PR (or a *.diff beside the ledger), and each covered rule
+# existed before it. Needed when the checklist asks for it; checked whenever
+# one is given.
 check_ledger() {
-  local dir=$1 root default_branch base diffs=() extra
+  local dir=$1 root default_branch base diffs=() lesson_diff rules_dirs=() sibling_rules
   if [ -z "$dir" ]; then
-    checklist_wants_ledger || return 0
+    is_ledger_required || return 0
     echo "ready-receipt: this repo's checklist has ledger: true; pass --ledger <dir> with feedback.tsv and ledger.tsv from feedback-ledger.sh" >&2
     exit 1
   fi
@@ -409,10 +415,17 @@ check_ledger() {
   trap 'rm -rf "$ledger_work"' EXIT
   git -C "$root" diff --no-color --no-ext-diff "$base" "$sha" > "$ledger_work/pr.diff"
   diffs=(--diff "$ledger_work/pr.diff")
-  for extra in "$dir"/*.diff; do
-    [ -e "$extra" ] && diffs+=(--diff "$extra")
+  for lesson_diff in "$dir"/*.diff; do
+    [ -e "$lesson_diff" ] && diffs+=(--diff "$lesson_diff")
   done
-  if ! bash "$scripts_dir/feedback-ledger.sh" check "$dir/feedback.tsv" "$dir/ledger.tsv" "${diffs[@]}" --rules "$root" >&2; then
+  # The rules as they were before this PR, so a rule it adds can't count as covered.
+  mkdir "$ledger_work/rules-before"
+  git -C "$root" archive "$base" | tar -x -C "$ledger_work/rules-before"
+  rules_dirs=(--rules "$ledger_work/rules-before")
+  for sibling_rules in "$dir"/*/; do
+    [ -d "$sibling_rules" ] && rules_dirs+=(--rules "$sibling_rules")
+  done
+  if ! bash "$scripts_dir/feedback-ledger.sh" check "$dir/feedback.tsv" "$dir/ledger.tsv" "${diffs[@]}" "${rules_dirs[@]}" >&2; then
     echo "ready-receipt: the look-back's ledger is incomplete; give every listed item a verdict" >&2
     exit 1
   fi
@@ -435,6 +448,10 @@ write_receipt() {
       *) usage ;;
     esac
   done
+  if [ -n "$ledger_dir" ] && ! $checklist; then
+    echo "ready-receipt: --ledger goes with --checklist" >&2
+    exit 2
+  fi
   mkdir -p "$receipts_dir"
   if $checklist; then
     check_ledger "$ledger_dir"

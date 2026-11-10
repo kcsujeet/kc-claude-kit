@@ -28,13 +28,13 @@ cat > "$transcript" <<'JSONL'
 {"type":"user","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"t2","is_error":true,"content":"Exit code 1"}]}}
 {"type":"user","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"t3","content":[{"type":"text","text":"The user answered: \"Keep cents\""}]}]}}
 {"type":"user","message":{"role":"user","content":[{"type":"text","text":"[Request interrupted by user for tool use]"}]}}
+{"type":"user","message":{"role":"user","content":"<command-message>review is running</command-message>"}}
 JSONL
 qa_rows=$work_dir/qa-rows.txt
 printf 'Row 1: total shows 0 for a free order\n\nRow 2: tax\tmissing\n' > "$qa_rows"
 
 list=$work_dir/feedback.tsv
 bash "$script" list "$transcript" --extra "$qa_rows" > "$list"
-listed() { cut -f2,3 "$list"; }
 expected=$'typed\tFix the total on the order page
 typed\tdon\'t round before summing
 session\tAnother Claude session sent a message: add the tax line
@@ -45,7 +45,7 @@ answer\tThe user answered: "Keep cents"
 interrupt\t[Request interrupted by user for tool use]
 qa-rows.txt\tRow 1: total shows 0 for a free order
 qa-rows.txt\tRow 2: tax missing'
-expect_eq "list finds each kind of feedback, in order, and skips reminders, notifications, summaries, skill text, queued shell commands and tool errors" "$expected" "$(listed)"
+expect_eq "list finds each kind of feedback, in order, and skips reminders, notifications, summaries, skill text, queued shell commands and tool errors" "$expected" "$(cut -f2,3 "$list")"
 expect_eq "items are numbered F1 onwards" "F1 F10" "$(cut -f1 "$list" | sed -n '1p;$p' | tr '\n' ' ' | sed 's/ $//')"
 
 # check: a lesson diff that adds §B13 and WF14, and rule files that hold §R11 and **QA1.**
@@ -53,7 +53,8 @@ diff_file=$work_dir/lesson.diff
 printf -- '--- a/rules.md\n+++ b/rules.md\n+- [ ] §B13 A new kind of actor\n+- **WF14.** The look-back lists\n- removed §B9 line\n' > "$diff_file"
 rules_dir=$work_dir/rules
 mkdir -p "$rules_dir"
-printf -- '- [ ] §R11 Reads and writes\n- **QA1.** Sheets\n- [ ] §R16 other\n' > "$rules_dir/topic.md"
+printf -- '- [ ] §R11 Reads and writes\n- **QA1.** Sheets\n- [ ] §R16 other, see §R17\n' > "$rules_dir/topic.md"
+printf -- '- [ ] §R12 a rule outside Markdown\n' > "$rules_dir/notes.txt"
 
 complete_ledger() {
   printf 'F1\tnot-feedback\tthe task\n'
@@ -117,7 +118,7 @@ expect_contains "it says so" "F2: lesson names no rule id" "$last_output"
 
 complete_ledger | sed 's/^F4\tcovered\t§R11\t.*/F4\tcovered\t§R12\tno box/' > "$ledger"
 expect_check failed "covered by a rule no rule file has fails"
-expect_contains "it names the rule" "F4: covered by §R12, which no rule file has" "$last_output"
+expect_contains "it names the rule" "F4: covered by §R12, which no rule file had" "$last_output"
 
 complete_ledger | sed 's/^F4\tcovered\t§R11\t.*/F4\tcovered\t§R1\tno box/' > "$ledger"
 expect_check failed "covered by an id that is only the start of a real one fails"
@@ -144,6 +145,49 @@ expect_contains "it lists the verdicts" "'skipped' is not lesson, covered, one-o
 complete_ledger > "$ledger"
 output=$(bash "$script" check "$list" "$ledger" --rules "$rules_dir" 2>&1) && actual=passed || actual=failed
 expect_eq "with no lesson diff given, no lesson can be shown" failed "$actual"
+
+# A lesson must be defined by the diff, not only cited by it; a covered rule must be defined.
+printf -- '--- a/rules.md\n+++ b/rules.md\n+see §B13 for context\n+- **WF14.** The look-back lists\n' > "$work_dir/citing.diff"
+complete_ledger > "$ledger"
+output=$(bash "$script" check "$list" "$ledger" --diff "$work_dir/citing.diff" --rules "$rules_dir" 2>&1) && actual=passed || actual=failed
+expect_eq "a diff that only cites a rule does not add it" failed "$actual"
+expect_contains "it names the rule" "F2: lesson §B13 is not added by the lesson diff" "$output"
+complete_ledger | sed 's/^F4\tcovered\t§R11\t.*/F4\tcovered\t§R17\tcited only/' > "$ledger"
+expect_check failed "a rule only cited in the rules is not covered"
+complete_ledger | sed 's/^F4\tcovered\t§R11\t.*/F4\tcovered\t§R12\tnot in Markdown/' > "$ledger"
+expect_check failed "only Markdown rule files count"
+
+# An empty field stays empty: the reason doesn't slide into the rule id.
+complete_ledger | sed 's/^F2\tlesson\t§B13$/F2\tlesson\t\tsee F3/' > "$ledger"
+expect_check failed "a lesson with an empty rule field fails"
+expect_contains "it reads the field as empty" "F2: lesson names no rule id" "$last_output"
+
+# Blank lines and a last line with no newline are read.
+printf '%s' "$(complete_ledger | sed '3a\
+')" > "$ledger"
+{ cat "$list"; printf '\n'; } > "$work_dir/list-blank.tsv"
+output=$(bash "$script" check "$work_dir/list-blank.tsv" "$ledger" --diff "$diff_file" --rules "$rules_dir" 2>&1) && actual=passed || actual=failed
+expect_eq "a blank line in the list or ledger and no final newline still pass" passed "$actual"
+
+# A diff with no added lines, and rules with no ids, report problems instead of stopping.
+printf -- '--- a/rules.md\n+++ b/rules.md\n- removed §B9 line\n' > "$work_dir/removal.diff"
+mkdir -p "$work_dir/no-rules" && printf 'nothing here\n' > "$work_dir/no-rules/readme.md"
+complete_ledger > "$ledger"
+output=$(bash "$script" check "$list" "$ledger" --diff "$work_dir/removal.diff" --rules "$work_dir/no-rules" 2>&1) && actual=passed || actual=failed
+expect_eq "a removal-only diff and rules with no ids fail the ledger" failed "$actual"
+expect_contains "it says the lesson isn't added" "F2: lesson §B13 is not added by the lesson diff" "$output"
+expect_contains "it says the rule wasn't there" "F4: covered by §R11, which no rule file had" "$output"
+
+# Usage and unreadable inputs.
+output=$(bash "$script" 2>&1 || true)
+expect_contains "usage shows every verdict form" "<id> not-feedback <reason>" "$output"
+expect_eq "check with no ledger is a usage error" 2 "$(bash "$script" check "$list" >/dev/null 2>&1; echo $?)"
+expect_contains "a missing transcript says so" "cannot read $work_dir/none.jsonl" "$(bash "$script" list "$work_dir/none.jsonl" 2>&1 || true)"
+expect_contains "a missing extra file says so" "cannot read $work_dir/none.txt" "$(bash "$script" list "$transcript" --extra "$work_dir/none.txt" 2>&1 || true)"
+no_jq_bin=$work_dir/no-jq-bin
+mkdir -p "$no_jq_bin"
+ln -s "$(command -v basename)" "$no_jq_bin/basename"
+expect_contains "list without jq says so" "needs jq" "$(PATH=$no_jq_bin "$BASH" "$script" list "$transcript" 2>&1 || true)"
 
 expect_eq "a missing transcript is a usage error" 2 "$(bash "$script" list "$work_dir/none.jsonl" >/dev/null 2>&1; echo $?)"
 expect_eq "an unknown command is a usage error" 2 "$(bash "$script" tally >/dev/null 2>&1; echo $?)"
