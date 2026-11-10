@@ -9,7 +9,7 @@
 #               (default: the current directory's repository)
 #
 # Output, per repository: `## <owner/name>`, then one line per pull request whose title or
-# description names the key, newest first (at most 50):
+# description names the key, newest first (at most `max_rows`, 50):
 #   `#<n> <state> @<author> <head branch>: <title>`
 # or `(none)`.
 #
@@ -48,9 +48,12 @@ if [ "${#repos[@]}" -eq 0 ]; then
   repos=("$current_repo")
 fi
 
+# gh pr list returns at most this many per repository; a task named by more is claimed already.
+max_rows=50
+
 for repo in "${repos[@]}"; do
   echo "## $repo"
-  rows=$(gh pr list --repo "$repo" --state all --search "\"$task_key\" in:title,body" --limit 50 \
+  rows=$(gh pr list --repo "$repo" --state all --search "\"$task_key\" in:title,body" --limit "$max_rows" \
     --json number,state,author,headRefName,title \
     --jq '.[] | "#\(.number) \(.state) @\(.author.login) \(.headRefName): \(.title)"') \
     || fail "gh pr list --repo $repo failed"
