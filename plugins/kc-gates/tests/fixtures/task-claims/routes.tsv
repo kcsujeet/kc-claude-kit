@@ -1,0 +1,3 @@
+pr list --repo acme/shop --state all --search "ABC-1" in:title,body --limit 50 --json number,state,author,headRefName,title	pr-list-shop.json
+pr list --repo acme/shop-api --state all --search "ABC-1" in:title,body --limit 50 --json number,state,author,headRefName,title	pr-list-empty.json
+repo view --json nameWithOwner	repo-view.json

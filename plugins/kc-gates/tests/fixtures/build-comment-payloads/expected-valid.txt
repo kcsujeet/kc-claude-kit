@@ -7,3 +7,5 @@ wrote {out}/review.json (one review, 5 comment(s))
 
 Command for the user to approve (not run):
 KC_REVIEW_POST_APPROVED=1 gh api repos/{owner}/{repo}/pulls/12/reviews -X POST --input {out}/review.json
+
+After it posts and the state is verified, ask the user whether the work item this pull request is for changes hands: back to the author when the review asks for changes, on to the next step when it approves. When the project's own rules say who moves it, do what they say and tell the user; otherwise ask, and never leave it unmentioned.
