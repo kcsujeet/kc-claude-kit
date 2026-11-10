@@ -175,9 +175,12 @@ interface OrderTotalProps {
   order: Order
 }
 
+const CENTS_PER_DOLLAR = 100
+const dollars = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' })
+
 /** Shows an order's total in dollars. */
 export function OrderTotal({ order }: OrderTotalProps) {
-  return <p>Total: ${(order.totalCents / 100).toFixed(2)}</p>
+  return <p>Total: {dollars.format(order.totalCents / CENTS_PER_DOLLAR)}</p>
 }
 TSX
 git add -A
