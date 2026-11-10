@@ -1,0 +1,4 @@
+[
+  {"number": 41, "state": "OPEN", "author": {"login": "alice"}, "headRefName": "ABC-1-storefront-hours", "title": "ABC-1: Show storefront opening hours"},
+  {"number": 37, "state": "CLOSED", "author": {"login": "bob"}, "headRefName": "abc-1-first-try", "title": "Hours on the storefront (ABC-1)"}
+]
