@@ -13,9 +13,14 @@
 #       After commits that only hold fixes to that pass: the ones the user
 #       picked from its open list, or a reviewer asked for. Refused unless <pass-sha> has a pass or --after receipt and
 #       <sha> descends from it. Run it from the repo root.
-#   ready-receipt.sh write <sha> --checklist
+#   ready-receipt.sh write <sha> --checklist [--ledger <dir>]
 #       After walking the repo's hand-off checklist alone, before opening a
-#       draft PR in a repo whose checklist applies to drafts.
+#       draft PR in a repo whose checklist applies to drafts. A checklist whose
+#       front matter holds `ledger: true` (a repo whose PRs carry lessons)
+#       also needs --ledger: a folder with feedback.tsv (feedback-ledger.sh
+#       list's output) and ledger.tsv (a verdict per item), which must pass
+#       feedback-ledger.sh check against this PR's diff from the default
+#       branch, plus any *.diff in the folder (a lesson PR in another repo).
 #   ready-receipt.sh check <sha> [--pass]
 #       Exits 0 and prints the receipt when there is one, 1 otherwise. With
 #       --pass, a receipt for the checklist alone doesn't count: handing a PR
@@ -373,13 +378,54 @@ check_receipt() {
   cat "$receipt"
 }
 
+# Succeeds when the repo's hand-off checklist opens with front matter holding
+# `ledger: true`.
+checklist_wants_ledger() {
+  local checklist
+  checklist="$(git rev-parse --show-toplevel 2>/dev/null)/.claude/hand-off-checklist.md"
+  [ -r "$checklist" ] || return 1
+  awk 'NR == 1 && $0 != "---" { exit }
+       NR > 1 && $0 == "---" { exit }
+       NR > 1 && /^ledger:[[:space:]]*true[[:space:]]*$/ { found = 1; exit }
+       END { exit !found }' "$checklist"
+}
+
+# Refuses the checklist receipt unless the look-back's ledger passes: every
+# piece of feedback the session got has a verdict, and each lesson's rule is
+# added by this PR (or a *.diff beside the ledger). Needed when the checklist
+# asks for it; checked whenever one is given.
+check_ledger() {
+  local dir=$1 root default_branch base diffs=() extra
+  if [ -z "$dir" ]; then
+    checklist_wants_ledger || return 0
+    echo "ready-receipt: this repo's checklist has ledger: true; pass --ledger <dir> with feedback.tsv and ledger.tsv from feedback-ledger.sh" >&2
+    exit 1
+  fi
+  [ -r "$dir/feedback.tsv" ] && [ -r "$dir/ledger.tsv" ] || { echo "ready-receipt: $dir needs feedback.tsv and ledger.tsv" >&2; exit 1; }
+  root=$(git rev-parse --show-toplevel 2>/dev/null) || { echo "ready-receipt: run it from the repo the PR is in" >&2; exit 2; }
+  default_branch=$(git -C "$root" symbolic-ref -q --short refs/remotes/origin/HEAD 2>/dev/null || echo main)
+  base=$(git -C "$root" merge-base "$default_branch" "$sha" 2>/dev/null) || { echo "ready-receipt: $sha shares no commit with $default_branch" >&2; exit 1; }
+  ledger_work=$(mktemp -d)
+  trap 'rm -rf "$ledger_work"' EXIT
+  git -C "$root" diff --no-color --no-ext-diff "$base" "$sha" > "$ledger_work/pr.diff"
+  diffs=(--diff "$ledger_work/pr.diff")
+  for extra in "$dir"/*.diff; do
+    [ -e "$extra" ] && diffs+=(--diff "$extra")
+  done
+  if ! bash "$scripts_dir/feedback-ledger.sh" check "$dir/feedback.tsv" "$dir/ledger.tsv" "${diffs[@]}" --rules "$root" >&2; then
+    echo "ready-receipt: the look-back's ledger is incomplete; give every listed item a verdict" >&2
+    exit 1
+  fi
+}
+
 write_receipt() {
-  local rounds="" open="" after="" size="" scope_approved="" checklist=false
+  local rounds="" open="" after="" size="" scope_approved="" checklist=false ledger_dir=""
   shift
   pass_dir=""
   while [ "$#" -gt 0 ]; do
     case "$1" in
       --checklist) checklist=true; shift ;;
+      --ledger) [ "$#" -ge 2 ] || usage; ledger_dir=$2; shift 2 ;;
       --rounds) rounds=$2; shift 2 ;;
       --open) open=$2; shift 2 ;;
       --size) size=$2; shift 2 ;;
@@ -391,6 +437,7 @@ write_receipt() {
   done
   mkdir -p "$receipts_dir"
   if $checklist; then
+    check_ledger "$ledger_dir"
     printf 'sha=%s\ndate=%s\nchecklist=walked\n' "$sha" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$receipts_dir/$sha"
   elif [ -n "$after" ]; then
     is_full_sha "$after" || { echo "ready-receipt: --after needs a full SHA" >&2; exit 2; }

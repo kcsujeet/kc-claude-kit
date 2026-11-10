@@ -1,5 +1,6 @@
 ---
 drafts: true
+ledger: true
 ---
 
 # Hand-off checklist
@@ -14,6 +15,10 @@ Read by `kc-gates:kc-ready-for-review` before a pull request here is opened or m
 - [ ] An existing rule that should have caught it was widened instead of adding a narrower one beside it.
 - [ ] Every skill, agent, hook and script the PR adds or changes works in a repo with nothing added for the kit: what it runs ships in the plugin, and a repo file it reads is optional, with a default when it is missing (`CLAUDE.md`, "Plugins stand alone").
 - [ ] The PR description names the class of mistake in one sentence and two or three other cases the rule catches, from areas other than the one it came from; wording the request suggested was rewritten for the class, not kept because it was given.
+
+## It comes from the whole look-back
+
+- [ ] The lessons come from a listed look-back: `feedback-ledger.sh list` was run over the session transcript, with the review comments and QA rows as `--extra` files, every item has a verdict in the ledger, and `feedback-ledger.sh check` passes against this PR's diff (and a sibling repo's lesson diff where the lesson went there). The checklist receipt needs it: `ready-receipt.sh write <sha> --checklist --ledger <dir>`, since this file has `ledger: true`. The PR description gives the counts: items listed, and how many a first look-back from memory had missed.
 
 ## Nothing names where it came from
 

@@ -124,8 +124,9 @@ check allow "allowed: gh pr view" \
 check allow "allowed: non-gh command" \
   "git push origin HEAD"
 
-bash "$scripts/ready-receipt.sh" write "$(git -C "$work_dir/lesson-repo" rev-parse HEAD)" --checklist >/dev/null
-bash "$scripts/ready-receipt.sh" write "$(printf 'd%.0s' {1..40})" --checklist >/dev/null
+# Written from the work dir: a checklist receipt reads the checklist of the repo it runs in.
+(cd "$work_dir" && bash "$scripts/ready-receipt.sh" write "$(git -C "$work_dir/lesson-repo" rev-parse HEAD)" --checklist >/dev/null)
+(cd "$work_dir" && bash "$scripts/ready-receipt.sh" write "$(printf 'd%.0s' {1..40})" --checklist >/dev/null)
 check allow "allowed: draft PR once the checklist was walked" \
   "gh pr create --draft --fill" "$work_dir/lesson-repo"
 check allow "allowed: draft PR from GitHub once the checklist was walked" \

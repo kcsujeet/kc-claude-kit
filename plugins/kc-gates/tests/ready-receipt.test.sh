@@ -370,6 +370,32 @@ expect_write refused "an --open that is no count is refused" "$fixed_head" --rou
 expect_said "it asks for a count" "--open is a count"
 expect_write written "--checklist needs no pass folder" "$(make_fake_sha e)" --checklist
 expect_contains "--checklist records the walk" "checklist=walked" "$(bash "$scripts/ready-receipt.sh" check "$(make_fake_sha e)")"
+# A checklist with `ledger: true` needs the look-back's ledger, and it must pass.
+build_repo
+mkdir -p "$repo/.claude"
+printf -- '---\nledger: true\n---\n# Hand-off checklist\n' > "$repo/.claude/hand-off-checklist.md"
+printf -- '- [ ] §X2 Totals print cents.\n' > "$repo/RULES.md"
+lesson_head=$(commit_all "lesson")
+run_git update-ref refs/remotes/origin/main "$base"
+run_git symbolic-ref refs/remotes/origin/HEAD refs/remotes/origin/main
+expect_write refused "a checklist asking for the ledger refuses a receipt without one" "$lesson_head" --checklist
+expect_said "it asks for the ledger" "pass --ledger <dir>"
+ledger_dir=$work_dir/ledger-$RANDOM
+mkdir -p "$ledger_dir"
+printf 'F1\ttyped\tprint cents\nF2\ttyped\tgo ahead\n' > "$ledger_dir/feedback.tsv"
+printf 'F1\tlesson\t§X2\n' > "$ledger_dir/ledger.tsv"
+expect_write refused "a ledger with an item left out is refused" "$lesson_head" --checklist --ledger "$ledger_dir"
+expect_said "it names the item" "F2: no verdict in the ledger"
+printf 'F1\tlesson\t§X3\nF2\tnot-feedback\tthe go-ahead\n' > "$ledger_dir/ledger.tsv"
+expect_write refused "a lesson the PR doesn't add is refused" "$lesson_head" --checklist --ledger "$ledger_dir"
+printf -- '+- **X3.** From the sibling repo\n' > "$ledger_dir/sibling.diff"
+expect_write written "a lesson added by a sibling repo's diff beside the ledger counts" "$lesson_head" --checklist --ledger "$ledger_dir"
+rm "$ledger_dir/sibling.diff"
+printf 'F1\tlesson\t§X2\nF2\tnot-feedback\tthe go-ahead\n' > "$ledger_dir/ledger.tsv"
+expect_write written "a complete ledger whose lessons the PR adds is written" "$lesson_head" --checklist --ledger "$ledger_dir"
+rm -f "$ledger_dir/feedback.tsv"
+expect_write refused "a ledger folder without the feedback list is refused" "$lesson_head" --checklist --ledger "$ledger_dir"
+
 expect_write refused "--after refuses a commit with only the checklist's receipt" "$(make_fake_sha 9)" --after "$(make_fake_sha e)"
 if bash "$scripts/ready-receipt.sh" check "$(make_fake_sha e)" --pass >/dev/null; then
   record "check --pass refuses a checklist receipt" fail "it passed"
