@@ -266,3 +266,7 @@ echo "wrote $review_file (one review, $draft_count comment(s)$body_note)"
 echo
 echo "Command for the user to approve (not run):"
 echo "KC_REVIEW_POST_APPROVED=1 gh api repos/{owner}/{repo}/pulls/$pr_number/reviews -X POST --input $(quote_path "$review_file")"
+echo
+# A posted review leaves the work item it is for (a ticket, an issue) with the reviewer and
+# its old status until someone moves it; the hand-back is the user's call, so it is asked.
+echo "After it posts and the state is verified, ask the user whether the work item this pull request is for changes hands: back to the author when the review asks for changes, on to the next step when it approves. When the project's own rules say who moves it, do what they say and tell the user; otherwise ask, and never leave it unmentioned."

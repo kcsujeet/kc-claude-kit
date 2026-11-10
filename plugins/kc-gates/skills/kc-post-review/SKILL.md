@@ -407,6 +407,7 @@ The kc-gates plugin ships a PreToolUse hook that blocks GitHub review writes (`g
 1. Re-query the relevant resource via `gh api` (e.g. `repos/.../pulls/<N>/reviews` or `pulls/<N>/comments`).
 2. Match what you find against what you intended to do.
 3. Report the verified state, not the assumed state.
+4. After a review on someone else's pull request, read the work item it is for (the ticket or issue it names) and ask the user in the same turn whether it changes hands: back to the author, in progress again, when the review asks for changes; on to the next step when it approves. A review that is posted while the item still sits with the reviewer reads as the reviewer holding it up. When the project's own rules say who moves the item after a review, do what they say and tell the user; otherwise ask. Never leave it unmentioned. The payload builder prints this question after the post command.
 
 Saying "no comments posted" when six comments are live on the PR (a real prior failure) destroys trust faster than the original posting violation. Always verify before claiming.
 

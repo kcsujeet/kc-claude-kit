@@ -27,6 +27,8 @@ out="$work_dir/out"
 bash "$builder" "$fixtures/valid.json" "$fixtures/review.diff" "$head_sha" --pr 12 --out-dir "$out" > "$work_dir/valid.txt"
 sed "s|{out}|$out|g" "$fixtures/expected-valid.txt" > "$work_dir/expected-valid.txt"
 expect_file "valid: one checked comment per draft, one review and one approval command" "$work_dir/expected-valid.txt" "$work_dir/valid.txt"
+expect_contains "valid: after the command, the user is asked whether the work item changes hands" \
+  "ask the user whether the work item this pull request is for changes hands" "$(cat "$work_dir/valid.txt")"
 expect_file "valid: a range payload carries start_line and start_side" "$fixtures/expected-comment-2.json" "$out/comment-2.json"
 expect_file "valid: an old-side payload keeps side LEFT" "$fixtures/expected-comment-3.json" "$out/comment-3.json"
 expect_eq "valid: a single-line payload has exactly the five fields" "body,commit_id,line,path,side" \
