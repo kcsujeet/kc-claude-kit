@@ -7,7 +7,7 @@ set -euo pipefail
 git init -q -b main
 git config user.email eval@example.com
 git config user.name "Eval Fixture"
-mkdir -p src/orders src/analytics
+mkdir -p src/orders src/analytics src/stores
 cat > package.json <<'JSON'
 {
   "name": "shop",
@@ -37,6 +37,24 @@ export function useOrders() {
     queryKey: ['orders'],
     queryFn: async (): Promise<Order[]> => (await fetch('/api/orders')).json(),
   })
+}
+TS
+cat > src/stores/useStores.ts <<'TS'
+import { useQuery } from '@tanstack/react-query'
+
+export interface Store {
+  id: string
+  name: string
+}
+
+/** Reads the shop's stores. */
+export function useStores({ enabled = true }: { enabled?: boolean } = {}) {
+  const query = useQuery({
+    queryKey: ['stores'],
+    queryFn: async (): Promise<Store[]> => (await fetch('/api/stores')).json(),
+    enabled,
+  })
+  return { stores: query.data ?? [], isLoading: query.isPending }
 }
 TS
 cat > src/analytics/track.ts <<'TS'
@@ -121,6 +139,32 @@ export const OrderSearchInput = forwardRef<HTMLInputElement, { placeholder: stri
     return <input ref={ref} type="search" placeholder={placeholder} />
   },
 )
+TSX
+
+# §R39: the picker turns its own fetch off when stores are passed in, but its spinner reads
+# useStores' isLoading, which is the query's isPending and stays true while the query is off.
+cat > src/stores/StorePicker.tsx <<'TSX'
+import { type Store, useStores } from './useStores'
+
+interface StorePickerProps {
+  stores?: Store[]
+  value: string
+  onChange: (storeId: string) => void
+}
+
+/** Picks one of the shop's stores, from the stores passed in or the shop's own list. */
+export function StorePicker({ stores, value, onChange }: StorePickerProps) {
+  const { stores: fetchedStores, isLoading } = useStores({ enabled: !stores })
+  if (isLoading) return <p>Loading stores…</p>
+  const options = stores ?? fetchedStores
+  return (
+    <select value={value} onChange={(event) => onChange(event.target.value)}>
+      {options.map((store) => (
+        <option key={store.id} value={store.id}>{store.name}</option>
+      ))}
+    </select>
+  )
+}
 TSX
 
 # Clean: a small presentational component with a named export and a typed prop.

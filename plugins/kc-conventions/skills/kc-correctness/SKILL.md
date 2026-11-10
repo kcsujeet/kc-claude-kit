@@ -29,6 +29,8 @@ paths:
   - §B14. A guard against a delete counts only what the delete would harm
   - §B15. A change moves only the states it is for
   - §B16. A stored value is read in every state it can reach
+  - §B17. A new kind of actor passes the guards written for the old one
+  - §B18. A switch turned off stops every reader
 - Sweeps
 
 ## Rules
@@ -73,6 +75,8 @@ The correctness gate agent ticks every box against the diff. A box is FAIL if an
 - [ ] §B14 A guard that refuses a delete or removal counts only the related records the delete would harm, and the evidence lists each status or state the related record can have with a verdict (blocks, goes with it). A guard that counts every related row, so an abandoned, expired, failed or archived one blocks the delete, FAILS, as does a message that names an internal term or no way forward. (N/A: no delete guard in scope)
 - [ ] §B15 A change moves only the states it is for: for each changed condition, fallback, default or validation, and for each one a finding proposes, the evidence lists every state that reaches the line (each value its inputs can hold: saved and unsaved, empty, each option of a choice, each existing record; when each input arrives: before and after data loads, a first pass and a later one, a retry; and each path that reaches the line, with the checks it runs first) with the result before and after. A state outside the change's purpose whose result moves FAILS; a proposed fix that moves one is rewritten or dropped before it is reported. A proposed fix that changes behaviour is run, not only read: applied to a scratch copy with a test for the break it fixes, then the suite and each listed state run, and the evidence says `ran:` with the result; one that can't be run is asked for as the outcome and its test, not as code. (N/A: no condition, fallback, default or validation changed or proposed)
 - [ ] §B16 A stored value is read in every state it can reach: for each value the diff writes for a later step or reads from an earlier one (a cookie, a cache or storage entry, a URL or query parameter, a file, a row, a flag), the evidence is a table with one row per state or event and the `file:line` that handles it, or "unhandled". The states are what it can be when read (missing, stale, written by an older version, another user's or session's, half-written, written by two writers at once, with which copy wins and by what stamp); the events are what can happen between the write and the read (reload, sign-out or expiry, back and forward, retry, restart, a second tab, an update or deploy). A row with no handler FAILS. A submitted form value is §B5. (N/A: the diff writes or reads no value that waits for a later step)
+- [ ] §B17 A new kind of actor passes the guards written for the old one: when the diff lets a new kind of record own or perform an action another kind did (a store sending reminders only a person sent, a service account placing orders a customer placed, a gift card paying for what a customer's card paid), every guard, filter and early return on that action's paths keyed on the old kind (its active status, its connection, its ownership, its plan, a join through its id) is listed, in jobs, schedulers and services as well as the code the diff touches, each with a verdict: holds for the new kind, needs the new kind's own check, or doesn't apply. A guard that drops, refuses or stalls the new kind's work FAILS, citing its `file:line`. (N/A: no action gains a new kind of owner or performer)
+- [ ] §B18 A switch turned off stops every reader: when the diff puts a feature or its data behind a switch (a feature flag, a permission, a plan, a setting), the evidence lists every reader of what is switched (each serializer and every subclass that declares the field again, background jobs and work already queued, scheduled steps, outgoing mail or webhooks, signed-out and public pages, exports and links built from it), each with the line that checks the switch or why it needn't. A reader that still uses the switched data or behaviour while the switch is off FAILS. (N/A: the diff adds or widens no switch)
 
 **Point, do not double-report.** A removed export or a changed shared prop shape is structure §S10. A cast asserting a type the value does not have, as syntax, is clarity §C17. Duplicated markup, dead imports, or props threaded through and never read after a refactor are simplicity §P9. A locale formatter with no explicit time zone is datetime §D7. When a bug and one of those boxes describe the same line, report it once, under the closer fit, and name the other box in the evidence.
 
@@ -174,6 +178,7 @@ A shop had one store, so code reached it as `shop.store`. When shops gain severa
 
 **How to check.** Find every accessor that returns one record from the many (an ordered single-record association, `.first`, a `default_` method) and grep its readers. Each reader already has, or can get, the specific record it means: the order's store, the store in the URL, the store on the customer's account. Point it there, then delete the accessor and its fallbacks. Keep one only when a product rule says which record it is ("the store the shop marked primary"), and name that rule in the code.
 
+
 ### §B14. A guard against a delete counts only what the delete would harm
 
 A shop could not delete a storefront "that has checkouts". Every checkout counted, so one guest who opened a checkout and left (expired) locked the storefront forever, and a test environment, where nobody completes payments, filled with storefronts nobody could delete. The guard existed to keep payment history; only paid checkouts, and ones still in progress, hold any.
@@ -213,3 +218,15 @@ Save the diff under review to a file and run the script over it; `-` reads the d
   ```bash
   bash "${CLAUDE_PLUGIN_ROOT}/scripts/added-lines.sh" <diff-file>
   ```
+
+### §B17. A new kind of actor passes the guards written for the old one
+
+Code that performs an action is full of checks written when only one kind of record did it: send only when the writer's account is active and their email connected, place the order only for a customer in good standing, charge only a card its owner still holds. When a new kind starts doing the same action (a store sends on a person's behalf, a service account places orders, a gift card pays), the diff adds the new path and those checks stay where they were, often in a job or scheduler the diff never opens. The work is then dropped or stalls without an error: a reminder scheduled from the store's address never goes out because its writer has no email of their own connected; a service account's order sits unpaid because the payment step asks for a customer's billing profile.
+
+**How to check.** Name the action and the old kind. Grep each place that performs or queues the action (the job, the scheduler's query, the service, the early returns before it) for conditions on the old kind, and give each a verdict for the new kind. Then run the new kind through the path end to end, scheduled and immediate.
+
+### §B18. A switch turned off stops every reader
+
+A feature behind a flag, a permission or a plan is usually switched off where people see it: the menu entry, the settings page, the picker. The data it created keeps flowing through every other reader: a serializer that still sends it (and a subclass for public pages that declares the field again on its own), a job that sends queued work through it, an email footer built from it, an export. Turning the switch off then hides the setting and leaves the behaviour on. A custom storefront domain switched off for a shop kept appearing in every order email, since the link builder read the saved domain and never the switch.
+
+**How to check.** List every reader of what the switch guards, by grep on the field, the association and the method names, subclasses included. Each reader checks the switch, through one method on the record that owns it so the readers agree, or says why it needn't. Then turn the switch off and walk each reader, signed-out pages and queued work included.

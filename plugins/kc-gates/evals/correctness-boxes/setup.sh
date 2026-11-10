@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# A shop repo whose feature branch makes six changes, each with one correctness-rule violation a
+# A shop repo whose feature branch makes eight changes, each with one correctness-rule violation a
 # review should flag, and adds one unit (priceRange) that handles its edge cases, which it should
 # not flag. main holds the code two of the changes edit.
 set -euo pipefail
@@ -7,7 +7,7 @@ set -euo pipefail
 git init -q -b main
 git config user.email eval@example.com
 git config user.name "Eval Fixture"
-mkdir -p src/customers src/catalog
+mkdir -p src/customers src/catalog src/reminders src/shops
 cat > src/customers/types.ts <<'TS'
 export interface Address {
   line1: string
@@ -45,6 +45,37 @@ export interface Order {
   id: string
   productId: string
   status: 'open' | 'shipped' | 'cancelled' | 'refunded'
+}
+TS
+cat > src/reminders/types.ts <<'TS'
+export interface User {
+  id: string
+  active: boolean
+  emailConnected: boolean
+}
+export interface Reminder {
+  id: string
+  senderUserId: string
+  sendAt: Date
+  body: string
+}
+TS
+cat > src/reminders/dueReminders.ts <<'TS'
+import type { Reminder, User } from './types'
+
+/** The reminders the scheduler sends now: due, and from a sender who can still send. */
+export function dueReminders(reminders: Reminder[], users: Map<string, User>, now: Date): Reminder[] {
+  return reminders.filter((reminder) => {
+    const sender = users.get(reminder.senderUserId)
+    return reminder.sendAt <= now && sender?.active === true && sender.emailConnected
+  })
+}
+TS
+cat > src/shops/types.ts <<'TS'
+export interface Shop {
+  id: string
+  slug: string
+  features: Record<string, boolean>
 }
 TS
 printf '{ "name": "shop", "type": "module", "scripts": { "test": "vitest run" } }\n' > package.json
@@ -134,6 +165,64 @@ export interface SavedCart {
 
 export function loadSavedCart(storage: Storage): SavedCart {
   return JSON.parse(storage.getItem('cart') as string) as SavedCart
+}
+TS
+
+# §B17: reminders can now be sent from a store's own address, but the scheduler still
+# requires the writer's own active account and connected email, so store reminders from a writer
+# without one never go out.
+cat > src/reminders/types.ts <<'TS'
+export interface User {
+  id: string
+  active: boolean
+  emailConnected: boolean
+}
+export interface Store {
+  id: string
+  emailAddress: string
+}
+export interface Reminder {
+  id: string
+  senderUserId: string
+  /** Set when the reminder goes out from the store's address instead of the writer's own. */
+  storeId?: string
+  sendAt: Date
+  body: string
+}
+TS
+cat > src/reminders/scheduleStoreReminder.ts <<'TS'
+import type { Reminder, Store, User } from './types'
+
+/** Schedules a reminder sent from the store's address on behalf of the user who wrote it. */
+export function scheduleStoreReminder(author: User, store: Store, body: string, sendAt: Date): Reminder {
+  return { id: crypto.randomUUID(), senderUserId: author.id, storeId: store.id, sendAt, body }
+}
+TS
+
+# §B18: a custom storefront domain behind a feature flag; the settings page checks the flag, the
+# link builder used by order emails reads the saved domain whatever the flag says.
+cat > src/shops/types.ts <<'TS'
+export interface Shop {
+  id: string
+  slug: string
+  features: Record<string, boolean>
+  customDomain?: string
+}
+TS
+cat > src/shops/customDomainSettings.ts <<'TS'
+import type { Shop } from './types'
+
+/** Whether the shop's settings page offers a custom storefront domain. */
+export function canUseCustomDomain(shop: Shop): boolean {
+  return shop.features.customDomains === true
+}
+TS
+cat > src/shops/links.ts <<'TS'
+import type { Shop } from './types'
+
+/** The storefront address order emails link to. */
+export function storefrontUrl(shop: Shop): string {
+  return shop.customDomain ? `https://${shop.customDomain}` : `https://shops.example.com/${shop.slug}`
 }
 TS
 

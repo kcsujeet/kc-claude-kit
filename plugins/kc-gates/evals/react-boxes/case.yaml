@@ -1,6 +1,6 @@
 schema_version: "1.1"
 name: react-boxes
-description: A React 19 branch seeded with one realistic React-rule violation per component (an index key on reorderable lines, an effect-only component, a raw fetch beside an existing read hook, a memo with nothing to compute, forwardRef on React 19) and one component written the way the rules ask; the review fails, flags each seeded file and raises nothing on the clean one.
+description: A React 19 branch seeded with one realistic React-rule violation per component (an index key on reorderable lines, an effect-only component, a raw fetch beside an existing read hook, a memo with nothing to compute, forwardRef on React 19, a picker whose spinner reads a disabled query's pending flag (§R39)) and one component written the way the rules ask; the review fails, flags each seeded file and raises nothing on the clean one.
 tags: [review, gate, react]
 context:
   scaffold_script: setup.sh

@@ -122,6 +122,7 @@ The react gate agent ticks every box against the diff. A box is FAIL if any matc
 - [ ] §R36 A field that picks a record is a picker component for that kind of record, in its own file, shaped like 2 cited existing pickers (the props they take, how they narrow, how they show an empty list). A form or field component that fetches records and builds the options itself FAILS. (N/A: no record picker added or changed)
 - [ ] §R37 Markup shared by two or more components is a component taking the differences as props. A hook or function whose return value carries JSX for callers to render FAILS, unless the codebase's API for that spot takes options with node labels and 2 cited similar call sites build them inline. (N/A: no shared markup added or moved)
 - [ ] §R38 Every value a render reads for what it shows or passes on comes from a subscription (a watched form field, a store selector, state, a hook's return value). A one-off read during render (`getValues()`, `getState()`, `ref.current`, a module variable that changes) FAILS: a memoizing compiler or `memo` can keep its first result, and a ref is unset on the first render; read it in an effect or event handler, or subscribe. (N/A: no render reads a form, store or ref)
+- [ ] §R39 A loading flag shows a request that is running: every spinner, skeleton, disabled control or early return the diff drives from a read's pending or loading flag is checked against each way that read can be switched off (an `enabled` option, a request skipped until an id or choice exists, data passed in instead of fetched), and the evidence names the line the flag comes from. A flag that stays set while the request is off (a query library's pending status, which holds for a disabled query with no data, or a project hook's `isLoading` that returns it) FAILS unless the same condition that switches the request off also gates the UI. (N/A: no UI driven by a read's loading flag)
 
 ## Review detail
 
@@ -323,7 +324,7 @@ The detail for §R20, §R35, §R36 and §R37 is in `${CLAUDE_PLUGIN_ROOT}/skills
 
 ### Section 3 — Data fetching
 
-The detail for §R11-§R13, §R21-§R23, §R27, §R28 and §R30 is in `${CLAUDE_PLUGIN_ROOT}/skills/kc-react/references/data-fetching.md`. Read it in full before grading any of them.
+The detail for §R11-§R13, §R21-§R23, §R27, §R28, §R30 and §R39 is in `${CLAUDE_PLUGIN_ROOT}/skills/kc-react/references/data-fetching.md`. Read it in full before grading any of them.
 
 ---
 

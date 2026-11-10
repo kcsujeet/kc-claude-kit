@@ -94,6 +94,8 @@ summarize_blocks() {
   awk '
     function trim(s) { sub(/^[[:space:]]+/, "", s); sub(/[[:space:]]+$/, "", s); return s }
     function strip_label(s) { sub(/^[A-Z]+:/, "", s); return trim(s) }
+    # A gate name is one word; a label after it ("verification (diff B)") is not part of it.
+    function gate_name(s) { s = strip_label(s); sub(/[[:space:](].*$/, "", s); return s }
     function settle_bare_box(has_nested_evidence) {
       if (!awaiting_evidence) return
       if (has_nested_evidence) boxes++
@@ -106,7 +108,7 @@ summarize_blocks() {
       kind = ""
     }
     /^[[:space:]]*```/ { next }
-    /^GATE:/ { emit_block(); kind = "gate"; name = strip_label($0); status = ""; boxes = 0; bad = 0; section = ""; next }
+    /^GATE:/ { emit_block(); kind = "gate"; name = gate_name($0); status = ""; boxes = 0; bad = 0; section = ""; next }
     /^SCOPE:/ { emit_block(); kind = "scope"; name = "SCOPE"; status = "-"; boxes = 0; bad = 0; section = "boxes"; next }
     kind == "" { next }
     /^STATUS:/ { settle_bare_box(0); status = strip_label($0); next }

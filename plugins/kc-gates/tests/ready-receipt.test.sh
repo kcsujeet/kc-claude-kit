@@ -183,6 +183,10 @@ expect_write refused "a round with no verification block is refused" "$fixed_hea
 expect_said "it names the verification gate" "round-1: no GATE: verification block"
 
 build_pass
+printf 'GATE: naming (diff B, the client)\nSTATUS: PASS\nBOXES:\n- [PASS] §N1: 0 hits\n' > "$pass_dir/round-1/verdicts/naming.txt"
+expect_write written "a label after the gate name is not part of the name" "$fixed_head" --rounds 1 --open 0 --size full --pass "$pass_dir"
+
+build_pass
 printf 'GATE: naming\nBOXES:\n- [PASS] §N1: 0 hits\n' > "$pass_dir/round-1/verdicts/naming.txt"
 expect_write refused "a block with no STATUS: is refused" "$fixed_head" --rounds 1 --open 0 --pass "$pass_dir"
 expect_said "it names the missing status" "GATE: naming has no STATUS:"

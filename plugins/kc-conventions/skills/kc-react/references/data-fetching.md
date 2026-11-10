@@ -1,6 +1,6 @@
 # React: data fetching
 
-Review detail for react §R11-§R13, §R21-§R23 and §R27, moved out of `SKILL.md` to keep it under the line cap. The boxes are in `SKILL.md` under `## Review checklist`.
+Review detail for react §R11-§R13, §R21-§R23, §R27, §R28, §R30 and §R39, moved out of `SKILL.md` to keep it under the line cap. The boxes are in `SKILL.md` under `## Review checklist`.
 
 ## §R11. Reads and writes live in separate hooks
 
@@ -118,3 +118,17 @@ const { data: options } = useProducts({ status }) // GET /products?status=active
 
 Filter in code only when the server cannot, and say why in a comment. "Cannot" means the data or the endpoint is out of your hands (a third-party API, a field the server never stores). An endpoint your team owns that simply lacks the filter gets the filter, usually one entry beside the filters it already declares, and the server change ships first so the client never sends a filter the server rejects.
 
+## §R39. A loading flag shows a request that is running
+
+A read's loading flag is read as "the request is on its way", but some flags mean "there is no data yet", which also holds for a request that will never run. TanStack Query v5's `isPending` stays true for a disabled query with no data, so a picker that turns its own fetch off when the caller passes the options in shows its spinner forever. The same class: a tab whose query waits for a selected id shows a skeleton until someone picks one, instead of asking them to pick; a "saving" label tied to a mutation's idle state shows before anything was sent.
+
+Find where the flag comes from (a project hook often returns `isLoading: query.isPending` under a friendlier name) and list each way the request can be off. Drive the UI from a flag that means a request is in flight (v5's `isLoading` or `isFetching`), or gate it on the same condition as `enabled`.
+
+```tsx
+// Flag: useStores returns isLoading: query.isPending, so passing stores in keeps the spinner on
+const { stores: fetched, isLoading } = useStores({ enabled: !stores })
+if (isLoading) return <Spinner />
+
+// Prefer: the condition that switches the fetch off also switches the spinner off
+if (!stores && isLoading) return <Spinner />
+```
