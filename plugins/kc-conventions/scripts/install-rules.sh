@@ -2,7 +2,7 @@
 # Installs the plugin's generated rules into a project: copies every
 # rules/*.md (found relative to this script, never guessed) into the
 # destination, then writes <dest>/.kc-conventions-version from the plugin's
-# .claude-plugin/plugin.json so the SessionStart hook can tell a current copy
+# .claude-plugin/plugin.json so the hook that checks the install can tell a current copy
 # from a stale one. Copies, never symlinks: a symlink into the plugin's install
 # directory breaks when the plugin updates or is removed.
 #
