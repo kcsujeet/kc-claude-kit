@@ -3,9 +3,8 @@
 # that the look-back is due (the working agreement's "Order of work on a task", step 6). After an
 # approval: its own misses across the review's rounds become lessons. After a merge: the task is
 # handed off, so every piece of feedback it got is listed and given a verdict. Both without being
-# asked. The step is placed "once the task is handed off", and nothing marked that moment for the
-# agent's own work: a session merged its pull request, was asked what came next, and listed four
-# steps without the look-back.
+# asked. The step is placed "once the task is handed off", and nothing else marks that moment for
+# the agent's own work.
 #
 # An approval is `gh pr review --approve` (or `-a`), or a `gh api` write to a PR's reviews whose
 # event is APPROVE: given as a field (`-f event=APPROVE`), inline, or in the `--input` file.

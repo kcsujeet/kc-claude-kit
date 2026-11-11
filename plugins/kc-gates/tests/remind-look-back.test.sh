@@ -74,6 +74,7 @@ expect_hook quiet "asking whether a pull request is merged" "gh api repos/shop/w
 expect_hook quiet "a PUT to another endpoint of the pull request" "gh api repos/shop/web/pulls/12/update-branch -X PUT"
 expect_hook quiet "a merge command echoed, not run" "echo run gh-pr-merge later"
 expect_hook quiet "git merge" "git merge main"
+expect_hook quiet "a PUT to the merge endpoint by another tool" "curl -X PUT https://api.example.test/repos/shop/web/pulls/12/merge"
 expect_hook quiet "a merge endpoint read in one command and a PUT in a later one" "gh api repos/shop/web/pulls/12/merge ; gh api repos/shop/web/pulls/12/update-branch -X PUT"
 
 # --- not approvals -------------------------------------------------------------------------------

@@ -192,6 +192,11 @@ expect_eq "a removal-only diff and rules with no ids fail the ledger" failed "$a
 expect_contains "it says the lesson isn't added" "F2: lesson §B13 is not added by the lesson diff" "$output"
 expect_contains "it says the rule wasn't there" "F4: covered by §R11, which no rule file had" "$output"
 
+# A --rules folder that isn't there has no rule files: the ledger is still checked item by item.
+output=$(bash "$script" check "$list" "$ledger" --diff "$diff_file" --rules "$work_dir/gone" 2>&1) && actual=passed || actual=failed
+expect_eq "a rules folder that does not exist fails the covered verdict" failed "$actual"
+expect_contains "it still reports the item" "F4: covered by §R11, which no rule file had" "$output"
+
 # Usage and unreadable inputs.
 output=$(bash "$script" 2>&1 || true)
 expect_contains "usage shows every verdict form" "<id> not-feedback <reason>" "$output"
