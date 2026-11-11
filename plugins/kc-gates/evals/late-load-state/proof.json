@@ -1,0 +1,40 @@
+{
+  "case": "plugins/kc-gates/evals/late-load-state",
+  "commit": "7aaf8b916c598f958411d1a0c2a5c627b2b75a29",
+  "case_hash": "d7f7e0aafde4e22f0e61b255d6b31b17be123cea",
+  "plugins_hash": "60e0d3a7b6583130fac84e8301cc80b3d5b229d5",
+  "claude": "2.1.317 (Claude Code)",
+  "model": "sonnet",
+  "verdict": "ok",
+  "runs": {
+    "with": [
+      {
+        "error": null,
+        "graders": [
+          {
+            "name": "flags-late-list",
+            "passed": true,
+            "scored": true
+          },
+          {
+            "name": "verdict-failed",
+            "passed": true,
+            "scored": false
+          }
+        ]
+      }
+    ],
+    "without": [
+      {
+        "error": null,
+        "graders": [
+          {
+            "name": "flags-late-list",
+            "passed": false,
+            "scored": true
+          }
+        ]
+      }
+    ]
+  }
+}
