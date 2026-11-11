@@ -1,10 +1,17 @@
 #!/usr/bin/env bash
-# PostToolUse hook for Bash: after a command that approves a pull request, reminds Claude that the
-# review's look-back is due (the working agreement's "Order of work on a task", step 6): its own
-# misses across the review's rounds become lessons, without being asked.
+# PostToolUse hook for Bash: after a command that approves or merges a pull request, reminds Claude
+# that the look-back is due (the working agreement's "Order of work on a task", step 6). After an
+# approval: its own misses across the review's rounds become lessons. After a merge: the task is
+# handed off, so every piece of feedback it got is listed and given a verdict. Both without being
+# asked. The step is placed "once the task is handed off", and nothing marked that moment for the
+# agent's own work: a session merged its pull request, was asked what came next, and listed four
+# steps without the look-back.
 #
 # An approval is `gh pr review --approve` (or `-a`), or a `gh api` write to a PR's reviews whose
 # event is APPROVE: given as a field (`-f event=APPROVE`), inline, or in the `--input` file.
+#
+# A merge is `gh pr merge` (but not `--disable-auto`, which only cancels a queued one), or a
+# `gh api` PUT to a PR's `merge`.
 #
 # It splits the command as the guards do, quotes or not, so a review body holding `;` or
 # `--approve` can cost a reminder or add one. A reminder is harmless either way, and a shell
@@ -42,6 +49,21 @@ is_approval_segment() {
   [ -r "$input_file" ] && grep -Eq '"event"[[:space:]]*:[[:space:]]*"APPROVE"' "$input_file"
 }
 
+# A PR's merge endpoint; a GET on it only asks whether the PR is merged.
+readonly PR_MERGE_ENDPOINT='pulls/[0-9]+/merge([^/[:alnum:]]|$)'
+
+# True when the segment merges a PR.
+is_merge_segment() {
+  local segment=$1
+  if printf '%s' "$segment" | grep -Eq "${GH_COMMAND_START}pr[[:space:]]+merge([[:space:]]|$)"; then
+    printf '%s' "$segment" | grep -Eq -- '--disable-auto([[:space:]]|$)' && return 1
+    return 0
+  fi
+  printf '%s' "$segment" | grep -Eq "${GH_COMMAND_START}api([[:space:]]|$)" || return 1
+  printf '%s' "$segment" | grep -Eq "$PR_MERGE_ENDPOINT" || return 1
+  printf '%s' "$segment" | grep -Eq -- "(-X|--method)[[:space:]=]*[\"']?PUT"
+}
+
 main() {
   local input command cwd segment
   input="$(cat)"
@@ -52,6 +74,12 @@ main() {
     if is_approval_segment "$segment" "$cwd"; then
       cat <<'EOF'
 {"hookSpecificOutput":{"hookEventName":"PostToolUse","additionalContext":"kc-gates: this approved a pull request, so the review's look-back is due once it closes (working agreement, Order of work on a task, step 6). Before calling the review done, list your own misses across its rounds (a finding the author fixed only where it named, a suggestion that caused a later finding, a gap a later round found that an earlier one could have) and write them as lessons, without being asked."}}
+EOF
+      exit 0
+    fi
+    if is_merge_segment "$segment"; then
+      cat <<'EOF'
+{"hookSpecificOutput":{"hookEventName":"PostToolUse","additionalContext":"kc-gates: this merged a pull request, so its task is handed off and the look-back is due (working agreement, Order of work on a task, step 6). Before saying what comes next, list every piece of feedback the session got (feedback-ledger.sh list over its transcript), give each one a verdict, and write the lessons, without being asked."}}
 EOF
       exit 0
     fi

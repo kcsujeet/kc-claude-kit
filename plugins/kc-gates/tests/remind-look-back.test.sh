@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
-# Tests scripts/remind-look-back.sh: every way of approving a pull request gets the look-back
-# reminder; comments, other reviews and reads get nothing. Each case runs twice, once with jq and
-# once through the sed fallback.
+# Tests scripts/remind-look-back.sh: every way of approving a pull request gets the review's
+# look-back reminder and every way of merging one gets the task's; comments, other reviews, reads
+# and cancelling a queued merge get nothing. Each case runs twice, once with jq and once through
+# the sed fallback.
 set -euo pipefail
 
 tests_dir=$(cd "$(dirname "$0")" && pwd)
@@ -34,6 +35,8 @@ expect_hook() {
       verdict=quiet
     elif printf '%s' "$output" | grep -q '"hookEventName":"PostToolUse","additionalContext":"kc-gates: this approved a pull request'; then
       verdict=remind
+    elif printf '%s' "$output" | grep -q '"hookEventName":"PostToolUse","additionalContext":"kc-gates: this merged a pull request'; then
+      verdict=remind-merge
     else
       verdict="unexpected output: $output"
     fi
@@ -55,6 +58,23 @@ expect_hook remind "--approve quoted on its own" "gh pr review 12 '--approve'"
 expect_hook remind "a pending review submitted as APPROVE" "gh api repos/shop/web/pulls/12/reviews/7/events -X POST -f event=APPROVE"
 expect_hook remind "an --input file under ~/" "gh api repos/shop/web/pulls/12/reviews -X POST --input ~/approve.json"
 expect_hook remind "an --input file by absolute path, as the payload builder prints it" "gh api repos/shop/web/pulls/12/reviews -X POST --input $work_dir/approve.json"
+
+# --- merges --------------------------------------------------------------------------------------
+expect_hook remind-merge "gh pr merge" "gh pr merge 12 --merge"
+expect_hook remind-merge "gh pr merge with no number, squashing" "gh pr merge --squash --delete-branch"
+expect_hook remind-merge "gh pr merge alone on its line" "gh pr merge"
+expect_hook remind-merge "a merge queued with --auto" "gh pr merge 12 --auto --rebase"
+expect_hook remind-merge "a merge after another command" "gh pr view 12 --json state && gh pr merge 12 --merge"
+expect_hook remind-merge "gh api PUT to the merge endpoint" "gh api repos/shop/web/pulls/12/merge -X PUT -f merge_method=squash"
+expect_hook remind-merge "gh api --method PUT, quoted" "gh api --method 'PUT' repos/shop/web/pulls/12/merge"
+
+# --- not merges ----------------------------------------------------------------------------------
+expect_hook quiet "cancelling a queued merge" "gh pr merge 12 --disable-auto"
+expect_hook quiet "asking whether a pull request is merged" "gh api repos/shop/web/pulls/12/merge"
+expect_hook quiet "a PUT to another endpoint of the pull request" "gh api repos/shop/web/pulls/12/update-branch -X PUT"
+expect_hook quiet "a merge command echoed, not run" "echo run gh-pr-merge later"
+expect_hook quiet "git merge" "git merge main"
+expect_hook quiet "a merge endpoint read in one command and a PUT in a later one" "gh api repos/shop/web/pulls/12/merge ; gh api repos/shop/web/pulls/12/update-branch -X PUT"
 
 # --- not approvals -------------------------------------------------------------------------------
 expect_hook quiet "a comment review from its --input file" "gh api repos/shop/web/pulls/12/reviews -X POST --input comment.json"

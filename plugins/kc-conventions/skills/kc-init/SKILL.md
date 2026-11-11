@@ -19,7 +19,7 @@ Run the bundled installer and report its output:
 bash "${CLAUDE_PLUGIN_ROOT}/scripts/install-rules.sh"
 ```
 
-It finds the rules relative to itself, so there is no path to guess, copies every `rules/*.md` into `.claude/rules/`, writes the plugin version to `.claude/rules/.kc-conventions-version`, and prints one line per rule (`new`, `unchanged` or `replaced`) followed by the version. The SessionStart hook compares that stamp with the installed plugin and says so when they differ, so stale rules are reported instead of silently kept. `--dest <dir>` installs somewhere else.
+It finds the rules relative to itself, so there is no path to guess, copies every `rules/*.md` into `.claude/rules/`, writes the plugin version to `.claude/rules/.kc-conventions-version`, and prints one line per rule (`new`, `unchanged` or `replaced`) followed by the version. The plugin's hook compares that stamp with the installed plugin on a session's first prompt and says so when they differ, so stale rules are reported instead of silently kept. `--dest <dir>` installs somewhere else.
 
 Copy rather than symlink, which is what the script does. A symlink into the plugin's install directory breaks when the plugin updates or is removed, and it will not survive being cloned by anyone else.
 
@@ -33,10 +33,10 @@ If the script exits non-zero, relay its message and stop: missing rules or an un
 
 ## Updating later
 
-Re-run this skill after the plugin updates; the SessionStart hook says when the stamp and the plugin disagree. The installer overwrites, so a rule edited upstream propagates on the next run, and it rewrites the stamp. When rules are already installed, run it with `--dry-run` first: every `would replace:` line is a file whose installed copy differs from the plugin's, which is either an upstream change or a local edit. Name those files to the user before the real run rather than silently discarding local changes.
+Re-run this skill after the plugin updates; the plugin's hook says, on a session's first prompt, when the stamp and the plugin disagree. The installer overwrites, so a rule edited upstream propagates on the next run, and it rewrites the stamp. When rules are already installed, run it with `--dry-run` first: every `would replace:` line is a file whose installed copy differs from the plugin's, which is either an upstream change or a local edit. Name those files to the user before the real run rather than silently discarding local changes.
 
 ## What this does not do
 
 It does not touch `CLAUDE.md`. An `@import` would work, but imports expand into context at launch, which throws away the `paths:` scoping and puts all thirteen files in every session. `.claude/rules/` keeps them deferred.
 
-It also does not install machine-wide. For conventions on every project on a machine, the files go in `~/.claude/rules/` instead, which is a one-time symlink or copy outside this skill's scope.
+It also does not install machine-wide. For conventions on every project on a machine, the files go in `~/.claude/rules/` instead: `install-rules.sh --dest ~/.claude/rules` copies and stamps them there, and the hook reports that copy when it falls behind the plugin, with the command that refreshes it.

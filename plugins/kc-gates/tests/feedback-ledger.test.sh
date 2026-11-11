@@ -123,6 +123,20 @@ expect_contains "it names the rule" "F4: covered by §R12, which no rule file ha
 complete_ledger | sed 's/^F4\tcovered\t§R11\t.*/F4\tcovered\t§R1\tno box/' > "$ledger"
 expect_check failed "covered by an id that is only the start of a real one fails"
 
+# A rule file with no ids (a working agreement) is named by its file name.
+complete_ledger | sed 's/^F4\tcovered\t§R11\t.*/F4\tcovered\ttopic.md\tthe line is there and was not applied/' > "$ledger"
+expect_check passed "covered by a rule file named by its file name passes"
+
+complete_ledger | sed 's/^F4\tcovered\t§R11\t.*/F4\tcovered\tother.md\tno such file/' > "$ledger"
+expect_check failed "covered by a file no rules dir holds fails"
+expect_contains "it names the file" "F4: covered by other.md, which is not a rule file" "$last_output"
+
+complete_ledger | sed 's/^F4\tcovered\t§R11\t.*/F4\tcovered\ttopicxmd\ta dot is not a wildcard/' > "$ledger"
+expect_check failed "covered by a name that only matches as a pattern fails"
+
+complete_ledger | sed 's/^F4\tcovered\t§R11\t.*/F4\tcovered\tnotes.txt\tnot a Markdown rule file/' > "$ledger"
+expect_check failed "covered by a file that is not a Markdown rule file fails"
+
 complete_ledger | sed 's/^F4\tcovered\t§R11\t.*/F4\tcovered\t§R11/' > "$ledger"
 expect_check failed "covered with no reason it was still missed fails"
 expect_contains "it asks why" "F4: covered by §R11 says nothing on why it was still missed" "$last_output"
