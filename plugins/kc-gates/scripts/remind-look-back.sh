@@ -15,7 +15,10 @@
 #
 # It splits the command as the guards do, quotes or not, so a review body holding `;` or
 # `--approve` can cost a reminder or add one. A reminder is harmless either way, and a shell
-# parser here would be more code than the reminder is worth.
+# parser here would be more code than the reminder is worth. Heredoc bodies are dropped first:
+# they are nearly always text being written (a fixture, a changelog line), and a command that
+# only writes the words `gh pr merge` merged nothing. The guards keep reading them, since a guard
+# that misses a command lets it through.
 #
 # Output: PostToolUse JSON with the reminder as additionalContext after an approval, nothing
 # otherwise. Always exits 0. Hook schema: https://code.claude.com/docs/en/hooks
@@ -64,6 +67,28 @@ is_merge_segment() {
   printf '%s' "$segment" | grep -Eq -- "(-X|--method)[[:space:]=]*[\"']?PUT"
 }
 
+# Prints <command> without its heredoc bodies; the line that opens each heredoc stays. A here-string
+# (`<<<`) is not a heredoc.
+drop_heredoc_bodies() {
+  printf '%s\n' "$1" | awk '
+    terminator != "" {
+      line = $0
+      # Without jq the tabs in the payload arrive still escaped, as a backslash and a t.
+      if (strips_tabs) sub(/^(\t|\\t)+/, "", line)
+      if (line == terminator) terminator = ""
+      next
+    }
+    {
+      print
+      if (match($0, /(^|[^<])<<-?[[:space:]]*["\047\\]?[A-Za-z_][A-Za-z0-9_]*/)) {
+        opener = substr($0, RSTART, RLENGTH)
+        strips_tabs = (opener ~ /<<-/)
+        sub(/^.*<<-?[[:space:]]*["\047\\]?/, "", opener)
+        terminator = opener
+      }
+    }'
+}
+
 main() {
   local input command cwd segment
   input="$(cat)"
@@ -89,7 +114,7 @@ EOF
       exit 0
     fi
   done <<EOF
-$(split_segments "$command")
+$(split_segments "$(drop_heredoc_bodies "$command")")
 EOF
   exit 0
 }

@@ -77,6 +77,12 @@ expect_hook quiet "asking whether a pull request is merged" "gh api repos/shop/w
 expect_hook quiet "a PUT to another endpoint of the pull request" "gh api repos/shop/web/pulls/12/update-branch -X PUT"
 expect_hook quiet "a merge command echoed, not run" "echo run gh-pr-merge later"
 expect_hook quiet "git merge" "git merge main"
+expect_hook quiet "a merge command written into a file by a heredoc" "cat > notes.txt <<'EOF'\ngh pr merge 12 --squash\nEOF"
+expect_hook quiet "an approval written by a heredoc with tabs stripped" "cat <<-EOF > notes.txt\n\tgh pr review 12 --approve\n\tEOF"
+expect_hook remind-merge "a merge after a heredoc has closed" "cat > notes.txt <<EOF\nsome notes\nEOF\ngh pr merge 12 --squash"
+expect_hook remind-merge "a merge on the line that opens a heredoc" "gh pr merge 12 --squash --body-file - <<EOF\nthe body\nEOF"
+expect_hook remind-merge "a merge after a tab-stripped heredoc has closed" "cat <<-EOF > notes.txt\n\tsome notes\n\tEOF\ngh pr merge 12 --squash"
+expect_hook remind-merge "a here-string is no heredoc" "cat <<< EOF\ngh pr merge 12 --squash"
 expect_hook quiet "a PUT to the merge endpoint by another tool" "curl -X PUT https://api.example.test/repos/shop/web/pulls/12/merge"
 expect_hook quiet "a merge endpoint read in one command and a PUT in a later one" "gh api repos/shop/web/pulls/12/merge ; gh api repos/shop/web/pulls/12/update-branch -X PUT"
 
