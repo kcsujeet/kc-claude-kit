@@ -36,8 +36,8 @@ expect_output() {
 payload_for() { printf '{"session_id":"%s","cwd":"%s","prompt":"hello"}' "$1" "$2"; }
 
 not_installed="The portable coding conventions are not installed in this project. Run /kc-conventions:kc-init to copy them into .claude/rules/, or say so if this project should not have them."
-project_stale="The portable coding conventions in .claude/rules are from kc-conventions plugin 1.0.2, but 9.8.7 is installed: this session loaded the older rules, which may lack steps the newer plugins rely on. Run /kc-conventions:kc-init to refresh them."
-home_stale="The portable coding conventions in $work_dir/home/.claude/rules are from kc-conventions plugin 1.0.2, but 9.8.7 is installed: this session loaded the older rules, which may lack steps the newer plugins rely on. Refresh them with: bash \"$work_dir/plugin/scripts/install-rules.sh\" --dest \"$work_dir/home/.claude/rules\""
+project_stale="The portable coding conventions in .claude/rules are from kc-conventions plugin 1.0.2, but 9.8.7 is installed: the older rules may lack steps the newer plugins rely on. Run /kc-conventions:kc-init to refresh them."
+home_stale="The portable coding conventions in $work_dir/home/.claude/rules are from kc-conventions plugin 1.0.2, but 9.8.7 is installed: the older rules may lack steps the newer plugins rely on. Refresh them with: bash \"$work_dir/plugin/scripts/install-rules.sh\" --dest \"$work_dir/home/.claude/rules\""
 
 # Run by hand in the project, no payload.
 expect_output "missing: no rules installed" "$not_installed" "$(run_hook_from "$work_dir/project" "")"
@@ -137,6 +137,22 @@ expect_output "open stdin, no payload: both runs returned within the hook's time
 
 expect_output "no project, nothing installed: quiet" \
   "" "$(run_hook_from "$work_dir/spare" "$(payload_for s5 "$work_dir/spare")")"
+
+# A session in a subfolder of a project is told about the project: its copy, or that it has none.
+git init -q "$work_dir/repo"
+mkdir -p "$work_dir/repo/src/pages"
+expect_output "subfolder of a project, nothing installed: told" \
+  "$not_installed" "$(run_hook_from "$work_dir/spare" "$(payload_for s11 "$work_dir/repo/src/pages")")"
+mkdir -p "$work_dir/repo/.claude/rules"
+touch "$work_dir/repo/.claude/rules/kc-working-agreement.md"
+echo "1.0.2" > "$work_dir/repo/.claude/rules/.kc-conventions-version"
+expect_output "subfolder of a project: the copy at the project's root is checked" \
+  "$project_stale" "$(run_hook_from "$work_dir/spare" "$(payload_for s12 "$work_dir/repo/src/pages")")"
+mkdir -p "$work_dir/repo/src/.claude/rules"
+touch "$work_dir/repo/src/.claude/rules/kc-working-agreement.md"
+echo "9.8.7" > "$work_dir/repo/src/.claude/rules/.kc-conventions-version"
+expect_output "subfolder with a copy of its own: that copy is the one checked" \
+  "" "$(run_hook_from "$work_dir/spare" "$(payload_for s13 "$work_dir/repo/src")")"
 
 # A git worktree's .git is a file, and it is a project all the same.
 mkdir -p "$work_dir/worktree" && echo "gitdir: $work_dir/project/.git/worktrees/w" > "$work_dir/worktree/.git"

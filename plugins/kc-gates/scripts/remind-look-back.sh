@@ -10,7 +10,8 @@
 # event is APPROVE: given as a field (`-f event=APPROVE`), inline, or in the `--input` file.
 #
 # A merge is `gh pr merge` (but not `--disable-auto`, which only cancels a queued one), or a
-# `gh api` PUT to a PR's `merge`.
+# `gh api` PUT to a PR's `merge`. With `--auto` the merge may only be queued, and the reminder
+# says so.
 #
 # It splits the command as the guards do, quotes or not, so a review body holding `;` or
 # `--approve` can cost a reminder or add one. A reminder is harmless either way, and a shell
@@ -77,6 +78,13 @@ EOF
       exit 0
     fi
     if is_merge_segment "$segment"; then
+      # --auto merges at once when the requirements are already met, and queues the merge when not.
+      if printf '%s' "$segment" | grep -Eq -- '--auto([[:space:]]|$)'; then
+        cat <<'EOF'
+{"hookSpecificOutput":{"hookEventName":"PostToolUse","additionalContext":"kc-gates: this set a pull request to merge once its requirements are met (--auto). Once it has merged, its task is handed off and the look-back is due (working agreement, Order of work on a task, step 6): before saying what comes next, list every piece of feedback the session got (feedback-ledger.sh list over its transcript), give each one a verdict, and write the lessons, without being asked."}}
+EOF
+        exit 0
+      fi
       cat <<'EOF'
 {"hookSpecificOutput":{"hookEventName":"PostToolUse","additionalContext":"kc-gates: this merged a pull request, so its task is handed off and the look-back is due (working agreement, Order of work on a task, step 6). Before saying what comes next, list every piece of feedback the session got (feedback-ledger.sh list over its transcript), give each one a verdict, and write the lessons, without being asked."}}
 EOF

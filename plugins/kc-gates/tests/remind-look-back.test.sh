@@ -37,6 +37,8 @@ expect_hook() {
       verdict=remind
     elif printf '%s' "$output" | grep -q '"hookEventName":"PostToolUse","additionalContext":"kc-gates: this merged a pull request'; then
       verdict=remind-merge
+    elif printf '%s' "$output" | grep -q '"hookEventName":"PostToolUse","additionalContext":"kc-gates: this set a pull request to merge once its requirements are met'; then
+      verdict=remind-queued-merge
     else
       verdict="unexpected output: $output"
     fi
@@ -63,7 +65,8 @@ expect_hook remind "an --input file by absolute path, as the payload builder pri
 expect_hook remind-merge "gh pr merge" "gh pr merge 12 --merge"
 expect_hook remind-merge "gh pr merge with no number, squashing" "gh pr merge --squash --delete-branch"
 expect_hook remind-merge "gh pr merge alone on its line" "gh pr merge"
-expect_hook remind-merge "a merge queued with --auto" "gh pr merge 12 --auto --rebase"
+expect_hook remind-queued-merge "a merge queued with --auto" "gh pr merge 12 --auto --rebase"
+expect_hook remind-merge "a flag that only starts like --auto" "gh pr merge 12 --autofoo"
 expect_hook remind-merge "a merge after another command" "gh pr view 12 --json state && gh pr merge 12 --merge"
 expect_hook remind-merge "gh api PUT to the merge endpoint" "gh api repos/shop/web/pulls/12/merge -X PUT -f merge_method=squash"
 expect_hook remind-merge "gh api --method PUT, quoted" "gh api --method 'PUT' repos/shop/web/pulls/12/merge"
