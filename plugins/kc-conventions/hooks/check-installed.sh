@@ -8,7 +8,8 @@
 # session started in, which need not be the project (an app can start a session in a spare folder
 # and move it), and one registered `async` has no stated route into the model's context; a
 # UserPromptSubmit hook's stdout is added as context, and its payload names the folder the session
-# is in now (https://code.claude.com/docs/en/hooks).
+# is in now (https://code.claude.com/docs/en/hooks). From a subfolder it checks the nearest copy
+# above it, up to the project's root.
 #
 # Reads the hook payload from stdin for `cwd` and `session_id`. Run by hand with no payload, it
 # checks the current folder and always speaks. A caller that leaves stdin open and sends nothing
@@ -40,6 +41,19 @@ fi
 
 readonly RULE_FILE=kc-working-agreement.md
 project_rules_dir=".claude/rules"
+# From a subfolder, the copy that counts is the nearest one above it, up to the project's root
+# (the folder holding .git). The notice then names that folder, since /kc-conventions:kc-init
+# installs into the folder it is run from.
+project_dir=$PWD
+while [ ! -f "$project_dir/$project_rules_dir/$RULE_FILE" ] && [ ! -e "$project_dir/.git" ] && [ "$project_dir" != / ]; do
+  project_dir=$(dirname "$project_dir")
+done
+from_project_dir=""
+if [ "$project_dir" != "$PWD" ] && [ "$project_dir" != / ]; then
+  cd "$project_dir" || exit 0
+  project_rules_dir="$project_dir/.claude/rules"
+  from_project_dir=" from $project_dir"
+fi
 home_rules_dir="$HOME/.claude/rules"
 # In the home folder itself the two are one copy, refreshed as the home copy is.
 [ "$project_rules_dir" -ef "$home_rules_dir" ] && project_rules_dir=""
@@ -58,21 +72,21 @@ print_stale_notice() {
   if [ -z "$installed_version" ]; then
     echo "The portable coding conventions in $rules_dir carry no version stamp, so they may predate kc-conventions plugin $plugin_version. $refresh"
   else
-    echo "The portable coding conventions in $rules_dir are from kc-conventions plugin $installed_version, but $plugin_version is installed: this session loaded the older rules, which may lack steps the newer plugins rely on. $refresh"
+    echo "The portable coding conventions in $rules_dir are from kc-conventions plugin $installed_version, but $plugin_version is installed: the older rules may lack steps the newer plugins rely on. $refresh"
   fi
 }
 
 if [ ! -f "$project_rules_dir/$RULE_FILE" ] && [ ! -f "$home_rules_dir/$RULE_FILE" ]; then
   # Not a project directory: nothing to install the rules into. A worktree's .git is a file.
   [ -e .git ] || exit 0
-  notice="The portable coding conventions are not installed in this project. Run /kc-conventions:kc-init to copy them into .claude/rules/, or say so if this project should not have them."
+  notice="The portable coding conventions are not installed in this project. Run /kc-conventions:kc-init$from_project_dir to copy them into .claude/rules/, or say so if this project should not have them."
 else
   # Without a readable plugin version there is nothing to compare against.
   [ -n "$plugin_version" ] || exit 0
   # A session loads the home copy beside the project's, so each is checked. /kc-conventions:kc-init
   # installs into the project; the home copy is refreshed in place.
   notice=$(
-    print_stale_notice "$project_rules_dir" "Run /kc-conventions:kc-init to refresh them."
+    print_stale_notice "$project_rules_dir" "Run /kc-conventions:kc-init$from_project_dir to refresh them."
     print_stale_notice "$home_rules_dir" "Refresh them with: bash \"$plugin_root/scripts/install-rules.sh\" --dest \"$home_rules_dir\""
   )
   [ -n "$notice" ] || exit 0

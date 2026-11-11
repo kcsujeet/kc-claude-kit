@@ -23,7 +23,9 @@
 #         <id> covered <rule id> <why it was missed>  a --rules dir, the rules as they were before
 #                                                     the lesson PR, defines the id; a rule file
 #                                                     with no ids is named by its file name, which
-#                                                     a --rules dir holds
+#                                                     a --rules dir holds in a `rules` or `.claude`
+#                                                     folder (the dir itself may be one), or as
+#                                                     CLAUDE.md, AGENTS.md or SKILL.md
 #         <id> one-off <reason>
 #         <id> not-feedback <reason>
 #       A rule id is written as the rules write it (`§B13`, `B13`, `WF14`). A line defines it when
@@ -102,8 +104,13 @@ defines_rule_id() {
 
 # A file name as a pattern that matches it whole, for grep -E.
 escape_file_name() {
-  printf '%s' "$1" | sed 's/[.[\*^$]/\\&/g'
+  printf '%s' "$1" | sed 's/[][\.*^$+?(){}|]/\\&/g'
 }
+
+# Where rules live, as a path starting at a --rules dir's own name: a `rules` or `.claude` folder
+# (the dir itself may be one), or a file an agent reads as instructions. A Markdown file anywhere
+# else (a changelog, a readme) is not one.
+readonly RULE_FILE_PATH='(^|/)(rules|\.claude)/|(^|/)(CLAUDE|AGENTS|SKILL)\.md$'
 
 run_check() {
   local feedback_list=${1:-} ledger=${2:-} diffs=() rules_dirs=()
@@ -137,7 +144,7 @@ run_check() {
   done
   for input_path in "${rules_dirs[@]}"; do
     find "$input_path" -name '*.md' -type f -exec cat {} + >> "$rule_lines_before" 2>/dev/null || true
-    find "$input_path" -name '*.md' -type f >> "$rule_paths_before" 2>/dev/null || true
+    (cd "$input_path" 2>/dev/null && find . -name '*.md' -type f | sed "s|^\.|$(basename "$(pwd -P)")|" | grep -E "$RULE_FILE_PATH") >> "$rule_paths_before" || true
   done
 
   local problems=0 ledger_line item_id verdict verdict_detail why seen=" "
