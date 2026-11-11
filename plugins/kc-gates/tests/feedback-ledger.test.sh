@@ -51,7 +51,7 @@ expect_eq "items are numbered F1 onwards" "F1 F10" "$(cut -f1 "$list" | sed -n '
 # check: a lesson diff that adds §B13 and WF14, and rule files that hold §R11 and **QA1.**
 diff_file=$work_dir/lesson.diff
 printf -- '--- a/rules.md\n+++ b/rules.md\n+- [ ] §B13 A new kind of actor\n+- **WF14.** The look-back lists\n- removed §B9 line\n' > "$diff_file"
-rules_dir=$work_dir/rules
+rules_dir=$work_dir/repo
 mkdir -p "$rules_dir/rules"
 printf -- '- [ ] §R11 Reads and writes\n- **QA1.** Sheets\n- [ ] §R16 other, see §R17\n' > "$rules_dir/rules/topic.md"
 printf 'c++ notes\n' > "$rules_dir/rules/c++.md"
@@ -143,6 +143,17 @@ expect_contains "it names the file" "F4: covered by changes.md, which is not a r
 
 complete_ledger | sed 's/^F4\tcovered\t§R11\t.*/F4\tcovered\tSKILL.md\tan instructions file outside a rules folder/' > "$ledger"
 expect_check passed "covered by an instructions file named as agents read it passes"
+
+# A --rules dir that is itself a rules folder holds its rule files at its top.
+mkdir -p "$work_dir/home/.claude" && printf 'house rules\n' > "$work_dir/home/.claude/house.md"
+complete_ledger | sed 's/^F4\tcovered\t§R11\t.*/F4\tcovered\ttopic.md\ta rule file at the top of a rules folder/' > "$ledger"
+output=$(bash "$script" check "$list" "$ledger" --diff "$diff_file" --rules "$rules_dir/rules" --rules "$rules_dir" 2>&1) && actual=passed || actual=failed
+expect_eq "covered by a file at the top of a dir named rules passes" passed "$actual"
+output=$(cd "$rules_dir/rules" && bash "$script" check "$list" "$ledger" --diff "$diff_file" --rules . --rules "$rules_dir" 2>&1) && actual=passed || actual=failed
+expect_eq "covered by a file at the top of the current folder, a rules folder, passes" passed "$actual"
+complete_ledger | sed 's/^F4\tcovered\t§R11\t.*/F4\tcovered\thouse.md\ta rule file at the top of a .claude folder/' > "$ledger"
+output=$(bash "$script" check "$list" "$ledger" --diff "$diff_file" --rules "$work_dir/home/.claude/" --rules "$rules_dir" 2>&1) && actual=passed || actual=failed
+expect_eq "covered by a file at the top of a dir named .claude passes" passed "$actual"
 
 complete_ledger | sed 's/^F4\tcovered\t§R11\t.*/F4\tcovered\tc++.md\tpattern characters in a name are plain text/' > "$ledger"
 expect_check passed "covered by a rule file whose name holds pattern characters passes"

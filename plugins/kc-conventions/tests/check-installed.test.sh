@@ -141,18 +141,20 @@ expect_output "no project, nothing installed: quiet" \
 # A session in a subfolder of a project is told about the project: its copy, or that it has none.
 git init -q "$work_dir/repo"
 mkdir -p "$work_dir/repo/src/pages"
-expect_output "subfolder of a project, nothing installed: told" \
-  "$not_installed" "$(run_hook_from "$work_dir/spare" "$(payload_for s11 "$work_dir/repo/src/pages")")"
+expect_output "subfolder of a project, nothing installed: told, naming the folder to install from" \
+  "The portable coding conventions are not installed in this project. Run /kc-conventions:kc-init from $work_dir/repo to copy them into .claude/rules/, or say so if this project should not have them." "$(run_hook_from "$work_dir/spare" "$(payload_for s11 "$work_dir/repo/src/pages")")"
 mkdir -p "$work_dir/repo/.claude/rules"
 touch "$work_dir/repo/.claude/rules/kc-working-agreement.md"
 echo "1.0.2" > "$work_dir/repo/.claude/rules/.kc-conventions-version"
-expect_output "subfolder of a project: the copy at the project's root is checked" \
-  "$project_stale" "$(run_hook_from "$work_dir/spare" "$(payload_for s12 "$work_dir/repo/src/pages")")"
+expect_output "subfolder of a project: the copy at the project's root is checked and named" \
+  "The portable coding conventions in $work_dir/repo/.claude/rules are from kc-conventions plugin 1.0.2, but 9.8.7 is installed: the older rules may lack steps the newer plugins rely on. Run /kc-conventions:kc-init from $work_dir/repo to refresh them." "$(run_hook_from "$work_dir/spare" "$(payload_for s12 "$work_dir/repo/src/pages")")"
 mkdir -p "$work_dir/repo/src/.claude/rules"
 touch "$work_dir/repo/src/.claude/rules/kc-working-agreement.md"
 echo "9.8.7" > "$work_dir/repo/src/.claude/rules/.kc-conventions-version"
 expect_output "subfolder with a copy of its own: that copy is the one checked" \
   "" "$(run_hook_from "$work_dir/spare" "$(payload_for s13 "$work_dir/repo/src")")"
+expect_output "subfolder below a folder with a copy: the nearest copy is the one checked, not the root's" \
+  "" "$(run_hook_from "$work_dir/spare" "$(payload_for s14 "$work_dir/repo/src/pages")")"
 
 # A git worktree's .git is a file, and it is a project all the same.
 mkdir -p "$work_dir/worktree" && echo "gitdir: $work_dir/project/.git/worktrees/w" > "$work_dir/worktree/.git"

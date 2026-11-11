@@ -78,15 +78,13 @@ EOF
       exit 0
     fi
     if is_merge_segment "$segment"; then
-      # --auto merges at once when the requirements are already met, and queues the merge when not.
+      local merge_lead="this merged a pull request, so its task is handed off and the look-back is due"
+      # With --auto the pull request merges only once its requirements are met (`gh pr merge --help`).
       if printf '%s' "$segment" | grep -Eq -- '--auto([[:space:]]|$)'; then
-        cat <<'EOF'
-{"hookSpecificOutput":{"hookEventName":"PostToolUse","additionalContext":"kc-gates: this set a pull request to merge once its requirements are met (--auto). Once it has merged, its task is handed off and the look-back is due (working agreement, Order of work on a task, step 6): before saying what comes next, list every piece of feedback the session got (feedback-ledger.sh list over its transcript), give each one a verdict, and write the lessons, without being asked."}}
-EOF
-        exit 0
+        merge_lead="this set a pull request to merge once its requirements are met (--auto); once it has merged, its task is handed off and the look-back is due"
       fi
-      cat <<'EOF'
-{"hookSpecificOutput":{"hookEventName":"PostToolUse","additionalContext":"kc-gates: this merged a pull request, so its task is handed off and the look-back is due (working agreement, Order of work on a task, step 6). Before saying what comes next, list every piece of feedback the session got (feedback-ledger.sh list over its transcript), give each one a verdict, and write the lessons, without being asked."}}
+      cat <<EOF
+{"hookSpecificOutput":{"hookEventName":"PostToolUse","additionalContext":"kc-gates: $merge_lead (working agreement, Order of work on a task, step 6). Before saying what comes next, list every piece of feedback the session got (feedback-ledger.sh list over its transcript), give each one a verdict, and write the lessons, without being asked."}}
 EOF
       exit 0
     fi
