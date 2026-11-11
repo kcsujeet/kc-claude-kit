@@ -21,7 +21,9 @@
 #                                                     working agreement) is named by its file
 #                                                     name, which a --diff changes
 #         <id> covered <rule id> <why it was missed>  a --rules dir, the rules as they were before
-#                                                     the lesson PR, defines the id
+#                                                     the lesson PR, defines the id; a rule file
+#                                                     with no ids is named by its file name, which
+#                                                     a --rules dir holds
 #         <id> one-off <reason>
 #         <id> not-feedback <reason>
 #       A rule id is written as the rules write it (`§B13`, `B13`, `WF14`). A line defines it when
@@ -98,6 +100,11 @@ defines_rule_id() {
   grep -Eq "^[[:space:]]*(-[[:space:]]+(\[[ xX]\][[:space:]]+)?|#+[[:space:]]+)?(§${rule_id}|\*\*${rule_id}\.\*\*)([^0-9A-Za-z]|$)" "$file"
 }
 
+# A file name as a pattern that matches it whole, for grep -E.
+escape_file_name() {
+  printf '%s' "$1" | sed 's/[.[\*^$]/\\&/g'
+}
+
 run_check() {
   local feedback_list=${1:-} ledger=${2:-} diffs=() rules_dirs=()
   [ -n "$feedback_list" ] && [ -n "$ledger" ] || usage
@@ -115,13 +122,14 @@ run_check() {
     [ -r "$input_path" ] || { echo "$script_name: cannot read $input_path" >&2; exit 2; }
   done
 
-  local scratch_dir added_lines changed_paths rule_lines_before
+  local scratch_dir added_lines changed_paths rule_lines_before rule_paths_before
   scratch_dir=$(mktemp -d)
   trap 'rm -rf "$scratch_dir"' RETURN
   added_lines=$scratch_dir/added
   changed_paths=$scratch_dir/changed
   rule_lines_before=$scratch_dir/rules
-  touch "$added_lines" "$changed_paths" "$rule_lines_before"
+  rule_paths_before=$scratch_dir/rule-paths
+  touch "$added_lines" "$changed_paths" "$rule_lines_before" "$rule_paths_before"
   # The lesson PRs' added lines, without their `+`, and the paths they change.
   for input_path in ${diffs[@]+"${diffs[@]}"}; do
     sed -n '/^+++ /d; s/^+//p' "$input_path" >> "$added_lines"
@@ -129,6 +137,7 @@ run_check() {
   done
   for input_path in "${rules_dirs[@]}"; do
     find "$input_path" -name '*.md' -type f -exec cat {} + >> "$rule_lines_before" 2>/dev/null || true
+    find "$input_path" -name '*.md' -type f >> "$rule_paths_before" 2>/dev/null || true
   done
 
   local problems=0 ledger_line item_id verdict verdict_detail why seen=" "
@@ -147,7 +156,7 @@ run_check() {
         for rule in ${verdict_detail//,/ }; do
           case "$rule" in
             *.*)
-              escaped_name=$(printf '%s' "$rule" | sed 's/[.[\*^$]/\\&/g')
+              escaped_name=$(escape_file_name "$rule")
               grep -Eq "(^|/)${escaped_name}\$" "$changed_paths" \
                 || record_problem "$item_id: lesson $rule is not a file the lesson diff changes" ;;
             *) defines_rule_id "$rule" "$added_lines" || record_problem "$item_id: lesson $rule is not added by the lesson diff" ;;
@@ -155,7 +164,12 @@ run_check() {
         done ;;
       covered)
         [ -n "$verdict_detail" ] || { record_problem "$item_id: covered names no rule id"; continue; }
-        defines_rule_id "$verdict_detail" "$rule_lines_before" || record_problem "$item_id: covered by $verdict_detail, which no rule file had"
+        case "$verdict_detail" in
+          *.*)
+            grep -Eq "(^|/)$(escape_file_name "$verdict_detail")\$" "$rule_paths_before" \
+              || record_problem "$item_id: covered by $verdict_detail, which is not a rule file" ;;
+          *) defines_rule_id "$verdict_detail" "$rule_lines_before" || record_problem "$item_id: covered by $verdict_detail, which no rule file had" ;;
+        esac
         [ -n "$why" ] || record_problem "$item_id: covered by $verdict_detail says nothing on why it was still missed" ;;
       one-off | not-feedback)
         [ -n "$verdict_detail" ] || record_problem "$item_id: $verdict gives no reason" ;;

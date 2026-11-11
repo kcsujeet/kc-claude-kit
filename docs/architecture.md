@@ -24,7 +24,7 @@ kc-claude-kit/
     │   ├── scripts/build-rules.sh          # regenerates rules/, --check fails on drift
     │   ├── scripts/install-rules.sh        # what kc-init runs: copies rules/ and writes the version stamp
     │   ├── tests/                          # sweep and lookup fixtures, their runners, install-rules and mutation-sweep tests
-    │   ├── hooks/                          # SessionStart: missing or stale rules
+    │   ├── hooks/                          # first prompt: missing or stale rules
     │   └── evals/
     ├── kc-gates/
     │   ├── .claude-plugin/plugin.json      # depends on kc-conventions
@@ -113,7 +113,7 @@ A gate agent loads its topic through the subagent `skills:` field, which injects
 
 Skills accept `paths:` ([skills](https://code.claude.com/docs/en/skills)), which suggested the rule copies could go. Measured on 2.1.280: after reading a matching file, a `paths:`-scoped plugin skill's content was not in context; it loads only when the model invokes it. Rules load when a matching file is read ([memory](https://code.claude.com/docs/en/memory)), and plugins cannot ship rules, so `/kc-conventions:kc-init` still copies them into `.claude/rules/`.
 
-What changed is that the rules are generated from the skills, so there is one source, and `init` writes a version stamp that the SessionStart hook compares with the installed plugin, so stale copies are reported instead of silently kept.
+What changed is that the rules are generated from the skills, so there is one source, and `init` writes a version stamp that the plugin's hook compares with the installed plugin on a session's first prompt, so stale copies are reported instead of silently kept.
 
 ### Gates are plugin agents
 
