@@ -1,0 +1,142 @@
+{
+  "case": "plugins/kc-gates/evals/react-boxes",
+  "commit": "af52bb9dec5af5444d1b8011ec9274680d7ee3f5",
+  "case_hash": "190af25373ea6d26e5b6c998b5160ac0bcf8c816",
+  "plugins_hash": "ef93a2728205f2a528a331a98b37b48d972208bc",
+  "claude": "2.1.317 (Claude Code)",
+  "model": "sonnet",
+  "verdict": "ok",
+  "runs": {
+    "with": [
+      {
+        "error": null,
+        "graders": [
+          {
+            "name": "flags-effect-only-component",
+            "passed": true,
+            "scored": true
+          },
+          {
+            "name": "flags-forward-ref",
+            "passed": true,
+            "scored": true
+          },
+          {
+            "name": "flags-index-key",
+            "passed": true,
+            "scored": true
+          },
+          {
+            "name": "flags-pointless-memo",
+            "passed": true,
+            "scored": true
+          },
+          {
+            "name": "flags-raw-fetch",
+            "passed": true,
+            "scored": true
+          },
+          {
+            "name": "flags-stuck-loading-flag",
+            "passed": true,
+            "scored": true
+          },
+          {
+            "name": "no-finding-on-clean-unit",
+            "passed": true,
+            "scored": false
+          },
+          {
+            "name": "verdict-failed",
+            "passed": true,
+            "scored": false
+          }
+        ]
+      }
+    ],
+    "without": [
+      {
+        "error": null,
+        "graders": [
+          {
+            "name": "flags-effect-only-component",
+            "passed": false,
+            "scored": true
+          },
+          {
+            "name": "flags-forward-ref",
+            "passed": false,
+            "scored": true
+          },
+          {
+            "name": "flags-index-key",
+            "passed": false,
+            "scored": true
+          },
+          {
+            "name": "flags-pointless-memo",
+            "passed": false,
+            "scored": true
+          },
+          {
+            "name": "flags-raw-fetch",
+            "passed": false,
+            "scored": true
+          },
+          {
+            "name": "flags-stuck-loading-flag",
+            "passed": false,
+            "scored": true
+          }
+        ]
+      }
+    ],
+    "base_rules": [
+      {
+        "error": null,
+        "graders": [
+          {
+            "name": "flags-effect-only-component",
+            "passed": true,
+            "scored": true
+          },
+          {
+            "name": "flags-forward-ref",
+            "passed": true,
+            "scored": true
+          },
+          {
+            "name": "flags-index-key",
+            "passed": true,
+            "scored": true
+          },
+          {
+            "name": "flags-pointless-memo",
+            "passed": true,
+            "scored": true
+          },
+          {
+            "name": "flags-raw-fetch",
+            "passed": true,
+            "scored": true
+          },
+          {
+            "name": "flags-stuck-loading-flag",
+            "passed": true,
+            "scored": true
+          },
+          {
+            "name": "no-finding-on-clean-unit",
+            "passed": false,
+            "scored": true
+          },
+          {
+            "name": "verdict-failed",
+            "passed": true,
+            "scored": true
+          }
+        ]
+      }
+    ]
+  }
+}
