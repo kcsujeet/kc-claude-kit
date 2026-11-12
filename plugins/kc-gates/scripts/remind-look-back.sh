@@ -108,7 +108,7 @@ main() {
   while IFS= read -r segment; do
     if is_approval_segment "$segment" "$cwd"; then
       cat <<'EOF'
-{"hookSpecificOutput":{"hookEventName":"PostToolUse","additionalContext":"kc-gates: this approved a pull request, so the review's look-back is due once it closes (working agreement, Order of work on a task, step 6). Before calling the review done, list your own misses across its rounds (a finding the author fixed only where it named, a suggestion that caused a later finding, a gap a later round found that an earlier one could have) and write them as lessons, without being asked."}}
+{"hookSpecificOutput":{"hookEventName":"PostToolUse","additionalContext":"kc-gates: this approved a pull request, so the review's look-back is due once it closes (working agreement, Order of work on a task, step 6). Before calling the review done, list your own misses across its rounds (a finding the author fixed only where it named, a suggestion that caused a later finding, a gap a later round found that an earlier one could have) and write the ones that pass step 6's bar as lessons, without being asked."}}
 EOF
       exit 0
     fi
@@ -119,7 +119,7 @@ EOF
         merge_lead="this set a pull request to merge once its requirements are met (--auto); once it has merged, its task is handed off and the look-back is due"
       fi
       cat <<EOF
-{"hookSpecificOutput":{"hookEventName":"PostToolUse","additionalContext":"kc-gates: $merge_lead (working agreement, Order of work on a task, step 6). Before saying what comes next, list every piece of feedback the session got (feedback-ledger.sh list over its transcript), give each one a verdict, and write the lessons, without being asked."}}
+{"hookSpecificOutput":{"hookEventName":"PostToolUse","additionalContext":"kc-gates: $merge_lead (working agreement, Order of work on a task, step 6). Before saying what comes next, list every piece of feedback the session got (feedback-ledger.sh list over its transcript), give each one a verdict, and write the lessons that pass step 6's bar, without being asked; what the merged change left open meets that bar too."}}
 EOF
       exit 0
     fi

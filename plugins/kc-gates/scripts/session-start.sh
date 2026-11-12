@@ -11,7 +11,7 @@
 
 set -u
 
-echo 'Before a PR of yours goes to a reviewer (marking it ready, opening it ready, requesting a reviewer, or moving its ticket to review), run /kc-gates:kc-ready-for-review on it once: one gate round, then you write the fixes, each held by a test, lint and types rather than another round, and what is still open goes to the user. Nothing runs per commit or push.'
+echo 'Before a PR of yours goes to a reviewer (marking it ready, opening it ready, requesting a reviewer, or moving its ticket to review), run /kc-gates:kc-ready-for-review on it once, without asking whether to: one gate round, then you write the fixes, each held by a test, lint and types rather than another round, and what is still open goes to the user. Nothing runs per commit or push.'
 
 plugin_root=${CLAUDE_PLUGIN_ROOT:-$(cd "$(dirname "$0")/.." && pwd)}
 config=${CLAUDE_CONFIG_DIR:-$HOME/.claude}
@@ -37,5 +37,5 @@ case "$repo" in
 esac
 [ -n "$user" ] || exit 0
 
-echo "You maintain this kit ($repo). When feedback you act on in any project (a correction, a review comment, a QA finding) shows a habit that would have caught a whole class of mistakes, it becomes a kit lesson, unasked, written in the look-back at the end of the task (working agreement, \"Order of work on a task\" step 6) together with the task's other lessons, not as each piece of feedback lands, starting from feedback-ledger.sh's list of every piece of feedback in the session and a verdict for each: generalized as the kit's CLAUDE.md says (the class of mistake first, the case one example of it), checked against its .claude/hand-off-checklist.md before the first commit, in its own PR from a worktree of your clone with the changed plugins' versions raised, and merged once its checks pass."
+echo "You maintain this kit ($repo). When feedback you act on in any project (a correction, a review comment, a QA finding) shows a habit that would have caught a whole class of mistakes and passes step 6's bar, it becomes a kit lesson, unasked, written in the look-back at the end of the task (working agreement, \"Order of work on a task\" step 6) together with the task's other lessons, not as each piece of feedback lands, starting from feedback-ledger.sh's list of every piece of feedback in the session and a verdict for each: generalized as the kit's CLAUDE.md says (the class of mistake first, the case one example of it), checked against its .claude/hand-off-checklist.md before the first commit, in its own PR from a worktree of your clone with the changed plugins' versions raised, and merged once its checks pass."
 exit 0

@@ -11,7 +11,7 @@ The pass runs the gates once and ends. A second round mostly found code written 
 
 ## When it runs
 
-- **Once, at hand-off:** before marking a PR ready, opening it ready, requesting a reviewer, or moving its ticket to review. For a stack, once per PR, each against its own base.
+- **Once, at hand-off:** before marking a PR ready, opening it ready, requesting a reviewer, or moving its ticket to review. For a stack, once per PR, each against its own base. Run it as soon as the work is done and its draft is open, without asking the person whether to: it is part of the task.
 - **Not before:** commits and pushes on the way there run nothing, and neither does showing the person the change for approval: no `kc-code-review` fan-out and no QA walk while the code is still being built, since this pass repeats both. Run tests, lint and types as you work, as always. The order of work is in the working agreement's "Order of work on a task": assess, approval, build, draft PR, this pass, ready.
 - **Not again for fixes.** Fixes a reviewer's comments ask for are written as step 6 writes them and recorded with `--after` (step 9). A new pass runs only when the PR gains work it didn't have (a new feature, a new approach).
 

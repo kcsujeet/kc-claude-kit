@@ -51,6 +51,8 @@ printf '{"commit_id":"abc","event":"COMMENT","comments":[]}' > "$work_dir/commen
 
 # --- approvals -----------------------------------------------------------------------------------
 expect_hook remind "gh pr review --approve" "gh pr review 12 --approve"
+expect_contains "the approval reminder points to step 6's bar" "write the ones that pass step 6's bar as lessons" \
+  "$(build_payload "gh pr review 12 --approve" | bash "$hook")"
 expect_hook remind "gh pr review -a with a body" "gh pr review 12 -a --body 'ship it'"
 expect_hook remind "gh api with -f event=APPROVE" "KC_REVIEW_POST_APPROVED=1 gh api repos/shop/web/pulls/12/reviews -X POST -f event=APPROVE -f commit_id=abc"
 expect_hook remind "gh api with an --input file holding APPROVE" "gh api repos/shop/web/pulls/12/reviews -X POST --input approve.json"
@@ -63,6 +65,9 @@ expect_hook remind "an --input file by absolute path, as the payload builder pri
 
 # --- merges --------------------------------------------------------------------------------------
 expect_hook remind-merge "gh pr merge" "gh pr merge 12 --merge"
+expect_contains "the merge reminder points to step 6's bar, for what the merge left open too" \
+  "write the lessons that pass step 6's bar, without being asked; what the merged change left open meets that bar too." \
+  "$(build_payload "gh pr merge 12 --merge" | bash "$hook")"
 expect_hook remind-merge "gh pr merge with no number, squashing" "gh pr merge --squash --delete-branch"
 expect_hook remind-merge "gh pr merge alone on its line" "gh pr merge"
 expect_hook remind-queued-merge "a merge queued with --auto" "gh pr merge 12 --auto --rebase"
