@@ -195,7 +195,35 @@ expect_said "it names the missing boxes" "GATE: naming has no BOXES: line with a
 build_pass
 printf 'GATE: naming\nSTATUS: PASS\nBOXES:\n- [PASS] §N1: 0 hits\n- [PASS] §N2:\n' > "$pass_dir/round-1/verdicts/naming.txt"
 expect_write refused "a box with no evidence is refused" "$fixed_head" --rounds 1 --open 0 --pass "$pass_dir"
-expect_said "it counts the bare box" "GATE: naming has 1 box(es) with no verdict or no evidence"
+expect_said "it counts the bare box and names it" "GATE: naming has 1 box(es) with no verdict or no evidence: §N2"
+
+# What a gate box needs is a verdict, an id and evidence; the layout a gate gave them in is not checked.
+build_pass
+printf 'GATE: naming\nSTATUS: PASS\nBOXES:\n- [PASS] §N1 Stored values, one row per state:\n\n  | State | Handler |\n  | --- | --- |\n  | missing | shop/total.sh:3 |\n\n- [PASS] §N2: 0 hits\nFINDINGS:\n- none\n' > "$pass_dir/round-1/verdicts/naming.txt"
+expect_write written "a box whose evidence is a table after a blank line is no bad box" "$fixed_head" --rounds 1 --open 0 --pass "$pass_dir"
+
+build_pass
+printf 'GATE: naming\nSTATUS: PASS\nBOXES:\n- [PASS] §N1 Rows:\n| State | Handler |\n| --- | --- |\n| missing | shop/total.sh:3 |\n- [PASS] §N2: 0 hits\nFINDINGS:\n- none\n' > "$pass_dir/round-1/verdicts/naming.txt"
+expect_write written "a box whose evidence is a table at the margin is no bad box" "$fixed_head" --rounds 1 --open 0 --pass "$pass_dir"
+
+build_pass
+printf 'GATE: naming\nSTATUS: PASS\nBOXES:\n  - [PASS] §N1 Bare\n  - [PASS] §N2: 0 hits\nFINDINGS:\n- none\n' > "$pass_dir/round-1/verdicts/naming.txt"
+expect_write refused "an indented box under a bare box is the next box, not its evidence" "$fixed_head" --rounds 1 --open 0 --pass "$pass_dir"
+expect_said "it names the bare one" "GATE: naming has 1 box(es) with no verdict or no evidence: §N1"
+
+build_pass
+printf 'GATE: naming\nSTATUS: PASS\nBOXES:\n- [PASS] §N1: 0 hits\n- [PASS] §N2 Bare\n  FINDINGS:\n  - none\n' > "$pass_dir/round-1/verdicts/naming.txt"
+expect_write refused "a block header indented under a bare box is not its evidence" "$fixed_head" --rounds 1 --open 0 --pass "$pass_dir"
+expect_said "it names the box with only a header under it" "GATE: naming has 1 box(es) with no verdict or no evidence: §N2"
+
+build_pass
+printf 'GATE: naming\nSTATUS: PASS\nBOXES:\n- [PASS] §N1 Every new name conforms.\n  - shop/total.sh order_total matches order_tax\n- [PASS] §N2: 0 hits\nFINDINGS:\n- none\n' > "$pass_dir/round-1/verdicts/naming.txt"
+expect_write written "a box with no colon after its name and evidence under it is no bad box" "$fixed_head" --rounds 1 --open 0 --pass "$pass_dir"
+
+build_pass
+printf 'GATE: naming\nSTATUS: PASS\nBOXES:\n- [PASS] §N1: 0 hits\n- [PASS] §N2 Inline chains.\n\n- [PASS] §N3\nFINDINGS:\n- none\n' > "$pass_dir/round-1/verdicts/naming.txt"
+expect_write refused "boxes with no colon and nothing under them are refused" "$fixed_head" --rounds 1 --open 0 --pass "$pass_dir"
+expect_said "it names each one" "GATE: naming has 2 box(es) with no verdict or no evidence: §N2, §N3"
 
 build_pass
 printf 'GATE: naming\nSTATUS: PASS\nBOXES:\n- [PASS] §N1 Every new name conforms. Each unit, read:\n  - shop/total.sh order_total matches order_tax\n- [PASS] §N2: 0 hits\nFINDINGS:\n- none\n' > "$pass_dir/round-1/verdicts/naming.txt"
@@ -213,13 +241,13 @@ expect_write written "an evidence bullet that opens with a link counts" "$fixed_
 build_pass
 printf 'GATE: naming\nSTATUS: PASS\nBOXES:\n- [MAYBE] §N1 Every new name conforms:\n  - shop/total.sh order_total matches order_tax\n- [PASS] §N2: 0 hits\nFINDINGS:\n- none\n' > "$pass_dir/round-1/verdicts/naming.txt"
 expect_write refused "an unknown verdict with bullets under it is refused" "$fixed_head" --rounds 1 --open 0 --pass "$pass_dir"
-expect_said "it counts the unknown verdict" "GATE: naming has 1 box(es) with no verdict or no evidence"
+expect_said "it counts the unknown verdict and names the box" "GATE: naming has 1 box(es) with no verdict or no evidence: §N1"
 
 build_pass
 edit_scope round-1 's/^- \[N\/A\] §G3: .*/- [N\/A] §G3:\
   - no linked issue, given under the box/'
 expect_write refused "a SCOPE: box with its evidence only in bullets is refused" "$fixed_head" --rounds 1 --open 0 --pass "$pass_dir"
-expect_said "it counts the SCOPE box" "SCOPE: has 1 box(es) with no verdict or no evidence"
+expect_said "it counts the SCOPE box and names it" "SCOPE: has 1 box(es) with no verdict or no evidence: §G3"
 
 build_pass
 printf 'GATE: naming\nSTATUS: PASS\nBOXES:\n- [PASS] §N1: 0 hits in shop/total.sh\n  and shop/tax.sh\n\n- [PASS] §N2: 0 hits\nFINDINGS:\n' > "$pass_dir/round-1/verdicts/naming.txt"

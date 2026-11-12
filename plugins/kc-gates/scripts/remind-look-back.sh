@@ -15,7 +15,10 @@
 #
 # It splits the command as the guards do, quotes or not, so a review body holding `;` or
 # `--approve` can cost a reminder or add one. A reminder is harmless either way, and a shell
-# parser here would be more code than the reminder is worth.
+# parser here would be more code than the reminder is worth. Heredoc bodies are dropped first,
+# unless a shell reads them: they are nearly always text being written (a fixture, a changelog
+# line), and a command that only writes the words `gh pr merge` merged nothing. The guards keep
+# reading them, since a guard that misses a command lets it through.
 #
 # Output: PostToolUse JSON with the reminder as additionalContext after an approval, nothing
 # otherwise. Always exits 0. Hook schema: https://code.claude.com/docs/en/hooks
@@ -64,6 +67,38 @@ is_merge_segment() {
   printf '%s' "$segment" | grep -Eq -- "(-X|--method)[[:space:]=]*[\"']?PUT"
 }
 
+# Prints <command> without its heredoc bodies; the line that opens each heredoc stays. A body goes
+# only once its terminator line has come: a `<<` that opens nothing (inside quotes, after `#`, in
+# arithmetic) never gets one, and what follows it is kept. A heredoc fed to a shell is kept too,
+# since that body runs. A here-string (`<<<`) is not a heredoc. Of two heredocs opened on one line
+# only the first body goes, which can add a reminder, never cost one. As bash(1), "Here Documents",
+# has it: the delimiter is the word after quote removal, the body ends at a line holding only it,
+# and `<<-` strips leading tabs from the body and from that line.
+drop_heredoc_bodies() {
+  printf '%s\n' "$1" | awk '
+    function print_held(   i) { for (i = 1; i <= held_count; i++) print held[i]; held_count = 0 }
+    terminator != "" {
+      line = $0
+      # Without jq the tabs in the payload arrive still escaped, as a backslash and a t.
+      if (strips_tabs) sub(/^(\t|\\t)+/, "", line)
+      if (line == terminator) { held_count = 0; terminator = "" }
+      else held[++held_count] = $0
+      next
+    }
+    {
+      print
+      if ($0 ~ /(^|[^[:alnum:]_.-])(bash|sh|zsh|dash|ksh|source|eval|ssh)([[:space:]].*)?<</) next
+      # The delimiter as the shell reads it: a quoted string, or a word up to a space or an operator.
+      if (match($0, /(^|[^<])<<-?[ \t]*("[^"]+"|\047[^\047]+\047|\\*[^ \t;&|<>()"\047\\]+)/)) {
+        terminator = substr($0, RSTART, RLENGTH)
+        strips_tabs = (terminator ~ /<<-/)
+        sub(/^.*<<-?[ \t]*/, "", terminator)
+        gsub(/["\047\\]/, "", terminator)
+      }
+    }
+    END { print_held() }'
+}
+
 main() {
   local input command cwd segment
   input="$(cat)"
@@ -89,7 +124,7 @@ EOF
       exit 0
     fi
   done <<EOF
-$(split_segments "$command")
+$(split_segments "$(drop_heredoc_bodies "$command")")
 EOF
   exit 0
 }

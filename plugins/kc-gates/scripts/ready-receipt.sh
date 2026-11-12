@@ -94,33 +94,43 @@ print_verdicts() {
 }
 
 # Prints one line per block in the verdict text on stdin:
-#   block<TAB><GATE name|SCOPE><TAB><status><TAB><boxes with evidence><TAB><malformed boxes>
+#   block<TAB><GATE name|SCOPE><TAB><status><TAB><boxes with evidence><TAB><malformed boxes><TAB><their labels>
 # and one line per SCOPE box: scope<TAB><id><TAB><verdict><TAB><evidence>.
-# Code fences around a pasted block are ignored. A box whose line ends at its
-# colon counts when its evidence follows as indented bullets under it.
+# Code fences around a pasted block are ignored. What a gate box needs is a
+# verdict, an id and evidence, in whatever layout the gate gave them: a box
+# with nothing after its id (its colon missing too) counts when evidence
+# follows under it as indented lines or a table, blank lines between or not;
+# another box or a block header (STATUS:, FINDINGS:) under it is not evidence.
 summarize_blocks() {
   awk '
     function trim(s) { sub(/^[[:space:]]+/, "", s); sub(/[[:space:]]+$/, "", s); return s }
     function strip_label(s) { sub(/^[A-Z]+:/, "", s); return trim(s) }
+    function mark_malformed(box_label) { malformed++; malformed_labels = malformed_labels (malformed_labels == "" ? "" : ", ") box_label }
+    function get_box_label(s) { s = trim(s); sub(/[[:space:]].*$/, "", s); sub(/:$/, "", s); return s == "" ? "a box with no id" : s }
+    function is_nested_text(line) { return line ~ /^[[:space:]]+[^[:space:]]/ || line ~ /^\|/ }
+    function is_box_line(line) { return line ~ /^[[:space:]]*- \[(PASS|FAIL|N\/A)\]/ }
+    function is_block_header(line) { return line ~ /^[[:space:]]*(GATE|SCOPE|STATUS|BOXES|FINDINGS):/ }
+    function is_evidence_line(line) { return is_nested_text(line) && !is_box_line(line) }
     function settle_bare_box(has_nested_evidence) {
       if (!awaiting_evidence) return
       if (has_nested_evidence) boxes++
-      else bad++
+      else mark_malformed(pending_label)
       awaiting_evidence = 0
     }
     function emit_block() {
       settle_bare_box(0)
-      if (kind != "") printf "block\t%s\t%s\t%d\t%d\n", name, (status == "" ? "-" : status), boxes, bad
+      if (kind != "") printf "block\t%s\t%s\t%d\t%d\t%s\n", name, (status == "" ? "-" : status), boxes, malformed, malformed_labels
       kind = ""
     }
     /^[[:space:]]*```/ { next }
-    /^GATE:/ { emit_block(); kind = "gate"; name = strip_label($0); status = ""; boxes = 0; bad = 0; section = ""; next }
-    /^SCOPE:/ { emit_block(); kind = "scope"; name = "SCOPE"; status = "-"; boxes = 0; bad = 0; section = "boxes"; next }
+    /^GATE:/ { emit_block(); kind = "gate"; name = strip_label($0); status = ""; boxes = 0; malformed = 0; malformed_labels = ""; section = ""; next }
+    /^SCOPE:/ { emit_block(); kind = "scope"; name = "SCOPE"; status = "-"; boxes = 0; malformed = 0; malformed_labels = ""; section = "boxes"; next }
     kind == "" { next }
     /^STATUS:/ { settle_bare_box(0); status = strip_label($0); next }
     /^BOXES:/ { settle_bare_box(0); section = "boxes"; next }
     /^FINDINGS:/ { settle_bare_box(0); section = "findings"; next }
-    awaiting_evidence && /^[[:space:]]+- / && !/^[[:space:]]+- \[(PASS|FAIL|N\/A)\]/ { settle_bare_box(1); next }
+    awaiting_evidence && is_block_header($0) { settle_bare_box(0) }
+    awaiting_evidence && is_evidence_line($0) { settle_bare_box(1); next }
     section == "boxes" && /^[[:space:]]*- \[/ {
       settle_bare_box(0)
       line = $0
@@ -133,6 +143,8 @@ summarize_blocks() {
       if (colon) {
         id = trim(substr(rest, 1, colon - 1))
         evidence = trim(substr(rest, colon + 1))
+      } else {
+        id = trim(rest)
       }
       is_known_verdict = verdict == "PASS" || verdict == "FAIL" || verdict == "N/A"
       has_id = id != ""
@@ -142,8 +154,9 @@ summarize_blocks() {
         if (kind == "scope") printf "scope\t%s\t%s\t%s\n", id, verdict, evidence
       } else if (is_known_verdict && has_id && kind == "gate") {
         awaiting_evidence = 1
+        pending_label = get_box_label(rest)
       } else {
-        bad++
+        mark_malformed(get_box_label(rest))
       }
     }
     END { emit_block() }'
@@ -158,7 +171,7 @@ get_scope_rows() {
 }
 
 check_gate_block() {
-  local review=$1 summary=$2 gate=$3 rows block_count status boxes boxes_missing_evidence
+  local review=$1 summary=$2 gate=$3 rows block_count status boxes malformed_box_count malformed_box_labels
   rows=$(printf '%s\n' "$summary" | awk -F '\t' -v gate="$gate" '$1 == "block" && $2 == gate')
   block_count=$(printf '%s' "$rows" | grep -c . || true)
   if [ "$block_count" -eq 0 ]; then
@@ -169,23 +182,23 @@ check_gate_block() {
     record_problem "$review: $block_count GATE: $gate blocks; keep the one the gate returned last"
     return
   fi
-  IFS=$'\t' read -r _ _ status boxes boxes_missing_evidence <<< "$rows"
+  IFS=$'\t' read -r _ _ status boxes malformed_box_count malformed_box_labels <<< "$rows"
   case "$status" in
     PASS | 'PASS (N/A)' | FAIL) ;;
     *) record_problem "$review: GATE: $gate has no STATUS: PASS, PASS (N/A) or FAIL" ;;
   esac
   [ "$boxes" -gt 0 ] || record_problem "$review: GATE: $gate has no BOXES: line with a box"
-  [ "$boxes_missing_evidence" -eq 0 ] || record_problem "$review: GATE: $gate has $boxes_missing_evidence box(es) with no verdict or no evidence"
+  [ "$malformed_box_count" -eq 0 ] || record_problem "$review: GATE: $gate has $malformed_box_count box(es) with no verdict or no evidence: $malformed_box_labels"
 }
 
 check_scope_block() {
-  local review=$1 summary=$2 box_id box_count boxes_missing_evidence
+  local review=$1 summary=$2 box_id box_count malformed_box_count malformed_box_labels
   if ! printf '%s\n' "$summary" | grep -q $'^block\tSCOPE\t'; then
     record_problem "$review: no SCOPE: block"
     return
   fi
-  boxes_missing_evidence=$(printf '%s\n' "$summary" | awk -F '\t' '$1 == "block" && $2 == "SCOPE" { print $5 }' | head -n 1)
-  [ "$boxes_missing_evidence" -eq 0 ] || record_problem "$review: SCOPE: has $boxes_missing_evidence box(es) with no verdict or no evidence"
+  IFS=$'\t' read -r _ _ _ _ malformed_box_count malformed_box_labels <<< "$(printf '%s\n' "$summary" | grep $'^block\tSCOPE\t' | head -n 1)"
+  [ "$malformed_box_count" -eq 0 ] || record_problem "$review: SCOPE: has $malformed_box_count box(es) with no verdict or no evidence: $malformed_box_labels"
   for box_id in §G1 §G2 §G3 §G4 §G5; do
     box_count=$(get_scope_rows "$summary" "$box_id" | grep -c . || true)
     if [ "$box_count" -eq 0 ]; then
