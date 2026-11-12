@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # A shop repo whose feature branch seeds one realistic violation per file for the gates every
-# review runs (naming, clarity, structure, simplicity), and adds one unit (orderStatusLabel)
+# review runs (naming, clarity, structure, simplicity; §N4 and §S14 included), and adds one unit (orderStatusLabel)
 # written the way their rules ask, which the review should not flag. main holds the money
 # formatter one of the files duplicates.
 set -euo pipefail
@@ -31,6 +31,32 @@ import type { Order } from './types'
 /** One line per order for the daily operations email. */
 export function buildOrderReport(orders: Order[]): string[] {
   return orders.map((order) => `${order.id}: ${order.status}`)
+}
+TS
+# The order schema owns every validation rule for an order's fields; the form only calls it.
+cat > src/orders/orderSchema.ts <<'TS'
+export interface OrderInput {
+  quantity: number
+  note: string
+}
+
+/** Every validation rule for an order's fields; forms call this and show what it returns. */
+export function validateOrderInput(input: OrderInput): string[] {
+  const errors: string[] = []
+  if (!Number.isInteger(input.quantity) || input.quantity < 1) errors.push('Quantity must be at least 1')
+  if (input.quantity > 99) errors.push('Quantity must be at most 99')
+  if (input.note.length > 200) errors.push('Note must be at most 200 characters')
+  return errors
+}
+TS
+cat > src/orders/orderForm.ts <<'TS'
+import { validateOrderInput } from './orderSchema'
+import type { OrderInput } from './orderSchema'
+
+export function submitOrderForm(input: OrderInput, save: (input: OrderInput) => void): string[] {
+  const errors = validateOrderInput(input)
+  if (errors.length === 0) save(input)
+  return errors
 }
 TS
 printf '{ "name": "shop", "type": "module" }\n' > package.json
@@ -122,6 +148,32 @@ import type { Order } from '../orders/types'
 
 export function shipOrder(order: Order, options: { express: boolean }): Order {
   return { ...order, status: 'shipped' }
+}
+TS
+
+# structure §S14: a new rule (every line item must be in a pack of 6) added to the form, when the
+# schema already owns every other rule for the quantity field and the form only calls it.
+cat > src/orders/orderForm.ts <<'TS'
+import { validateOrderInput } from './orderSchema'
+import type { OrderInput } from './orderSchema'
+
+export function submitOrderForm(input: OrderInput, save: (input: OrderInput) => void): string[] {
+  const errors = validateOrderInput(input)
+  if (input.quantity % 6 !== 0) errors.push('Quantity must be a multiple of 6')
+  if (errors.length === 0) save(input)
+  return errors
+}
+TS
+
+# naming §N4: a qualifier that repeats the context the name already sits in (a footer-only model).
+cat > src/notifications/storeFooter.ts <<'TS'
+export interface StoreFooter {
+  footerEmail: string
+  footerPhone: string
+}
+
+export function renderStoreFooter(footer: StoreFooter): string {
+  return `Questions? ${footer.footerEmail} or ${footer.footerPhone}`
 }
 TS
 

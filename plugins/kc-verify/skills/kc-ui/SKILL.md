@@ -43,9 +43,11 @@ Before opening the app, walk the design (mockup, prototype, spec) and write down
 
 Then put the app in each state and diff it against the design: which sections, fields, columns and actions appear, in which states, and what they do. Each difference in structure or behaviour is a finding, unless the ticket or the product owner decided otherwise; name that decision when you skip one.
 
+Compare each element, not only which sections and columns show: for every element the design shows, check its presence, its order among its siblings, its colour, its variant (filled or outlined, primary or secondary, soft or solid), its weight, its copy and its state (disabled, selected, empty, loading). Examples: a status chip outlined in the design and filled in the app; two columns in a different order; a button the design shows disabled in a state where the app leaves it live; an API field's casing or type against its contract. A difference that only follows the app's own pattern for that kind of element is allowed (see below), and the walk says that it was weighed.
+
 Then compare every new or changed component with its siblings on the same screen: a new card next to existing cards uses the same title size, subtitle style, field label style and spacing. Measure it (computed font size, weight and colour) rather than eyeballing it.
 
-A design is not a pixel spec for things the app already has a pattern for. Titles, button labels, casing, icons, chips and wording follow the app's existing patterns so the product stays consistent; a difference there is not a finding unless the design introduces something the app has no pattern for.
+A design is not a pixel spec for things the app already has a pattern for. Titles, button labels, casing, icons, chips and wording follow the app's existing patterns so the product stays consistent; a difference there is not a finding unless the design introduces something the app has no pattern for. The call is made per element after comparing it: a variant or colour that differs where the app has no pattern for it is a finding, and one that follows the app's pattern is noted as chosen.
 
 ### Step 2 — get real data in front of it
 
@@ -142,7 +144,7 @@ Do not report a UI change verified until every box is ticked:
 - [ ] When the work spans several branches or pull requests, the list covers every screen any of them changes, not only the one being worked on now.
 - [ ] If a design exists, the state matrix is written from it, covering every switch in both positions, every layout-changing option, every role, empty/one/many, and every drawer and dialog.
 - [ ] Every drawer and dialog was opened and filled in: empty, one item picked, several picked, and editing an existing item.
-- [ ] The app, running the change's own code (every branch it needs), was put in every state of the matrix and compared to the design section by section, not only the state you happened to land in; the code and the author's screenshots count for no state; and where a screen shows items matching a reference (a template, a guide, a total, a sheet), each item was measured against it in numbers, with the measurement kept as a test that fails when an item moves off it.
+- [ ] The app, running the change's own code (every branch it needs), was put in every state of the matrix and compared to the design section by section and, within each, element by element (presence, order, colour, variant, weight, copy, state), not only the state you happened to land in or which sections and columns show; the code and the author's screenshots count for no state; and where a screen shows items matching a reference (a template, a guide, a total, a sheet), each item was measured against it in numbers, with the measurement kept as a test that fails when an item moves off it.
 - [ ] Every new or changed component was measured against its siblings on the same screen (title, subtitle, field labels, spacing, and each field's width against what it holds).
 - [ ] Every behaviour the change touches was set off every way a person can (click, hand scroll, keyboard, deep link, reload), while loading and once settled, on every page that shares the component.
 - [ ] Each finding is about structure or behaviour; cosmetic differences where the app has an existing pattern (titles, labels, casing, icons) follow the app.
