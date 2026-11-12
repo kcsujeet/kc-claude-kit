@@ -422,7 +422,7 @@ rm "$ledger_dir/sibling.diff"
 printf 'F1\tlesson\t§X2\nF2\tnot-feedback\tthe go-ahead\n' > "$ledger_dir/ledger.tsv"
 expect_write written "a complete ledger whose lessons the PR adds is written" "$lesson_head" --checklist --ledger "$ledger_dir"
 # A covered rule must have existed before this PR: the base's rules, or a sibling repo's folder.
-printf 'F1\tcovered\t§X2\tadded here, not missed\nF2\tnot-feedback\tthe go-ahead\n' > "$ledger_dir/ledger.tsv"
+printf 'F1\tcovered\t§X2\tadded here, not missed\tlesson:§X2\nF2\tnot-feedback\tthe go-ahead\n' > "$ledger_dir/ledger.tsv"
 expect_write refused "a rule this PR adds is not covered" "$lesson_head" --checklist --ledger "$ledger_dir"
 expect_said "it says the rule wasn't there" "F1: covered by §X2, which no rule file had"
 mkdir -p "$ledger_dir/sibling-rules"
