@@ -40,5 +40,5 @@ mkdir -p "$(dirname "$told_file")"
 printf '%s\n' "$installed_versions" > "$told_file"
 
 plugin=$(basename "$(dirname "$loaded_root")")
-echo "This session runs $plugin $(basename "$loaded_root"), but $installed_versions is installed: its newer rules aren't active here until the person types /reload-plugins or starts a new session. Ask them for it before a review pass or other work $plugin drives."
+echo "This session runs $plugin $(basename "$loaded_root"), but $installed_versions is installed: its newer rules aren't active here until the person types /reload-plugins or starts a new session. Ask them for it now, before any other work: as the turn's one question, in the host's question box with an answer to click where it has one, and do nothing else until they have reloaded."
 exit 0
