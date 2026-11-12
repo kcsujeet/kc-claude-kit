@@ -119,7 +119,7 @@ EOF
         merge_lead="this set a pull request to merge once its requirements are met (--auto); once it has merged, its task is handed off and the look-back is due"
       fi
       cat <<EOF
-{"hookSpecificOutput":{"hookEventName":"PostToolUse","additionalContext":"kc-gates: $merge_lead (working agreement, Order of work on a task, step 6). Before saying what comes next, list every piece of feedback the session got (feedback-ledger.sh list over its transcript), give each one a verdict, and write the lessons that pass step 6's bar (from the person, a reviewer or real harm; twice or at real cost; smaller than the problem), without being asked. What the merged change left open (fail-safe findings, friction with your own tools) meets the same bar, not a new pull request."}}
+{"hookSpecificOutput":{"hookEventName":"PostToolUse","additionalContext":"kc-gates: $merge_lead (working agreement, Order of work on a task, step 6). Before saying what comes next, list every piece of feedback the session got (feedback-ledger.sh list over its transcript), give each one a verdict, and write the lessons that pass step 6's bar, without being asked; what the merged change left open meets that bar too."}}
 EOF
       exit 0
     fi
