@@ -72,6 +72,12 @@ complete_ledger() {
   printf 'F10\tone-off\ttax line is this sheet only\n'
 }
 ledger=$work_dir/ledger.tsv
+# The complete ledger with F4's covered verdict replaced by the given fields, tab-joined.
+ledger_with_covered_f4() {
+  local fields
+  fields=$(printf '\t%s' "$@")
+  complete_ledger | awk -v line="F4\tcovered$fields" -F'\t' '$1 == "F4" { print line; next } { print }' > "$ledger"
+}
 run_check() { bash "$script" check "$list" "$ledger" --diff "$diff_file" --rules "$rules_dir" 2>&1; }
 expect_check() {
   local expectation=$1 label=$2 output actual=passed
@@ -119,67 +125,69 @@ complete_ledger | sed 's/^F2\tlesson\t§B13$/F2\tlesson/' > "$ledger"
 expect_check failed "a lesson with no rule id fails"
 expect_contains "it says so" "F2: lesson names no rule id" "$last_output"
 
-complete_ledger | sed 's/^F4\tcovered\t§R11\t.*/F4\tcovered\t§R12\tno box\tno-change:x/' > "$ledger"
+ledger_with_covered_f4 '§R12' 'no box' 'no-change:x'
 expect_check failed "covered by a rule no rule file has fails"
 expect_contains "it names the rule" "F4: covered by §R12, which no rule file had" "$last_output"
 
-complete_ledger | sed 's/^F4\tcovered\t§R11\t.*/F4\tcovered\t§R1\tno box\tno-change:x/' > "$ledger"
+ledger_with_covered_f4 '§R1' 'no box' 'no-change:x'
 expect_check failed "covered by an id that is only the start of a real one fails"
 
 # A rule file with no ids (a working agreement) is named by its file name.
-complete_ledger | sed 's/^F4\tcovered\t§R11\t.*/F4\tcovered\ttopic.md\tthe line is there and was not applied\tno-change:x/' > "$ledger"
+ledger_with_covered_f4 'topic.md' 'the line is there and was not applied' 'no-change:x'
 expect_check passed "covered by a rule file named by its file name passes"
 
-complete_ledger | sed 's/^F4\tcovered\t§R11\t.*/F4\tcovered\tother.md\tno such file\tno-change:x/' > "$ledger"
+ledger_with_covered_f4 'other.md' 'no such file' 'no-change:x'
 expect_check failed "covered by a file no rules dir holds fails"
 expect_contains "it names the file" "F4: covered by other.md, which is not a rule file" "$last_output"
 
-complete_ledger | sed 's/^F4\tcovered\t§R11\t.*/F4\tcovered\ttopicxmd\ta dot is not a wildcard\tno-change:x/' > "$ledger"
+ledger_with_covered_f4 'topicxmd' 'a dot is not a wildcard' 'no-change:x'
 expect_check failed "covered by a name that only matches as a pattern fails"
 
-complete_ledger | sed 's/^F4\tcovered\t§R11\t.*/F4\tcovered\tchanges.md\ta Markdown file that holds no rules\tno-change:x/' > "$ledger"
+ledger_with_covered_f4 'changes.md' 'a Markdown file that holds no rules' 'no-change:x'
 expect_check failed "covered by a Markdown file outside where rules live fails"
 expect_contains "it names the file" "F4: covered by changes.md, which is not a rule file" "$last_output"
 
-complete_ledger | sed 's/^F4\tcovered\t§R11\t.*/F4\tcovered\tSKILL.md\tan instructions file outside a rules folder\tno-change:x/' > "$ledger"
+ledger_with_covered_f4 'SKILL.md' 'an instructions file outside a rules folder' 'no-change:x'
 expect_check passed "covered by an instructions file named as agents read it passes"
 
 # A --rules dir that is itself a rules folder holds its rule files at its top.
 mkdir -p "$work_dir/home/.claude" && printf 'house rules\n' > "$work_dir/home/.claude/house.md"
-complete_ledger | sed 's/^F4\tcovered\t§R11\t.*/F4\tcovered\ttopic.md\ta rule file at the top of a rules folder\tno-change:x/' > "$ledger"
+ledger_with_covered_f4 'topic.md' 'a rule file at the top of a rules folder' 'no-change:x'
 output=$(bash "$script" check "$list" "$ledger" --diff "$diff_file" --rules "$rules_dir/rules" --rules "$rules_dir" 2>&1) && actual=passed || actual=failed
 expect_eq "covered by a file at the top of a dir named rules passes" passed "$actual"
 output=$(cd "$rules_dir/rules" && bash "$script" check "$list" "$ledger" --diff "$diff_file" --rules . --rules "$rules_dir" 2>&1) && actual=passed || actual=failed
 expect_eq "covered by a file at the top of the current folder, a rules folder, passes" passed "$actual"
-complete_ledger | sed 's/^F4\tcovered\t§R11\t.*/F4\tcovered\thouse.md\ta rule file at the top of a .claude folder\tno-change:x/' > "$ledger"
+ledger_with_covered_f4 'house.md' 'a rule file at the top of a .claude folder' 'no-change:x'
 output=$(bash "$script" check "$list" "$ledger" --diff "$diff_file" --rules "$work_dir/home/.claude/" --rules "$rules_dir" 2>&1) && actual=passed || actual=failed
 expect_eq "covered by a file at the top of a dir named .claude passes" passed "$actual"
 
-complete_ledger | sed 's/^F4\tcovered\t§R11\t.*/F4\tcovered\tc++.md\tpattern characters in a name are plain text\tno-change:x/' > "$ledger"
+ledger_with_covered_f4 'c++.md' 'pattern characters in a name are plain text' 'no-change:x'
 expect_check passed "covered by a rule file whose name holds pattern characters passes"
 
-complete_ledger | sed 's/^F4\tcovered\t§R11\t.*/F4\tcovered\tnotes.txt\tnot a Markdown rule file\tno-change:x/' > "$ledger"
+ledger_with_covered_f4 'notes.txt' 'not a Markdown rule file' 'no-change:x'
 expect_check failed "covered by a file that is not a Markdown rule file fails"
 
-complete_ledger | sed 's/^F4\tcovered\t§R11\t.*/F4\tcovered\t§R11/' > "$ledger"
+ledger_with_covered_f4 '§R11'
 expect_check failed "covered with no reason it was still missed fails"
 expect_contains "it asks why" "F4: covered by §R11 says nothing on why it was still missed" "$last_output"
 
 # A rule that existed and was still missed says what catches the miss now.
-complete_ledger | sed 's/^F4\tcovered\t§R11\t.*/F4\tcovered\t§R11\tno box for it/' > "$ledger"
+ledger_with_covered_f4 '§R11' 'no box for it'
 expect_check failed "covered with nothing on what catches the miss now fails"
 expect_contains "it asks what catches it" "F4: covered by §R11 says nothing on what catches the miss now" "$last_output"
-complete_ledger | sed 's/^F4\tcovered\t§R11\t.*/F4\tcovered\t§R11\tno box for it\tno-change:/' > "$ledger"
+ledger_with_covered_f4 '§R11' 'no box for it' 'no-change:'
 expect_check failed "covered with an empty no-change reason fails"
-complete_ledger | sed 's/^F4\tcovered\t§R11\t.*/F4\tcovered\t§R11\tno box for it\tlesson:ZZ9/' > "$ledger"
+ledger_with_covered_f4 '§R11' 'no box for it' 'lesson:'
+expect_check failed "covered with an empty lesson id fails"
+expect_contains "it asks what catches it" "F4: covered by §R11 says nothing on what catches the miss now" "$last_output"
+ledger_with_covered_f4 '§R11' 'no box for it' 'lesson:ZZ9'
 expect_check failed "covered caught by a rule the lesson diff doesn't add fails"
-expect_contains "it names the rule" "F4: lesson ZZ9 is not added by the lesson diff" "$last_output"
-complete_ledger | sed 's/^F4\tcovered\t§R11\t.*/F4\tcovered\t§R11\tno box for it\tlesson:B13,WF14/' > "$ledger"
+ledger_with_covered_f4 '§R11' 'no box for it' 'lesson:B13,WF14'
 expect_check passed "covered caught by rules the lesson diff adds passes"
-complete_ledger | sed 's/^F4\tcovered\t§R11\t.*/F4\tcovered\t§R11\tno box for it\tskipped/' > "$ledger"
+ledger_with_covered_f4 '§R11' 'no box for it' 'skipped'
 expect_check failed "covered with a catch that is neither lesson: nor no-change: fails"
 
-complete_ledger | sed 's/^F4\tcovered\t§R11\t.*/F4\tcovered/' > "$ledger"
+ledger_with_covered_f4
 expect_check failed "covered with no rule id fails"
 expect_contains "it says so" "F4: covered names no rule id" "$last_output"
 
@@ -204,9 +212,9 @@ complete_ledger > "$ledger"
 output=$(bash "$script" check "$list" "$ledger" --diff "$work_dir/citing.diff" --rules "$rules_dir" 2>&1) && actual=passed || actual=failed
 expect_eq "a diff that only cites a rule does not add it" failed "$actual"
 expect_contains "it names the rule" "F2: lesson §B13 is not added by the lesson diff" "$output"
-complete_ledger | sed 's/^F4\tcovered\t§R11\t.*/F4\tcovered\t§R17\tcited only\tno-change:x/' > "$ledger"
+ledger_with_covered_f4 '§R17' 'cited only' 'no-change:x'
 expect_check failed "a rule only cited in the rules is not covered"
-complete_ledger | sed 's/^F4\tcovered\t§R11\t.*/F4\tcovered\t§R12\tnot in Markdown\tno-change:x/' > "$ledger"
+ledger_with_covered_f4 '§R12' 'not in Markdown' 'no-change:x'
 expect_check failed "only Markdown rule files count"
 
 # An empty field stays empty: the reason doesn't slide into the rule id.
