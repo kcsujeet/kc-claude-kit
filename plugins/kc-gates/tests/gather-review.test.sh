@@ -30,6 +30,16 @@ make_repo() {
   git -C "$repo_dir" commit -q -m feature
 }
 
+# Passes when <needle> is absent from <haystack>.
+expect_not_contains() {
+  local label=$1 needle=$2 haystack=$3
+  case "$haystack" in
+    *"$needle"*) record "$label" fail "unexpected: $needle
+in:         $haystack" ;;
+    *) record "$label" ok ;;
+  esac
+}
+
 # --- branch mode, falling back to main ---------------------------------------
 repo="$work_dir/repo-main"
 make_repo "$repo" main
@@ -65,6 +75,51 @@ repo_master="$work_dir/repo-master"
 make_repo "$repo_master" master
 master_output=$(cd "$repo_master" && bash "$gather" --branch --out-dir "$work_dir/out-master")
 expect_contains "branch: base falls back to master when main is absent" "BASE=master" "$master_output"
+
+# --- branch mode, a local base behind its upstream ---------------------------
+# A bare "remote" and a clone whose local main is behind origin/main: the diff
+# against it would hold work that is already merged, so meta.env says so.
+stale_remote="$work_dir/stale-remote.git"
+stale_other="$work_dir/stale-other"
+stale_clone="$work_dir/stale-clone"
+git init -q --bare "$stale_remote"
+git -C "$stale_remote" symbolic-ref HEAD refs/heads/main
+git clone -q "$stale_remote" "$stale_other" 2>/dev/null
+git -C "$stale_other" config user.email test@example.com
+git -C "$stale_other" config user.name Test
+git -C "$stale_other" checkout -q -b main
+printf 'one\n' > "$stale_other/a.txt"
+git -C "$stale_other" add a.txt
+git -C "$stale_other" commit -q -m base
+git -C "$stale_other" push -q origin main
+git clone -q "$stale_remote" "$stale_clone" 2>/dev/null
+git -C "$stale_clone" config user.email test@example.com
+git -C "$stale_clone" config user.name Test
+git -C "$stale_clone" checkout -q -b feature
+printf 'mine\n' > "$stale_clone/b.txt"
+git -C "$stale_clone" add b.txt
+git -C "$stale_clone" commit -q -m feature
+# Up to date: no line.
+uptodate_output=$(cd "$stale_clone" && bash "$gather" --branch main --out-dir "$work_dir/out-uptodate")
+expect_not_contains "base_stale: an up-to-date local base prints no BASE_STALE" "BASE_STALE=" "$uptodate_output"
+# Two commits land on the remote; the clone fetches them but main stays behind.
+for merged_number in 1 2; do
+  printf '%s\n' "$merged_number" > "$stale_other/merged-$merged_number.txt"
+  git -C "$stale_other" add "merged-$merged_number.txt"
+  git -C "$stale_other" commit -q -m "merged $merged_number"
+done
+git -C "$stale_other" push -q origin main
+git -C "$stale_clone" fetch -q origin
+stale_output=$(cd "$stale_clone" && bash "$gather" --branch main --out-dir "$work_dir/out-stale")
+expect_contains "base_stale: a local base behind its upstream names the count and the upstream" \
+  "BASE_STALE='main is behind origin/main by 2 commit(s): gather again with --branch origin/main'" "$stale_output"
+expect_contains "base_stale: the line is saved to meta.env" "BASE_STALE=" "$(cat "$work_dir/out-stale/meta.env")"
+expect_contains "base_stale: the base itself is not changed" "BASE=main" "$stale_output"
+remote_ref_output=$(cd "$stale_clone" && bash "$gather" --branch origin/main --out-dir "$work_dir/out-remote-ref")
+expect_not_contains "base_stale: the remote-tracking ref as base prints no BASE_STALE" "BASE_STALE=" "$remote_ref_output"
+git -C "$stale_clone" branch -q local-base "$(git -C "$stale_clone" rev-parse main)"
+noupstream_output=$(cd "$stale_clone" && bash "$gather" --branch local-base --out-dir "$work_dir/out-noupstream")
+expect_not_contains "base_stale: a local base with no upstream prints no BASE_STALE" "BASE_STALE=" "$noupstream_output"
 
 # --- PR mode, against the stub gh --------------------------------------------
 use_gh_fixtures "$fixtures"
