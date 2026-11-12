@@ -20,12 +20,18 @@
 #                                                     defines each id; a rule file with no ids (a
 #                                                     working agreement) is named by its file
 #                                                     name, which a --diff changes
-#         <id> covered <rule id> <why it was missed>  a --rules dir, the rules as they were before
+#         <id> covered <rule id> <why it was missed> <what catches it now>
+#                                                     a --rules dir, the rules as they were before
 #                                                     the lesson PR, defines the id; a rule file
 #                                                     with no ids is named by its file name, which
 #                                                     a --rules dir holds in a `rules` or `.claude`
 #                                                     folder (the dir itself may be one), or as
-#                                                     CLAUDE.md, AGENTS.md or SKILL.md
+#                                                     CLAUDE.md, AGENTS.md or SKILL.md. A rule
+#                                                     that existed and was still missed needs a
+#                                                     box or a trigger, so the last field is
+#                                                     `lesson:<rule id>[,<rule id>]...`, checked as
+#                                                     a lesson is, or `no-change:<why the rule as
+#                                                     written would have caught it>`
 #         <id> one-off <reason>
 #         <id> not-feedback <reason>
 #       A rule id is written as the rules write it (`§B13`, `B13`, `WF14`). A line defines it when
@@ -45,17 +51,14 @@ usage() {
 
 # Turns a JSONL transcript into "<source>\t<text>" lines, in order.
 list_transcript() {
-  jq -r '
+  jq -L "$(dirname "$0")/lib" -r '
+    include "typed-message";
     def oneline: gsub("[\t\r\n]+"; " ") | sub("^ +"; "") | sub(" +$"; "");
-    def typed_text:
-      if (.message.content | type) == "string" then [.message.content]
-      else [.message.content[]? | select(.type == "text") | .text] end;
-    def is_not_typed: test("^(<system-reminder>|<task-notification>|<local-command|<command-name>|<command-message>|Caveat: |Base directory for this skill: )");
     if .type == "user" and (.isCompactSummary | not) then
       if (.isMeta == true) then
-        (typed_text[] | select(test("^Another Claude session sent a message")) | "session\t" + oneline)
+        (message_texts[] | select(test("^Another Claude session sent a message")) | "session\t" + oneline)
       else
-        (typed_text[] | select(is_not_typed | not) |
+        (typed_texts |
           if test("^\\[Request interrupted") then "interrupt\t" + oneline else "typed\t" + oneline end),
         (.message.content | if type == "array" then .[] else empty end
           | select(.type == "tool_result")
@@ -147,28 +150,32 @@ run_check() {
     (cd "$input_path" 2>/dev/null && find . -name '*.md' -type f | sed "s|^\.|$(basename "$(pwd -P)")|" | grep -E "$RULE_FILE_PATH") >> "$rule_paths_before" || true
   done
 
-  local problems=0 ledger_line item_id verdict verdict_detail why seen=" "
+  local problems=0 ledger_line item_id verdict verdict_detail why_missed what_catches_it seen=" "
   record_problem() { echo "$1"; problems=$((problems + 1)); }
+  # Each rule a lesson names is added by the lesson diff: an id it defines, or a file it changes.
+  check_lesson_rules() {
+    local rule escaped_name
+    for rule in ${2//,/ }; do
+      case "$rule" in
+        *.*)
+          escaped_name=$(escape_file_name "$rule")
+          grep -Eq "(^|/)${escaped_name}\$" "$changed_paths" \
+            || record_problem "$1: lesson $rule is not a file the lesson diff changes" ;;
+        *) defines_rule_id "$rule" "$added_lines" || record_problem "$1: lesson $rule is not added by the lesson diff" ;;
+      esac
+    done
+  }
   while IFS= read -r ledger_line || [ -n "$ledger_line" ]; do
     [ -n "$ledger_line" ] || continue
     # A separator that is not whitespace, so `read` keeps an empty field instead of skipping it.
-    IFS=$'\x1f' read -r item_id verdict verdict_detail why <<< "${ledger_line//$'\t'/$'\x1f'}"
+    IFS=$'\x1f' read -r item_id verdict verdict_detail why_missed what_catches_it <<< "${ledger_line//$'\t'/$'\x1f'}"
     case "$seen" in *" $item_id "*) record_problem "$item_id: listed twice in the ledger"; continue ;; esac
     seen="$seen$item_id "
     grep -q "^$item_id"$'\t' "$feedback_list" || { record_problem "$item_id: not on the feedback list"; continue; }
     case "$verdict" in
       lesson)
         [ -n "$verdict_detail" ] || { record_problem "$item_id: lesson names no rule id"; continue; }
-        local rule escaped_name
-        for rule in ${verdict_detail//,/ }; do
-          case "$rule" in
-            *.*)
-              escaped_name=$(escape_file_name "$rule")
-              grep -Eq "(^|/)${escaped_name}\$" "$changed_paths" \
-                || record_problem "$item_id: lesson $rule is not a file the lesson diff changes" ;;
-            *) defines_rule_id "$rule" "$added_lines" || record_problem "$item_id: lesson $rule is not added by the lesson diff" ;;
-          esac
-        done ;;
+        check_lesson_rules "$item_id" "$verdict_detail" ;;
       covered)
         [ -n "$verdict_detail" ] || { record_problem "$item_id: covered names no rule id"; continue; }
         case "$verdict_detail" in
@@ -177,7 +184,12 @@ run_check() {
               || record_problem "$item_id: covered by $verdict_detail, which is not a rule file" ;;
           *) defines_rule_id "$verdict_detail" "$rule_lines_before" || record_problem "$item_id: covered by $verdict_detail, which no rule file had" ;;
         esac
-        [ -n "$why" ] || record_problem "$item_id: covered by $verdict_detail says nothing on why it was still missed" ;;
+        [ -n "$why_missed" ] || record_problem "$item_id: covered by $verdict_detail says nothing on why it was still missed"
+        case "$what_catches_it" in
+          lesson:?*) check_lesson_rules "$item_id" "${what_catches_it#lesson:}" ;;
+          no-change:?*) ;;
+          *) record_problem "$item_id: covered by $verdict_detail says nothing on what catches the miss now (lesson:<rule id> or no-change:<why>)" ;;
+        esac ;;
       one-off | not-feedback)
         [ -n "$verdict_detail" ] || record_problem "$item_id: $verdict gives no reason" ;;
       *) record_problem "$item_id: '$verdict' is not lesson, covered, one-off or not-feedback" ;;
