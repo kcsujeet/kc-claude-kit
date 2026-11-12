@@ -63,7 +63,7 @@ list_transcript() {
         (.message.content | if type == "array" then .[] else empty end
           | select(.type == "tool_result")
           | (.content | if type == "array" then map(.text? // "") | join(" ") else tostring end) as $text
-          | if ($text | test("^The user answered|^User has answered")) then "answer\t" + ($text | oneline)
+          | if ($text | test("^The user answered|^User has answered|^Your questions have been answered")) then "answer\t" + ($text | oneline)
             elif ($text | test("^The user doesn.t want to proceed with this tool use")) then "rejected\t" + ($text | oneline)
             else empty end)
       end
