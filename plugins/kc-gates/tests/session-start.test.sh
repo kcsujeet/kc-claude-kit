@@ -27,6 +27,9 @@ lines_for() {
 printf '{"shop-kit":{"source":{"source":"git","url":"https://github.com/shop-owner/kit.git"}}}' \
   > "$config/plugins/known_marketplaces.json"
 expect_eq "cached copy, maintainer: reminder and lessons line" 2 "$(lines_for "$cached" routes-owner.tsv)"
+expect_contains "the lessons line holds the bar: not your own gates' findings, twice or at real cost" \
+  "not what your own gates or tools find on your own change) shows a habit that would have caught a whole class of mistakes, and it passes step 6's bar (twice or at real cost" \
+  "$(KC_GH_ROUTES="$fixtures/routes-owner.tsv" CLAUDE_CONFIG_DIR="$config" CLAUDE_PLUGIN_ROOT="$cached" bash "$script")"
 expect_eq "cached copy, another user: reminder only" 1 "$(lines_for "$cached" routes-other.tsv)"
 expect_contains "the reminder names the pass" "kc-ready-for-review" \
   "$(KC_GH_ROUTES="$fixtures/routes-other.tsv" CLAUDE_CONFIG_DIR="$config" CLAUDE_PLUGIN_ROOT="$cached" bash "$script")"

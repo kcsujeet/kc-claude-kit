@@ -63,6 +63,9 @@ expect_hook remind "an --input file by absolute path, as the payload builder pri
 
 # --- merges --------------------------------------------------------------------------------------
 expect_hook remind-merge "gh pr merge" "gh pr merge 12 --merge"
+expect_contains "the merge reminder holds the bar and leaves fail-safe findings open" \
+  "write the lessons that pass step 6's bar (from the person, a reviewer or real harm; twice or at real cost; smaller than the problem), without being asked. What the merged change left open (fail-safe findings, friction with your own tools) meets the same bar, not a new pull request." \
+  "$(build_payload "gh pr merge 12 --merge" | bash "$hook")"
 expect_hook remind-merge "gh pr merge with no number, squashing" "gh pr merge --squash --delete-branch"
 expect_hook remind-merge "gh pr merge alone on its line" "gh pr merge"
 expect_hook remind-queued-merge "a merge queued with --auto" "gh pr merge 12 --auto --rebase"
@@ -120,6 +123,7 @@ for mode in jq sed; do
   [ "$mode" = sed ] && no_jq=1
   no_cwd_output=$(cd "$work_dir" && printf '%s' "$no_cwd_payload" | KC_GUARD_NO_JQ=$no_jq bash "$hook")
   expect_contains "[$mode] a payload with no cwd reads the --input path from where the hook runs" "this approved a pull request" "$no_cwd_output"
+  expect_contains "[$mode] the approval reminder asks only for lessons that pass the bar" "write the ones that pass step 6's bar as lessons" "$no_cwd_output"
 done
 
 finish
