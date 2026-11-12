@@ -203,6 +203,20 @@ printf 'GATE: naming\nSTATUS: PASS\nBOXES:\n- [PASS] §N1 Stored values, one row
 expect_write written "a box whose evidence is a table after a blank line is no bad box" "$fixed_head" --rounds 1 --open 0 --pass "$pass_dir"
 
 build_pass
+printf 'GATE: naming\nSTATUS: PASS\nBOXES:\n- [PASS] §N1 Rows:\n| State | Handler |\n| --- | --- |\n| missing | shop/total.sh:3 |\n- [PASS] §N2: 0 hits\nFINDINGS:\n- none\n' > "$pass_dir/round-1/verdicts/naming.txt"
+expect_write written "a box whose evidence is a table at the margin is no bad box" "$fixed_head" --rounds 1 --open 0 --pass "$pass_dir"
+
+build_pass
+printf 'GATE: naming\nSTATUS: PASS\nBOXES:\n  - [PASS] §N1 Bare\n  - [PASS] §N2: 0 hits\nFINDINGS:\n- none\n' > "$pass_dir/round-1/verdicts/naming.txt"
+expect_write refused "an indented box under a bare box is the next box, not its evidence" "$fixed_head" --rounds 1 --open 0 --pass "$pass_dir"
+expect_said "it names the bare one" "GATE: naming has 1 box(es) with no verdict or no evidence: §N1"
+
+build_pass
+printf 'GATE: naming\nSTATUS: PASS\nBOXES:\n- [PASS] §N1: 0 hits\n- [PASS] §N2 Bare\n  FINDINGS:\n  - none\n' > "$pass_dir/round-1/verdicts/naming.txt"
+expect_write refused "a block header indented under a bare box is not its evidence" "$fixed_head" --rounds 1 --open 0 --pass "$pass_dir"
+expect_said "it names the box with only a header under it" "GATE: naming has 1 box(es) with no verdict or no evidence: §N2"
+
+build_pass
 printf 'GATE: naming\nSTATUS: PASS\nBOXES:\n- [PASS] §N1 Every new name conforms.\n  - shop/total.sh order_total matches order_tax\n- [PASS] §N2: 0 hits\nFINDINGS:\n- none\n' > "$pass_dir/round-1/verdicts/naming.txt"
 expect_write written "a box with no colon after its name and evidence under it is no bad box" "$fixed_head" --rounds 1 --open 0 --pass "$pass_dir"
 
