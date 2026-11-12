@@ -29,7 +29,11 @@
 # TITLE, DIFF_FILE and CHANGED_FILES, plus PR and URL in PR mode. Values with
 # characters outside [A-Za-z0-9_./:@+,-] are single-quoted, so the file can be
 # sourced. In PR mode, when the local HEAD is not the PR's head commit, it adds
-# FETCH=, the command that fetches it; it never runs the fetch itself.
+# FETCH=, the command that fetches it; it never runs the fetch itself. In branch
+# mode, when the base is a local branch whose upstream has commits it lacks, it
+# adds BASE_STALE=<base> is <n> commits behind <upstream>: gather again with
+# --branch <upstream>, since the diff then holds work that is already merged;
+# it never fetches and never changes the base.
 #
 # Exits 0 on success, 1 when gh, git or the base lookup fails, 2 on a usage
 # error.
@@ -63,6 +67,7 @@ base_arg=""
 out_dir=""
 since_sha=""
 since_skipped=""
+base_stale=""
 whole_diff=false
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -121,6 +126,14 @@ if [ "$branch_mode" = true ]; then
     review_base=master
   else
     fail "no base branch: pass one after --branch (no origin/HEAD, main or master)"
+  fi
+  # A local base behind its upstream makes the diff carry already-merged work.
+  if git rev-parse --verify --quiet "refs/heads/$review_base" >/dev/null &&
+    base_upstream=$(git rev-parse --abbrev-ref "$review_base@{upstream}" 2>/dev/null); then
+    base_behind=$(git rev-list --count "$review_base..$base_upstream" 2>/dev/null || echo 0)
+    if [ "$base_behind" -gt 0 ]; then
+      base_stale="$review_base is $base_behind commits behind $base_upstream: gather again with --branch $base_upstream"
+    fi
   fi
   head_sha=$(git rev-parse HEAD)
   review_title=$(git rev-parse --abbrev-ref HEAD)
@@ -190,6 +203,7 @@ cp "$files_tmp" "$changed_files"
   print_env_line DIFF_FILE "$diff_file"
   print_env_line CHANGED_FILES "$changed_files"
   if [ -n "$fetch_command" ]; then print_env_line FETCH "$fetch_command"; fi
+  if [ -n "$base_stale" ]; then print_env_line BASE_STALE "$base_stale"; fi
   if [ -n "$since_skipped" ]; then
     print_env_line SINCE_SKIPPED "$since_skipped"
   elif [ -n "$since_sha" ]; then
