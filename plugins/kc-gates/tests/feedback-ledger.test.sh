@@ -27,6 +27,7 @@ cat > "$transcript" <<'JSONL'
 {"type":"user","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"t1","is_error":true,"content":"The user doesn't want to proceed with this tool use. The tool use was rejected."}]}}
 {"type":"user","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"t2","is_error":true,"content":"Exit code 1"}]}}
 {"type":"user","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"t3","content":[{"type":"text","text":"The user answered: \"Keep cents\""}]}]}}
+{"type":"user","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"t4","content":"Your questions have been answered: \"Round when?\"=\"At the total\". You can now continue with these answers in mind."}]}}
 {"type":"user","message":{"role":"user","content":[{"type":"text","text":"[Request interrupted by user for tool use]"}]}}
 {"type":"user","message":{"role":"user","content":"<command-message>review is running</command-message>"}}
 JSONL
@@ -42,11 +43,12 @@ typed\twhy a helper for one line?
 typed\tname it for the store
 rejected\tThe user doesn\'t want to proceed with this tool use. The tool use was rejected.
 answer\tThe user answered: "Keep cents"
+answer\tYour questions have been answered: "Round when?"="At the total". You can now continue with these answers in mind.
 interrupt\t[Request interrupted by user for tool use]
 qa-rows.txt\tRow 1: total shows 0 for a free order
 qa-rows.txt\tRow 2: tax missing'
 expect_eq "list finds each kind of feedback, in order, and skips reminders, notifications, summaries, skill text, queued shell commands and tool errors" "$expected" "$(cut -f2,3 "$list")"
-expect_eq "items are numbered F1 onwards" "F1 F10" "$(cut -f1 "$list" | sed -n '1p;$p' | tr '\n' ' ' | sed 's/ $//')"
+expect_eq "items are numbered F1 onwards" "F1 F11" "$(cut -f1 "$list" | sed -n '1p;$p' | tr '\n' ' ' | sed 's/ $//')"
 
 # check: a lesson diff that adds §B13 and WF14, and rule files that hold §R11 and **QA1.**
 diff_file=$work_dir/lesson.diff
@@ -70,6 +72,7 @@ complete_ledger() {
   printf 'F8\tnot-feedback\tan interrupt to redirect, its message is F4\n'
   printf 'F9\tlesson\tWF14\n'
   printf 'F10\tone-off\ttax line is this sheet only\n'
+  printf 'F11\tone-off\twhen to round is this order page only\n'
 }
 ledger=$work_dir/ledger.tsv
 # The complete ledger with F4's covered verdict replaced by the given fields, tab-joined.
@@ -88,7 +91,7 @@ expect_check() {
 
 complete_ledger > "$ledger"
 expect_check passed "a ledger with a verdict for every item passes"
-expect_contains "it counts the items" "10 item(s), each with a verdict" "$last_output"
+expect_contains "it counts the items" "11 item(s), each with a verdict" "$last_output"
 
 complete_ledger | sed '/^F5/d' > "$ledger"
 expect_check failed "an item with no verdict fails"
@@ -98,9 +101,9 @@ expect_contains "it names the item" "F5: no verdict in the ledger" "$last_output
 expect_check failed "an item given two verdicts fails"
 expect_contains "it names the item" "F2: listed twice in the ledger" "$last_output"
 
-{ complete_ledger; printf 'F11\tone-off\tno such item\n'; } > "$ledger"
+{ complete_ledger; printf 'F12\tone-off\tno such item\n'; } > "$ledger"
 expect_check failed "a verdict for an item not on the list fails"
-expect_contains "it names the item" "F11: not on the feedback list" "$last_output"
+expect_contains "it names the item" "F12: not on the feedback list" "$last_output"
 
 complete_ledger | sed 's/^F2\tlesson\t§B13$/F2\tlesson\t§B9/' > "$ledger"
 expect_check failed "a lesson whose rule the diff only removes fails"

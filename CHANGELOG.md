@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Fixed
+
+- `kc-gates` 3.4.1: `feedback-ledger.sh list` lists answers given in the question box. The box's tool result starts "Your questions have been answered", which the list didn't match, so a look-back never saw the choices made there (a price, a line of copy dropped, a fix approved past its diff).
+
 ### Added
 
 - `kc-conventions` 2.1.27 and `kc-gates` 3.4.0: three misses from one look-back, each held by a check that fails without it. The look-back marked a miss "covered" and wrote no lesson, though the working agreement says a rule that was there and still missed needs a box or a trigger: `feedback-ledger.sh check` now refuses a `covered` verdict that doesn't say what catches the miss now, `lesson:<rule id>` from the lesson diff or `no-change:<why>`. Two claims went out unchecked: live payment commands handed over three times, each failing on access the CLI's config already showed missing, and "a lesson is only text" said of a kit that asks every lesson for a check. A new Stop hook, `check-reply-sources.sh`, holds back once a reply that says what instructions require with nothing read that turn, or hands over an account CLI's command (payments, hosting, cloud, code host) without having run that CLI or read its config; the working agreement's claim line names both. A fourth candidate, widening the correctness gate to count a newly reachable state as a change, was dropped: its eval showed the gate already flags that case, and the change that caused the miss had no review pass.
