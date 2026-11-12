@@ -31,7 +31,7 @@
 # sourced. In PR mode, when the local HEAD is not the PR's head commit, it adds
 # FETCH=, the command that fetches it; it never runs the fetch itself. In branch
 # mode, when the base is a local branch whose upstream has commits it lacks, it
-# adds BASE_STALE=<base> is <n> commits behind <upstream>: gather again with
+# adds BASE_STALE=<base> is behind <upstream> by <n> commit(s): gather again with
 # --branch <upstream>, since the diff then holds work that is already merged;
 # it never fetches and never changes the base.
 #
@@ -59,6 +59,18 @@ print_env_line() {
       ;;
   esac
   printf '%s=%s\n' "$env_key" "$env_value"
+}
+
+# Prints why the base is stale, or nothing: the base is a local branch whose
+# upstream has commits it lacks. Always returns 0.
+describe_stale_base() {
+  local base=$1 upstream behind
+  if ! upstream=$(git rev-parse --abbrev-ref "$base@{upstream}" 2>/dev/null); then
+    return 0
+  fi
+  behind=$(git rev-list --count "$base..$upstream" 2>/dev/null || echo 0)
+  [ "$behind" -gt 0 ] || return 0
+  echo "$base is behind $upstream by $behind commit(s): gather again with --branch $upstream"
 }
 
 pr_number=""
@@ -128,13 +140,7 @@ if [ "$branch_mode" = true ]; then
     fail "no base branch: pass one after --branch (no origin/HEAD, main or master)"
   fi
   # A local base behind its upstream makes the diff carry already-merged work.
-  if git rev-parse --verify --quiet "refs/heads/$review_base" >/dev/null &&
-    base_upstream=$(git rev-parse --abbrev-ref "$review_base@{upstream}" 2>/dev/null); then
-    base_behind=$(git rev-list --count "$review_base..$base_upstream" 2>/dev/null || echo 0)
-    if [ "$base_behind" -gt 0 ]; then
-      base_stale="$review_base is $base_behind commits behind $base_upstream: gather again with --branch $base_upstream"
-    fi
-  fi
+  base_stale=$(describe_stale_base "$review_base")
   head_sha=$(git rev-parse HEAD)
   review_title=$(git rev-parse --abbrev-ref HEAD)
   # Explicit prefixes and no external diff tool, whatever the user's git config

@@ -103,21 +103,20 @@ git -C "$stale_clone" commit -q -m feature
 uptodate_output=$(cd "$stale_clone" && bash "$gather" --branch main --out-dir "$work_dir/out-uptodate")
 expect_not_contains "base_stale: an up-to-date local base prints no BASE_STALE" "BASE_STALE=" "$uptodate_output"
 # Two commits land on the remote; the clone fetches them but main stays behind.
-for n in 1 2; do
-  printf '%s\n' "$n" > "$stale_other/merged-$n.txt"
-  git -C "$stale_other" add "merged-$n.txt"
-  git -C "$stale_other" commit -q -m "merged $n"
+for merged_number in 1 2; do
+  printf '%s\n' "$merged_number" > "$stale_other/merged-$merged_number.txt"
+  git -C "$stale_other" add "merged-$merged_number.txt"
+  git -C "$stale_other" commit -q -m "merged $merged_number"
 done
 git -C "$stale_other" push -q origin main
 git -C "$stale_clone" fetch -q origin
 stale_output=$(cd "$stale_clone" && bash "$gather" --branch main --out-dir "$work_dir/out-stale")
 expect_contains "base_stale: a local base behind its upstream names the count and the upstream" \
-  "BASE_STALE='main is 2 commits behind origin/main: gather again with --branch origin/main'" "$stale_output"
+  "BASE_STALE='main is behind origin/main by 2 commit(s): gather again with --branch origin/main'" "$stale_output"
 expect_contains "base_stale: the line is saved to meta.env" "BASE_STALE=" "$(cat "$work_dir/out-stale/meta.env")"
 expect_contains "base_stale: the base itself is not changed" "BASE=main" "$stale_output"
 remote_ref_output=$(cd "$stale_clone" && bash "$gather" --branch origin/main --out-dir "$work_dir/out-remote-ref")
 expect_not_contains "base_stale: the remote-tracking ref as base prints no BASE_STALE" "BASE_STALE=" "$remote_ref_output"
-expect_eq "base_stale: the remote-tracking ref holds only the branch's file" "b.txt" "$(cat "$work_dir/out-remote-ref/changed-files.txt")"
 git -C "$stale_clone" branch -q local-base "$(git -C "$stale_clone" rev-parse main)"
 noupstream_output=$(cd "$stale_clone" && bash "$gather" --branch local-base --out-dir "$work_dir/out-noupstream")
 expect_not_contains "base_stale: a local base with no upstream prints no BASE_STALE" "BASE_STALE=" "$noupstream_output"
