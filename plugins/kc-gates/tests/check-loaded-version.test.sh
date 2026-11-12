@@ -43,7 +43,7 @@ run_check() {
 }
 
 behind_line() {
-  echo "This session runs kc-gates $1, but $2 is installed: its newer rules aren't active here until the person types /reload-plugins or starts a new session. Ask them for it now, before any other work: as the turn's one question, in the host's question box with an answer to click where it has one, and do nothing else until they have reloaded."
+  echo "This session runs kc-gates $1, but $2 is installed: its newer rules aren't active here until the person types /reload-plugins or starts a new session. Ask them for it now, in the host's question box with an answer to click where it has one, and do no other work until they have reloaded: all of it depends on the newer rules."
 }
 
 write_installed_plugins 3.1.0
