@@ -57,6 +57,11 @@
             "type": "command",
             "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/remind-look-back.sh\"",
             "shell": "bash"
+          },
+          {
+            "type": "command",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/remind-reload.sh\"",
+            "shell": "bash"
           }
         ]
       }
