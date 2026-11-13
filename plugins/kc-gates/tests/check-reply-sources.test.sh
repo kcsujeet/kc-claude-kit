@@ -46,7 +46,7 @@ heroku_reply=$(printf 'Run this:\n\n```bash\nheroku config:set PRICE=15 --app sh
 # Claims about instructions.
 { write_typed_message "will these hold?"; } > "$transcript"
 expect_eq "a claim about the kit with nothing read is noted" noted "$(run_hook "$kit_claim")"
-expect_reason "it says nothing was read" "nothing in that turn read them"
+expect_reason "it says nothing was read" "without reading them first"
 
 { write_typed_message "will these hold?"; write_tool_call Read file_path "/home/me/kit/plugins/kc-conventions/rules/kc-working-agreement.md"; write_tool_result; } > "$transcript"
 expect_eq "a claim about the kit after reading a rule file goes out" out "$(run_hook "$kit_claim")"
@@ -91,7 +91,7 @@ expect_eq "a prose line that starts with a CLI's name goes out" out "$(run_hook 
 
 both_reply=$(printf '%s\n\n```bash\ngh pr merge 7\n```\n' "$kit_claim")
 expect_eq "both kinds in one reply are noted together" noted "$(run_hook "$both_reply")"
-expect_reason "it gives both reasons" "nothing in that turn read them.*a gh command"
+expect_reason "it gives both reasons" "without reading them first.*a gh command"
 
 # Commands anywhere in a fenced block, behind any fence, at the start of any command in a line.
 { write_typed_message "ship it"; } > "$transcript"
@@ -131,6 +131,10 @@ expect_eq "a tool result with text beside it doesn't start a new turn" out "$(ru
 rm -f "$misses_file"
 jq -cn --arg reply "$heroku_reply" '{session_id: "s", transcript_path: "/nonexistent", last_assistant_message: $reply}' | bash "$hook" > "$hook_output"
 expect_eq "a missing transcript notes nothing" out "$([ -s "$misses_file" ] && echo noted || echo out)"
-expect_eq "with no plugin data folder it notes nothing and prints nothing" "" "$(write_typed_message "x" > "$transcript"; jq -cn --arg reply "$kit_claim" --arg path "$transcript" '{session_id: "s", transcript_path: $path, last_assistant_message: $reply}' | CLAUDE_PLUGIN_DATA='' bash "$hook")"
+write_typed_message "x" > "$transcript"
+expect_eq "with no plugin data folder it prints nothing, errors included" "" "$(jq -cn --arg reply "$kit_claim" --arg path "$transcript" '{session_id: "s", transcript_path: $path, last_assistant_message: $reply}' | CLAUDE_PLUGIN_DATA='' bash "$hook" 2>&1)"
+rm -rf "$CLAUDE_PLUGIN_DATA"
+expect_eq "with no session id it prints nothing, errors included" "" "$(jq -cn --arg reply "$kit_claim" --arg path "$transcript" '{transcript_path: $path, last_assistant_message: $reply}' | bash "$hook" 2>&1)"
+expect_eq "with no session id no misses folder is made" absent "$([ -e "$CLAUDE_PLUGIN_DATA/reply-misses" ] && echo present || echo absent)"
 
 finish

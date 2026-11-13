@@ -51,4 +51,13 @@ expect_eq "long prose after a code block is still noted" noted "$(run_hook "$pro
 
 expect_eq "an empty reply goes out" out "$(run_hook "")"
 
+# Without a data folder or a session id there is nowhere to note a miss: nothing is written,
+# printed or reported as an error.
+rm -rf "$CLAUDE_PLUGIN_DATA"
+expect_eq "with no data folder a long reply prints nothing, errors included" "" \
+  "$(jq -cn --arg reply "$long_reply" '{session_id: "s", last_assistant_message: $reply}' | CLAUDE_PLUGIN_DATA='' bash "$hook" 2>&1)"
+expect_eq "with no session id a long reply prints nothing, errors included" "" \
+  "$(jq -cn --arg reply "$long_reply" '{last_assistant_message: $reply}' | bash "$hook" 2>&1)"
+expect_eq "with no session id no misses folder is made" absent "$([ -e "$CLAUDE_PLUGIN_DATA/reply-misses" ] && echo present || echo absent)"
+
 finish

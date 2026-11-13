@@ -15,10 +15,13 @@
 # It sees only that such a call happened, not whether it was a read or what it found.
 #
 # Input: the Stop payload on stdin. Output: none; each miss is appended to
-# $CLAUDE_PLUGIN_DATA/reply-misses/<session_id>. Always exits 0, and notes nothing when jq, the
+# the session's misses file (lib/reply-misses.sh). Always exits 0, and notes nothing when jq, the
 # plugin data folder, a session id or the transcript is missing. Hook schema:
 # https://code.claude.com/docs/en/hooks
 set -u
+
+# shellcheck source=lib/reply-misses.sh
+. "$(dirname "$0")/lib/reply-misses.sh"
 
 # CLIs that act on an account: a key, a login or a permission decides whether a command works.
 readonly ACCOUNT_CLIS='stripe|wrangler|gh|aws|gcloud|az|fly|flyctl|vercel|netlify|heroku|firebase|supabase|doctl|railway|render'
@@ -52,10 +55,8 @@ command_starts() {
 }
 
 command -v jq >/dev/null 2>&1 || exit 0
-[ -n "${CLAUDE_PLUGIN_DATA:-}" ] || exit 0
 payload=$(cat)
 session_id=$(printf '%s' "$payload" | jq -r '.session_id // empty')
-[ -n "$session_id" ] || exit 0
 reply=$(printf '%s' "$payload" | jq -r '.last_assistant_message // empty')
 transcript=$(printf '%s' "$payload" | jq -r '.transcript_path // empty')
 [ -n "$reply" ] && [ -r "$transcript" ] || exit 0
@@ -70,12 +71,12 @@ turn_tool_calls=$(jq -L "$(dirname "$0")/lib" -rs '
   | .name + "\t" + ((.input.file_path // .input.path // .input.command // .input.pattern // "") | tostring | gsub("\n"; " "))
 ' "$transcript" 2>/dev/null) || exit 0
 
-reasons=()
+misses=()
 
 # A claim can wrap across lines, so the reply is matched as one line.
 if printf '%s' "$reply" | tr '\n' ' ' | grep -Eiq "$INSTRUCTIONS_CLAIM" \
   && ! printf '%s\n' "$turn_tool_calls" | grep -Eq "$INSTRUCTIONS_SOURCE"; then
-  reasons+=("It said what instructions hold or require (the kit, a rule, a checklist, CLAUDE.md), and nothing in that turn read them. Read the rule now; if the claim was wrong, correct it in one line.")
+  misses+=("It said what instructions hold or require (the kit, a rule, a checklist, CLAUDE.md) without reading them first.")
 fi
 
 # The account CLIs the reply's fenced blocks run, and the ones this turn's shell commands ran.
@@ -92,11 +93,9 @@ for cli in $handed_clis; do
   unchecked_clis+=("$cli")
 done
 if [ "${#unchecked_clis[@]}" -gt 0 ]; then
-  reasons+=("It handed the person a ${unchecked_clis[*]} command, and that turn never ran ${unchecked_clis[*]} or read its config. Check what the command needs that you can see (the login, the keys and what they may do, the account it acts on); if something is missing, say so in one line.")
+  misses+=("It handed the person a ${unchecked_clis[*]} command without first running ${unchecked_clis[*]} or reading its config.")
 fi
 
-[ "${#reasons[@]}" -gt 0 ] || exit 0
-misses_file="$CLAUDE_PLUGIN_DATA/reply-misses/$session_id"
-mkdir -p "$(dirname "$misses_file")"
-printf '%s\n' "${reasons[@]}" >> "$misses_file"
+[ "${#misses[@]}" -gt 0 ] || exit 0
+append_reply_misses "$session_id" "${misses[@]}"
 exit 0

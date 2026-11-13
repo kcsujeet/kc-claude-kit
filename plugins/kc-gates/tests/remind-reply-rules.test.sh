@@ -7,27 +7,29 @@ tests_dir=$(cd "$(dirname "$0")" && pwd)
 # shellcheck source=lib/harness.sh
 . "$tests_dir/lib/harness.sh"
 hook="$(dirname "$tests_dir")/scripts/remind-reply-rules.sh"
-length_hook="$(dirname "$tests_dir")/scripts/check-reply-length.sh"
 export CLAUDE_PLUGIN_DATA=$work_dir/data
 
 run_hook() { jq -cn --arg id "$1" '{session_id: $id, hook_event_name: "UserPromptSubmit", prompt: "next"}' | bash "$hook"; }
+# Notes <miss> for session <id>, as the Stop hooks do.
+note_miss() { mkdir -p "$CLAUDE_PLUGIN_DATA/reply-misses"; printf '%s\n' "$2" >> "$CLAUDE_PLUGIN_DATA/reply-misses/$1"; }
 
-first=$(run_hook s)
-expect_contains "a turn with no misses gets the rules" "Reply rules for this turn: answer first, under 180 words" "$first"
-expect_eq "a turn with no misses names none" "" "$(printf '%s\n' "$first" | grep 'last reply' || true)"
+reminder_without_misses=$(run_hook s)
+expect_contains "a turn with no misses gets the rules" "Reply rules for this turn: answer first, under 180 words" "$reminder_without_misses"
+expect_eq "a turn with no misses names none" "" "$(printf '%s\n' "$reminder_without_misses" | grep 'last reply' || true)"
 
-# The length hook notes a 250-word reply; the next turn names it once.
-long_reply=$(awk 'BEGIN { for (i = 1; i <= 250; i++) printf "word "; print "" }')
-jq -cn --arg reply "$long_reply" '{session_id: "s", hook_event_name: "Stop", last_assistant_message: $reply}' | bash "$length_hook"
-second=$(run_hook s)
-expect_contains "the next turn names the miss" "- It ran 250 words of prose, past the 180 limit." "$second"
-expect_contains "it says not to repeat the last reply" "Don't repeat or rewrite it" "$second"
+note_miss s "It ran too long."
+reminder_with_misses=$(run_hook s)
+expect_contains "the next turn names the miss" "- It ran too long." "$reminder_with_misses"
+expect_contains "it says not to repeat the last reply" "Don't repeat or rewrite it" "$reminder_with_misses"
 expect_eq "the miss is named only once" "" "$(run_hook s | grep 'last reply' || true)"
 
-jq -cn --arg reply "$long_reply" '{session_id: "other", hook_event_name: "Stop", last_assistant_message: $reply}' | bash "$length_hook"
+note_miss other "It ran too long."
 expect_eq "another session's miss isn't named here" "" "$(run_hook s | grep 'last reply' || true)"
-expect_contains "that session gets its own" "It ran 250 words" "$(run_hook other)"
+expect_contains "that session gets its own" "- It ran too long." "$(run_hook other)"
 
+note_miss s "It ran too long."
+expect_eq "a payload with no session id names no misses and reports no error" "" \
+  "$(printf '{}' | bash "$hook" 2>&1 | grep -v '^Reply rules for this turn' || true)"
 expect_contains "without a plugin data folder the rules still print" "Reply rules for this turn" "$(jq -cn '{session_id: "s"}' | CLAUDE_PLUGIN_DATA='' bash "$hook")"
 
 finish
