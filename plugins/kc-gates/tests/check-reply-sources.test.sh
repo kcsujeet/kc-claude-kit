@@ -19,6 +19,8 @@ write_tool_call() {
 }
 write_tool_result() { jq -cn '{type: "user", message: {role: "user", content: [{type: "tool_result", tool_use_id: "t", content: "ok"}]}}'; }
 write_reminder() { jq -cn '{type: "user", message: {role: "user", content: "<system-reminder>a hook note</system-reminder>"}}'; }
+# A hook's additionalContext as transcripts hold it: an attachment entry.
+write_hook_note() { jq -cn --arg text "$1" '{attachment: {type: "hook_additional_context", content: [$text], hookName: "PostToolUse:Bash"}}'; }
 
 # Runs the hook on <reply> against the transcript; prints "noted" or "out", and keeps the output in
 # $hook_output for expect_reason.
@@ -126,6 +128,28 @@ expect_eq "a typed message with string content starts a new turn" noted "$(run_h
 expect_eq "a skill preamble after a read doesn't hide the read" out "$(run_hook "$kit_claim")"
 { write_typed_message "will these hold?"; write_tool_call Read file_path "/home/me/kit/plugins/kc-conventions/rules/kc-testing.md"; write_tool_result; jq -cn '{type: "user", message: {role: "user", content: [{type: "tool_result", tool_use_id: "t", content: "ok"}, {type: "text", text: "ok"}]}}'; } > "$transcript"
 expect_eq "a tool result with text beside it doesn't start a new turn" out "$(run_hook "$kit_claim")"
+
+# After plugins were installed, the reply opens with the reload status.
+installed_note="kc-gates: this changed the installed plugins. Make it the first line of your reply."
+{ write_typed_message "merge it"; write_tool_call Bash command "claude plugin update kc-gates@shop-kit"; write_tool_result; write_hook_note "$installed_note"; } > "$transcript"
+expect_eq "plugins installed, reload status on the first line: out" out \
+  "$(run_hook "$(printf 'Installed 3.7.0; the app reloads this session by itself.\n\nThe merge went through.')")"
+expect_eq "plugins installed, reload status only further down: noted" noted \
+  "$(run_hook "$(printf 'Merged the PR.\n\n- Installed: 3.7.0, the app reloads by itself.')")"
+expect_reason "it names the first line" "first line didn't give the reload status"
+expect_eq "blank lines before the first line don't count" out \
+  "$(run_hook "$(printf '\n\nReloads by itself once this reply ends; 3.7.0 is installed.')")"
+{ write_typed_message "merge it"; write_tool_call Bash command "gh pr merge 7"; write_tool_result; write_hook_note "kc-gates: this merged a pull request, so its look-back is due."; } > "$transcript"
+expect_eq "a turn whose hooks installed nothing needs no reload line" out "$(run_hook "Merged the PR.")"
+{ write_typed_message "update"; write_hook_note "$installed_note"; write_typed_message "and now?"; } > "$transcript"
+expect_eq "an install in an earlier turn doesn't count" out "$(run_hook "Merged the PR.")"
+
+# A reply that can't settle something is reminded to check every source first.
+write_typed_message "did it reload?" > "$transcript"
+expect_eq "\"I can't confirm\" is noted" noted "$(run_hook "I can't confirm the session reloaded.")"
+expect_reason "it asks for every source checked" "check every source that could settle it"
+expect_eq "\"not sure whether\" is noted" noted "$(run_hook "I'm not sure whether it reloaded.")"
+expect_eq "a reply that settles it is out" out "$(run_hook "It reloaded: the app log shows it at 12:13:34.")"
 
 # It never blocks on what it can't read.
 rm -f "$misses_file"

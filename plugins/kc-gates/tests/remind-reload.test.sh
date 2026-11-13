@@ -65,6 +65,7 @@ desktop_output=$(build_payload "claude plugin update shop-rules@shop-kit" | CLAU
 expect_contains "the desktop app is told to state that it reloads on its own" \
   "reloads this session itself when this turn ends" "$desktop_output"
 expect_contains "the desktop statement says there is nothing to type" "there is nothing to type" "$desktop_output"
+expect_contains "the desktop statement goes first in the reply" "Make it the first line of your reply" "$desktop_output"
 expect_contains "the desktop statement says never leave the person guessing" "never be left guessing" "$desktop_output"
 expect_eq "the desktop app is not asked for /reload-plugins" no \
   "$(printf '%s' "$desktop_output" | grep -q 'Ask the person for /reload-plugins' && echo yes || echo no)"

@@ -12,6 +12,13 @@
 #     (payments, hosting, cloud, code host): the turn must have run that CLI itself, at the start
 #     of a command, or named a path in its config folder.
 #
+# And two things a reply must open with or check first:
+#
+#   - After a turn whose hooks said the installed plugins changed (remind-reload.sh,
+#     update-after-merge.sh), the reply's first line gives the reload status.
+#   - A reply that says it can't confirm or doesn't know something is noted as a reminder to check
+#     every source that could settle it first; the script can't tell whether that happened.
+#
 # It sees only that such a call happened, not whether it was a read or what it found.
 #
 # Input: the Stop payload on stdin. Output: none; each miss is appended to
@@ -28,6 +35,9 @@ readonly ACCOUNT_CLIS='stripe|wrangler|gh|aws|gcloud|az|fly|flyctl|vercel|netlif
 
 # A sentence that says what instructions hold, require or lack.
 readonly INSTRUCTIONS_CLAIM='(the kit|kit.s|kc-[a-z]+|working agreement|hand-off checklist|checklist|claude\.md|agents\.md|the rules?|a rule|skill)[^.!?]{0,80}(says|say|requires?|needs?|asks? for|forbids?|allows?|already|has no|have no|does not|doesn.t|is not|isn.t|are not|aren.t|can.t|cannot|only)'
+
+# A sentence that says something couldn't be settled.
+readonly UNCERTAIN_CLAIM="(can.t|cannot|couldn.t|could not) (confirm|verify|tell whether|tell if|say whether)|I don.t know (whether|if)|not sure (whether|if)"
 
 # What reading instructions looks like in a tool call's path or command.
 readonly INSTRUCTIONS_SOURCE='kc-claude-kit|plugins/kc-|(^|/)rules/|/skills/|(^|/)\.claude/|CLAUDE\.md|AGENTS\.md|SKILL\.md'
@@ -72,6 +82,22 @@ turn_tool_calls=$(jq -L "$(dirname "$0")/lib" -rs '
 ' "$transcript" 2>/dev/null) || exit 0
 
 misses=()
+
+# True when a hook said this turn that the installed plugins changed.
+turn_changed_plugins=$(jq -L "$(dirname "$0")/lib" -rs '
+  include "typed-message";
+  (map(is_typed_message) | rindex(true) // -1) as $start
+  | [.[($start + 1):][] | select(.attachment.type == "hook_additional_context")
+     | .attachment.content[]? | select(test("changed the installed plugins"))] | length > 0
+' "$transcript" 2>/dev/null)
+first_line=$(printf '%s\n' "$reply" | grep -m1 -v '^[[:space:]]*$')
+if [ "$turn_changed_plugins" = true ] && ! printf '%s' "$first_line" | grep -Eiq 'reload|install'; then
+  misses+=("Plugins were installed in that turn, and the reply's first line didn't give the reload status.")
+fi
+
+if printf '%s' "$reply" | tr '\n' ' ' | grep -Eiq "$UNCERTAIN_CLAIM"; then
+  misses+=("It said it couldn't confirm or didn't know something. That is a claim too: check every source that could settle it (every log, file and command) and cite what you found, or name the one you couldn't check and why.")
+fi
 
 # A claim can wrap across lines, so the reply is matched as one line.
 if printf '%s' "$reply" | tr '\n' ' ' | grep -Eiq "$INSTRUCTIONS_CLAIM" \

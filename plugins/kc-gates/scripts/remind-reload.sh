@@ -39,7 +39,7 @@ main() {
     if printf '%s' "$segment" | grep -Eq "$PLUGIN_CHANGE"; then
       if [ "${CLAUDE_CODE_ENTRYPOINT:-}" = claude-desktop ]; then
         cat <<'EOF'
-{"hookSpecificOutput":{"hookEventName":"PostToolUse","additionalContext":"kc-gates: this changed the installed plugins. The person must never be left guessing whether to reload. State it plainly in one line of your reply: the update is installed; the desktop app reloads this session itself when this turn ends, so there is nothing to type. Do not ask for /reload-plugins here; the app does it, and an ask would request a reload already on its way."}}
+{"hookSpecificOutput":{"hookEventName":"PostToolUse","additionalContext":"kc-gates: this changed the installed plugins. The person must never be left guessing whether to reload. Make it the first line of your reply, before anything else: the update is installed; the desktop app reloads this session itself when this turn ends, so there is nothing to type. Do not ask for /reload-plugins here; the app does it, and an ask would request a reload already on its way."}}
 EOF
         exit 0
       fi
