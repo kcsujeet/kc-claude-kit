@@ -19,6 +19,7 @@ const BMP_BASE64 = (() => {
 })()
 const BAND = {
   hasSurvey: false,
+  isCollapsed: false,
   isWorking: false,
   maxRows: 20,
   bodyColumns: 120,
