@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Tests scripts/remind-reload.sh: every command that changes the installed plugins gets the
-# reload reminder; reads, help and other claude commands get nothing. Each case runs twice, once
+# reload reminder (in the desktop app, a statement that it reloads itself); reads, help and other
+# claude commands get nothing. Each case runs twice, once
 # with jq and once through the sed fallback.
 set -euo pipefail
 
@@ -60,8 +61,17 @@ expect_hook quiet "a word that only ends in claude" "myclaude plugin update x"
 expect_hook quiet "an unrelated command" "git push origin main"
 
 # --- the desktop app reloads live sessions itself -----------------------------------------------
-expect_eq "quiet in the desktop app, which reloads on its own" "" \
-  "$(build_payload "claude plugin update shop-rules@shop-kit" | CLAUDE_CODE_ENTRYPOINT=claude-desktop bash "$hook")"
+desktop_output=$(build_payload "claude plugin update shop-rules@shop-kit" | CLAUDE_CODE_ENTRYPOINT=claude-desktop bash "$hook")
+expect_contains "the desktop app is told to state that it reloads on its own" \
+  "reloads this session itself when this turn ends" "$desktop_output"
+expect_contains "the desktop statement says there is nothing to type" "there is nothing to type" "$desktop_output"
+expect_contains "the desktop statement says never leave the person guessing" "never be left guessing" "$desktop_output"
+expect_eq "the desktop app is not asked for /reload-plugins" no \
+  "$(printf '%s' "$desktop_output" | grep -q 'Ask the person for /reload-plugins' && echo yes || echo no)"
+expect_eq "nothing for a non-plugin command in the desktop app" "" \
+  "$(build_payload "git push origin main" | CLAUDE_CODE_ENTRYPOINT=claude-desktop bash "$hook")"
+expect_contains "another host's reminder also says never leave the person guessing" "never be left guessing" \
+  "$(build_payload "claude plugin update shop-rules@shop-kit" | CLAUDE_CODE_ENTRYPOINT=cli bash "$hook")"
 expect_contains "another host still gets the reminder" "Ask the person for /reload-plugins now" \
   "$(build_payload "claude plugin update shop-rules@shop-kit" | CLAUDE_CODE_ENTRYPOINT=cli bash "$hook")"
 
