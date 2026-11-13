@@ -95,7 +95,7 @@ expect_deny "quoted file name" 'cat "src/a.ts"' 'src/a.ts'
 expect_deny "a real read after a heredoc ends" $'cat > x.txt <<EOF\nhi\nEOF\ncat src/a.ts' 'src/a.ts'
 expect_deny "a read after a bare assignment" 'FOO=1; cat src/a.ts' 'src/a.ts'
 
-expect_allow "grep -rn" 'grep -rn "expires_at" src'
+expect_allow "grep -rn" 'grep -rn "order_total" src'
 expect_allow "git grep at a revision" 'git grep -n total origin/main -- src'
 expect_allow "git log" 'git log --oneline -5'
 expect_allow "git log -p on a rev:path" 'git log -p main:src/a.ts'
