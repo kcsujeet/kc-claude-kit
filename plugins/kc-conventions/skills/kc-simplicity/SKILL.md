@@ -295,6 +295,8 @@ When moving data into a shared default breaks some callers, they were silently r
 
 Most of what this catches is not exotic. It is an ordinary thing built in a shape similar code does not have: an endpoint that trims what the caller asked for when no other endpoint does; a data read named for the one screen that uses it where every other is named for its resource; related data loaded up front in one place when similar code loads it on request; a record created on first use when records like it are created with their parent; an error message in a library's default words where the repo has its own. Each passes a line-by-line review, and similar code side by side shows the difference at once. The same holds for a fix to a review finding: the fix is new code, and it conforms too.
 
+A sibling's shape is not copied when it breaks a rule in another topic's checklist (a test that loops over per-item lookups that can come back empty breaks testing §T14, say): the finding names that box, and the new code follows the box.
+
 ### §P14. Handle the states the data can be in, not the ones a comment says it once was
 
 Old comments outlive the data they describe: "the first store may have no name of its own" stays in the code after a backfill names every store and creation starts naming new ones. Code that trusts the comment grows a special case (a name may stay blank, but only if it was blank before) that guards a state nothing can produce any more, and every reader has to learn it. Before writing such a branch, find what could still produce the state: the create path, the update path, an import, a job. If none can, and a backfill has run, enforce the rule plainly (required, validated) and leave the old state to the backfill. If one still can, say which.

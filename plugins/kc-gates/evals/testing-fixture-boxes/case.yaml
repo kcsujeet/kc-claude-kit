@@ -1,0 +1,6 @@
+schema_version: "1.1"
+name: testing-fixture-boxes
+description: A branch that moves two config entries from one category to another, leaving fixtures in four untouched test files on the old category and adding a test that dereferences a lookup which can come back empty; the review fails and flags each of them.
+tags: [review, gate, testing]
+context:
+  scaffold_script: setup.sh

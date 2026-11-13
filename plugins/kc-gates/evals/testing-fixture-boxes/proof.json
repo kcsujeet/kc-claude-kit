@@ -1,0 +1,117 @@
+{
+  "case": "plugins/kc-gates/evals/testing-fixture-boxes",
+  "commit": "b62735a8faef2e5cf92e1f9cc3add23034f775f2",
+  "case_hash": "2f07c8bdaf3cbb29c1bdc31b9e5897bf5a4395e6",
+  "plugins_hash": "fae1a9bde3f972d9606c9e91c9d706427670b66a",
+  "claude": "2.1.323 (Claude Code)",
+  "model": "sonnet",
+  "verdict": "ok",
+  "runs": {
+    "with": [
+      {
+        "error": null,
+        "graders": [
+          {
+            "name": "flags-lookup-dereference",
+            "passed": true,
+            "scored": true
+          },
+          {
+            "name": "flags-stale-fixture-csv",
+            "passed": true,
+            "scored": true
+          },
+          {
+            "name": "flags-stale-fixture-grant",
+            "passed": true,
+            "scored": true
+          },
+          {
+            "name": "flags-stale-fixture-notify",
+            "passed": true,
+            "scored": true
+          },
+          {
+            "name": "flags-stale-fixture-summary",
+            "passed": true,
+            "scored": true
+          },
+          {
+            "name": "verdict-failed",
+            "passed": true,
+            "scored": false
+          }
+        ]
+      }
+    ],
+    "without": [
+      {
+        "error": null,
+        "graders": [
+          {
+            "name": "flags-lookup-dereference",
+            "passed": false,
+            "scored": true
+          },
+          {
+            "name": "flags-stale-fixture-csv",
+            "passed": false,
+            "scored": true
+          },
+          {
+            "name": "flags-stale-fixture-grant",
+            "passed": false,
+            "scored": true
+          },
+          {
+            "name": "flags-stale-fixture-notify",
+            "passed": false,
+            "scored": true
+          },
+          {
+            "name": "flags-stale-fixture-summary",
+            "passed": false,
+            "scored": true
+          }
+        ]
+      }
+    ],
+    "base_rules": [
+      {
+        "error": null,
+        "graders": [
+          {
+            "name": "flags-lookup-dereference",
+            "passed": true,
+            "scored": true
+          },
+          {
+            "name": "flags-stale-fixture-csv",
+            "passed": false,
+            "scored": true
+          },
+          {
+            "name": "flags-stale-fixture-grant",
+            "passed": false,
+            "scored": true
+          },
+          {
+            "name": "flags-stale-fixture-notify",
+            "passed": false,
+            "scored": true
+          },
+          {
+            "name": "flags-stale-fixture-summary",
+            "passed": false,
+            "scored": true
+          },
+          {
+            "name": "verdict-failed",
+            "passed": true,
+            "scored": true
+          }
+        ]
+      }
+    ]
+  }
+}
