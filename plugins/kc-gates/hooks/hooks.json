@@ -1,5 +1,5 @@
 {
-  "description": "Reminds every session to run kc-ready-for-review before a PR goes to a reviewer, and the kit's maintainer to ship lessons; keeps its marketplace's plugins updated during a session and says when the session runs an older kc-gates than is installed; blocks GitHub review writes (PR and issue comments, reviews) that lack the KC_REVIEW_POST_APPROVED=1 approval token, and PR hand-offs to review (gh pr ready, a ready gh pr create, adding a reviewer) whose head commit has no kc-ready-for-review receipt, and draft PRs too where the repo's hand-off checklist says drafts: true; after a command that approves or merges a pull request, reminds Claude that the look-back is due; and holds back a reply that says what instructions require without reading them that turn, or hands the person an account CLI's command without having checked that CLI",
+  "description": "Reminds every session to run kc-ready-for-review before a PR goes to a reviewer, and the kit's maintainer to ship lessons; keeps its marketplace's plugins updated during a session and says when the session runs an older kc-gates than is installed; blocks GitHub review writes (PR and issue comments, reviews) that lack the KC_REVIEW_POST_APPROVED=1 approval token, and PR hand-offs to review (gh pr ready, a ready gh pr create, adding a reviewer) whose head commit has no kc-ready-for-review receipt, and draft PRs too where the repo's hand-off checklist says drafts: true; after a command that approves or merges a pull request, reminds Claude that the look-back is due; and holds back a reply that says what instructions require without reading them that turn, hands the person an account CLI's command without having checked that CLI, or runs past 180 words of prose",
   "hooks": {
     "SessionStart": [
       {
@@ -72,6 +72,12 @@
           {
             "type": "command",
             "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/check-reply-sources.sh\"",
+            "shell": "bash",
+            "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/check-reply-length.sh\"",
             "shell": "bash",
             "timeout": 10
           }
