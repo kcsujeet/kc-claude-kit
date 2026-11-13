@@ -18,7 +18,7 @@ On-demand loading has two conditions, and a session can miss both without any si
 - **The working directory.** Only the `CLAUDE.md` files and unscoped rules from the session's own directory upward load at launch. A session started above the repo (a workspace folder holding several repos) treats the repo as a subdirectory, so its `CLAUDE.md` and every rule wait for a file inside it to be opened.
 - **The Read tool.** A path-scoped rule, nested `CLAUDE.md` or subdirectory file loads when the Read tool opens a matching file. A file read through the shell (`cat`, `sed`, `head`, `grep` output) loads nothing, and agents in permissive modes are often told to read files that way.
 
-So an instruction that has to shape a plan, before any code is opened, cannot rely on deferral. Put it where it loads for the directory sessions actually start in, at user scope, or in a SessionStart hook's `additionalContext`. Then tell agents to read code with the Read tool, so the path-scoped rest still arrives.
+So an instruction that has to shape a plan, before any code is opened, cannot rely on deferral. Put it where it loads for the directory sessions actually start in, at user scope, or in a SessionStart hook's `additionalContext`. Then tell agents to read code with the Read tool, so the path-scoped rest still arrives. Telling is not enough on its own: an agent that reads through the shell anyway gets no sign it missed anything, so kc-conventions' `guard-shell-source-reads.sh` refuses a shell read of a source file and points to the Read tool.
 
 ## Hard numbers
 
