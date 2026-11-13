@@ -21,3 +21,8 @@ def is_typed_message:
   .type == "user" and (.isMeta | not) and (.isCompactSummary | not)
   and ([.message.content[]? | select(.type == "tool_result")] | length) == 0
   and ([typed_texts] | length) > 0;
+
+# The entries of the current turn: those after the person's last typed message, or all of them
+# when there is none. Called on the whole transcript, read as one array (`jq -s`).
+def turn_entries:
+  .[((map(is_typed_message) | rindex(true) // -1) + 1):];

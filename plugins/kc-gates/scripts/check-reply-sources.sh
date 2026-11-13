@@ -14,7 +14,7 @@
 #
 # And two things a reply must open with or check first:
 #
-#   - After a turn whose hooks said the installed plugins changed (remind-reload.sh,
+#   - After a turn whose hooks asked for the reload status first (remind-reload.sh in the desktop app,
 #     update-after-merge.sh), the reply's first line gives the reload status.
 #   - A reply that says it can't confirm or doesn't know something is noted as a reminder to check
 #     every source that could settle it first; the script can't tell whether that happened.
@@ -75,23 +75,21 @@ transcript=$(printf '%s' "$payload" | jq -r '.transcript_path // empty')
 # then the path or command it was given.
 turn_tool_calls=$(jq -L "$(dirname "$0")/lib" -rs '
   include "typed-message";
-  (map(is_typed_message) | rindex(true) // -1) as $start
-  | .[($start + 1):][]
+  turn_entries[]
   | select(.type == "assistant") | .message.content[]? | select(.type == "tool_use")
   | .name + "\t" + ((.input.file_path // .input.path // .input.command // .input.pattern // "") | tostring | gsub("\n"; " "))
 ' "$transcript" 2>/dev/null) || exit 0
 
 misses=()
 
-# True when a hook said this turn that the installed plugins changed.
-turn_changed_plugins=$(jq -L "$(dirname "$0")/lib" -rs '
+# True when a hook this turn asked for the reload status on the reply's first line.
+reload_line_asked=$(jq -L "$(dirname "$0")/lib" -rs '
   include "typed-message";
-  (map(is_typed_message) | rindex(true) // -1) as $start
-  | [.[($start + 1):][] | select(.attachment.type == "hook_additional_context")
-     | .attachment.content[]? | select(test("changed the installed plugins"))] | length > 0
+  [turn_entries[] | select(.attachment.type == "hook_additional_context")
+     | .attachment.content[]? | select(test("first line of your reply"))] | length > 0
 ' "$transcript" 2>/dev/null)
 first_line=$(printf '%s\n' "$reply" | grep -m1 -v '^[[:space:]]*$')
-if [ "$turn_changed_plugins" = true ] && ! printf '%s' "$first_line" | grep -Eiq 'reload|install'; then
+if [ "$reload_line_asked" = true ] && ! printf '%s' "$first_line" | grep -Eiq 'reload|install'; then
   misses+=("Plugins were installed in that turn, and the reply's first line didn't give the reload status.")
 fi
 

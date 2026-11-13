@@ -141,6 +141,9 @@ expect_eq "blank lines before the first line don't count" out \
   "$(run_hook "$(printf '\n\nReloads by itself once this reply ends; 3.7.0 is installed.')")"
 { write_typed_message "merge it"; write_tool_call Bash command "gh pr merge 7"; write_tool_result; write_hook_note "kc-gates: this merged a pull request, so its look-back is due."; } > "$transcript"
 expect_eq "a turn whose hooks installed nothing needs no reload line" out "$(run_hook "Merged the PR.")"
+ask_note="kc-gates: this changed the installed plugins, and this session still runs the versions it loaded. Ask the person for /reload-plugins now, as the turn's one question in the host's question box."
+{ write_typed_message "merge it"; write_tool_call Bash command "claude plugin update kc-gates@shop-kit"; write_tool_result; write_hook_note "$ask_note"; } > "$transcript"
+expect_eq "a host that asks for /reload-plugins instead needs no reload first line" out "$(run_hook "Merged the PR.")"
 { write_typed_message "update"; write_hook_note "$installed_note"; write_typed_message "and now?"; } > "$transcript"
 expect_eq "an install in an earlier turn doesn't count" out "$(run_hook "Merged the PR.")"
 
