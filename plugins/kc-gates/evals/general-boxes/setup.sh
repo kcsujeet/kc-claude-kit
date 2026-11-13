@@ -23,6 +23,7 @@ export interface Order {
   totalCents: number
   carrier: 'ups' | 'fedex' | 'usps'
   customerEmail: string
+  placedAt: string
 }
 TS
 cat > src/orders/orderReport.ts <<'TS'
@@ -33,30 +34,23 @@ export function buildOrderReport(orders: Order[]): string[] {
   return orders.map((order) => `${order.id}: ${order.status}`)
 }
 TS
-# The order schema owns every validation rule for an order's fields; the form only calls it.
-cat > src/orders/orderSchema.ts <<'TS'
-export interface OrderInput {
-  quantity: number
-  note: string
-}
+# The cancellation module owns every rule for whether an order can be cancelled; the handler only
+# asks it and answers the request.
+cat > src/orders/cancellation.ts <<'TS'
+import type { Order } from './types'
 
-/** Every validation rule for an order's fields; forms call this and show what it returns. */
-export function validateOrderInput(input: OrderInput): string[] {
-  const errors: string[] = []
-  if (!Number.isInteger(input.quantity) || input.quantity < 1) errors.push('Quantity must be at least 1')
-  if (input.quantity > 99) errors.push('Quantity must be at most 99')
-  if (input.note.length > 200) errors.push('Note must be at most 200 characters')
-  return errors
+/** Every rule for whether a customer may cancel an order. */
+export function canCancelOrder(order: Order): boolean {
+  return order.status === 'open'
 }
 TS
-cat > src/orders/orderForm.ts <<'TS'
-import { validateOrderInput } from './orderSchema'
-import type { OrderInput } from './orderSchema'
+cat > src/orders/cancelOrderHandler.ts <<'TS'
+import { canCancelOrder } from './cancellation'
+import type { Order } from './types'
 
-export function submitOrderForm(input: OrderInput, save: (input: OrderInput) => void): string[] {
-  const errors = validateOrderInput(input)
-  if (errors.length === 0) save(input)
-  return errors
+export function handleCancelOrder(order: Order): { status: number; message: string } {
+  if (!canCancelOrder(order)) return { status: 409, message: 'This order can no longer be cancelled' }
+  return { status: 200, message: 'Order cancelled' }
 }
 TS
 printf '{ "name": "shop", "type": "module" }\n' > package.json
@@ -151,29 +145,33 @@ export function shipOrder(order: Order, options: { express: boolean }): Order {
 }
 TS
 
-# structure §S14: a new rule (every line item must be in a pack of 6) added to the form, when the
-# schema already owns every other rule for the quantity field and the form only calls it.
-cat > src/orders/orderForm.ts <<'TS'
-import { validateOrderInput } from './orderSchema'
-import type { OrderInput } from './orderSchema'
+# structure §S14: a new rule (orders can only be cancelled within 30 minutes) written into the
+# handler that calls the cancellation module, which owns every other cancellation rule.
+cat > src/orders/cancelOrderHandler.ts <<'TS'
+import { canCancelOrder } from './cancellation'
+import type { Order } from './types'
 
-export function submitOrderForm(input: OrderInput, save: (input: OrderInput) => void): string[] {
-  const errors = validateOrderInput(input)
-  if (input.quantity % 6 !== 0) errors.push('Quantity must be a multiple of 6')
-  if (errors.length === 0) save(input)
-  return errors
+const CANCEL_WINDOW_MINUTES = 30
+
+export function handleCancelOrder(order: Order, now: Date): { status: number; message: string } {
+  if (!canCancelOrder(order)) return { status: 409, message: 'This order can no longer be cancelled' }
+  const minutesSincePlaced = (now.getTime() - new Date(order.placedAt).getTime()) / 60000
+  if (minutesSincePlaced > CANCEL_WINDOW_MINUTES) {
+    return { status: 409, message: 'Orders can only be cancelled within 30 minutes of placing them' }
+  }
+  return { status: 200, message: 'Order cancelled' }
 }
 TS
 
-# naming §N4: a qualifier that repeats the context the name already sits in (a footer-only model).
-cat > src/notifications/storeFooter.ts <<'TS'
-export interface StoreFooter {
-  footerEmail: string
-  footerPhone: string
+# naming §N4: the props of a customer card, each prefixed with the customer the card is already about.
+cat > src/notifications/customerCard.ts <<'TS'
+export interface CustomerCardProps {
+  customerName: string
+  customerEmail: string
 }
 
-export function renderStoreFooter(footer: StoreFooter): string {
-  return `Questions? ${footer.footerEmail} or ${footer.footerPhone}`
+export function renderCustomerCard(props: CustomerCardProps): string {
+  return `${props.customerName} <${props.customerEmail}>`
 }
 TS
 

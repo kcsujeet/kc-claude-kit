@@ -1,6 +1,6 @@
 ---
 type: regex
 target: last_message
-pattern: "(^|\\n)- (🔴|🟠|🟡)[^\\n]*orderForm\\.ts[^\\n]*(orderSchema|schema|owns|owner|validateOrderInput|belongs)"
+pattern: "(^|\\n)- (🔴|🟠|🟡)[^\\n]*cancelOrderHandler\\.ts[^\\n]*(cancellation|canCancelOrder|owns|owner|belongs|where the other)"
 flags: i
 ---
