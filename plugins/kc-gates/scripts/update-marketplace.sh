@@ -13,6 +13,9 @@
 # install waits for Claude Code's own pass. A failure is told to Claude once, as additionalContext,
 # and retried on the next look. The session keeps what it loaded; check-loaded-version.sh says when
 # it is behind. Reads the hook payload's cwd from stdin. Always exits 0.
+#
+# update-after-merge.sh also runs it, right after a merge, with KC_UPDATE_NOW=1 (look now, whatever
+# the interval) and KC_HOOK_EVENT=PostToolUse (the event its failure notice is written for).
 
 set -u
 
@@ -74,7 +77,11 @@ failure_file="$plugin_data_dir/update-marketplace.failure"
 now=$(date +%s)
 last_checked_at=$(cat "$checked_at_file" 2>/dev/null)
 case "$last_checked_at" in '' | *[!0-9]*) last_checked_at=0 ;; esac
-[ $((now - last_checked_at)) -ge "$update_interval_seconds" ] || exit 0
+is_look_forced=false
+[ "${KC_UPDATE_NOW:-}" = 1 ] && is_look_forced=true
+is_interval_elapsed=false
+[ $((now - last_checked_at)) -ge "$update_interval_seconds" ] && is_interval_elapsed=true
+[ "$is_look_forced" = true ] || [ "$is_interval_elapsed" = true ] || exit 0
 # Stamped before looking: a failed look waits the interval instead of running on every prompt.
 mkdir -p "$plugin_data_dir"
 echo "$now" > "$checked_at_file"
@@ -84,7 +91,8 @@ record_update_failure() {
   local failure=$1
   if [ "$(cat "$failure_file" 2>/dev/null)" != "$failure" ]; then
     jq -cn --arg context "Updating $marketplace's plugins during this session failed: $failure. Tell the person; until it's fixed, new versions arrive only with Claude Code's own update when a session starts." \
-      '{hookSpecificOutput: {hookEventName: "UserPromptSubmit", additionalContext: $context}}'
+      --arg event "${KC_HOOK_EVENT:-UserPromptSubmit}" \
+      '{hookSpecificOutput: {hookEventName: $event, additionalContext: $context}}'
   fi
   printf '%s\n' "$failure" > "$failure_file"
   exit 0

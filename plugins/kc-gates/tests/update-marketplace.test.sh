@@ -87,6 +87,9 @@ expect_eq "source moved: updates the marketplace, then each plugin installed fro
 # Short of the interval by more than the second the clock can tick before the hook reads it.
 expect_eq "looked 590 seconds ago: doesn't look again" "" "$(run_update 590)"
 expect_eq "looked 600 seconds ago: looks again" "$full_update" "$(run_update 600)"
+commit_to "$source_repo" after-a-merge
+expect_eq "looked 5 seconds ago, with KC_UPDATE_NOW=1 (right after a merge): looks again" \
+  "$full_update" "$(run_update 5 KC_UPDATE_NOW=1)"
 
 # An update moves this plugin's install to a new version folder, while the session keeps running
 # the copy it loaded.
@@ -156,6 +159,9 @@ commit_to "$source_repo" four
 expect_eq "the marketplace update fails: tells Claude, and stops there" \
   "$(failure_context "claude plugin marketplace update shop-kit failed")
 plugin marketplace update shop-kit" "$(run_update never CLAUDE_STUB_FAILS="plugin marketplace update shop-kit")"
+expect_contains "with KC_HOOK_EVENT=PostToolUse, the notice is written for that event" \
+  '"hookEventName":"PostToolUse"' \
+  "$(run_update never KC_HOOK_EVENT=PostToolUse CLAUDE_STUB_FAILS="plugin update kc-gates@shop-kit")"
 
 rm "$stub_bin/claude"
 no_claude_path="$(dirname "$(command -v git)"):$(dirname "$(command -v jq)"):/usr/bin:/bin"
