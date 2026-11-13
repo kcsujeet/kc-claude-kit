@@ -52,21 +52,6 @@ is_approval_segment() {
   [ -r "$input_file" ] && grep -Eq '"event"[[:space:]]*:[[:space:]]*"APPROVE"' "$input_file"
 }
 
-# A PR's merge endpoint; a GET on it only asks whether the PR is merged.
-readonly PR_MERGE_ENDPOINT='pulls/[0-9]+/merge([^/[:alnum:]]|$)'
-
-# True when the segment merges a PR.
-is_merge_segment() {
-  local segment=$1
-  if printf '%s' "$segment" | grep -Eq "${GH_COMMAND_START}pr[[:space:]]+merge([[:space:]]|$)"; then
-    printf '%s' "$segment" | grep -Eq -- '--disable-auto([[:space:]]|$)' && return 1
-    return 0
-  fi
-  printf '%s' "$segment" | grep -Eq "${GH_COMMAND_START}api([[:space:]]|$)" || return 1
-  printf '%s' "$segment" | grep -Eq "$PR_MERGE_ENDPOINT" || return 1
-  printf '%s' "$segment" | grep -Eq -- "(-X|--method)[[:space:]=]*[\"']?PUT"
-}
-
 # Prints <command> without its heredoc bodies; the line that opens each heredoc stays. A body goes
 # only once its terminator line has come: a `<<` that opens nothing (inside quotes, after `#`, in
 # arithmetic) never gets one, and what follows it is kept. A heredoc fed to a shell is kept too,

@@ -1,5 +1,5 @@
 {
-  "description": "Reminds every session to run kc-ready-for-review before a PR goes to a reviewer, and the kit's maintainer to ship lessons; keeps its marketplace's plugins updated during a session and says when the session runs an older kc-gates than is installed; blocks GitHub review writes (PR and issue comments, reviews) that lack the KC_REVIEW_POST_APPROVED=1 approval token, and PR hand-offs to review (gh pr ready, a ready gh pr create, adding a reviewer) whose head commit has no kc-ready-for-review receipt, and draft PRs too where the repo's hand-off checklist says drafts: true; after a command that approves or merges a pull request, reminds Claude that the look-back is due; and starts every turn with the reply rules, naming what the last reply missed: a claim about what instructions require with nothing read that turn, an account CLI's command handed over unchecked, or more than 180 words of prose (noted at Stop, never blocked, so no reply is shown twice)",
+  "description": "Reminds every session to run kc-ready-for-review before a PR goes to a reviewer, and the kit's maintainer to ship lessons; keeps its marketplace's plugins updated during a session and says when the session runs an older kc-gates than is installed; blocks GitHub review writes (PR and issue comments, reviews) that lack the KC_REVIEW_POST_APPROVED=1 approval token, and PR hand-offs to review (gh pr ready, a ready gh pr create, adding a reviewer) whose head commit has no kc-ready-for-review receipt, and draft PRs too where the repo's hand-off checklist says drafts: true; after a command that approves or merges a pull request, reminds Claude that the look-back is due, and after a merge installs what it brought to this marketplace at once, stating the reload; and starts every turn with the reply rules, naming what the last reply missed: a claim about what instructions require with nothing read that turn, an account CLI's command handed over unchecked, or more than 180 words of prose (noted at Stop, never blocked, so no reply is shown twice)",
   "hooks": {
     "SessionStart": [
       {
@@ -68,6 +68,12 @@
             "type": "command",
             "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/remind-reload.sh\"",
             "shell": "bash"
+          },
+          {
+            "type": "command",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/update-after-merge.sh\"",
+            "shell": "bash",
+            "timeout": 120
           }
         ]
       }
