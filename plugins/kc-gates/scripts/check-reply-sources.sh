@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
-# Stop hook: holds back, once, a reply that states something nothing in its turn checked. It is the
+# Stop hook: notes a reply that stated something nothing in its turn checked, for the next turn's
+# reminder (remind-reply-rules.sh) to name. It never blocks: by the time a Stop hook runs, the
+# person has already seen the reply, so a block only shows them a second copy of it. It is the
 # trigger for the working agreement's "A claim needs a check behind it", for the two kinds of
 # claim a script can tell from the turn's own tool calls:
 #
@@ -10,12 +12,11 @@
 #     (payments, hosting, cloud, code host): the turn must have run that CLI itself, at the start
 #     of a command, or named a path in its config folder.
 #
-# It sees only that such a call happened, not whether it was a read or what it found. A held reply
-# goes out on its second try (`stop_hook_active`), so one that explains why it can't check is
-# never held twice; the cost of a needless hold is that one retry.
+# It sees only that such a call happened, not whether it was a read or what it found.
 #
-# Input: the Stop payload on stdin. Output: `{"decision":"block","reason":...}` or nothing.
-# Always exits 0, and lets the reply out when jq or the transcript is missing. Hook schema:
+# Input: the Stop payload on stdin. Output: none; each miss is appended to
+# $CLAUDE_PLUGIN_DATA/reply-misses/<session_id>. Always exits 0, and notes nothing when jq, the
+# plugin data folder, a session id or the transcript is missing. Hook schema:
 # https://code.claude.com/docs/en/hooks
 set -u
 
@@ -51,8 +52,10 @@ command_starts() {
 }
 
 command -v jq >/dev/null 2>&1 || exit 0
+[ -n "${CLAUDE_PLUGIN_DATA:-}" ] || exit 0
 payload=$(cat)
-[ "$(printf '%s' "$payload" | jq -r '.stop_hook_active // false')" = true ] && exit 0
+session_id=$(printf '%s' "$payload" | jq -r '.session_id // empty')
+[ -n "$session_id" ] || exit 0
 reply=$(printf '%s' "$payload" | jq -r '.last_assistant_message // empty')
 transcript=$(printf '%s' "$payload" | jq -r '.transcript_path // empty')
 [ -n "$reply" ] && [ -r "$transcript" ] || exit 0
@@ -72,7 +75,7 @@ reasons=()
 # A claim can wrap across lines, so the reply is matched as one line.
 if printf '%s' "$reply" | tr '\n' ' ' | grep -Eiq "$INSTRUCTIONS_CLAIM" \
   && ! printf '%s\n' "$turn_tool_calls" | grep -Eq "$INSTRUCTIONS_SOURCE"; then
-  reasons+=("This reply says what instructions hold or require (the kit, a rule, a checklist, CLAUDE.md), and nothing in this turn read them. Read the rule it is about and cite its file and line, or drop the claim.")
+  reasons+=("It said what instructions hold or require (the kit, a rule, a checklist, CLAUDE.md), and nothing in that turn read them. Read the rule now; if the claim was wrong, correct it in one line.")
 fi
 
 # The account CLIs the reply's fenced blocks run, and the ones this turn's shell commands ran.
@@ -89,8 +92,11 @@ for cli in $handed_clis; do
   unchecked_clis+=("$cli")
 done
 if [ "${#unchecked_clis[@]}" -gt 0 ]; then
-  reasons+=("This reply hands the person a ${unchecked_clis[*]} command, and this turn never ran ${unchecked_clis[*]} or read its config. Check what the command needs that you can see (the login, the keys and what they may do, the account it acts on), fix what is missing first, or say in the reply why you can't check.")
+  reasons+=("It handed the person a ${unchecked_clis[*]} command, and that turn never ran ${unchecked_clis[*]} or read its config. Check what the command needs that you can see (the login, the keys and what they may do, the account it acts on); if something is missing, say so in one line.")
 fi
 
 [ "${#reasons[@]}" -gt 0 ] || exit 0
-jq -n --arg reason "${reasons[*]}" '{decision: "block", reason: $reason}'
+misses_file="$CLAUDE_PLUGIN_DATA/reply-misses/$session_id"
+mkdir -p "$(dirname "$misses_file")"
+printf '%s\n' "${reasons[@]}" >> "$misses_file"
+exit 0
