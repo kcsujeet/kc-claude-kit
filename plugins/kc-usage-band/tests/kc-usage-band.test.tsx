@@ -101,6 +101,7 @@ for (const surface of ['terminal', 'desktop'] as const) {
       component: 'AbovePrompt',
       props: {
         hasSurvey: false,
+        isCollapsed: false,
         isWorking: false,
         maxRows: 20,
         bodyColumns: 200,
@@ -119,6 +120,7 @@ for (const surface of ['terminal', 'desktop'] as const) {
 const THUMBNAILS = { type: 'Text', props: {}, children: ['[Image #1]'] } as const
 const BAND_PROPS = {
   hasSurvey: false,
+  isCollapsed: false,
   isWorking: false,
   maxRows: 20,
   bodyColumns: 200,
@@ -126,18 +128,19 @@ const BAND_PROPS = {
   view: {},
 }
 
-test('keeps what the plugins beneath drew, stacked above the pills', async ($, on) => {
+test('keeps what the engine draws beneath above the pills, and leaves other plugins their part', async ($, on) => {
   mock.clock(on, { now: NOW })
   on('ui.render', () => THUMBNAILS as never)
 
   const ui = await $.ui.mount({ plugin: 'kc-usage-band', surface: 'terminal', component: 'AbovePrompt', props: BAND_PROPS })
-  const drawn = await ui.drawn()
+  const drawn = JSON.stringify(await ui.drawn())
+  // `next(e)` answers the engine's own node; each other plugin's part is drawn beside the band, not inside it.
+  const engineAt = drawn.indexOf('"type":"engine"')
 
-  expect(drawn).toMatchObject({ type: 'Box', props: { flexDirection: 'column' } })
-  const column = drawn.type === 'Box' ? drawn : undefined
-  expect(column?.children?.[0]).toMatchObject(THUMBNAILS)
-  expect(JSON.stringify(column?.children?.[1])).toContain('↑ ')
-  expect(column?.children?.[1]).toMatchObject({ type: 'Box', props: { flexWrap: 'wrap', rowGap: 1 } })
+  expect(engineAt).toBeGreaterThanOrEqual(0)
+  expect(engineAt).toBeLessThan(drawn.indexOf('↑ '))
+  expect(drawn).toContain('"flexWrap":"wrap"')
+  expect(drawn).toContain('[Image #1]')
 })
 
 test('colors a percentage amber from 70% and red from 90%', async ($, on) => {

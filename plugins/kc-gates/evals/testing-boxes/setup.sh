@@ -18,6 +18,30 @@ export interface Cart {
   isMember: boolean
 }
 TS
+mkdir -p src/redemption
+cat > src/redemption/canRedeem.ts <<'TS'
+export interface PromoCode {
+  usedCount: number
+  limit: number | null
+}
+
+export function canRedeem(code: PromoCode): boolean {
+  if (code.limit === null) return true
+  return code.usedCount < code.limit
+}
+TS
+cat > src/redemption/canRedeem.test.ts <<'TS'
+import { expect, it } from 'vitest'
+import { canRedeem } from './canRedeem'
+
+it('allows a code with no limit', () => {
+  expect(canRedeem({ usedCount: 500, limit: null })).toBe(true)
+})
+
+it('blocks a code that has reached its limit', () => {
+  expect(canRedeem({ usedCount: 10, limit: 10 })).toBe(false)
+})
+TS
 printf '{ "name": "shop", "type": "module", "scripts": { "test": "vitest run" } }\n' > package.json
 git add -A
 git commit -q -m "Add cart and coupon types"
@@ -125,6 +149,67 @@ import { roundPrice } from '../../src/pricing/roundPrice'
 
 it('rounds to cents', () => {
   expect(roundPrice(19.999)).toBe(20)
+})
+TS
+
+# §T1: the diff adds a disabled flag and rewrites the test file from an older copy, which drops the
+# case for the limit (a deleted test with nothing else covering its behaviour).
+cat > src/redemption/canRedeem.ts <<'TS'
+export interface PromoCode {
+  usedCount: number
+  limit: number | null
+  disabled: boolean
+}
+
+export function canRedeem(code: PromoCode): boolean {
+  if (code.disabled) return false
+  if (code.limit === null) return true
+  return code.usedCount < code.limit
+}
+TS
+cat > src/redemption/canRedeem.test.ts <<'TS'
+import { expect, it } from 'vitest'
+import { canRedeem } from './canRedeem'
+
+it('allows a code with no limit', () => {
+  expect(canRedeem({ usedCount: 500, limit: null, disabled: false })).toBe(true)
+})
+
+it('rejects a disabled code', () => {
+  expect(canRedeem({ usedCount: 0, limit: null, disabled: true })).toBe(false)
+})
+TS
+
+# §T5: a formatter's cases asserted in the test of the page that calls it, with no test for the
+# formatter beside it.
+mkdir -p src/checkout
+cat > src/shipping/shippingLine.ts <<'TS'
+export function formatShippingLine(feeCents: number): string {
+  if (feeCents === 0) return 'Free shipping'
+  return `$${(feeCents / 100).toFixed(2)} shipping`
+}
+TS
+cat > src/checkout/checkoutSummary.ts <<'TS'
+import { formatShippingLine } from '../shipping/shippingLine'
+
+export function renderCheckoutSummary(subtotalCents: number, feeCents: number): string[] {
+  return [`Subtotal: $${(subtotalCents / 100).toFixed(2)}`, formatShippingLine(feeCents)]
+}
+TS
+cat > src/checkout/checkoutSummary.test.ts <<'TS'
+import { expect, it } from 'vitest'
+import { renderCheckoutSummary } from './checkoutSummary'
+
+it('shows free shipping when there is no fee', () => {
+  expect(renderCheckoutSummary(5000, 0)).toEqual(['Subtotal: $50.00', 'Free shipping'])
+})
+
+it('shows the fee when there is one', () => {
+  expect(renderCheckoutSummary(5000, 700)).toEqual(['Subtotal: $50.00', '$7.00 shipping'])
+})
+
+it('shows a fee with cents', () => {
+  expect(renderCheckoutSummary(5000, 1250)).toEqual(['Subtotal: $50.00', '$12.50 shipping'])
 })
 TS
 

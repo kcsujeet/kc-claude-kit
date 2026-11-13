@@ -1,6 +1,6 @@
 schema_version: "1.1"
 name: correctness-boxes
-description: A branch seeded with one realistic correctness-rule violation per unit (an off-by-one loop, an average over an empty list, a count with a different filter than its list, a `||` changed to `??` that lets an empty name through, one address picked after addresses became many, a delete guard that cancelled orders block, a stored value read without its missing state) and one unit that handles its edge cases; the review fails, flags each seeded unit and raises nothing on the clean one.
+description: A branch seeded with one realistic correctness-rule violation per unit (an off-by-one loop, an average over an empty list, a count with a different filter than its list, a `||` changed to `??` that lets an empty name through, one address picked after addresses became many, a delete guard that cancelled orders block, a stored value read without its missing state, a merge that kept one side of a file and lost main's fix, a new field with no fallback on blank where its sibling has one, a directory and count that include deactivated users, an override that stops calling super so a check the base class yields to never runs) and one unit that handles its edge cases; the review fails, flags each seeded unit and raises nothing on the clean one.
 tags: [review, gate, correctness]
 context:
   scaffold_script: setup.sh

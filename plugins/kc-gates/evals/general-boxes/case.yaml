@@ -1,6 +1,6 @@
 schema_version: "1.1"
 name: general-boxes
-description: A branch seeded with one realistic violation per file for the gates every review runs (a `data` name, a function named like a value, a nested ternary, a bare timeout, an `as unknown as` cast, a value-selecting switch, a default export, a re-implemented money formatter, an unused parameter) and one unit written the way those rules ask; the review fails, flags each seeded file and raises nothing on the clean one.
+description: A branch seeded with one realistic violation per file for the gates every review runs (a `data` name, a function named like a value, a nested ternary, a bare timeout, an `as unknown as` cast, a value-selecting switch, a default export, a re-implemented money formatter, an unused parameter, a new cancellation rule written into the handler that calls the module owning every other cancellation rule, props of a customer card each prefixed with `customer`) and one unit written the way those rules ask; the review fails, flags each seeded file and raises nothing on the clean one.
 tags: [review, gate, naming, clarity, structure, simplicity]
 context:
   scaffold_script: setup.sh

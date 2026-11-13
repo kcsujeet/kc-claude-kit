@@ -1,6 +1,6 @@
 schema_version: "1.1"
 name: testing-boxes
-description: A branch seeded with one realistic testing-rule violation per unit (an untested new branch, a class-name assertion, a gate tested one way, a bounds assertion on a known value, an unfrozen clock, a test filed away from its unit) and one unit tested the way the rules ask; the review fails, flags each seeded unit and raises nothing on the clean pair.
+description: A branch seeded with one realistic testing-rule violation per unit (an untested new branch, a class-name assertion, a gate tested one way, a bounds assertion on a known value, an unfrozen clock, a test filed away from its unit, a test file rewritten without the case for a limit, a formatter's cases asserted in its caller's test) and one unit tested the way the rules ask; the review fails, flags each seeded unit and raises nothing on the clean pair.
 tags: [review, gate, testing]
 context:
   scaffold_script: setup.sh
