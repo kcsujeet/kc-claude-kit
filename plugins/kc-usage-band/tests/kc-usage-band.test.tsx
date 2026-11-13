@@ -101,6 +101,7 @@ for (const surface of ['terminal', 'desktop'] as const) {
       component: 'AbovePrompt',
       props: {
         hasSurvey: false,
+        isCollapsed: false,
         isWorking: false,
         maxRows: 20,
         bodyColumns: 200,
@@ -119,6 +120,7 @@ for (const surface of ['terminal', 'desktop'] as const) {
 const THUMBNAILS = { type: 'Text', props: {}, children: ['[Image #1]'] } as const
 const BAND_PROPS = {
   hasSurvey: false,
+  isCollapsed: false,
   isWorking: false,
   maxRows: 20,
   bodyColumns: 200,
