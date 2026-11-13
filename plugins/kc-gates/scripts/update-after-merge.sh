@@ -20,7 +20,6 @@ scripts_dir=$(dirname "$0")
 # shellcheck source=lib/hook-input.sh
 . "$scripts_dir/lib/hook-input.sh"
 
-command -v jq >/dev/null 2>&1 || exit 0
 input=$(cat)
 command=$(extract_field "$input" command)
 is_merge=false
