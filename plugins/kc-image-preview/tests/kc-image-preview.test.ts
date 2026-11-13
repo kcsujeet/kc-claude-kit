@@ -125,7 +125,8 @@ test('with nothing else in the band, draws only the thumbnails', async ($, on) =
   expect(drawn).toMatchObject({ type: 'Box', props: { flexDirection: 'column' } })
   const column = drawn.type === 'Box' ? drawn : undefined
   expect(column?.props).toEqual({ flexDirection: 'column' })
-  expect(column?.children?.at(-1)).toEqual(EMPTY_BAND)
+  // What `next(e)` answered: the engine's own node, whose `ref` the engine numbers.
+  expect(column?.children?.at(-1)).toMatchObject({ type: 'engine' })
 })
 
 test('after /clear starts a new session, [Image #1] is the new session\'s image', async ($, on) => {
