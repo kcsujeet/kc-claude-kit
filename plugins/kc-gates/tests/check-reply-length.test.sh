@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # shellcheck disable=SC2016  # the replies hold Markdown backticks, not shell expansions
-# Tests scripts/check-reply-length.sh: a reply over 180 words of prose is held back once, with its
-# word count; fenced code blocks and table rows don't count, and a second try always goes out.
+# Tests scripts/check-reply-length.sh: a reply over 180 words of prose is noted for the next turn, with its
+# word count; fenced code blocks and table rows don't count, and nothing is ever printed.
 set -euo pipefail
 
 tests_dir=$(cd "$(dirname "$0")" && pwd)
@@ -14,24 +14,28 @@ printf '%s\n' '{"type":"user","message":{"role":"user","content":[{"type":"text"
 # <count> words: "word word word ..."
 repeat_word() { awk -v n="$1" 'BEGIN { for (i = 1; i <= n; i++) printf "word "; print "" }'; }
 
+# Runs the hook on <reply>; prints "noted" when it wrote a miss for the next turn, "out" when it
+# wrote none, and "unexpected output" when it printed anything (a Stop hook here never blocks).
+export CLAUDE_PLUGIN_DATA=$work_dir/data
+misses_file=$CLAUDE_PLUGIN_DATA/reply-misses/s
 hook_output=$work_dir/hook-output
 run_hook() {
-  local reply=$1 active=${2:-false}
-  jq -cn --arg reply "$reply" --arg path "$transcript" --argjson active "$active" \
-    '{session_id: "s", transcript_path: $path, hook_event_name: "Stop", stop_hook_active: $active, last_assistant_message: $reply}' \
+  local reply=$1
+  rm -f "$misses_file"
+  jq -cn --arg reply "$reply" --arg path "$transcript" \
+    '{session_id: "s", transcript_path: $path, hook_event_name: "Stop", stop_hook_active: false, last_assistant_message: $reply}' \
     | bash "$hook" > "$hook_output" || { echo "exit $?"; return; }
-  if grep -q '"decision": *"block"' "$hook_output"; then echo held
-  elif [ -s "$hook_output" ]; then echo "unexpected output"
+  if [ -s "$hook_output" ]; then echo "unexpected output"
+  elif [ -s "$misses_file" ]; then echo noted
   else echo out; fi
 }
 
 long_reply=$(repeat_word 250)
 expect_eq "a 50-word reply goes out" out "$(run_hook "$(repeat_word 50)")"
 expect_eq "a reply of exactly 180 words goes out" out "$(run_hook "$(repeat_word 180)")"
-expect_eq "a 250-word reply is held" held "$(run_hook "$long_reply")"
-expect_contains "the reason gives the word count" "This reply is 250 words" "$(cat "$hook_output")"
-expect_contains "the reason says to send it unchanged if every line is needed" "no other check asked for changes, send it again unchanged" "$(cat "$hook_output")"
-expect_eq "the same turn's second try goes out" out "$(run_hook "$long_reply" true)"
+expect_eq "a 250-word reply is noted" noted "$(run_hook "$long_reply")"
+expect_contains "the miss gives the word count" "It ran 250 words of prose" "$(cat "$misses_file")"
+expect_eq "a 250-word reply prints nothing, so it is never shown twice" "" "$(cat "$hook_output")"
 
 code_reply=$(printf '%s\n\n```bash\n%s\n```\n' "$(repeat_word 30)" "$(repeat_word 300)")
 expect_eq "30 words of prose plus a 300-word code block goes out" out "$(run_hook "$code_reply")"
@@ -43,8 +47,17 @@ table_reply=$(printf '%s\n\n%s\n' "$(repeat_word 30)" "$table_rows")
 expect_eq "30 words of prose plus a long table goes out" out "$(run_hook "$table_reply")"
 
 prose_after_block=$(printf '```bash\nls\n```\n\n%s\n' "$(repeat_word 250)")
-expect_eq "long prose after a code block is still held" held "$(run_hook "$prose_after_block")"
+expect_eq "long prose after a code block is still noted" noted "$(run_hook "$prose_after_block")"
 
 expect_eq "an empty reply goes out" out "$(run_hook "")"
+
+# Without a data folder or a session id there is nowhere to note a miss: nothing is written,
+# printed or reported as an error.
+rm -rf "$CLAUDE_PLUGIN_DATA"
+expect_eq "with no data folder a long reply prints nothing, errors included" "" \
+  "$(jq -cn --arg reply "$long_reply" '{session_id: "s", last_assistant_message: $reply}' | CLAUDE_PLUGIN_DATA='' bash "$hook" 2>&1)"
+expect_eq "with no session id a long reply prints nothing, errors included" "" \
+  "$(jq -cn --arg reply "$long_reply" '{last_assistant_message: $reply}' | bash "$hook" 2>&1)"
+expect_eq "with no session id no misses folder is made" absent "$([ -e "$CLAUDE_PLUGIN_DATA/reply-misses" ] && echo present || echo absent)"
 
 finish

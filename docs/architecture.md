@@ -33,8 +33,8 @@ kc-claude-kit/
     │   │   ├── kc-post-review/             # user-invoked only: drafting and posting comments
     │   │   └── kc-ready-for-review/SKILL.md # the one pass before a PR goes to a reviewer
     │   ├── agents/<topic>-gate.md          # one gate agent per topic, plus project-conventions-gate.md and verification-gate.md
-    │   ├── hooks/hooks.json                # hand-off reminder at session start; keeps the marketplace's plugins current and says when the session runs an older kc-gates; blocks unapproved GitHub posts and unreviewed hand-offs; reminds of the look-back after an approval; holds back a reply with an unchecked claim about instructions or an unchecked account-CLI command
-    │   ├── scripts/guard-github-post.sh, guard-hand-off.sh, remind-look-back.sh, check-reply-sources.sh, check-reply-length.sh, lib/hook-input.sh, lib/typed-message.jq
+    │   ├── hooks/hooks.json                # hand-off reminder at session start; keeps the marketplace's plugins current and says when the session runs an older kc-gates; blocks unapproved GitHub posts and unreviewed hand-offs; reminds of the look-back after an approval; starts each turn with the reply rules and names the last reply's misses (an unchecked claim about instructions, an unchecked account-CLI command, a reply over 180 words)
+    │   ├── scripts/guard-github-post.sh, guard-hand-off.sh, remind-look-back.sh, check-reply-sources.sh, check-reply-length.sh, remind-reply-rules.sh, lib/hook-input.sh, lib/reply-misses.sh, lib/typed-message.jq
     │   ├── scripts/update-marketplace.sh, check-loaded-version.sh  # plugin updates during a session; every plugin links the check
     │   ├── scripts/*.sh                    # gather-review, scope-facts, review-threads, build-comment-payloads, check-draft-names
     │   ├── tests/
