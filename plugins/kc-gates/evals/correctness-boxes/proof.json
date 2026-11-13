@@ -1,0 +1,217 @@
+{
+  "case": "plugins/kc-gates/evals/correctness-boxes",
+  "commit": "b204e6ce15b55002f0d67f46d3e6701dc25b6d20",
+  "case_hash": "a73fd11117d418afb2fcf196dcc33f70ad6ba1a8",
+  "plugins_hash": "5302e741ba8fa756c61f42de567a26407d3ac75f",
+  "claude": "2.1.317 (Claude Code)",
+  "model": "sonnet",
+  "verdict": "ok",
+  "runs": {
+    "with": [
+      {
+        "error": null,
+        "graders": [
+          {
+            "name": "flags-count-filter",
+            "passed": true,
+            "scored": true
+          },
+          {
+            "name": "flags-deactivated-users",
+            "passed": true,
+            "scored": true
+          },
+          {
+            "name": "flags-delete-guard",
+            "passed": true,
+            "scored": true
+          },
+          {
+            "name": "flags-empty-average",
+            "passed": true,
+            "scored": true
+          },
+          {
+            "name": "flags-empty-name-fallback",
+            "passed": true,
+            "scored": true
+          },
+          {
+            "name": "flags-first-of-many",
+            "passed": true,
+            "scored": true
+          },
+          {
+            "name": "flags-hidden-super-reliance",
+            "passed": true,
+            "scored": true
+          },
+          {
+            "name": "flags-merge-lost-side",
+            "passed": true,
+            "scored": true
+          },
+          {
+            "name": "flags-off-by-one",
+            "passed": true,
+            "scored": true
+          },
+          {
+            "name": "flags-sibling-fallback",
+            "passed": true,
+            "scored": true
+          },
+          {
+            "name": "flags-stored-value-states",
+            "passed": true,
+            "scored": true
+          },
+          {
+            "name": "no-finding-on-clean-unit",
+            "passed": true,
+            "scored": false
+          },
+          {
+            "name": "verdict-failed",
+            "passed": true,
+            "scored": false
+          }
+        ]
+      }
+    ],
+    "without": [
+      {
+        "error": null,
+        "graders": [
+          {
+            "name": "flags-count-filter",
+            "passed": false,
+            "scored": true
+          },
+          {
+            "name": "flags-deactivated-users",
+            "passed": false,
+            "scored": true
+          },
+          {
+            "name": "flags-delete-guard",
+            "passed": false,
+            "scored": true
+          },
+          {
+            "name": "flags-empty-average",
+            "passed": false,
+            "scored": true
+          },
+          {
+            "name": "flags-empty-name-fallback",
+            "passed": false,
+            "scored": true
+          },
+          {
+            "name": "flags-first-of-many",
+            "passed": false,
+            "scored": true
+          },
+          {
+            "name": "flags-hidden-super-reliance",
+            "passed": false,
+            "scored": true
+          },
+          {
+            "name": "flags-merge-lost-side",
+            "passed": false,
+            "scored": true
+          },
+          {
+            "name": "flags-off-by-one",
+            "passed": false,
+            "scored": true
+          },
+          {
+            "name": "flags-sibling-fallback",
+            "passed": false,
+            "scored": true
+          },
+          {
+            "name": "flags-stored-value-states",
+            "passed": false,
+            "scored": true
+          }
+        ]
+      }
+    ],
+    "base_rules": [
+      {
+        "error": null,
+        "graders": [
+          {
+            "name": "flags-count-filter",
+            "passed": true,
+            "scored": true
+          },
+          {
+            "name": "flags-deactivated-users",
+            "passed": false,
+            "scored": true
+          },
+          {
+            "name": "flags-delete-guard",
+            "passed": true,
+            "scored": true
+          },
+          {
+            "name": "flags-empty-average",
+            "passed": true,
+            "scored": true
+          },
+          {
+            "name": "flags-empty-name-fallback",
+            "passed": false,
+            "scored": true
+          },
+          {
+            "name": "flags-first-of-many",
+            "passed": true,
+            "scored": true
+          },
+          {
+            "name": "flags-hidden-super-reliance",
+            "passed": true,
+            "scored": true
+          },
+          {
+            "name": "flags-merge-lost-side",
+            "passed": true,
+            "scored": true
+          },
+          {
+            "name": "flags-off-by-one",
+            "passed": true,
+            "scored": true
+          },
+          {
+            "name": "flags-sibling-fallback",
+            "passed": false,
+            "scored": true
+          },
+          {
+            "name": "flags-stored-value-states",
+            "passed": true,
+            "scored": true
+          },
+          {
+            "name": "no-finding-on-clean-unit",
+            "passed": true,
+            "scored": true
+          },
+          {
+            "name": "verdict-failed",
+            "passed": true,
+            "scored": true
+          }
+        ]
+      }
+    ]
+  }
+}

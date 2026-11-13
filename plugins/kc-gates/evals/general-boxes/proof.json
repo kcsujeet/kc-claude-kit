@@ -1,11 +1,11 @@
 {
   "case": "plugins/kc-gates/evals/general-boxes",
-  "commit": "b204e6ce15b55002f0d67f46d3e6701dc25b6d20",
-  "case_hash": "062001a0b5398f9b94713335fba3bcc99664f653",
+  "commit": "3bade056545715d8297ad4e2fd4c27109eb8128c",
+  "case_hash": "6af2a0f758c9c5d47ee9ce4fa8c72f313be35f11",
   "plugins_hash": "5302e741ba8fa756c61f42de567a26407d3ac75f",
   "claude": "2.1.317 (Claude Code)",
   "model": "sonnet",
-  "verdict": "with the plugin, graders failed: no-finding-on-clean-unit",
+  "verdict": "ok",
   "runs": {
     "with": [
       {
@@ -68,7 +68,7 @@
           },
           {
             "name": "no-finding-on-clean-unit",
-            "passed": false,
+            "passed": true,
             "scored": false
           },
           {
@@ -136,6 +136,78 @@
           {
             "name": "flags-value-switch",
             "passed": false,
+            "scored": true
+          }
+        ]
+      }
+    ],
+    "base_rules": [
+      {
+        "error": null,
+        "graders": [
+          {
+            "name": "flags-bare-timeout",
+            "passed": true,
+            "scored": true
+          },
+          {
+            "name": "flags-default-export",
+            "passed": true,
+            "scored": true
+          },
+          {
+            "name": "flags-duplicated-formatter",
+            "passed": true,
+            "scored": true
+          },
+          {
+            "name": "flags-escape-cast",
+            "passed": true,
+            "scored": true
+          },
+          {
+            "name": "flags-misowned-rule",
+            "passed": true,
+            "scored": true
+          },
+          {
+            "name": "flags-nested-ternary",
+            "passed": true,
+            "scored": true
+          },
+          {
+            "name": "flags-redundant-qualifier",
+            "passed": false,
+            "scored": true
+          },
+          {
+            "name": "flags-type-word-name",
+            "passed": true,
+            "scored": true
+          },
+          {
+            "name": "flags-unused-param",
+            "passed": true,
+            "scored": true
+          },
+          {
+            "name": "flags-value-named-function",
+            "passed": true,
+            "scored": true
+          },
+          {
+            "name": "flags-value-switch",
+            "passed": true,
+            "scored": true
+          },
+          {
+            "name": "no-finding-on-clean-unit",
+            "passed": true,
+            "scored": true
+          },
+          {
+            "name": "verdict-failed",
+            "passed": true,
             "scored": true
           }
         ]

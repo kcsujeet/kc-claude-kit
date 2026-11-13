@@ -1,0 +1,172 @@
+{
+  "case": "plugins/kc-gates/evals/testing-boxes",
+  "commit": "b204e6ce15b55002f0d67f46d3e6701dc25b6d20",
+  "case_hash": "73869201e01e22688155bfcd8d86f05b8eaca44e",
+  "plugins_hash": "5302e741ba8fa756c61f42de567a26407d3ac75f",
+  "claude": "2.1.317 (Claude Code)",
+  "model": "sonnet",
+  "verdict": "ok",
+  "runs": {
+    "with": [
+      {
+        "error": null,
+        "graders": [
+          {
+            "name": "flags-bound-assertion",
+            "passed": true,
+            "scored": true
+          },
+          {
+            "name": "flags-callers-test-owns-cases",
+            "passed": true,
+            "scored": true
+          },
+          {
+            "name": "flags-class-assertion",
+            "passed": true,
+            "scored": true
+          },
+          {
+            "name": "flags-misplaced-test",
+            "passed": true,
+            "scored": true
+          },
+          {
+            "name": "flags-one-sided-gate",
+            "passed": true,
+            "scored": true
+          },
+          {
+            "name": "flags-removed-test",
+            "passed": true,
+            "scored": true
+          },
+          {
+            "name": "flags-unfrozen-clock",
+            "passed": true,
+            "scored": true
+          },
+          {
+            "name": "flags-untested-branch",
+            "passed": true,
+            "scored": true
+          },
+          {
+            "name": "no-finding-on-clean-pair",
+            "passed": true,
+            "scored": false
+          },
+          {
+            "name": "verdict-failed",
+            "passed": true,
+            "scored": false
+          }
+        ]
+      }
+    ],
+    "without": [
+      {
+        "error": null,
+        "graders": [
+          {
+            "name": "flags-bound-assertion",
+            "passed": false,
+            "scored": true
+          },
+          {
+            "name": "flags-callers-test-owns-cases",
+            "passed": false,
+            "scored": true
+          },
+          {
+            "name": "flags-class-assertion",
+            "passed": false,
+            "scored": true
+          },
+          {
+            "name": "flags-misplaced-test",
+            "passed": false,
+            "scored": true
+          },
+          {
+            "name": "flags-one-sided-gate",
+            "passed": false,
+            "scored": true
+          },
+          {
+            "name": "flags-removed-test",
+            "passed": false,
+            "scored": true
+          },
+          {
+            "name": "flags-unfrozen-clock",
+            "passed": false,
+            "scored": true
+          },
+          {
+            "name": "flags-untested-branch",
+            "passed": false,
+            "scored": true
+          }
+        ]
+      }
+    ],
+    "base_rules": [
+      {
+        "error": null,
+        "graders": [
+          {
+            "name": "flags-bound-assertion",
+            "passed": true,
+            "scored": true
+          },
+          {
+            "name": "flags-callers-test-owns-cases",
+            "passed": true,
+            "scored": true
+          },
+          {
+            "name": "flags-class-assertion",
+            "passed": true,
+            "scored": true
+          },
+          {
+            "name": "flags-misplaced-test",
+            "passed": true,
+            "scored": true
+          },
+          {
+            "name": "flags-one-sided-gate",
+            "passed": true,
+            "scored": true
+          },
+          {
+            "name": "flags-removed-test",
+            "passed": false,
+            "scored": true
+          },
+          {
+            "name": "flags-unfrozen-clock",
+            "passed": true,
+            "scored": true
+          },
+          {
+            "name": "flags-untested-branch",
+            "passed": true,
+            "scored": true
+          },
+          {
+            "name": "no-finding-on-clean-pair",
+            "passed": true,
+            "scored": true
+          },
+          {
+            "name": "verdict-failed",
+            "passed": true,
+            "scored": true
+          }
+        ]
+      }
+    ]
+  }
+}
