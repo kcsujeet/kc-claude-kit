@@ -8,6 +8,8 @@ tests_dir=$(cd "$(dirname "$0")" && pwd)
 # shellcheck source=lib/harness.sh
 . "$tests_dir/lib/harness.sh"
 hook="$(dirname "$tests_dir")/scripts/remind-reload.sh"
+# The cases below are for a host that does not reload on its own; the desktop app sets this.
+unset CLAUDE_CODE_ENTRYPOINT
 
 build_payload() {
   local command
@@ -56,5 +58,11 @@ expect_hook quiet "help for update" "claude plugin update --help"
 expect_hook quiet "updating the CLI itself" "claude update"
 expect_hook quiet "a word that only ends in claude" "myclaude plugin update x"
 expect_hook quiet "an unrelated command" "git push origin main"
+
+# --- the desktop app reloads live sessions itself -----------------------------------------------
+expect_eq "quiet in the desktop app, which reloads on its own" "" \
+  "$(build_payload "claude plugin update shop-rules@shop-kit" | CLAUDE_CODE_ENTRYPOINT=claude-desktop bash "$hook")"
+expect_contains "another host still gets the reminder" "Ask the person for /reload-plugins now" \
+  "$(build_payload "claude plugin update shop-rules@shop-kit" | CLAUDE_CODE_ENTRYPOINT=cli bash "$hook")"
 
 finish

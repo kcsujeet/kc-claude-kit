@@ -8,6 +8,10 @@
 # but only if that hook runs then; a session that installed the update itself knows right away
 # and asks right away, rather than leaving the request as a line in a message.
 #
+# Quiet in the Claude desktop app (CLAUDE_CODE_ENTRYPOINT=claude-desktop): it watches
+# installed_plugins.json and reloads every live session itself once the turn in progress ends, so
+# an ask there would request a reload the app already does.
+#
 # It splits the command as the guards do, quotes or not; a reminder too many is harmless.
 # Heredoc bodies are not dropped: a command that writes the words `claude plugin update` into a
 # file is rare here, and the reminder costs nothing.
@@ -27,6 +31,7 @@ readonly PLUGIN_CHANGE='(^|[^[:alnum:]_.-])claude[[:space:]]+plugin[[:space:]]+(
 main() {
   local input command segment
   input="$(cat)"
+  [ "${CLAUDE_CODE_ENTRYPOINT:-}" = claude-desktop ] && exit 0
   command="$(extract_field "$input" command)"
   while IFS= read -r segment; do
     printf '%s' "$segment" | grep -Eq -- '(^|[[:space:]])(-h|--help)([[:space:]]|$)' && continue
