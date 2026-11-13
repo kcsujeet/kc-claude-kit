@@ -12,7 +12,7 @@
 # watches installed_plugins.json and reloads every live session itself once the turn in progress
 # ends, so an ask there would request a reload already on its way. It still says so: Claude is told
 # to state the reload state in one line of its reply, because the person must never be left
-# guessing whether to reload. A step the host does on its own is stated, not left silent.
+# guessing whether to reload.
 #
 # It splits the command as the guards do, quotes or not; a reminder too many is harmless.
 # Heredoc bodies are not dropped: a command that writes the words `claude plugin update` into a
