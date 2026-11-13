@@ -77,7 +77,11 @@ failure_file="$plugin_data_dir/update-marketplace.failure"
 now=$(date +%s)
 last_checked_at=$(cat "$checked_at_file" 2>/dev/null)
 case "$last_checked_at" in '' | *[!0-9]*) last_checked_at=0 ;; esac
-[ "${KC_UPDATE_NOW:-}" = 1 ] || [ $((now - last_checked_at)) -ge "$update_interval_seconds" ] || exit 0
+is_look_forced=false
+[ "${KC_UPDATE_NOW:-}" = 1 ] && is_look_forced=true
+is_interval_elapsed=false
+[ $((now - last_checked_at)) -ge "$update_interval_seconds" ] && is_interval_elapsed=true
+[ "$is_look_forced" = true ] || [ "$is_interval_elapsed" = true ] || exit 0
 # Stamped before looking: a failed look waits the interval instead of running on every prompt.
 mkdir -p "$plugin_data_dir"
 echo "$now" > "$checked_at_file"
