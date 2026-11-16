@@ -24,6 +24,23 @@
 #       A `covered` verdict is checked against the rules as they were at the
 #       merge-base, plus each folder inside the ledger folder (another repo's
 #       rules as they were). --ledger without --checklist is a usage error.
+#   ready-receipt.sh write <sha> --verdicts <graded-checklist> [--task <KEY>]
+#       Records the checklist verdicts of the repo's hand-off checklist as it
+#       is at <sha> (.claude/hand-off-checklist.md), beside the receipt, in
+#       <sha>.checklist. The graded file is the checklist with each box's
+#       `[ ]` replaced by `[PASS]`, `[FAIL]` or `[N/A: reason]` (the box's
+#       text copied as it is, or its first 20+ characters). A box with no
+#       line, FAIL, or N/A with no reason is recorded as unmet. It can be
+#       given with any other write mode, or alone; --task <KEY> (a tracker
+#       issue key) lets guard-tracker-transition.sh find it with no repo.
+#       A `--after` write copies the pass's verdicts when the checklist is
+#       unchanged.
+#   ready-receipt.sh check <sha> --checklist [--repo <dir>]
+#       Exits 0 when the repo at <dir> has no hand-off checklist at <sha>, or
+#       every box has PASS or N/A with a reason; otherwise prints one line per
+#       unmet box (its first 80 characters) and exits 1.
+#   ready-receipt.sh check-task <KEY>
+#       The same for the newest verdicts recorded with --task <KEY>.
 #   ready-receipt.sh check <sha> [--pass]
 #       Exits 0 and prints the receipt when there is one, 1 otherwise. With
 #       --pass, a receipt for the checklist alone doesn't count: handing a PR
@@ -447,8 +464,130 @@ check_ledger() {
   fi
 }
 
+readonly CHECKLIST_PATH=.claude/hand-off-checklist.md
+readonly TAB=$'\t'
+
+# Prints each box's text (a `- [ ]` line) of the checklist on stdin.
+list_boxes() {
+  sed -nE 's/^[[:space:]]*- \[[ xX]\][[:space:]]*(.*[^[:space:]])[[:space:]]*$/\1/p'
+}
+
+# Prints one `verdict<TAB>reason<TAB>text` line per graded box (`- [PASS] text`,
+# `- [FAIL] text`, `- [N/A: reason] text`) of the file on stdin.
+list_graded() {
+  sed -nE "s/^[[:space:]]*- \\[(PASS|FAIL|N\\/A)(:[[:space:]]*([^]]*))?\\][[:space:]]*(.*[^[:space:]])[[:space:]]*\$/\\1${TAB}\\3${TAB}\\4/p"
+}
+
+# Prints the recorded verdict for <box> from the graded lines in $1: its
+# verdict, or MISSING; N/A with no reason is NA-NO-REASON. A graded line names
+# the box by its full text or a prefix of 20+ characters.
+grade_box() {
+  local graded=$1 box=$2 line
+  line=$(printf '%s\n' "$graded" | BOX="$box" awk -F '\t' '
+    { g = $3 }
+    g == ENVIRON["BOX"] || (length(g) >= 20 && index(ENVIRON["BOX"], g) == 1) { print $1 "\t" $2; exit }')
+  if [ -z "$line" ]; then echo MISSING; return; fi
+  case "$line" in
+    "N/A$TAB") echo NA-NO-REASON ;;
+    *) printf '%s\n' "${line%%"$TAB"*}" ;;
+  esac
+}
+
+write_verdicts() {
+  local sha=$1 graded_file=$2 task=$3 repo blob=none text graded="" box verdict out=$receipts_dir/$1.checklist
+  repo=$(git rev-parse --show-toplevel 2>/dev/null) || repo=""
+  if [ -n "$repo" ] && blob=$(git -C "$repo" rev-parse -q --verify "$sha:$CHECKLIST_PATH" 2>/dev/null); then
+    text=$(git -C "$repo" show "$sha:$CHECKLIST_PATH")
+  else
+    blob=none
+    text=""
+  fi
+  if [ -n "$graded_file" ]; then
+    [ -r "$graded_file" ] || { echo "ready-receipt: no graded checklist $graded_file" >&2; exit 2; }
+    graded=$(list_graded < "$graded_file")
+  fi
+  {
+    printf 'sha=%s\ndate=%s\nblob=%s\n' "$sha" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$blob"
+    [ -z "$task" ] || printf 'task=%s\n' "$task"
+    while IFS= read -r box; do
+      [ -n "$box" ] || continue
+      verdict=$(grade_box "$graded" "$box")
+      printf 'box\t%s\t%s\n' "$verdict" "$box"
+    done < <(printf '%s\n' "$text" | list_boxes)
+  } > "$out"
+  if [ "$blob" = none ] && [ -n "$graded_file" ]; then
+    echo "ready-receipt: $sha has no $CHECKLIST_PATH; nothing to grade (recorded with no boxes)" >&2
+  fi
+  if ! unmet=$(print_unmet "$out"); then
+    echo "ready-receipt: verdicts recorded, but these boxes are unmet and the hand-off guard will block:" >&2
+    printf '%s\n' "$unmet" | sed 's/^/  /' >&2
+  fi
+  echo "checklist verdicts written: $out"
+}
+
+# Prints one line per unmet box in a verdicts file; fails when there is one.
+print_unmet() {
+  local lines
+  lines=$(awk -F '\t' '
+    $1 != "box" || $2 == "PASS" || $2 == "N/A" { next }
+    { t = substr($3, 1, 80) }
+    $2 == "FAIL" { print "FAIL: " t; next }
+    $2 == "NA-NO-REASON" { print "N/A without a reason: " t; next }
+    { print "no verdict: " t }' "$1")
+  [ -z "$lines" ] || { printf '%s\n' "$lines"; return 1; }
+}
+
+# Copies the pass's verdicts to <sha> (a fix commit after it) when the checklist is unchanged.
+inherit_verdicts() {
+  local from=$1 to=$2 repo blob stored
+  [ -f "$receipts_dir/$from.checklist" ] || return 0
+  repo=$(git rev-parse --show-toplevel 2>/dev/null) || return 0
+  blob=$(git -C "$repo" rev-parse -q --verify "$to:$CHECKLIST_PATH" 2>/dev/null) || blob=none
+  stored=$(sed -n 's/^blob=//p' "$receipts_dir/$from.checklist")
+  [ "$blob" = "$stored" ] || return 0
+  sed "s/^sha=.*/sha=$to/" "$receipts_dir/$from.checklist" > "$receipts_dir/$to.checklist"
+}
+
+# check <sha> --checklist [--repo <dir>]
+check_verdicts() {
+  local sha=$1 repo="" boxes_count
+  shift
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --repo) [ "$#" -ge 2 ] || usage; repo=$2; shift 2 ;;
+      *) usage ;;
+    esac
+  done
+  local sidecar=$receipts_dir/$sha.checklist
+  if [ -n "$repo" ] && git -C "$repo" cat-file -e "$sha^{commit}" 2>/dev/null; then
+    git -C "$repo" rev-parse -q --verify "$sha:$CHECKLIST_PATH" >/dev/null 2>&1 || return 0
+    if [ ! -f "$sidecar" ]; then
+      boxes_count=$(git -C "$repo" show "$sha:$CHECKLIST_PATH" | list_boxes | grep -c . || true)
+      echo "no verdicts recorded for the $boxes_count boxes of $CHECKLIST_PATH"
+      return 1
+    fi
+  else
+    [ -f "$sidecar" ] || return 0
+  fi
+  print_unmet "$sidecar"
+}
+
+check_task_verdicts() {
+  local key=$1 file found=""
+  for file in "$receipts_dir"/*.checklist; do
+    [ -f "$file" ] || continue
+    grep -qFx "task=$key" "$file" || continue
+    if [ -z "$found" ] || [ "$file" -nt "$found" ]; then found=$file; fi
+  done
+  if [ -z "$found" ]; then
+    echo "no checklist receipt names $key"
+    return 1
+  fi
+  print_unmet "$found"
+}
+
 write_receipt() {
-  local rounds="" open="" after="" size="" scope_approved="" checklist=false ledger_dir=""
+  local rounds="" open="" after="" size="" scope_approved="" checklist=false ledger_dir="" verdicts="" task=""
   shift
   pass_dir=""
   while [ "$#" -gt 0 ]; do
@@ -461,6 +600,8 @@ write_receipt() {
       --after) after=$2; shift 2 ;;
       --pass) pass_dir=$2; shift 2 ;;
       --scope-approved) scope_approved=$2; shift 2 ;;
+      --verdicts) [ "$#" -ge 2 ] || usage; verdicts=$2; shift 2 ;;
+      --task) [ "$#" -ge 2 ] || usage; task=$2; shift 2 ;;
       *) usage ;;
     esac
   done
@@ -469,6 +610,10 @@ write_receipt() {
     exit 2
   fi
   mkdir -p "$receipts_dir"
+  if [ -n "$verdicts$task" ] && ! $checklist && [ -z "$after$rounds$open$pass_dir$size" ]; then
+    write_verdicts "$sha" "$verdicts" "$task"
+    return
+  fi
   if $checklist; then
     check_ledger "$ledger_dir"
     printf 'sha=%s\ndate=%s\nchecklist=walked\n' "$sha" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$receipts_dir/$sha"
@@ -483,20 +628,32 @@ write_receipt() {
       exit 1
     fi
     printf 'sha=%s\ndate=%s\nafter=%s\n' "$sha" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$after" > "$receipts_dir/$sha"
+    [ -n "$verdicts$task" ] || inherit_verdicts "$after" "$sha"
   else
     write_pass_receipt "$rounds" "$open" "$size" "$scope_approved"
   fi
+  [ -z "$verdicts$task" ] || write_verdicts "$sha" "$verdicts" "$task" >&2
   echo "receipt written: $receipts_dir/$sha"
 }
 
 [ "$#" -ge 2 ] || usage
 action=$1
+if [ "$action" = check-task ]; then
+  check_task_verdicts "$2"
+  exit
+fi
 sha=$2
 shift 2
 is_full_sha "$sha" || { echo "ready-receipt: <sha> must be a full 40-character SHA" >&2; exit 2; }
 
 case "$action" in
   write) write_receipt "$sha" "$@" ;;
-  check) check_receipt "$sha" "$@" ;;
+  check)
+    if [ "${1:-}" = --checklist ]; then
+      shift
+      check_verdicts "$sha" "$@"
+    else
+      check_receipt "$sha" "$@"
+    fi ;;
   *) usage ;;
 esac
