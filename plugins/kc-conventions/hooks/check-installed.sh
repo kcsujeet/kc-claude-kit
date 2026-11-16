@@ -1,7 +1,17 @@
 #!/usr/bin/env bash
-# UserPromptSubmit hook: says when the convention rules are missing from the project, or when the
-# project's copy or the home folder's is older than the installed plugin, once per session and
-# state. Says nothing when they are installed and current, so the normal case costs no context.
+# UserPromptSubmit hook: plugins cannot ship rules, so the convention rules load only from a copy
+# in .claude/rules/. This hook installs that copy where it is safe to, and reports where it is not,
+# once per session and state:
+#   - no copy in the project or in ~/.claude/rules: installs into ~/.claude/rules with
+#     scripts/install-rules.sh and says so in one line (version, how to opt out). It never installs
+#     into a project folder: a project copy may be committed and shared, so that stays
+#     /kc-conventions:kc-init's job, on request.
+#   - the home copy is stale or unstamped: refreshes it in place and says so.
+#   - the project copy is stale: reports it, never rewrites a project's files.
+#   - KC_CONVENTIONS_AUTO_INSTALL=0 (environment, or `env` in ~/.claude/settings.json, which Claude
+#     Code exports to hooks) keeps report-only behaviour: nothing is written.
+#   - a failed install prints the error and the manual command; the hook still exits 0.
+# Says nothing when the rules are installed and current, so the normal case costs no context.
 # Bash 3.2 compatible, and reads JSON without jq.
 #
 # It runs on the first prompt, not at SessionStart. A SessionStart hook runs in the folder the
@@ -76,18 +86,44 @@ print_stale_notice() {
   fi
 }
 
+# Installs or refreshes the home copy with the plugin's installer. Prints one line saying what it
+# did, or the error and the manual command; never fails the hook.
+install_home_copy() {
+  local what=$1 output status=0
+  output=$(bash "$plugin_root/scripts/install-rules.sh" --dest "$home_rules_dir" 2>&1) || status=$?
+  if [ "$status" -eq 0 ]; then
+    echo "$what the portable coding conventions in $home_rules_dir (kc-conventions plugin $plugin_version); they load from the next session. Set KC_CONVENTIONS_AUTO_INSTALL=0 in the environment or in ~/.claude/settings.json env to stop this."
+  else
+    echo "Could not install the portable coding conventions into $home_rules_dir: $(printf '%s' "$output" | tail -n 1). Install them by hand with: bash \"$plugin_root/scripts/install-rules.sh\" --dest \"$home_rules_dir\""
+  fi
+}
+
+auto_install=true
+[ "${KC_CONVENTIONS_AUTO_INSTALL:-1}" = 0 ] && auto_install=false
+
 if [ ! -f "$project_rules_dir/$RULE_FILE" ] && [ ! -f "$home_rules_dir/$RULE_FILE" ]; then
-  # Not a project directory: nothing to install the rules into. A worktree's .git is a file.
-  [ -e .git ] || exit 0
-  notice="The portable coding conventions are not installed in this project. Run /kc-conventions:kc-init$from_project_dir to copy them into .claude/rules/, or say so if this project should not have them."
+  if [ "$auto_install" = true ]; then
+    # The home copy serves every project, so it needs no project; a project copy is kc-init's job.
+    notice=$(install_home_copy "Installed")
+  else
+    # Not a project directory: nothing to install the rules into. A worktree's .git is a file.
+    [ -e .git ] || exit 0
+    notice="The portable coding conventions are not installed in this project. Run /kc-conventions:kc-init$from_project_dir to copy them into .claude/rules/, or say so if this project should not have them."
+  fi
 else
   # Without a readable plugin version there is nothing to compare against.
   [ -n "$plugin_version" ] || exit 0
-  # A session loads the home copy beside the project's, so each is checked. /kc-conventions:kc-init
-  # installs into the project; the home copy is refreshed in place.
+  # A session loads the home copy beside the project's, so each is checked. A stale project copy
+  # is only reported (it may be committed and shared); a stale home copy is refreshed in place.
+  home_installed_version=""
+  [ -f "$home_rules_dir/.kc-conventions-version" ] && home_installed_version=$(head -n 1 "$home_rules_dir/.kc-conventions-version" | tr -d '[:space:]')
   notice=$(
     print_stale_notice "$project_rules_dir" "Run /kc-conventions:kc-init$from_project_dir to refresh them."
-    print_stale_notice "$home_rules_dir" "Refresh them with: bash \"$plugin_root/scripts/install-rules.sh\" --dest \"$home_rules_dir\""
+    if [ "$auto_install" = true ] && [ -f "$home_rules_dir/$RULE_FILE" ] && [ "$home_installed_version" != "$plugin_version" ]; then
+      install_home_copy "Refreshed"
+    else
+      print_stale_notice "$home_rules_dir" "Refresh them with: bash \"$plugin_root/scripts/install-rules.sh\" --dest \"$home_rules_dir\""
+    fi
   )
   [ -n "$notice" ] || exit 0
 fi

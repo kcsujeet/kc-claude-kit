@@ -100,7 +100,7 @@ Most skills start on their own when the topic comes up. You can also type any of
 | `kc-assess` | Assessing a task before building: claims check, reproduce first, every reader of the broken value. |
 | `kc-look-back` | The look-back at hand-off: list the feedback, a verdict each, lessons as one batch, where a lesson belongs. |
 | `kc-claims` | Checking a claim against its source before stating it. |
-| `kc-init` | Copies the rules into a project so they load automatically. Run once per project. |
+| `kc-init` | Copies the rules into a project, to commit them there. The home copy installs itself. |
 
 **`kc-instructions`**
 
@@ -130,7 +130,7 @@ Add the marketplace, then install what you want. To get the everyday workflow, t
 /plugin install kc-image-preview@kc-claude-kit
 ```
 
-`kc-gates` brings `kc-conventions` with it. Then, once in each project where you want the coding rules to load on their own:
+`kc-gates` brings `kc-conventions` with it, and its hook copies the coding rules into `~/.claude/rules/` on your first prompt (and refreshes that copy after an update), so they load in every project; set `KC_CONVENTIONS_AUTO_INSTALL=0` to opt out. To also commit a copy into one project, run this there:
 
 ```
 /kc-conventions:kc-init
