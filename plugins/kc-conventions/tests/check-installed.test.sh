@@ -2,7 +2,10 @@
 # Tests hooks/check-installed.sh: its three states (rules missing, rules stale with no stamp or a
 # stamp for another version, rules current), the folder it checks (the payload's `cwd`, not the
 # one it was started in), a stale copy in the home folder beside or without a project copy, and
-# saying each state once per session.
+# saying each state once per session. With KC_CONVENTIONS_AUTO_INSTALL=0 (the setting for the
+# report-only cases up to the "auto-install" section) the hook only reports; the last section
+# covers what it does by default: install or refresh the home copy, never touch a project's files,
+# report a failed install and still exit 0.
 set -euo pipefail
 
 tests_dir=$(cd "$(dirname "$0")" && pwd)
@@ -15,11 +18,21 @@ printf '{\n  "name": "conventions",\n  "version": "9.8.7"\n}\n' > "$work_dir/plu
 
 failures=0
 cases=0
+# What the helpers export as KC_CONVENTIONS_AUTO_INSTALL; empty leaves it unset (the default).
+auto_setting=0
+home_dir="$work_dir/home"
 # Runs the hook from <start dir> with <payload> on stdin (empty: run by hand, no payload).
 run_hook_from() {
   local start_dir=$1 payload=$2
   (cd "$start_dir" && printf '%s' "$payload" \
-    | HOME="$work_dir/home" CLAUDE_PLUGIN_ROOT="$work_dir/plugin" CLAUDE_PLUGIN_DATA="$work_dir/data" bash "$hook")
+    | run_env bash "$hook")
+}
+run_env() {
+  if [ -n "$auto_setting" ]; then
+    env HOME="$home_dir" KC_CONVENTIONS_AUTO_INSTALL="$auto_setting" CLAUDE_PLUGIN_ROOT="$work_dir/plugin" CLAUDE_PLUGIN_DATA="$work_dir/data" "$@"
+  else
+    env -u KC_CONVENTIONS_AUTO_INSTALL HOME="$home_dir" CLAUDE_PLUGIN_ROOT="$work_dir/plugin" CLAUDE_PLUGIN_DATA="$work_dir/data" "$@"
+  fi
 }
 expect_output() {
   local label=$1 expected=$2 actual=$3
@@ -120,7 +133,7 @@ run_with_open_stdin() {
   sleep "$SILENT_WRITER_SECONDS" > "$work_dir/held-open" &
   silent_writer=$!
   (cd "$work_dir/project" \
-    && HOME="$work_dir/home" CLAUDE_PLUGIN_ROOT="$work_dir/plugin" CLAUDE_PLUGIN_DATA="$work_dir/data" bash "$hook" \
+    && run_env bash "$hook" \
       < "$work_dir/held-open")
   kill "$silent_writer" 2>/dev/null
   wait "$silent_writer" 2>/dev/null || true
@@ -160,6 +173,73 @@ expect_output "subfolder below a folder with a copy: the nearest copy is the one
 mkdir -p "$work_dir/worktree" && echo "gitdir: $work_dir/project/.git/worktrees/w" > "$work_dir/worktree/.git"
 expect_output "worktree, nothing installed: told" \
   "$not_installed" "$(run_hook_from "$work_dir/spare" "$(payload_for s10 "$work_dir/worktree")")"
+
+# --- auto-install (the default): the hook installs or refreshes the home copy itself ---
+auto_setting=""
+mkdir -p "$work_dir/plugin/scripts" "$work_dir/plugin/rules"
+cp "$(dirname "$tests_dir")/scripts/install-rules.sh" "$work_dir/plugin/scripts/"
+echo "always on" > "$work_dir/plugin/rules/kc-working-agreement.md"
+echo "scoped" > "$work_dir/plugin/rules/kc-naming.md"
+fresh_home() { rm -rf "$work_dir/h" && mkdir -p "$work_dir/h" && home_dir="$work_dir/h"; }
+installed_line() {
+  echo "Installed the portable coding conventions in $work_dir/h/.claude/rules (kc-conventions plugin 9.8.7); they load from the next session. Set KC_CONVENTIONS_AUTO_INSTALL=0 in the environment or in ~/.claude/settings.json env to stop this."
+}
+
+# Nothing anywhere: installed into HOME with the stamp, one line, in a project and out of one.
+fresh_home
+rm -rf "$work_dir/project/.claude"
+expect_output "auto: nothing installed, installs into the home folder and says so"   "$(installed_line)" "$(run_hook_from "$work_dir/project" "$(payload_for a1 "$work_dir/project")")"
+expect_output "auto: the home copy has both rules and the stamp"   "9.8.7 kc-naming.md kc-working-agreement.md"   "$(cat "$work_dir/h/.claude/rules/.kc-conventions-version") $(cd "$work_dir/h/.claude/rules" && ls | tr '\n' ' ' | sed 's/ $//')"
+expect_output "auto: nothing is written into the project" "" "$(ls -A "$work_dir/project" | grep -v '^.git$' || true)"
+expect_output "auto: current afterwards, silent" "" "$(run_hook_from "$work_dir/project" "$(payload_for a2 "$work_dir/project")")"
+fresh_home
+expect_output "auto: installs where there is no project too"   "$(installed_line)" "$(run_hook_from "$work_dir/spare" "$(payload_for a3 "$work_dir/spare")")"
+expect_output "auto: said once per session" "" "$(rm -rf "$work_dir/h/.claude"; run_hook_from "$work_dir/spare" "$(payload_for a3 "$work_dir/spare")")"
+
+# Stale or unstamped home copy: refreshed in place.
+fresh_home
+mkdir -p "$work_dir/h/.claude/rules"
+echo "old" > "$work_dir/h/.claude/rules/kc-working-agreement.md"
+echo "1.0.2" > "$work_dir/h/.claude/rules/.kc-conventions-version"
+expect_output "auto: stale home copy is refreshed and says so"   "$(installed_line | sed 's/^Installed/Refreshed/')" "$(run_hook_from "$work_dir/spare" "$(payload_for a4 "$work_dir/spare")")"
+expect_output "auto: the refreshed home copy matches the plugin"   "always on 9.8.7" "$(cat "$work_dir/h/.claude/rules/kc-working-agreement.md") $(cat "$work_dir/h/.claude/rules/.kc-conventions-version")"
+rm "$work_dir/h/.claude/rules/.kc-conventions-version"
+expect_output "auto: unstamped home copy is refreshed"   "$(installed_line | sed 's/^Installed/Refreshed/')" "$(run_hook_from "$work_dir/spare" "$(payload_for a5 "$work_dir/spare")")"
+
+# Stale project copy: reported as before, files untouched; the stale home copy beside it is refreshed.
+mkdir -p "$work_dir/project/.claude/rules"
+echo "project edit" > "$work_dir/project/.claude/rules/kc-working-agreement.md"
+echo "1.0.2" > "$work_dir/project/.claude/rules/.kc-conventions-version"
+expect_output "auto: stale project copy is reported, not rewritten" "$project_stale"   "$(run_hook_from "$work_dir/project" "$(payload_for a6 "$work_dir/project")")"
+expect_output "auto: the project's files are untouched"   "project edit 1.0.2" "$(cat "$work_dir/project/.claude/rules/kc-working-agreement.md") $(cat "$work_dir/project/.claude/rules/.kc-conventions-version")"
+echo "1.0.2" > "$work_dir/h/.claude/rules/.kc-conventions-version"
+expect_output "auto: stale project copy and stale home copy: project reported, home refreshed"   "$project_stale
+$(installed_line | sed 's/^Installed/Refreshed/')" "$(run_hook_from "$work_dir/project" "$(payload_for a7 "$work_dir/project")")"
+expect_output "auto: project copy only (no home copy), current: nothing installed, silent" ""   "$(echo 9.8.7 > "$work_dir/project/.claude/rules/.kc-conventions-version"; fresh_home; run_hook_from "$work_dir/project" "$(payload_for a8 "$work_dir/project")"; ls -A "$work_dir/h")"
+
+# Opt-out: report only, nothing written.
+fresh_home
+rm -rf "$work_dir/project/.claude"
+auto_setting=0
+expect_output "opt-out: nothing installed is reported, not installed" "$not_installed"   "$(run_hook_from "$work_dir/project" "$(payload_for a9 "$work_dir/project")")"
+expect_output "opt-out: nothing written to the home folder" "" "$(ls -A "$work_dir/h")"
+mkdir -p "$work_dir/h/.claude/rules"
+echo "old" > "$work_dir/h/.claude/rules/kc-working-agreement.md"
+echo "1.0.2" > "$work_dir/h/.claude/rules/.kc-conventions-version"
+expect_output "opt-out: stale home copy is reported with the manual command" "$(echo "$home_stale" | sed "s#$work_dir/home#$work_dir/h#g")"   "$(run_hook_from "$work_dir/spare" "$(payload_for a10 "$work_dir/spare")")"
+expect_output "opt-out: stale home copy left as it was" "old 1.0.2"   "$(cat "$work_dir/h/.claude/rules/kc-working-agreement.md") $(cat "$work_dir/h/.claude/rules/.kc-conventions-version")"
+
+# A failed install says so with the manual command, writes nothing, and exits 0.
+auto_setting=""
+fresh_home
+mv "$work_dir/plugin/rules" "$work_dir/plugin/rules.away"
+failed_output=$(run_hook_from "$work_dir/project" "$(payload_for a11 "$work_dir/project")")
+failed_status=0
+(cd "$work_dir/project" && run_env bash "$hook" < /dev/null > /dev/null) || failed_status=$?
+mv "$work_dir/plugin/rules.away" "$work_dir/plugin/rules"
+expect_output "failure: names the error and the manual command"   "Could not install the portable coding conventions into $work_dir/h/.claude/rules: install-rules.sh: no rules found at $work_dir/plugin/rules/*.md; reinstall the kc-conventions plugin rather than building a path by hand. Install them by hand with: bash \"$work_dir/plugin/scripts/install-rules.sh\" --dest \"$work_dir/h/.claude/rules\"" \
+  "$failed_output"
+expect_output "failure: the hook still exits 0" "0" "$failed_status"
 
 echo "$((cases - failures)) passed, $failures failed"
 [ "$failures" -eq 0 ]

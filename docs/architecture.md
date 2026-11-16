@@ -18,13 +18,13 @@ kc-claude-kit/
     │   │   ├── kc-<topic>/SKILL.md         # one topic = one file: Rules + Review checklist + Review detail
     │   │   ├── kc-<topic>/scripts/*.sh     # that topic's deterministic sweeps
     │   │   ├── kc-<topic>/references/*.md  # Review detail moved out to keep SKILL.md under 500 lines
-    │   │   └── kc-init/SKILL.md            # copies the generated rules into a project
+    │   │   └── kc-init/SKILL.md            # copies the generated rules into a project (on request)
     │   ├── rules/                          # GENERATED from skills/kc-<topic>/SKILL.md; never edit by hand
     │   │   └── kc-working-agreement.md     # the one hand-written rule (no topic skill, always loaded)
     │   ├── scripts/build-rules.sh          # regenerates rules/, --check fails on drift
-    │   ├── scripts/install-rules.sh        # what kc-init runs: copies rules/ and writes the version stamp
+    │   ├── scripts/install-rules.sh        # what kc-init and the first-prompt hook run: copies rules/ and writes the version stamp
     │   ├── tests/                          # sweep and lookup fixtures, their runners, install-rules and mutation-sweep tests
-    │   ├── hooks/                          # first prompt: missing or stale rules
+    │   ├── hooks/                          # first prompt: installs or refreshes ~/.claude/rules, reports a stale project copy
     │   └── evals/
     ├── kc-gates/
     │   ├── .claude-plugin/plugin.json      # depends on kc-conventions
@@ -113,7 +113,7 @@ A gate agent loads its topic through the subagent `skills:` field, which injects
 
 Skills accept `paths:` ([skills](https://code.claude.com/docs/en/skills)), which suggested the rule copies could go. Measured on 2.1.280: after reading a matching file, a `paths:`-scoped plugin skill's content was not in context; it loads only when the model invokes it. Rules load when a matching file is read ([memory](https://code.claude.com/docs/en/memory)), and plugins cannot ship rules, so `/kc-conventions:kc-init` still copies them into `.claude/rules/`.
 
-What changed is that the rules are generated from the skills, so there is one source, and `init` writes a version stamp that the plugin's hook compares with the installed plugin on a session's first prompt, so stale copies are reported instead of silently kept.
+What changed is that the rules are generated from the skills, so there is one source, and `init` writes a version stamp that the plugin's hook compares with the installed plugin on a session's first prompt, so stale copies are reported instead of silently kept. The hook also installs the home copy (`~/.claude/rules`) when none exists and refreshes it when stale, since the kit does not work without the copy and asking is a step nobody needs to decide; it never writes a project's files, and `KC_CONVENTIONS_AUTO_INSTALL=0` turns it back to report-only.
 
 ### Gates are plugin agents
 
