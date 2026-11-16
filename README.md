@@ -96,6 +96,7 @@ Most skills start on their own when the topic comes up. You can also type any of
 | `kc-error-handling` | Errors that are caught, reported and explained. |
 | `kc-performance` | Queries and renders that stay fast. |
 | `kc-dependencies` | Adding a library only when it earns its place. |
+| `kc-delegation` | Handing work to subagents or a workflow without the cost running away. |
 | `kc-init` | Copies the rules into a project so they load automatically. Run once per project. |
 
 **`kc-instructions`**
