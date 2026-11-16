@@ -1,6 +1,6 @@
 ---
 name: skeptic
-description: Tries to refute each serious autopilot review finding in a round by reading the code, and returns for each whether it was refuted with the reason. Read-only. Dispatched by the autopilot deliver workflow; not meant to be invoked directly.
+description: Tries to refute serious review findings; read-only. Dispatched by deliver; not invoked directly.
 tools: Read, Grep, Glob, Bash
 model: sonnet
 ---

@@ -1,6 +1,6 @@
 ---
 name: review-prep
-description: Runs kc-gates's gather step for one autopilot unit exactly as the prompt says and returns its output and SCOPE block verbatim. Dispatched by the autopilot deliver workflow; not meant to be invoked directly.
+description: Runs kc-gates's gather step, returns output verbatim. Dispatched by deliver; not invoked directly.
 tools: Bash, Read
 model: sonnet
 ---

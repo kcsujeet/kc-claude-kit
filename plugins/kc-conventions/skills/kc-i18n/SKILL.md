@@ -1,6 +1,6 @@
 ---
 name: kc-i18n
-description: "Translation conventions for locale JSON files and the TypeScript and JavaScript code that calls them: source-locale-only edits, duplicate keys, key names that match their values, shared namespace for generic words, ICU plurals, and no concatenated translations. Use when writing or reviewing code that adds or changes a translation key, a locale file, or a `t()` call."
+description: "Translation conventions for locale JSON files and the code that calls them: source-locale-only edits, duplicate keys, key names, shared namespace, ICU plurals, no concatenation. Use when writing or reviewing code that adds or changes a translation key, a locale file, or a `t()` call."
 user-invocable: false
 paths:
   - "**/*.{ts,tsx,js,jsx}"

@@ -1,6 +1,6 @@
 ---
 name: kc-testing
-description: "Testing conventions for test files and the code they cover in TypeScript, JavaScript and other languages: tests first, a test for every behavior and bug fix at the unit that owns it and nothing it didn't change, exact assertions, no class-name assertions, gates tested both ways, local setup helpers, and tests placed beside their unit. Use when writing or reviewing tests, or any change that adds behavior or fixes a bug."
+description: "Testing conventions for test files and the code they cover: tests first, a test for every behavior and bug fix at its owning unit, exact assertions, no class-name assertions, gates tested both ways. Use when writing or reviewing tests, or any change that adds behavior or fixes a bug."
 user-invocable: false
 paths:
   - "**/*.{ts,tsx,js,jsx,mjs,cjs,rb,py,swift,go,java,kt,php,cs,rs}"

@@ -1,6 +1,6 @@
 ---
 name: kc-e2e
-description: Drive a feature end to end like a person would, after a change that spans more than one layer. Trigger on "test this end to end", "verify the whole flow", "does this actually work", "check the integration", or before reporting complete any change that crosses client and server. Exercises the real flow against a running system, deliberately including the unhappy paths, and reports what was done and what happened.
+description: "Drive a feature end to end like a person, unhappy paths included, after a change spanning more than one layer. Trigger on \"test this end to end\", \"verify the whole flow\", \"does this actually work\", \"check the integration\", or before reporting complete a client-and-server change."
 ---
 
 # Verifying a feature end to end

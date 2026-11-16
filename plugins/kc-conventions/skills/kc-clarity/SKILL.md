@@ -1,6 +1,6 @@
 ---
 name: kc-clarity
-description: "Readability conventions for TypeScript, JavaScript and other source files: ternary shape, guard clauses, comments, casts and type escape hatches, magic numbers, fallback chains, dense expressions and over-extraction. Use when writing or reviewing code that adds a ternary, a comment, an `as` cast, `any`, a non-null assertion, a numeric literal, a `??`/`||` fallback chain or a small helper."
+description: "Readability conventions for source files: ternaries, guard clauses, comments, casts, `any`, non-null assertions, magic numbers, `??`/`||` fallback chains, dense expressions, over-extraction. Use when writing or reviewing code that adds any of these or a small helper."
 user-invocable: false
 paths:
   - "**/*.{ts,tsx,js,jsx,mjs,cjs,rb,py,swift,go,java,kt,php,cs,rs}"

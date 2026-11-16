@@ -1,6 +1,6 @@
 ---
 name: kc-simplicity
-description: "DRY, YAGNI and KISS conventions for TypeScript, JavaScript and other source files: reuse before writing, search for an existing capability first, delete or collapse what adds nothing, numeric coercion, types as narrow as their consumers, refactor leftovers, props added to a shared component for one caller, helpers that earn their place, defaults over per-scenario variants, precedent for new patterns, and user flows that work the way people know them from other products. Use when writing or reviewing code that adds a helper, component, type, prop, option or abstraction, that repeats logic, or that adds or changes a flow people go through (sign-up, sign-in, password reset, checkout, settings, navigation)."
+description: "DRY, YAGNI and KISS conventions: reuse before writing, delete what adds nothing, narrow types, one-caller props, familiar user flows. Use when writing or reviewing code that adds a helper, component, type, prop or abstraction, repeats logic, or changes a flow (sign-up, checkout)."
 user-invocable: false
 paths:
   - "**/*.{ts,tsx,js,jsx,mjs,cjs,rb,py,swift,go,java,kt,php,cs,rs}"

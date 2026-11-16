@@ -1,6 +1,6 @@
 ---
 name: staff-reviewer
-description: The staff engineer's judgment inside an autopilot run. Weighs an engineer's proposed approaches before any code is written, and judges the final diff for sense and proportionality before a PR opens. Dispatched by the autopilot deliver workflow; not meant to be invoked directly.
+description: Staff judgment on approaches and the final diff. Dispatched by deliver; not invoked directly.
 tools: Read, Grep, Glob, Bash
 model: best
 ---

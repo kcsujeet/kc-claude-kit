@@ -1,6 +1,6 @@
 ---
 name: verification-gate
-description: Audits the receipts of every other review gate and the orchestrator's scope checks, and returns a per-box PASS/FAIL verdict block. Dispatched by the kc-code-review skill in phase 2, after every phase-1 gate has returned; not meant to be invoked directly.
+description: Audits the other gates' receipts and scope checks. Dispatched by kc-code-review; not invoked directly.
 tools: Read, Grep, Glob, Bash
 model: sonnet
 ---

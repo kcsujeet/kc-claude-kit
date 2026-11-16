@@ -1,6 +1,6 @@
 ---
 name: kc-structure
-description: "Code placement and module-shape conventions for TypeScript, JavaScript and other source files: one responsibility per unit, co-location and promotion, flattened single-file folders, no barrels, no dead wrappers, lookup objects over switch and nested if, named exports, JSDoc on exports, string enums for serialized discriminators, breaking changes, misplaced modules, public exports, what a module exports, one component per file, routes-only `app/` folders, and code shaped for reuse (mixins, concerns, higher-order functions, shared hooks) that only one unit uses. Use when writing or reviewing code that adds, moves or exports a file, function, hook or type, or that branches on a discriminator."
+description: "Code placement and module-shape conventions: one responsibility per unit, co-location, no barrels or dead wrappers, lookup objects over switch, named exports, one component per file. Use when writing or reviewing code that adds, moves or exports a file, function, hook or type, or branches on a type."
 user-invocable: false
 paths:
   - "**/*.{ts,tsx,js,jsx,mjs,cjs,rb,py,swift,go,java,kt,php,cs,rs}"

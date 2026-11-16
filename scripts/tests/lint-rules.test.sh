@@ -69,8 +69,55 @@ check "lint: a rule added with a detail heading but no box is flagged" lint-rule
 
 new_kit "$work_dir/renamed-script"
 # shellcheck disable=SC2016  # backticks are literal Markdown
+# shellcheck disable=SC2016  # backticks are literal Markdown
 printf 'Enumerate with the `loose-assertions.sh` sweep.\n' >> "$work_dir/renamed-script/plugins/kit-a/skills/kc-testing/SKILL.md"
 check "lint: a skill naming a script that was renamed or removed is flagged" lint-rules.sh "$work_dir/renamed-script" "names loose-assertions.sh, which is not in the repo"
+
+new_kit "$work_dir/links-ok"
+mkdir -p "$work_dir/links-ok/docs"
+printf '# Architecture\n' > "$work_dir/links-ok/docs/architecture.md"
+# shellcheck disable=SC2016  # backticks are literal Markdown
+printf 'Attach with ![alt](<file>). See [layout](docs/architecture.md#layout), [site](https://example.com/x.md), [here](#top) and [skill](plugins/kit-a/skills/kc-testing/SKILL.md). Also `docs/architecture.md`.\n' > "$work_dir/links-ok/README.md"
+printf 'See [back](../README.md) and [sibling](architecture.md).\n' >> "$work_dir/links-ok/docs/architecture.md"
+check "lint: resolving links, anchors, http links and docs paths are clean" lint-rules.sh "$work_dir/links-ok" clean
+
+new_kit "$work_dir/stale-link"
+printf 'More in [the reference](docs/reference.md#install).\n' > "$work_dir/stale-link/README.md"
+check "lint: a README link to a file that does not exist is flagged" lint-rules.sh "$work_dir/stale-link" "README.md: links to docs/reference.md, which is not in the repo"
+
+new_kit "$work_dir/stale-relative-link"
+printf 'See [other](../missing.md).\n' >> "$work_dir/stale-relative-link/plugins/kit-a/agents/testing-gate.md"
+check "lint: a relative link in a plugin file is resolved from that file" lint-rules.sh "$work_dir/stale-relative-link" "links to ../missing.md"
+
+new_kit "$work_dir/stale-docs-path"
+# shellcheck disable=SC2016  # backticks are literal Markdown
+printf 'Details in `docs/reference.md`.\n' > "$work_dir/stale-docs-path/CLAUDE.md"
+check "lint: a backticked docs path that does not exist is flagged" lint-rules.sh "$work_dir/stale-docs-path" "CLAUDE.md: links to docs/reference.md"
+
+new_kit "$work_dir/plugin-docs-path"
+# shellcheck disable=SC2016  # backticks are literal Markdown
+printf 'Use the repo template in `docs/pull_request_template.md`.\n' >> "$work_dir/plugin-docs-path/plugins/kit-a/agents/testing-gate.md"
+check "lint: a docs path in plugin text names the installing repo's file and is not flagged" lint-rules.sh "$work_dir/plugin-docs-path" clean
+
+new_agreement() {
+  mkdir -p "$1/plugins/kc-conventions/rules"
+  printf '## Order of work on a task\n\n1. **Assess.** x\n2. **Build.** y\n3. **Look back.** z\n\n## Report honestly\n\n4. not a step\n' > "$1/plugins/kc-conventions/rules/kc-working-agreement.md"
+}
+
+new_kit "$work_dir/step-ok"
+new_agreement "$work_dir/step-ok"
+printf 'Passes the working agreement'"'"'s step 3 bar; see Order of work on a task, step 2.\n' > "$work_dir/step-ok/CLAUDE.md"
+check "lint: citations of steps the working agreement has are clean" lint-rules.sh "$work_dir/step-ok" clean
+
+new_kit "$work_dir/step-stale"
+new_agreement "$work_dir/step-stale"
+printf 'Passes the working agreement'"'"'s step 6 bar.\n' > "$work_dir/step-stale/CLAUDE.md"
+check "lint: a citation of a step the working agreement no longer has is flagged" lint-rules.sh "$work_dir/step-stale" "cites the working agreement's step 6, but its Order of work on a task has 3 steps"
+
+new_kit "$work_dir/step-stale-heading"
+new_agreement "$work_dir/step-stale-heading"
+printf 'See Order of work on a task, step 4.\n' > "$work_dir/step-stale-heading/CLAUDE.md"
+check "lint: a step past the end of the list is flagged even when a later list numbers it" lint-rules.sh "$work_dir/step-stale-heading" "step 4"
 
 # --- test coverage ----------------------------------------------------------------------
 new_kit "$work_dir/covered"

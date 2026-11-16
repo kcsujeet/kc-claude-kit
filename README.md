@@ -97,6 +97,9 @@ Most skills start on their own when the topic comes up. You can also type any of
 | `kc-performance` | Queries and renders that stay fast. |
 | `kc-dependencies` | Adding a library only when it earns its place. |
 | `kc-delegation` | Handing work to subagents or a workflow without the cost running away. |
+| `kc-assess` | Assessing a task before building: claims check, reproduce first, every reader of the broken value. |
+| `kc-look-back` | The look-back at hand-off: list the feedback, a verdict each, lessons as one batch, where a lesson belongs. |
+| `kc-claims` | Checking a claim against its source before stating it. |
 | `kc-init` | Copies the rules into a project so they load automatically. Run once per project. |
 
 **`kc-instructions`**
@@ -139,7 +142,7 @@ Add the marketplace, then install what you want. To get the everyday workflow, t
 /plugin install kc-autopilot@kc-claude-kit
 ```
 
-To keep the kit current, turn on auto-update for the marketplace: `/plugin`, the Marketplaces tab, `kc-claude-kit`, **Enable auto-update**. More in [Staying up to date](docs/reference.md#staying-up-to-date).
+To keep the kit current, turn on auto-update for the marketplace: `/plugin`, the Marketplaces tab, `kc-claude-kit`, **Enable auto-update**.
 
 ## Make it yours
 
@@ -153,17 +156,4 @@ The kit knows general rules, not your project. Three optional files in your repo
 
 ## More detail
 
-Everything else is in [`docs/reference.md`](docs/reference.md):
-
-- [Install details](docs/reference.md#install-details) and [staying up to date](docs/reference.md#staying-up-to-date)
-- [The conventions](docs/reference.md#writing-code-the-conventions), topic by topic
-- [How a review works](docs/reference.md#reviewing-code), and each gate
-- [Posting review comments](docs/reference.md#posting-review-comments-to-github) and the safeguards around it
-- [The pass before a PR goes to review](docs/reference.md#before-a-pr-goes-to-review)
-- [Adding your repo's own rules](docs/reference.md#adding-your-repos-own-rules)
-- [Using the skills in Gemini CLI or Antigravity](docs/reference.md#using-the-skills-in-gemini-cli-or-antigravity)
-- [Script reference](docs/reference.md#script-reference)
-- [Developing the kit](docs/reference.md#developing)
-- [Autopilot](docs/reference.md#delivering-a-plan-with-autopilot-work-in-progress) (work in progress)
-
-How the kit is built and why: [`docs/architecture.md`](docs/architecture.md).
+How the kit is built and why, its layout, conventions, versioning and tests: [`docs/architecture.md`](docs/architecture.md).

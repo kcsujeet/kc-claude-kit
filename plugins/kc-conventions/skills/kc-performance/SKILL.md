@@ -1,6 +1,6 @@
 ---
 name: kc-performance
-description: "Performance conventions for TypeScript, JavaScript and other source files: filtering and pagination in the data layer, no unbounded selects or N+1 queries, indexes shipped with new query patterns, and client-side main-thread, list and image costs. Use when writing or reviewing code that queries data, adds a list endpoint, or renders long lists or images."
+description: "Performance conventions for source files: filtering and pagination in the data layer, no unbounded selects or N+1 queries, indexes with new queries, client list and image costs. Use when writing or reviewing code that queries data, adds a list endpoint, or renders long lists or images."
 user-invocable: false
 paths:
   - "**/*.{ts,tsx,js,jsx,mjs,cjs,rb,py,swift,go,java,kt,php,cs,rs}"

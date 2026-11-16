@@ -1,6 +1,6 @@
 ---
 name: triage
-description: Sorts an autopilot unit's review findings into fix or dismiss, each with a reason. Dispatched by the autopilot deliver workflow; not meant to be invoked directly.
+description: Sorts review findings into fix or dismiss. Dispatched by deliver; not invoked directly.
 tools: Read, Grep, Glob, Bash
 model: sonnet
 ---

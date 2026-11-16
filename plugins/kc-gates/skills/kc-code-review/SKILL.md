@@ -1,6 +1,6 @@
 ---
 name: kc-code-review
-description: Gate-based code review for a PR, branch, or set of changes in any repo. Gathers the diff and checks its scope, dispatches one gate agent per convention topic (naming, clarity, structure, simplicity, datetime, react, i18n, testing, correctness) plus a project-conventions gate that reads the target repo's own .claude/review-conventions.md, then a verification gate that audits their receipts, and aggregates the per-box PASS/FAIL verdicts into one PASSED/FAILED result. Use when the user says "review this PR", "review my code", "review my changes", "review my branch", "is this clean", "is this good to merge", "code review please", or gives a bare PR URL or branch name. Output stays in chat; it never posts to GitHub.
+description: "Gate-based code review of a PR, branch or changes in any repo: one gate agent per convention topic, one PASSED/FAILED result in chat. Use on \"review this PR\", \"review my code\", \"review my changes\", \"review my branch\", \"is this clean\", \"good to merge\", \"code review please\", a bare PR URL or branch."
 ---
 
 # Reviewing code

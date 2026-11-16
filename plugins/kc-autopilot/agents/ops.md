@@ -1,6 +1,6 @@
 ---
 name: ops
-description: Runs one of autopilot's bundled scripts for the deliver workflow and returns its output verbatim. Dispatched by the autopilot deliver workflow; not meant to be invoked directly.
+description: Runs a bundled autopilot script, returns output verbatim. Dispatched by deliver; not invoked directly.
 tools: Bash
 model: sonnet
 ---

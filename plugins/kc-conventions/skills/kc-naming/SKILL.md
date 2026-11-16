@@ -1,6 +1,6 @@
 ---
 name: kc-naming
-description: "Naming conventions for identifiers and file names in TypeScript, JavaScript, Ruby, Python, Swift, Go, Java, Kotlin, PHP, C# and Rust source files: role-not-type names, verb-led function names, named boolean operands, honest names, names unambiguous at the use site and honest about their kind and owner, repeated domain checks, and file names unique without their path and consistent with their siblings. Use when writing or reviewing code that adds or renames a variable, function, boolean, parameter, export or file, or when choosing a name."
+description: "Naming conventions for identifiers and file names in any language: role-not-type names, verb-led functions, named booleans, honest unambiguous names, consistent file names. Use when writing or reviewing code that adds or renames a variable, function, parameter, export or file, or choosing a name."
 user-invocable: false
 paths:
   - "**/*.{ts,tsx,js,jsx,mjs,cjs,rb,py,swift,go,java,kt,php,cs,rs}"

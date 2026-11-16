@@ -1,6 +1,6 @@
 ---
 name: kc-post-review
-description: Drafts review findings as Conventional Comments PR comments, and replies to reviewers' feedback on your own PR, and posts them to GitHub only after the user's explicit, fresh post signal. Covers the pre-draft and post-draft audits, tone and length budgets, replies, and the GitHub API posting shapes. Use before writing ANY PR comment or reply, even a one-line "Done in <sha>", and before drafting any message the user will send under their own name (a chat message or DM, an issue tracker comment); never draft one from memory. Also invoked as /kc-gates:kc-post-review.
+description: "Drafts review findings and replies to reviewers as PR comments, posted only on the user's fresh post signal. Use before writing ANY PR comment or reply, even \"Done in <sha>\", and before drafting any message sent under the user's name (chat, DM, issue comment). Also /kc-gates:kc-post-review."
 ---
 
 # Drafting and posting PR comments

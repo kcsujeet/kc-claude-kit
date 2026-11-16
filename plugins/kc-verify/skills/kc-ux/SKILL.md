@@ -1,6 +1,6 @@
 ---
 name: kc-ux
-description: Verify a person can use a change before calling it done. Trigger on "is this easy to use", "check the UX", "check the flow", "walk it like a user", "would a user get this", or before reporting complete a change to something a person does (a form, a flow, a link, a setting, a confirmation). Walks the change as someone new to the product, then the flows around it, with realistic data, and reports every place a person has to stop and work something out. For how it looks, use kc-ui.
+description: "Verify a person can use a change before calling it done: walk it as a newcomer. Trigger on \"is this easy to use\", \"check the UX\", \"check the flow\", \"walk it like a user\", \"would a user get this\", or before reporting complete a form, flow, link, setting or confirmation. Looks are kc-ui."
 ---
 
 # Verifying a change is usable

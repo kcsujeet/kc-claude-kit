@@ -127,7 +127,7 @@ Orchestration steps are scripts too, tested against a stub `gh`: `kc-init` runs 
 
 ### Posting is user-invoked and enforced
 
-Posting is task content, the kind that takes `disable-model-invocation: true` ([skills](https://code.claude.com/docs/en/skills)). Instructions are "context, not enforced configuration"; a PreToolUse hook is what blocks an action ([memory](https://code.claude.com/docs/en/memory), [hooks](https://code.claude.com/docs/en/hooks)).
+Posting is task content, the kind a skill's `disable-model-invocation: true` could keep to user invocation ([skills](https://code.claude.com/docs/en/skills)), but `kc-post-review` carries no such flag: Claude loads it before drafting any comment, and what stops a post is the `guard-github-post.sh` hook. Instructions are "context, not enforced configuration"; a PreToolUse hook is what blocks an action ([memory](https://code.claude.com/docs/en/memory), [hooks](https://code.claude.com/docs/en/hooks)).
 
 ### kc-autopilot: orchestration is a workflow, judgment is the staff model
 
