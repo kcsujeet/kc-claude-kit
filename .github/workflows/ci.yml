@@ -88,6 +88,9 @@ jobs:
       - name: Always-on size check tests
         run: bash scripts/tests/check-always-on.test.sh
 
+      - name: Budget change check tests
+        run: bash scripts/tests/check-budget-change.test.sh
+
       - name: Every plugin script has a test
         run: bash scripts/check-test-coverage.sh
 
@@ -141,6 +144,11 @@ jobs:
         run: |
           printf '%s\n' "$PR_BODY" > "$RUNNER_TEMP/pr-body.md"
           bash scripts/check-lesson-proof.sh "origin/$GITHUB_BASE_REF" --body-file "$RUNNER_TEMP/pr-body.md"
+
+      # Raising or removing a budget flag of the always-on size report above needs a
+      # `budget-raised: <why>` line in the description. Same description file as the step above.
+      - name: Check always-on budgets against the description
+        run: bash scripts/check-budget-change.sh "origin/$GITHUB_BASE_REF" --description-file "$RUNNER_TEMP/pr-body.md"
 
   # Each eval case a pull request adds or changes carries a proof.json from a local run of
   # scripts/run-changed-evals.sh: passed with its plugin, failed without it, made from the case and
