@@ -29,6 +29,17 @@
             "timeout": 10
           }
         ]
+      },
+      {
+        "matcher": "mcp__ccd_session__start_session|mcp__ccd_session__hand_off_to_session|Agent",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/guard-fork-context.sh\"",
+            "shell": "bash",
+            "timeout": 10
+          }
+        ]
       }
     ]
   }
