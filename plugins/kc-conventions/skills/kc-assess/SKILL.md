@@ -13,11 +13,14 @@ Step 1 of the working agreement's "Order of work on a task". Do this before any 
 2. **Read the issue and everything it links** (recordings, designs, logs), then find the cause.
 3. **Reproduce the failure first.** Read what the failing run records (the request that failed and its status, the log line, the stack trace) before reading code to explain it. A cause reasoned from code alone is a guess until the failing run shows it.
 4. **Trace a "changed, regressed, reverted or stopped" report from what is running back to the source** before any theory: which build or version is live, whether it contains the change, and what last touched that code (`git log` on the file).
-5. **When the cause is a design that lets this kind of bug happen** (state set after the first render, a cache filled on first use, a value read before anything writes it), present the fix for this case and the change to the design side by side, and say which to ship now. The narrow fix alone leaves the next case to the same design.
-6. **List every reader of the broken value or input** (a grep for the field or call): what each does with the bad case and whether the fix covers it, so review confirms the list instead of finding the rest.
-7. **For each reader a person reaches, state the state they are in** when the bad case gets there (which options are picked, what is shown and hidden), read from the conditions that show or hide each part or walked in the app. Check the fix against what they see in that state: a fix that blocks an action or reports an error works only if that error shows in that state.
-8. **When the fix changes how something looks or reads** and people already hold it up against a reference (an official form or template, a standard symbol, the layout a trade uses), open that reference first and show the person a picture of the change on a real case beside it before building it out. A look judged wrong at first sight costs a sketch to learn from, or a finished change.
-9. **Stop for approval** when the fix makes a call that is the person's (see "Ask before assuming") or they asked to see it first. Otherwise state the cause and the fix in a few lines and build.
+5. **Before proposing anything new, list how the codebase already does the same job**, with paths, searching by the job ("where stored formatted text is shown") and not by the mechanism you planned (a sanitizer library). A new unit says why none of them fits.
+6. **Answer what you can before asking.** Read the code, its history (`git log -S <text>` finds the change that made a field required), the change that made it so and the task's links; ask only what is left. The question stands on its own: the thing in plain words (not the name of a screen the person never saw), what you found, the options with their evidence and your pick. Cases: a reviewer asked why a field is required when the commit that made it so was one `git log -S` away; a question naming an internal screen its reader never opened.
+7. **Keep what people have long relied on** (a required field, a default, a layout) unless the task asks to change it. A change they would notice is a product call: put it to the person with what you found, never fold it in as a tidy-up.
+8. **When the cause is a design that lets this kind of bug happen** (state set after the first render, a cache filled on first use, a value read before anything writes it), present the fix for this case and the change to the design side by side, and say which to ship now. The narrow fix alone leaves the next case to the same design.
+9. **List every reader of the broken value or input** (a grep for the field or call): what each does with the bad case and whether the fix covers it, so review confirms the list instead of finding the rest.
+10. **For each reader a person reaches, state the state they are in** when the bad case gets there (which options are picked, what is shown and hidden), read from the conditions that show or hide each part or walked in the app. Check the fix against what they see in that state: a fix that blocks an action or reports an error works only if that error shows in that state.
+11. **When the fix changes how something looks or reads** and people already hold it up against a reference (an official form or template, a standard symbol, the layout a trade uses), open that reference first and show the person a picture of the change on a real case beside it before building it out. A look judged wrong at first sight costs a sketch to learn from, or a finished change.
+12. **Stop for approval** when the fix makes a call that is the person's (see "Ask before assuming") or they asked to see it first. Otherwise state the cause and the fix in a few lines and build.
 
 ## Examples
 
@@ -33,6 +36,13 @@ Step 1 (assess):
 - A job that failed overnight, explained from its code when its log named the row it stopped on.
 - A shared state filled only after the first render: the patch held the page back until it was filled and said nothing of filling it before the first render, which would stop the next page that reads it early.
 - "Reverted" reports: a layout "reverted" on a staging site, found to be the live build holding a later branch's stale copy of the file; a job that "stopped", found to be running an older release; prices that "changed overnight", found to follow a deploy.
+
+Steps 5 to 7 (existing code, asking, long-held behaviour):
+
+- A new sanitizing renderer built for product notes, when every stored rich-text field in the shop already shows through one viewer component.
+- A question to a reviewer, "why is this field required?", when `git log -S` on the field names the commit and its reason.
+- A "price" screen named in a question to someone who only knows the checkout page.
+- A required customer phone number made optional while fixing its error message, a default currency dropped, a list's column order changed: each is a product call for the person, not a tidy-up.
 
 Order of work, in general (an expensive check whose result later work throws away runs once, on the finished work):
 

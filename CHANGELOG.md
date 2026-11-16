@@ -20,6 +20,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Changed
 
+- `kc-conventions` 2.4.4: ask only what research leaves open. The working agreement gains short triggers (answer what you can from code, history and links before asking; keep long-held behaviour unless the task changes it; an adjacent problem is offered as its own follow-up, not folded into the plan; before a hand-off re-read open steps and load the skill each names), and `kc-assess` gains the steps behind them (list how the codebase already does the job, searching by job; answer before asking, with a self-contained question; long-held behaviour is a product call) with neutral examples. The class: a question or plan the person must redo because the asker skipped the evidence in reach; other cases are a "why is this column nullable?" a schema migration answers, a new date-picker built when the shop's forms already share one, a cart default reset as a tidy-up. Held by `plugins/kc-conventions/tests/working-agreement-triggers.test.sh`.
+
+### Changed
+
 - `kc-conventions` 2.4.3: a guard holds only where every way in passes it. `kc-look-back`'s layer list now says a guard counts only when the default branch requires its CI check before merge and a local hook covers commits made straight to that branch. The class: a check that some write path skips; other cases are a size budget in CI on a branch that merges with red checks, a clone that commits to the main branch and never runs CI, a pre-commit hook that a web edit never triggers.
 
 ### Added (budgets can't rise quietly)
