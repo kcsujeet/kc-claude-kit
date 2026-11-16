@@ -41,3 +41,9 @@ Order of work, in general (an expensive check whose result later work throws awa
 - A performance profile taken halfway through the refactor it was meant to judge.
 
 Step 2 (build): say in one line what kind of mistake a fix is for, and check everything the fix adds against it, since a fix often repeats its own mistake in the code written for it. Cases: a lookup per row added while removing another; one hard-coded time zone taken out and a hard-coded locale put in; a line drawn where things usually are replaced by icons drawn where things usually are.
+
+## Overlap by code, not only by task key
+
+Work overlaps by the code it changes, not only by its task key. Besides the tracker's assignee and the pull requests that name the task, look for open pull requests, by anyone, that change the files the fix will change, and for commits to them on the default branch since the failure was reproduced: `task-claims.sh <key> --repo <owner/name> --path <file>... --since <commit>`, with `--since` run in a checkout. When one is open, stop and ask whether to build, review that change, or leave it. Example: a fix built for a task nobody else held, in a shared component that another open pull request, for a different task, had already changed.
+
+Run the same check again right before marking the pull request ready, with the commit the work started from: the default branch moves while the work is open. When it already changed or fixed that code, or another open pull request now changes it, ask the person instead of handing off. Example: a pull request ready to hand off after another one merged, rewrote the same component and fixed the bug another way.

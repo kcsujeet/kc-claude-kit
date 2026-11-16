@@ -1,0 +1,5 @@
+[
+  {"number": 52, "author": {"login": "alice"}, "headRefName": "ABC-2-footer-links", "title": "ABC-2: Footer links", "files": [{"path": "src/storefront/Header.tsx"}, {"path": "src/storefront/Footer.tsx"}]},
+  {"number": 49, "author": {"login": "carol"}, "headRefName": "ABC-3-order-copy", "title": "ABC-3: Order copy", "files": [{"path": "src/orders/Summary.tsx"}]},
+  {"number": 47, "author": {"login": "bob"}, "headRefName": "ABC-4-hours-layout", "title": "ABC-4: Hours layout", "files": [{"path": "src/storefront/hours/Layout.tsx"}, {"path": "src/storefront/hours/Row.tsx"}]}
+]
