@@ -1,6 +1,6 @@
 ---
 name: kc-init
-description: Install the portable convention rules into this project. Trigger on "install the conventions", "set up my rules here", "add my coding rules to this project", "/kc-conventions:kc-init", or when a session reports that the conventions are not installed yet. Copies the bundled rule files into .claude/rules/ so they load with their path scoping intact, stamps the plugin version beside them, and reports what landed where.
+description: "Install the portable convention rules into this project, copying them into .claude/rules/. Trigger on \"install the conventions\", \"set up my rules here\", \"add my coding rules to this project\", \"/kc-conventions:kc-init\", or when a session reports the conventions are not installed."
 ---
 
 # Installing the conventions into a project

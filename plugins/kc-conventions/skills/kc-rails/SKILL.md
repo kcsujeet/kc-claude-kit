@@ -1,6 +1,6 @@
 ---
 name: kc-rails
-description: "Rails conventions for Ruby source, specs and migrations: doing each job the way similar code in the app already does it, Rails naming and model conventions, work in the app's own layers, check-then-act races, per-record queries and N+1s (aggregates that preloading does not fix, bulk passes at a shared seam, computed serializer attributes, time-dependent memos), request-shaped risks (unbounded work, null and empty input, GETs that write, HTTP verbs), renaming, retiring or backfilling stored values, and spec honesty (N+1 specs, mutation checks, real data shapes, schema dumps). Use when writing or reviewing a Rails model, controller, command or service object, query, serializer, contract or form object, job, migration, backfill or spec."
+description: "Rails conventions for Ruby source, specs and migrations: the app's own layers and patterns, races, N+1s, request-shaped risks, backfills, spec honesty. Use when writing or reviewing a Rails model, controller, command, service, query, serializer, contract, job, migration or spec."
 user-invocable: false
 paths:
   - "**/*.{rb,rake}"

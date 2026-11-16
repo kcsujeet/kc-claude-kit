@@ -1,6 +1,6 @@
 ---
 name: shipper
-description: Pushes an autopilot unit's branch, opens or updates its ready PR with the generated body, and waits for CI. Dispatched by the autopilot deliver workflow; not meant to be invoked directly.
+description: Pushes a unit's branch, opens its ready PR, waits for CI. Dispatched by deliver; not invoked directly.
 tools: Read, Write, Bash
 model: sonnet
 ---

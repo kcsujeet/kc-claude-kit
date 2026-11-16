@@ -1,6 +1,6 @@
 ---
 name: project-conventions-gate
-description: Grades one diff against the target repo's own .claude/review-conventions.md, one box per repo rule, and returns a per-box PASS/FAIL verdict block. Dispatched by the kc-code-review skill as one of its phase-1 gates; not meant to be invoked directly.
+description: Grades a diff against the repo's review-conventions.md, per box. Dispatched by kc-code-review; not invoked directly.
 tools: Read, Grep, Glob, Bash
 model: sonnet
 ---

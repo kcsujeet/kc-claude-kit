@@ -1,6 +1,6 @@
 ---
 name: kc-run
-description: Deliver an approved plan end to end as the staff engineer. Validates the plan file, decides the cross-unit approach, writes each unit's contract and QA personas, then starts the deliver workflow, which runs engineer, review, persona QA and verification per unit until clean and opens ready PRs. Reports back once, at the end. Use when the user says "run this plan", "autopilot this", or gives a plan file.
+description: "Deliver an approved plan end to end as the staff engineer: validates the plan, writes unit contracts and QA personas, starts the deliver workflow, opens ready PRs. Use on \"run this plan\", \"autopilot this\", or a plan file."
 argument-hint: "<path to plan.md> [--base <branch>] [--dry-run]"
 model: best
 ---

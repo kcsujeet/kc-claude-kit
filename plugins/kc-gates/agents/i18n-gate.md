@@ -1,6 +1,6 @@
 ---
 name: i18n-gate
-description: Grades one diff against the i18n conventions checklist and returns a per-box PASS/FAIL verdict block. Dispatched by the kc-code-review skill as one of its phase-1 gates; not meant to be invoked directly.
+description: Grades a diff against the i18n checklist, per-box PASS/FAIL. Dispatched by kc-code-review; not invoked directly.
 tools: Read, Grep, Glob, Bash, Skill
 model: sonnet
 skills:

@@ -1,6 +1,6 @@
 ---
 name: kc-type-safety
-description: "Type-safety conventions for TypeScript, Swift, Kotlin, Rust, Go, C# and Java source files: no `any`, no silencing casts or non-null assertions, boundary parsing, reusing existing types, and types as narrow as their consumers. Use when writing or reviewing typed code, especially code that casts, suppresses a type error, or parses external input."
+description: "Type-safety conventions for typed source files: no `any`, no silencing casts or non-null assertions, boundary parsing, reuse existing types, narrow types. Use when writing or reviewing typed code, especially code that casts, suppresses a type error, or parses external input."
 user-invocable: false
 paths:
   - "**/*.{ts,tsx,swift,kt,rs,go,cs,java}"

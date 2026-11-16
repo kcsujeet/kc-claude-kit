@@ -1,6 +1,6 @@
 ---
 name: kc-datetime
-description: "Date and time conventions for TypeScript, JavaScript and other source files: no hand-rolled date math or millisecond arithmetic, ISO 8601 serialization with offset, truncation, `new Date()` in render or memos, timezone, week start and hour format as settings, and locale formatters given the configured time zone. Use when writing or reviewing code that parses, formats, compares, shifts, serializes or stores a date, time or timezone."
+description: "Date and time conventions for source files: no hand-rolled date math, ISO 8601 with offset, `new Date()` in render, timezone, week start, hour format, locale formatters. Use when writing or reviewing code that parses, formats, compares, shifts, serializes or stores a date, time or timezone."
 user-invocable: false
 paths:
   - "**/*.{ts,tsx,js,jsx,mjs,cjs,rb,py,swift,go,java,kt,php,cs,rs}"

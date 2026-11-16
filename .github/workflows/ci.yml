@@ -56,6 +56,12 @@ jobs:
       - name: Rules lint
         run: bash scripts/lint-rules.sh
 
+      # What the kit puts in every session's context: always-on rules, skill and agent
+      # descriptions, hook-printed text. Report only; a budget is set by passing a flag
+      # (--budget-rules, --budget-descriptions, --max-description, --budget-hooks).
+      - name: Always-on size report
+        run: bash scripts/check-always-on.sh --budget-rules 10000 --budget-descriptions 11000 --max-description 320 --budget-hooks 1000
+
   scripts:
     name: Shell scripts and their tests
     runs-on: ubuntu-latest
@@ -77,6 +83,9 @@ jobs:
 
       - name: Rules lint and coverage check tests
         run: bash scripts/tests/lint-rules.test.sh
+
+      - name: Always-on size check tests
+        run: bash scripts/tests/check-always-on.test.sh
 
       - name: Every plugin script has a test
         run: bash scripts/check-test-coverage.sh

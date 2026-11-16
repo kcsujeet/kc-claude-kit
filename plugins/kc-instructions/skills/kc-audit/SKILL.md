@@ -1,6 +1,6 @@
 ---
 name: kc-audit
-description: Audit a repository's Claude Code instruction setup and propose a restructure. Trigger on "audit my CLAUDE.md", "review my CLAUDE.md", "is my CLAUDE.md any good", "my CLAUDE.md is too long", "Claude keeps ignoring my instructions", "should this be a skill or a rule", "set up CLAUDE.md for this repo", or a request to reorganize claude rules, skills, and hooks. Inventories every instruction file, classifies each section by where it belongs (CLAUDE.md, path-scoped rule, skill, hook, or deletion), reports the always-loaded token cost before and after, and proposes a file plan. Never rewrites instruction files without explicit approval.
+description: "Audit a repo's Claude Code instruction setup (CLAUDE.md, rules, skills, hooks) and propose a restructure; never rewrites without approval. Trigger on \"audit my CLAUDE.md\", \"my CLAUDE.md is too long\", \"Claude keeps ignoring my instructions\", \"should this be a skill or a rule\", \"set up CLAUDE.md\"."
 ---
 
 # Auditing a repo's instruction setup

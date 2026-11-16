@@ -1,6 +1,6 @@
 ---
 name: kc-error-handling
-description: "Error-handling conventions for TypeScript, JavaScript and other source files: no swallowed errors, typed errors with stable codes, one error envelope, actionable messages, field-level validation errors, and structured logging. Use when writing or reviewing code that throws, catches, logs, or returns an error or validation failure."
+description: "Error-handling conventions for source files: no swallowed errors, typed errors with stable codes, one error envelope, actionable messages, field-level validation errors, structured logging. Use when writing or reviewing code that throws, catches, logs, or returns an error or validation failure."
 user-invocable: false
 paths:
   - "**/*.{ts,tsx,js,jsx,mjs,cjs,rb,py,swift,go,java,kt,php,cs,rs}"

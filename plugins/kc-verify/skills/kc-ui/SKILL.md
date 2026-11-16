@@ -1,6 +1,6 @@
 ---
 name: kc-ui
-description: Verify a UI change visually before calling it done: does it look right. Trigger on "check the UI", "does this look right", "verify my UI change", "screenshot this page", "check dark mode", "check mobile", or before reporting a frontend change complete. Drives the actual screen with realistic data across states, viewports, themes and font scales, and reports what was checked and what was seen. Use when a change touches anything a person looks at. Whether a person can use it (flows, where actions land, wording) is kc-ux.
+description: "Verify a UI change visually before calling it done, across states, viewports and themes. Trigger on \"check the UI\", \"does this look right\", \"verify my UI change\", \"screenshot this page\", \"check dark mode\", \"check mobile\", or before reporting a frontend change complete. Usability is kc-ux."
 ---
 
 # Verifying a UI change

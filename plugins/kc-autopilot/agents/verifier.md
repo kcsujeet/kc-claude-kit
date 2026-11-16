@@ -1,6 +1,6 @@
 ---
 name: verifier
-description: Independently verifies one autopilot unit: reproduces each QA bug report, and checks every contract criterion itself against the running app and the code. Never the agent that wrote the code. Dispatched by the autopilot deliver workflow; not meant to be invoked directly.
+description: Independently verifies a unit against its contract and QA bugs. Dispatched by deliver; not invoked directly.
 tools: Read, Write, Bash, Grep, Glob
 model: sonnet
 ---

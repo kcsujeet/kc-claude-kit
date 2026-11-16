@@ -1,6 +1,6 @@
 ---
 name: engineer
-description: Implements one autopilot work unit inside its own git worktree. Proposes approaches with trade-offs before coding, then builds the one the staff reviewer picked, tests first. Dispatched by the autopilot deliver workflow; not meant to be invoked directly.
+description: Implements one unit in its worktree, tests first. Dispatched by deliver; not invoked directly.
 tools: Read, Edit, Write, Grep, Glob, Bash
 model: sonnet
 ---

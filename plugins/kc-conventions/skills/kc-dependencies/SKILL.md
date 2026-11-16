@@ -1,6 +1,6 @@
 ---
 name: kc-dependencies
-description: "Dependency conventions for package.json, Gemfile, pnpm-workspace.yaml, requirements.txt, pyproject.toml, go.mod, Cargo.toml, podspec and Package.swift manifests: ask before adding, health checks, platform first, exact versions and lockfiles, and the repo's version catalog. Use when adding, upgrading or removing a dependency, or reviewing a manifest change."
+description: "Dependency conventions for manifests (package.json, Gemfile, pyproject.toml, go.mod, Cargo.toml, Package.swift, etc.): ask before adding, health checks, exact versions, lockfiles, version catalog. Use when adding, upgrading or removing a dependency, or reviewing a manifest change."
 user-invocable: false
 paths:
   - "**/package.json"

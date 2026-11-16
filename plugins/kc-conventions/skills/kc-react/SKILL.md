@@ -1,6 +1,6 @@
 ---
 name: kc-react
-description: "React conventions for .tsx and .jsx components, hooks and API modules: component and markup structure, keys, conditional rendering, data-fetching hooks and cache updates, forms as the source of truth, state placement, memoization, render cost, layout at narrow widths, and `ref` as a prop on React 19. Use when writing or reviewing React components, hooks, queries, mutations, forms or layout CSS."
+description: "React conventions for .tsx and .jsx components, hooks and API modules: structure, keys, conditional rendering, data-fetching hooks, forms, state placement, memoization, narrow-width layout, `ref` as a prop. Use when writing or reviewing React components, hooks, queries, forms or layout CSS."
 user-invocable: false
 paths:
   - "**/*.{tsx,jsx}"

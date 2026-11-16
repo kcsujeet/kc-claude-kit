@@ -1,6 +1,6 @@
 ---
 name: kc-ready-for-review
-description: The one review-and-QA pass on your own PR before it goes to a human reviewer. Runs kc-code-review, the project's hand-off checklist and QA once, then you write the fixes from the findings, each held by a test, lint and types, and hand whatever is still open to the user. Fix code gets no further gate round, so the pass always ends. Writes the PR's merge-risk section. Ends in a receipt for the head commit, which the kc-gates hand-off guard requires before `gh pr ready`, a ready `gh pr create` or adding a reviewer. Use when work is about to go to review ("ready for review", "send it to review", "request a review", "move the ticket to review"), or when the guard blocks a hand-off. Not after each commit or push.
+description: "The one review-and-QA pass on your own PR before a human reviewer: runs kc-code-review, the hand-off checklist and QA, then you fix. Required by the hand-off guard. Use on \"ready for review\", \"send it to review\", \"request a review\", \"move the ticket to review\", or when the guard blocks a hand-off."
 ---
 
 # Ready for review
@@ -92,7 +92,7 @@ Chat, short:
 
 ```
 ### Ready for review: <PR title>
-**Head:** `<short-sha>` · **Size:** <small|full> · **Rounds:** <1|2> · **Open:** <n>
+**Head:** `<short-sha>` · **Size:** <small|full> · **Rounds:** 1 · **Open:** <n>
 **Risk:** <impact> · <two-way|one-way door> · <how a failure shows>
 
 | Check | Round 1 | Fixes |

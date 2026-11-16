@@ -1,6 +1,6 @@
 ---
 name: qa-persona
-description: QA for one autopilot unit as one user persona. Drives the unit's running app in a real headless browser and reports bugs with reproduction steps and screenshots. Dispatched by the autopilot deliver workflow; not meant to be invoked directly.
+description: QA of one unit as one user persona, headless browser. Dispatched by deliver; not invoked directly.
 tools: Read, Write, Bash
 model: sonnet
 skills:

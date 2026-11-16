@@ -9,6 +9,12 @@
 #      sub-id (`§RL3a` for `§RL3`): a rule with no box gets skipped by the gates.
 #   3. Every `§` reference resolves to a box or heading id, or to a lettered sub-id of one.
 #   4. Every script named in backticks (`select-gates.sh`) exists in the repo.
+#   5. Every relative Markdown link `](path)` and backticked `docs/....md` path in README.md,
+#      CLAUDE.md, docs/*.md and plugins/**/*.md resolves to a file (anchors after `#` are ignored,
+#      http and mailto links and `<placeholder>` targets skipped; plugin text may name docs paths
+#      of the repos that install it, so the backticked form is checked outside plugins/ only).
+#   6. A citation of the working agreement's step ("working agreement's step 6", "Order of work on
+#      a task, step 6") names a step in that rule's "Order of work on a task" numbered list.
 #
 # Prints one line per problem and exits 1 when there is any, 0 otherwise.
 set -euo pipefail
@@ -19,6 +25,9 @@ report() {
   echo "$1"
   problems=$((problems + 1))
 }
+
+work_file=$(mktemp)
+trap 'rm -f "$work_file"' EXIT
 
 markdown_files=$(git ls-files '*.md' | grep -vE '(^|/)evals/|^CHANGELOG\.md$' || true)
 shell_files=$(git ls-files '*.sh' | grep -vE '(^|/)evals/' || true)
@@ -75,6 +84,45 @@ for named_script in $(grep -ohE '`[^`]*\.sh' $markdown_files 2>/dev/null | grep 
     report "$first_use: names $named_script, which is not in the repo"
   fi
 done
+
+# 5. Links and docs paths that resolve to no file.
+link_files=$(printf '%s\n' "$markdown_files" | grep -E '^(README\.md|CLAUDE\.md|docs/[^/]+\.md|plugins/.*\.md)$' || true)
+while IFS= read -r file; do
+  [ -n "$file" ] || continue
+  base_dir=$(dirname "$file")
+  # shellcheck disable=SC2016  # the backtick is literal Markdown
+  { grep -oE '\]\([^) ]+\)' "$file" | sed -E 's/^\]\((.*)\)$/link \1/' || true
+    # Plugin text names docs in the repos that install it, so only the repo's own Markdown is held to this.
+    case "$file" in plugins/*) ;; *) grep -oE '`docs/[A-Za-z0-9_./-]+\.md[^`]*`' "$file" | sed -E 's/^`(.*)`$/docs \1/' || true ;; esac; } |
+    while read -r kind target; do
+      case "$target" in http://* | https://* | mailto:* | '#'* | *'<'*) continue ;; esac
+      target=${target%%#*}
+      [ -n "$target" ] || continue
+      if [ "$kind" = docs ]; then
+        resolved=$target
+      else
+        case "$target" in /*) resolved=${target#/} ;; *) resolved="$base_dir/$target" ;; esac
+      fi
+      [ -e "$resolved" ] || echo "$file: links to $target, which is not in the repo"
+    done
+done <<< "$link_files" > "$work_file"
+while IFS= read -r line; do
+  [ -n "$line" ] && report "$line"
+done < "$work_file"
+
+# 6. Citations of the working agreement's steps that name a step it does not have.
+agreement=plugins/kc-conventions/rules/kc-working-agreement.md
+if [ -f "$agreement" ]; then
+  last_step=$(awk '/^## Order of work on a task/ { inside = 1; next } /^## / { inside = 0 } inside && /^[0-9]+\. / { n = $1 + 0; if (n > last) last = n } END { print last + 0 }' "$agreement")
+  # shellcheck disable=SC2086,SC2013
+  for citation in $(grep -ohE "(Order of work on a task\"?[^A-Za-z0-9]{1,4}|working agreement('s)? )step [0-9]+" $markdown_files 2>/dev/null | grep -oE 'step [0-9]+$' | sort -u | tr ' ' '_'); do
+    step_number=${citation#step_}
+    if [ "$step_number" -lt 1 ] || [ "$step_number" -gt "$last_step" ]; then
+      first_use=$(grep -lE "(Order of work on a task\"?[^A-Za-z0-9]{1,4}|working agreement('s)? )step ${step_number}([^0-9]|$)" $markdown_files | head -n 1)
+      report "$first_use: cites the working agreement's step $step_number, but its Order of work on a task has $last_step steps"
+    fi
+  done
+fi
 
 if [ "$problems" -gt 0 ]; then
   echo "$problems problem(s)" >&2

@@ -1,6 +1,6 @@
 ---
 name: kc-correctness
-description: "Correctness conventions for source files in TypeScript, JavaScript, Ruby, Python, Swift, Go, Java, Kotlin, PHP, C# and Rust: logic errors (off-by-one, wrong operator, inverted condition, stale state or closure, wrong dependency array), unhandled edge cases (empty, null, zero, boundary values, timezone), data that does not match its declared type at a boundary, and regressions of bugs the repo already fixed. Use when writing or reviewing a change to conditions, loops, state, hooks or data crossing a boundary, or when hunting for bugs in a diff."
+description: "Correctness conventions for source files in any language: logic errors, unhandled edge cases (empty, null, zero, timezone), data not matching its type at a boundary, regressions of fixed bugs. Use when writing or reviewing conditions, loops, state, hooks or boundary data, or hunting bugs."
 user-invocable: false
 paths:
   - "**/*.{ts,tsx,js,jsx,mjs,cjs,rb,py,swift,go,java,kt,php,cs,rs}"

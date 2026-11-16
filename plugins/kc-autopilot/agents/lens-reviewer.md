@@ -1,6 +1,6 @@
 ---
 name: lens-reviewer
-description: Reviews one autopilot unit's diff through a single lens (security, data, compatibility, concurrency, accessibility, observability, plan-fit, readability, simplicity, or a conventions topic) and reports concrete findings. Dispatched by the autopilot deliver workflow; not meant to be invoked directly.
+description: Reviews one unit's diff through a single lens. Dispatched by deliver; not invoked directly.
 tools: Read, Grep, Glob, Bash, Skill
 model: sonnet
 ---
