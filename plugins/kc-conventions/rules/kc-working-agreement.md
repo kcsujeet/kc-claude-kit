@@ -30,9 +30,9 @@ An expensive check whose result later work will throw away runs once, on the fin
    - Trace "reverted" reports from what is running back to the source; list every reader of the broken value; for a look people know, show a picture beside its reference first.
    - For a design flaw, present the narrow fix and the design change side by side. Stop for approval only on the person's call or if asked; otherwise state it briefly and build.
 2. **Build.** Make the change and its tests (lint, types, affected tests); no review fan-out or app walk yet. Name the mistake a fix is for and check what it adds against it.
-3. **Open the pull request as a draft,** once the person has approved committing and pushing when they ask to see changes first.
-4. **Review and QA once** (`kc-gates:kc-ready-for-review`): the whole diff, every state in the running app. It runs as soon as the draft is open, without asking.
-5. **Mark it ready** and hand it to the reviewer, after running the code-overlap check again (`--path ... --since <start commit>`): if the default branch or another open pull request changed that code, ask first.
+3. **Commit locally,** once the person approved committing (when they asked to see changes first). Nothing is pushed and no pull request exists yet.
+4. **Review and QA once** (`kc-gates:kc-ready-for-review`) on the committed branch, before its first push: the whole diff, every state in the running app, and CI's commands run locally. It runs as soon as the commit exists, without asking.
+5. **Push and open the pull request** ready (or as the repo wants) from the body file the pass wrote, then hand it to the reviewer, after running the code-overlap check again (`--path ... --since <start commit>`): if the default branch or another open pull request changed that code, ask first.
 6. **Look back, then write the lessons** (`kc-conventions:kc-look-back`). Note feedback as it arrives and act on it, but write no rule until the task is handed off; then list it all with `feedback-ledger.sh list`, give each item a verdict, and write the lessons as one batch, unasked.
    - First check the previous batch's lesson pull requests merged. It is the first thing listed when asked what is next; a review of someone else's work ends the same way.
    - A lesson came from the person, a reviewer or real harm, is not already a rule, and is worth its cost. When findings come from your last fix or stop shrinking, stop and say so.
