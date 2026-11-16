@@ -235,4 +235,37 @@ check deny  "blocked: first push whose head has only the checklist's receipt" \
 check deny  "blocked: a ready PR whose head has only the checklist's receipt" \
   "gh pr create --repo acme/widgets --head lesson --fill"
 
+# A review receipt is not enough in a repo with a hand-off checklist (§H7): every box needs a
+# verdict of PASS, or N/A with a reason.
+make_checklist_repo "$work_dir/verdict-repo" '# Hand-off checklist\n\n- [ ] The shop total is documented in the README for readers.\n- [ ] Screenshots are attached to the description.\n'
+git -C "$work_dir/verdict-repo" checkout -q -b feature-new
+git -C "$work_dir/verdict-repo" remote add origin "$work_dir/remote.git"
+verdict_head=$(git -C "$work_dir/verdict-repo" rev-parse HEAD)
+printf 'rounds=2\n' > "$KC_READY_DIR/$verdict_head"
+record_verdicts() {
+  printf '%b' "$1" > "$work_dir/graded.md"
+  (cd "$work_dir/verdict-repo" && bash "$scripts/ready-receipt.sh" write "$verdict_head" --verdicts "$work_dir/graded.md" >/dev/null 2>&1)
+}
+check deny  "blocked: a draft PR whose receipt has no checklist verdicts" \
+  "gh pr create --draft --fill" "$work_dir/verdict-repo"
+check deny  "blocked: first push whose receipt has no checklist verdicts" \
+  "git push -u origin feature-new" "$work_dir/verdict-repo"
+record_verdicts '- [PASS] The shop total is documented in the README for readers.\n- [FAIL] Screenshots are attached to the description.\n'
+check deny  "blocked: a PR whose checklist has a FAIL box" \
+  "gh pr create --fill" "$work_dir/verdict-repo"
+check deny  "blocked: first push whose checklist has a FAIL box" \
+  "git push -u origin feature-new" "$work_dir/verdict-repo"
+check allow "allowed: user said to skip, checklist unmet" \
+  "KC_READY_SKIP=1 gh pr create --fill" "$work_dir/verdict-repo"
+blocked_output=$(build_payload 'gh pr create --fill' "$work_dir/verdict-repo" | bash "$scripts/guard-hand-off.sh" 2>/dev/null)
+expect_contains "the block names the FAIL box" "FAIL: Screenshots are attached to the description." "$blocked_output"
+expect_contains "the block gives the command to record verdicts" "ready-receipt.sh write $verdict_head --verdicts" "$blocked_output"
+record_verdicts '- [PASS] The shop total is documented in the README for readers.\n'
+expect_contains "the block names a box with no verdict" "no verdict: Screenshots are attached" "$(build_payload 'gh pr create --fill' "$work_dir/verdict-repo" | bash "$scripts/guard-hand-off.sh" 2>/dev/null)"
+record_verdicts '- [PASS] The shop total is documented in the README for readers.\n- [N/A: no screen changed] Screenshots are attached to the description.\n'
+check allow "allowed: every box PASS or N/A with a reason, PR" \
+  "gh pr create --fill" "$work_dir/verdict-repo"
+check allow "allowed: every box PASS or N/A with a reason, first push" \
+  "git push -u origin feature-new" "$work_dir/verdict-repo"
+
 finish
