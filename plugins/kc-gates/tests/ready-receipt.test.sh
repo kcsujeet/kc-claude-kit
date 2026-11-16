@@ -97,6 +97,12 @@ build_pass() {
   printf 'fixed\tshop/total.sh:4 prints nothing for f1\tshop/total.test.sh\nmechanical\tshop/tax.sh:2 unclear name\n' > "$pass_dir/fixes.txt"
 }
 
+# Heads the naming gate's block `GATE: naming <label>`, as a gate that graded two diffs does.
+relabel_naming_gate() {
+  sed -i.bak "s/^GATE: naming\$/GATE: naming $1/" "$pass_dir/round-1/verdicts/naming.txt"
+  rm "$pass_dir/round-1/verdicts/naming.txt.bak"
+}
+
 # Edits a round's SCOPE: block with a sed script, leaving no backup file
 # beside the blocks.
 edit_scope() {
@@ -257,6 +263,21 @@ build_pass
 printf 'GATE: naming\nSTATUS: PASS\nBOXES:\n- [PASS] §N1: 0 hits\nFINDINGS:\n- none' > "$pass_dir/round-1/verdicts/a-naming.txt"
 rm "$pass_dir/round-1/verdicts/naming.txt"
 expect_write written "a block saved with no trailing newline keeps the next file's block" "$fixed_head" --rounds 1 --open 0 --pass "$pass_dir"
+
+build_pass
+relabel_naming_gate "(server)"
+expect_write written "a block headed GATE: <name> (<label>) is that gate's block" "$fixed_head" --rounds 1 --open 0 --pass "$pass_dir"
+
+build_pass
+relabel_naming_gate "(server) (client)"
+expect_write refused "only one trailing label is dropped" "$fixed_head" --rounds 1 --open 0 --pass "$pass_dir"
+expect_said "it names the gate with its first label left" "no GATE: naming block"
+
+build_pass
+relabel_naming_gate "(server)"
+build_gate_block naming >> "$pass_dir/round-1/verdicts/clarity.txt"
+expect_write refused "a labelled block and a plain one for one gate are two blocks" "$fixed_head" --rounds 1 --open 0 --pass "$pass_dir"
+expect_said "it names the repeated gate" "2 GATE: naming blocks"
 
 build_pass
 build_gate_block naming >> "$pass_dir/round-1/verdicts/clarity.txt"
