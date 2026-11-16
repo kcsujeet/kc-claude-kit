@@ -24,7 +24,7 @@ Step 6 of the working agreement's "Order of work on a task".
 Put a lesson at the first layer that holds it:
 
 1. **A check:** a lint rule, type, test or script with a helpful error. It fails without the lesson, so nothing relies on being remembered.
-2. **A guard:** a hook or script that runs at the moment of action.
+2. **A guard:** a hook or script that runs at the moment of action. It holds only where every way in passes it: a CI check the default branch requires before merge, and a local hook for commits made straight to that branch. Examples: a size budget in CI on a branch that merges with red checks; a clone that commits to the main branch and never runs CI.
 3. **A path-scoped rule:** loads only when the files it covers are opened.
 4. **A skill:** a procedure or recipe, loaded when its description matches.
 5. **An always-on line:** only a short must or trigger that names its skill. Always-on text is paid for by every session.
