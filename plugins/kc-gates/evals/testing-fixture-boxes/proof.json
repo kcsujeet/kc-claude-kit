@@ -1,8 +1,8 @@
 {
   "case": "plugins/kc-gates/evals/testing-fixture-boxes",
-  "commit": "b62735a8faef2e5cf92e1f9cc3add23034f775f2",
+  "commit": "9db19baff4ca1ee35fb98e71978a875711fa8947",
   "case_hash": "2f07c8bdaf3cbb29c1bdc31b9e5897bf5a4395e6",
-  "plugins_hash": "fae1a9bde3f972d9606c9e91c9d706427670b66a",
+  "plugins_hash": "d21b1517d85c2a308603d83059c569e7a5dd52d1",
   "claude": "2.1.323 (Claude Code)",
   "model": "sonnet",
   "verdict": "ok",
