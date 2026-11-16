@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Changed
+
+- `kc-conventions` 2.4.3: a guard holds only where every way in passes it. `kc-look-back`'s layer list now says a guard counts only when the default branch requires its CI check before merge and a local hook covers commits made straight to that branch. The class: a check that some write path skips; other cases are a size budget in CI on a branch that merges with red checks, a clone that commits to the main branch and never runs CI, a pre-commit hook that a web edit never triggers.
+
 ### Added (budgets can't rise quietly)
 
 - `scripts/check-budget-change.sh`: compares the `--budget-*` and `--max-*` values on the `check-always-on.sh` line of `.github/workflows/ci.yml` with the base branch. A raised value or a removed flag fails unless the pull request description has `budget-raised: <why>` with a real reason; lowered or unchanged values pass. Runs in the `lesson-proof` CI job, on the same description file. The class: a limit a pull request can loosen by editing its own number; other cases are a coverage threshold, a bundle-size cap, a lint warning ceiling. Held by `scripts/tests/check-budget-change.test.sh` (each branch was broken once and a test failed). No plugin changed, so no version bump.
