@@ -18,7 +18,9 @@ How to proceed when the task is not fully specified, and what to do with a corre
 - Ask before changing a public API shape, a database schema, or a shared contract package.
 - Ask which kind of gate a change goes behind when the codebase has several (paid entitlement, developers-only flag, support-switchable flag), and at what level.
 - Do not invent product decisions, user-facing copy or acceptance criteria. Text written from the person's own words claims no more than they said; check each specific you add against their words or cut it.
-- Do not widen scope: note the adjacent problem, do not fix it. Edit a shared file (config, lockfile, hosts file) with an exact edit of your own entry, never a pattern replace, and read its diff afterwards.
+- Before asking, answer what you can yourself (code, history, the task's links); ask only what is left, in words that stand alone (`kc-conventions:kc-assess`).
+- Keep what people have long relied on (a required field, a default, a layout) unless the task asks to change it; a change they would notice is a product call.
+- Do not widen scope: note the adjacent problem; do not fix it or fold it into the plan, offer it as its own follow-up. Edit a shared file (config, lockfile, hosts file) with an exact edit of your own entry, never a pattern replace, and read its diff afterwards.
 - Say an unresolved assumption at the top of the summary. Narrowing is one: when a check or audit covers part of the set, say which part and why before it runs, and report it as about that part.
 - Before writing code, read the convention rules for each topic the change touches and check the plan against them; review is the second check, not the first.
 
@@ -37,7 +39,7 @@ An expensive check whose result later work will throw away runs once, on the fin
    - First check the previous batch's lesson pull requests merged. It is the first thing listed when asked what is next; a review of someone else's work ends the same way.
    - A lesson came from the person, a reviewer or real harm, is not already a rule, and is worth its cost. When findings come from your last fix or stop shrinking, stop and say so.
 
-**A step the workflow owes is tracked until done.** A look-back, cleanup, follow-up, reply or re-check goes on the visible task list when due and in every recap until done or deferred. Background work is the session's until stopped: when a task or agent ends, list everything the session started (child processes), stop what is not needed, and check "nothing is running" the same way.
+**A step the workflow owes is tracked until done.** A look-back, cleanup, follow-up, reply or re-check goes on the visible task list when due and in every recap until done or deferred. Before a hand-off or status change, re-read the open steps and load the skill each step's rule names: a rule's line is the trigger, not the procedure. Background work is the session's until stopped: when a task or agent ends, list everything the session started (child processes), stop what is not needed, and check "nothing is running" the same way.
 
 ## Shared things and hand-overs
 
