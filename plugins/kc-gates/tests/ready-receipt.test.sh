@@ -259,6 +259,24 @@ rm "$pass_dir/round-1/verdicts/naming.txt"
 expect_write written "a block saved with no trailing newline keeps the next file's block" "$fixed_head" --rounds 1 --open 0 --pass "$pass_dir"
 
 build_pass
+sed -i.bak 's/^GATE: naming$/GATE: naming (server)/' "$pass_dir/round-1/verdicts/naming.txt"
+rm "$pass_dir/round-1/verdicts/naming.txt.bak"
+expect_write written "a block headed GATE: <name> (<label>) is that gate's block" "$fixed_head" --rounds 1 --open 0 --pass "$pass_dir"
+
+build_pass
+sed -i.bak 's/^GATE: naming$/GATE: naming (server) (client)/' "$pass_dir/round-1/verdicts/naming.txt"
+rm "$pass_dir/round-1/verdicts/naming.txt.bak"
+expect_write refused "only one trailing label is dropped" "$fixed_head" --rounds 1 --open 0 --pass "$pass_dir"
+expect_said "it names the gate with its first label left" "no GATE: naming block"
+
+build_pass
+sed -i.bak 's/^GATE: naming$/GATE: naming (server)/' "$pass_dir/round-1/verdicts/naming.txt"
+rm "$pass_dir/round-1/verdicts/naming.txt.bak"
+build_gate_block naming >> "$pass_dir/round-1/verdicts/clarity.txt"
+expect_write refused "a labelled block and a plain one for one gate are two blocks" "$fixed_head" --rounds 1 --open 0 --pass "$pass_dir"
+expect_said "it names the repeated gate" "2 GATE: naming blocks"
+
+build_pass
 build_gate_block naming >> "$pass_dir/round-1/verdicts/clarity.txt"
 expect_write refused "two blocks for one gate are refused" "$fixed_head" --rounds 1 --open 0 --pass "$pass_dir"
 expect_said "it names the repeated gate" "2 GATE: naming blocks"

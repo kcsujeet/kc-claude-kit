@@ -101,10 +101,13 @@ print_verdicts() {
 # with nothing after its id (its colon missing too) counts when evidence
 # follows under it as indented lines or a table, blank lines between or not;
 # another box or a block header (STATUS:, FINDINGS:) under it is not evidence.
+# A gate that graded two diffs headed its blocks `GATE: <name> (<label>)`; the
+# one trailing parenthesised label is dropped, so the gate name is <name>.
 summarize_blocks() {
   awk '
     function trim(s) { sub(/^[[:space:]]+/, "", s); sub(/[[:space:]]+$/, "", s); return s }
     function strip_label(s) { sub(/^[A-Z]+:/, "", s); return trim(s) }
+    function strip_gate_label(s) { s = strip_label(s); sub(/[[:space:]]*\([^()]*\)$/, "", s); return s }
     function mark_malformed(box_label) { malformed++; malformed_labels = malformed_labels (malformed_labels == "" ? "" : ", ") box_label }
     function get_box_label(s) { s = trim(s); sub(/[[:space:]].*$/, "", s); sub(/:$/, "", s); return s == "" ? "a box with no id" : s }
     function is_nested_text(line) { return line ~ /^[[:space:]]+[^[:space:]]/ || line ~ /^\|/ }
@@ -123,7 +126,7 @@ summarize_blocks() {
       kind = ""
     }
     /^[[:space:]]*```/ { next }
-    /^GATE:/ { emit_block(); kind = "gate"; name = strip_label($0); status = ""; boxes = 0; malformed = 0; malformed_labels = ""; section = ""; next }
+    /^GATE:/ { emit_block(); kind = "gate"; name = strip_gate_label($0); status = ""; boxes = 0; malformed = 0; malformed_labels = ""; section = ""; next }
     /^SCOPE:/ { emit_block(); kind = "scope"; name = "SCOPE"; status = "-"; boxes = 0; malformed = 0; malformed_labels = ""; section = "boxes"; next }
     kind == "" { next }
     /^STATUS:/ { settle_bare_box(0); status = strip_label($0); next }
