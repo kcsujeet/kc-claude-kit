@@ -27,6 +27,11 @@
 #   `#<n> @<author> <head branch>: <title> [<matching paths>]`
 # or `(none)`; with --since, last, `## commits on <default branch> after <commit> changing the paths`
 # and one `git log` line (`<short sha> <author> <subject>`) per commit, or `(none)`.
+# The paths are literal repo-relative files or directories (a leading `./` is dropped, no globs). A
+# pull request is matched by the files gh lists for it, so a file it renames away is not seen, and gh
+# lists at most `max_pr_files` (100) files per pull request: one with that many that matches no path
+# is listed anyway, marked `files list may be cut off`, and a scan that returned `max_scan` pull
+# requests ends with a line saying older open ones were not checked. `(none)` alone means all were read.
 #
 # gh fields: https://cli.github.com/manual/gh_pr_list (search uses GitHub's issue search syntax).
 # The task's assignee lives in the tracker, which this script does not read; check it there.
@@ -60,6 +65,7 @@ while [ "$#" -gt 0 ]; do
     --path)
       [ "$#" -ge 2 ] && [ -n "$2" ] || usage
       path=${2%/}
+      path=${path#./}
       [ -n "$path" ] || usage
       paths+=("$path")
       shift 2
@@ -95,20 +101,26 @@ for repo in "${repos[@]}"; do
 done
 
 if [ "${#paths[@]}" -gt 0 ]; then
-  # gh pr list returns at most this many open pull requests per repository.
+  # gh pr list returns at most this many open pull requests per repository, and at most
+  # max_pr_files files per pull request.
   max_scan=100
-  # The paths reach the jq filter through the environment, one per line, so no quoting is needed.
+  max_pr_files=100
+  # The paths and limits reach the jq filter through the environment, so no quoting is needed.
   KC_CLAIM_PATHS=$(printf '%s\n' "${paths[@]}")
-  export KC_CLAIM_PATHS
+  KC_CLAIM_MAX_SCAN=$max_scan
+  KC_CLAIM_MAX_PR_FILES=$max_pr_files
+  export KC_CLAIM_PATHS KC_CLAIM_MAX_SCAN KC_CLAIM_MAX_PR_FILES
   for repo in "${repos[@]}"; do
     echo "## $repo: open pull requests changing the paths"
     # shellcheck disable=SC2016 # the $ names are jq variables, not shell ones
     rows=$(gh pr list --repo "$repo" --state open --limit "$max_scan" \
       --json number,author,headRefName,title,files \
-      --jq '(env.KC_CLAIM_PATHS | split("\n")) as $p | .[]
+      --jq '(env.KC_CLAIM_PATHS | split("\n")) as $p | (.[]
         | [.files[].path | select(. as $f | any($p[]; . as $q | $q == $f or ($f | startswith($q + "/"))))] as $hit
-        | select(($hit | length) > 0)
-        | "#\(.number) @\(.author.login) \(.headRefName): \(.title) [\($hit | join(", "))]"') \
+        | if ($hit | length) > 0 then "#\(.number) @\(.author.login) \(.headRefName): \(.title) [\($hit | join(", "))]"
+          elif (.files | length) >= (env.KC_CLAIM_MAX_PR_FILES | tonumber) then "#\(.number) @\(.author.login) \(.headRefName): \(.title) [files list may be cut off]"
+          else empty end),
+        (if length >= (env.KC_CLAIM_MAX_SCAN | tonumber) then "(scan stopped at \(length) open pull requests: older ones were not checked)" else empty end)') \
       || fail "gh pr list --repo $repo (open, by files) failed"
     if [ -n "$rows" ]; then
       printf '%s\n' "$rows"
@@ -122,7 +134,7 @@ if [ -n "$since" ]; then
   git fetch --quiet origin || fail "git fetch origin failed; run inside a checkout of the repository"
   default_ref=$(git symbolic-ref --short refs/remotes/origin/HEAD 2> /dev/null) || default_ref=origin/main
   echo "## commits on $default_ref after $since changing the paths"
-  commits=$(git log --format='%h %an %s' "$since..$default_ref" -- "${paths[@]}") \
+  commits=$(git --literal-pathspecs log --format='%h %an %s' "$since..$default_ref" -- "${paths[@]}") \
     || fail "git log $since..$default_ref failed"
   if [ -n "$commits" ]; then
     printf '%s\n' "$commits"

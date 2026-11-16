@@ -34,7 +34,25 @@ expect_eq "--path: open pull requests changing a listed file or a file under a l
 expect_eq "--path: a trailing slash on a directory still matches" "#47" "$(bash "$task_claims" ABC-1 --repo acme/shop --path src/storefront/hours/ | grep '^#47' | cut -d' ' -f1)"
 expect_eq "--path: a path no open pull request changes lists none" "## acme/shop: open pull requests changing the paths
 (none)" "$(bash "$task_claims" ABC-1 --repo acme/shop --path src/storefront/Hea | sed -n '/^## acme\/shop: open/,$p')"
+expect_eq "--path: a leading ./ is dropped, so the path still matches" "#52" "$(bash "$task_claims" ABC-1 --repo acme/shop --path ./src/storefront/Header.tsx | grep '^#52' | cut -d' ' -f1)"
 expect_contains "--path: only open pull requests are asked for" "--state open" "$(grep 'json number,author' "$KC_GH_LOG" | tail -1)"
+
+# The limits gh has: 100 pull requests per call, 100 files per pull request. Routes for them are added to a copy of the fixtures.
+limit_fixtures="$work_dir/limit-fixtures"
+cp -R "$tests_dir/fixtures/task-claims" "$limit_fixtures"
+jq -n '[range(100) | {number: (200 + .), author: {login: "dave"}, headRefName: "ABC-9-\(.)", title: "Other work \(.)", files: [{path: "src/other/\(.).ts"}]}]' > "$limit_fixtures/pr-files-full-scan.json"
+jq -n '[{number: 300, author: {login: "erin"}, headRefName: "ABC-8-rename", title: "ABC-8: Move shared code", files: [range(100) | {path: "src/moved/\(.).ts"}]}, {number: 301, author: {login: "frank"}, headRefName: "ABC-7-small", title: "ABC-7: Small", files: [{path: "src/other/a.ts"}]}]' > "$limit_fixtures/pr-files-wide.json"
+printf '%s\t%s\n' \
+  "pr list --repo acme/full --state all --search \"ABC-1\" in:title,body --limit 50 --json number,state,author,headRefName,title" pr-list-empty.json \
+  "pr list --repo acme/wide --state all --search \"ABC-1\" in:title,body --limit 50 --json number,state,author,headRefName,title" pr-list-empty.json \
+  "pr list --repo acme/full --state open --limit 100 --json number,author,headRefName,title,files" pr-files-full-scan.json \
+  "pr list --repo acme/wide --state open --limit 100 --json number,author,headRefName,title,files" pr-files-wide.json >> "$limit_fixtures/routes.tsv"
+full_scan=$(KC_GH_ROUTES="$limit_fixtures/routes.tsv" bash "$task_claims" ABC-1 --repo acme/full --path src/storefront/Header.tsx | sed -n '/^## acme\/full: open/,$p')
+expect_eq "--path: a scan that returned 100 pull requests says older ones were not checked, instead of (none)" "## acme/full: open pull requests changing the paths
+(scan stopped at 100 open pull requests: older ones were not checked)" "$full_scan"
+wide=$(KC_GH_ROUTES="$limit_fixtures/routes.tsv" bash "$task_claims" ABC-1 --repo acme/wide --path src/storefront/Header.tsx | sed -n '/^## acme\/wide: open/,$p')
+expect_eq "--path: a pull request listing 100 files that match no path is marked, not skipped; one with fewer is not" "## acme/wide: open pull requests changing the paths
+#300 @erin ABC-8-rename: ABC-8: Move shared code [files list may be cut off]" "$wide"
 
 # --since, on a throwaway checkout whose origin has a commit to the path after the base, and one to another file.
 origin_repo="$work_dir/origin.git"
@@ -65,6 +83,17 @@ other_file_output=$(cd "$checkout" && bash "$task_claims" ABC-1 --repo acme/shop
 expect_eq "--since: nothing after the commit touches the paths" "## commits on origin/main after $(git_in_checkout rev-parse origin/main) changing the paths
 (none)" "$other_file_output"
 
+# A glob is taken literally, as the open pull request half takes it: it must not list commits the other half could not find.
+glob_output=$(cd "$checkout" && bash "$task_claims" ABC-1 --repo acme/shop --path 'src/*.tsx' --since "$base_sha" | sed -n '/^## commits/,$p')
+expect_eq "--since: a glob is a literal path, so it matches no commit" "## commits on origin/main after $base_sha changing the paths
+(none)" "$glob_output"
+# A remote whose HEAD names no branch leaves the checkout without origin/HEAD even after a fetch: the default branch is then read as origin/main.
+git -C "$origin_repo" symbolic-ref HEAD refs/heads/unborn
+git_in_checkout remote set-head origin --delete
+no_head_output=$(cd "$checkout" && bash "$task_claims" ABC-1 --repo acme/shop --path src/Header.tsx --since "$base_sha" | sed -n '/^## commits/,$p')
+expect_eq "--since: without origin/HEAD the default branch is origin/main" "## commits on origin/main after $base_sha changing the paths
+$(git_in_checkout log -1 --format='%h dev %s' --grep='Rewrite the header' origin/main)" "$no_head_output"
+
 if grep -Eqv '^(pr list|repo view) ' "$KC_GH_LOG"; then
   record "only read calls reached gh" fail "$(cat "$KC_GH_LOG")"
 else
@@ -82,9 +111,12 @@ bash "$task_claims" ABC-1 --repo acme/shop --since abc123 > /dev/null 2>&1
 since_alone_status=$?
 bash "$task_claims" ABC-1 --path > /dev/null 2>&1
 bare_path_status=$?
+bash "$task_claims" ABC-1 --repo acme/shop --path src/Header.tsx --since "" > /dev/null 2>&1
+empty_since_status=$?
 set -e
 expect_eq "usage: --since without --path exits 2" 2 "$since_alone_status"
 expect_eq "usage: --path without a value exits 2" 2 "$bare_path_status"
+expect_eq "usage: --since with an empty value exits 2, so the commit check is never skipped silently" 2 "$empty_since_status"
 expect_eq "usage: no key exits 2" 2 "$no_key_status"
 expect_eq "usage: --repo without a value exits 2" 2 "$bare_repo_status"
 expect_eq "a failing gh call exits 1" 1 "$gh_fail_status"
