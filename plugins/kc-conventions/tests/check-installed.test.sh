@@ -189,8 +189,8 @@ installed_line() {
 fresh_home
 rm -rf "$work_dir/project/.claude"
 expect_output "auto: nothing installed, installs into the home folder and says so"   "$(installed_line)" "$(run_hook_from "$work_dir/project" "$(payload_for a1 "$work_dir/project")")"
-expect_output "auto: the home copy has both rules and the stamp"   "9.8.7 kc-naming.md kc-working-agreement.md"   "$(cat "$work_dir/h/.claude/rules/.kc-conventions-version") $(cd "$work_dir/h/.claude/rules" && ls | tr '\n' ' ' | sed 's/ $//')"
-expect_output "auto: nothing is written into the project" "" "$(ls -A "$work_dir/project" | grep -v '^.git$' || true)"
+expect_output "auto: the home copy has both rules and the stamp"   "9.8.7 kc-naming.md kc-working-agreement.md"   "$(cat "$work_dir/h/.claude/rules/.kc-conventions-version") $(cd "$work_dir/h/.claude/rules" && find . -maxdepth 1 -name "*.md" -exec basename {} \; | sort | tr "\n" " " | sed "s/ $//")"
+expect_output "auto: nothing is written into the project" "" "$(find "$work_dir/project" -mindepth 1 -maxdepth 1 ! -name .git -exec basename {} \;)"
 expect_output "auto: current afterwards, silent" "" "$(run_hook_from "$work_dir/project" "$(payload_for a2 "$work_dir/project")")"
 fresh_home
 expect_output "auto: installs where there is no project too"   "$(installed_line)" "$(run_hook_from "$work_dir/spare" "$(payload_for a3 "$work_dir/spare")")"
@@ -226,7 +226,7 @@ expect_output "opt-out: nothing written to the home folder" "" "$(ls -A "$work_d
 mkdir -p "$work_dir/h/.claude/rules"
 echo "old" > "$work_dir/h/.claude/rules/kc-working-agreement.md"
 echo "1.0.2" > "$work_dir/h/.claude/rules/.kc-conventions-version"
-expect_output "opt-out: stale home copy is reported with the manual command" "$(echo "$home_stale" | sed "s#$work_dir/home#$work_dir/h#g")"   "$(run_hook_from "$work_dir/spare" "$(payload_for a10 "$work_dir/spare")")"
+expect_output "opt-out: stale home copy is reported with the manual command" "${home_stale//$work_dir/home/$work_dir/h}"   "$(run_hook_from "$work_dir/spare" "$(payload_for a10 "$work_dir/spare")")"
 expect_output "opt-out: stale home copy left as it was" "old 1.0.2"   "$(cat "$work_dir/h/.claude/rules/kc-working-agreement.md") $(cat "$work_dir/h/.claude/rules/.kc-conventions-version")"
 
 # A failed install says so with the manual command, writes nothing, and exits 0.
