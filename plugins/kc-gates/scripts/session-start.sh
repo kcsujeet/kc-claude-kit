@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # SessionStart hook: what every session should know from kc-gates, printed as context.
 #
-# 1. Everyone: run kc-ready-for-review before a PR goes to a reviewer.
+# 1. Everyone: run kc-ready-for-review on the committed branch before its first push and PR.
 # 2. The kit's maintainer only: turn feedback worth keeping into kit lessons, shipped as merged
 #    PRs. The maintainer is the GitHub user signed in to gh when that user owns the repo this copy
 #    came from (the plugin directory's own clone, or its marketplace's source). Anyone else
@@ -11,7 +11,7 @@
 
 set -u
 
-echo 'Before a PR of yours goes to a reviewer (marking it ready, opening it ready, requesting a reviewer, or moving its ticket to review), run /kc-gates:kc-ready-for-review on it once, without asking. One gate round, then you fix; nothing runs per commit or push.'
+echo 'Before a branch'"'"'s first push and its PR, run /kc-gates:kc-ready-for-review once on the committed branch, without asking: one gate round, then you fix; nothing runs per commit. It also gates marking ready, requesting a reviewer and moving a ticket to review.'
 
 plugin_root=${CLAUDE_PLUGIN_ROOT:-$(cd "$(dirname "$0")/.." && pwd)}
 config=${CLAUDE_CONFIG_DIR:-$HOME/.claude}

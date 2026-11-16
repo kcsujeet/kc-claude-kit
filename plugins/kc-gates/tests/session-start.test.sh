@@ -31,7 +31,7 @@ expect_contains "the lessons line points to step 6 and the look-back skill" \
   "step 6, skill kc-conventions:kc-look-back" \
   "$(KC_GH_ROUTES="$fixtures/routes-owner.tsv" CLAUDE_CONFIG_DIR="$config" CLAUDE_PLUGIN_ROOT="$cached" bash "$script")"
 expect_eq "cached copy, another user: reminder only" 1 "$(lines_for "$cached" routes-other.tsv)"
-expect_contains "the reminder names the pass, run without asking" "kc-ready-for-review on it once, without asking" \
+expect_contains "the reminder names the pass, on the committed branch, run without asking" "kc-ready-for-review once on the committed branch, without asking" \
   "$(KC_GH_ROUTES="$fixtures/routes-other.tsv" CLAUDE_CONFIG_DIR="$config" CLAUDE_PLUGIN_ROOT="$cached" bash "$script")"
 
 printf '{"shop-kit":{"source":{"source":"github","repo":"shop-owner/kit"}}}' \
