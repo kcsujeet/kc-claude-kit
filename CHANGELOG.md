@@ -8,6 +8,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ### Changed
 
+- `kc-gates` 3.8.2: text posted on the user's behalf must be exactly the text the user was shown. With the approval token present, `guard-github-post.sh` now also reads the transcript and denies a GitHub write whose body (`-f`/`-F body=`, `--body`/`-b`, `--input` JSON `body` and `comments[].body`) appears in no assistant message before the user's latest typed message, comparing with blockquote markers, whitespace and surrounding quotes ignored. A body it can't read (a file argument, a shell substitution, an unreadable `--input`) or a missing transcript is allowed; the token behaviour is unchanged. New checklist box `§PC3` in `kc-post-review`. The class: an approval given for something the approver never saw in final form; other cases are a deploy confirmed against a plan that was later edited, a migration run after a dry run of a different script, a message sent with a placeholder filled in after the yes. Held by new cases in `plugins/kc-gates/tests/guard-github-post.test.sh` (shown, shown only after the approval, placeholder, blockquote, `--input`, heredoc, unreadable, untouched); each new branch was broken once and a test failed.
+
+### Changed
+
 - `kc-conventions` 2.4.3: a guard holds only where every way in passes it. `kc-look-back`'s layer list now says a guard counts only when the default branch requires its CI check before merge and a local hook covers commits made straight to that branch. The class: a check that some write path skips; other cases are a size budget in CI on a branch that merges with red checks, a clone that commits to the main branch and never runs CI, a pre-commit hook that a web edit never triggers.
 
 ### Added (budgets can't rise quietly)
