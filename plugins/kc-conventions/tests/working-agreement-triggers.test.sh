@@ -13,6 +13,7 @@ assess="$plugin_dir/skills/kc-assess/SKILL.md"
 failures=0
 fail() { echo "FAIL $1"; failures=$((failures + 1)); }
 
+# shellcheck disable=SC2016 # the backticks are literal: skill references are written in them.
 while IFS= read -r ref; do
   plugin=${ref%%:*}
   skill=${ref#*:}
