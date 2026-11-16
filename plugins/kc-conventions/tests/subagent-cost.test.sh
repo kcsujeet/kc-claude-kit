@@ -41,6 +41,13 @@ mkdir -p "$work_dir/sub/deep"
 usage_line 1 2 3 4 > "$work_dir/sub/deep/nested.jsonl"
 echo "ignored" > "$work_dir/sub/notes.txt"
 
+# Runs a command expected to fail: its exit status in $code, its stderr in $work_dir/err.
+run_failing() {
+  set +e
+  "$@" >/dev/null 2>"$work_dir/err"; code=$?
+  set -e
+}
+
 header="file${tab}calls${tab}cache_read${tab}cache_creation${tab}input${tab}output${tab}max_context"
 
 expect "one file: header, row, TOTAL; sums, max context, lines without usage ignored" \
@@ -63,23 +70,22 @@ nested.jsonl${tab}1${tab}1${tab}2${tab}3${tab}4${tab}6
 TOTAL${tab}4${tab}3501${tab}1002${tab}15${tab}184${tab}2004" \
   "$(bash "$script" "$work_dir/sub")"
 
-set +e
-bash "$script" >/dev/null 2>"$work_dir/err"; code=$?
-set -e
+run_failing bash "$script"
 expect "no arguments: exit 2" "2" "$code"
 expect "no arguments: usage on stderr" "usage:" "$(cut -c1-6 "$work_dir/err")"
 
-set +e
-bash "$script" "$work_dir/missing.jsonl" >/dev/null 2>"$work_dir/err"; code=$?
-set -e
+run_failing bash "$script" "$work_dir/missing.jsonl"
 expect "missing path: exit 2" "2" "$code"
 expect "missing path: names the path" "yes" "$(grep -q 'missing.jsonl' "$work_dir/err" && echo yes || echo no)"
 
-set +e
-PATH="$work_dir/nobin" /bin/bash "$script" "$work_dir/small.jsonl" >/dev/null 2>"$work_dir/err"; code=$?
-set -e
+PATH="$work_dir/nobin" run_failing /bin/bash "$script" "$work_dir/small.jsonl"
 expect "jq missing: exit 2" "2" "$code"
 expect "jq missing: says jq is required" "yes" "$(grep -q 'jq is required' "$work_dir/err" && echo yes || echo no)"
+
+mkdir -p "$work_dir/empty"
+run_failing bash "$script" "$work_dir/empty"
+expect "folder with no transcripts: exit 2" "2" "$code"
+expect "folder with no transcripts: says so" "yes" "$(grep -q "no .jsonl files found" "$work_dir/err" && echo yes || echo no)"
 
 echo
 echo "$((cases - failures))/$cases passed"
