@@ -26,27 +26,29 @@ lines_for() {
 
 printf '{"shop-kit":{"source":{"source":"git","url":"https://github.com/shop-owner/kit.git"}}}' \
   > "$config/plugins/known_marketplaces.json"
-expect_eq "cached copy, maintainer: reminder and lessons line" 2 "$(lines_for "$cached" routes-owner.tsv)"
+expect_eq "cached copy, maintainer: reminder, checks-first line and lessons line" 3 "$(lines_for "$cached" routes-owner.tsv)"
 expect_contains "the lessons line points to step 6 and the look-back skill" \
   "step 6, skill kc-conventions:kc-look-back" \
   "$(KC_GH_ROUTES="$fixtures/routes-owner.tsv" CLAUDE_CONFIG_DIR="$config" CLAUDE_PLUGIN_ROOT="$cached" bash "$script")"
-expect_eq "cached copy, another user: reminder only" 1 "$(lines_for "$cached" routes-other.tsv)"
+expect_eq "cached copy, another user: reminder and checks-first line" 2 "$(lines_for "$cached" routes-other.tsv)"
+expect_contains "every session is told lessons are checks first" "Lessons are checks first: a lint rule, test, script or hook; prose only when no check can hold it (feedback-ledger.sh check enforces it)" \
+  "$(KC_GH_ROUTES="$fixtures/routes-other.tsv" CLAUDE_CONFIG_DIR="$config" CLAUDE_PLUGIN_ROOT="$cached" bash "$script")"
 expect_contains "the reminder names the pass, on the committed branch, run without asking" "kc-ready-for-review once on the committed branch, without asking" \
   "$(KC_GH_ROUTES="$fixtures/routes-other.tsv" CLAUDE_CONFIG_DIR="$config" CLAUDE_PLUGIN_ROOT="$cached" bash "$script")"
 
 printf '{"shop-kit":{"source":{"source":"github","repo":"shop-owner/kit"}}}' \
   > "$config/plugins/known_marketplaces.json"
-expect_eq "github-source marketplace, maintainer: lessons line" 2 "$(lines_for "$cached" routes-owner.tsv)"
+expect_eq "github-source marketplace, maintainer: lessons line" 3 "$(lines_for "$cached" routes-owner.tsv)"
 
 clone="$work_dir/clone/plugins/kc-gates"
 mkdir -p "$clone"
 git init -q "$work_dir/clone"
 git -C "$work_dir/clone" remote add origin git@github.com:shop-owner/kit.git
-expect_eq "copy loaded from a clone, maintainer: lessons line" 2 "$(lines_for "$clone" routes-owner.tsv)"
-expect_eq "copy loaded from a clone, another user: reminder only" 1 "$(lines_for "$clone" routes-other.tsv)"
+expect_eq "copy loaded from a clone, maintainer: lessons line" 3 "$(lines_for "$clone" routes-owner.tsv)"
+expect_eq "copy loaded from a clone, another user: reminder and checks-first line" 2 "$(lines_for "$clone" routes-other.tsv)"
 
 printf 'unrelated\tnone.txt\n' > "$work_dir/routes-none.tsv"
-expect_eq "gh signed out: reminder only" 1 \
+expect_eq "gh signed out: reminder and checks-first line" 2 \
   "$(KC_GH_ROUTES="$work_dir/routes-none.tsv" CLAUDE_CONFIG_DIR="$config" CLAUDE_PLUGIN_ROOT="$cached" bash "$script" 2>/dev/null | wc -l | tr -d ' ')"
 
 finish

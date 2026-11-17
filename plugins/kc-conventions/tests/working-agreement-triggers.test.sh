@@ -31,6 +31,15 @@ grep -q 'without asking once the copy that matters is confirmed in place; files 
 grep -q 'list how the codebase already does the same job' "$assess" || fail "kc-assess: existing-code step missing"
 grep -q 'Answer what you can before asking' "$assess" || fail "kc-assess: answer-first step missing"
 grep -q 'Keep what people have long relied on' "$assess" || fail "kc-assess: long-held behaviour step missing"
+grep -q 'a result unlike what was entered or asked for is a bug, not a question' "$agreement" || fail "bug-not-a-question trigger missing"
+grep -q 'and stop (kc-gates flags edits)' "$agreement" || fail "a question gets an answer and no edit (kc-gates flags edits)"
+grep -q 'is a bug, never a question: reproduce it and fix it' "$assess" || fail "kc-assess: a differing result is a bug, not a question"
+grep -q 'gets its answer and no edit' "$assess" || fail "kc-assess: a question gets no edit in the same turn"
+
+# kc-testing: checks after a mechanical edit, and the full suites of a shared unit's users.
+testing="$plugin_dir/skills/kc-testing/SKILL.md"
+grep -q 'run lint and the formatter on every file it touched before committing' "$testing" || fail "kc-testing: lint every file a mechanical edit touched"
+grep -q "run the full suites of every package that uses it" "$testing" || fail "kc-testing: full suites of a shared unit's users"
 
 [ "$failures" -eq 0 ] && echo "ok   working agreement triggers"
 exit "$failures"

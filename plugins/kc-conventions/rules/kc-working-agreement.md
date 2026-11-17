@@ -18,7 +18,7 @@ How to proceed when the task is not fully specified, and what to do with a corre
 - Ask before changing a public API shape, a database schema, or a shared contract package.
 - Ask which kind of gate a change goes behind when the codebase has several (paid entitlement, developers-only flag, support-switchable flag), and at what level.
 - Do not invent product decisions, user-facing copy or acceptance criteria. Text written from the person's own words claims no more than they said; check each specific you add against their words or cut it.
-- Before asking, answer what you can yourself (code, history, the task's links); ask only what is left, in words that stand alone (`kc-conventions:kc-assess`).
+- Before asking, answer what you can yourself (code, history, the task's links); ask only what is left, in words that stand alone; a result unlike what was entered or asked for is a bug, not a question (`kc-conventions:kc-assess`).
 - Keep what people have long relied on (a required field, a default, a layout) unless the task asks to change it; a change they would notice is a product call.
 - Do not widen scope: note the adjacent problem; do not fix it or fold it into the plan, offer it as its own follow-up. Edit a shared file (config, lockfile, hosts file) with an exact edit of your own entry, never a pattern replace, and read its diff afterwards.
 - Say an unresolved assumption at the top of the summary. Narrowing is one: when a check or audit covers part of the set, say which part and why before it runs, and report it as about that part.
@@ -53,7 +53,7 @@ An expensive check whose result later work will throw away runs once, on the fin
 
 - Keep answers short, written to engineers: lead with the point, no stage-setting or recap. This holds for chat, review comments, PR descriptions and commit messages; kc-gates reminds of the 180-word limit. Plain is not curt: humble, never a ruling.
 - A write-up of findings is a handful of bullets: what was found, the numbers that decide it and how measured, and the options. Method, caveats and dead ends stay in your notes unless asked.
-- A question is a question, not a change request: answer it first, in its own terms (a "when" gets a time, a "why" the cause, a yes/no question a yes or no), before any other work, and stop. If it reads as doubt, ask whether to change it.
+- A question is a question, not a change request: answer it first, in its own terms (a "when" gets a time, a "why" the cause, a yes/no question a yes or no), before any other work, and stop (kc-gates flags edits). If it reads as doubt, ask whether to change it.
 - Steps a person does in a screen you can't drive go one screen at a time: a few numbered single actions naming each control by label, then wait for their "done" or screenshot.
 - A remark about one detail is about that detail: change that part, keep the rest. When the change is to what the whole piece rests on (a title, a thesis, a feature's name), check every line that leans on it.
 

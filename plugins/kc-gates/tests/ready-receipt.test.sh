@@ -14,6 +14,10 @@ tests_dir=$(cd "$(dirname "$0")" && pwd)
 . "$tests_dir/lib/harness.sh"
 scripts="$(dirname "$tests_dir")/scripts"
 export KC_READY_DIR="$work_dir/receipts"
+# A stub gh with no PR for the branch, so a receipt write never reaches the network; the unanswered-comment
+# cases below point KC_GH_ROUTES at a PR with comments.
+gh_fixtures="$tests_dir/fixtures/unanswered-pr-comments"
+use_gh_fixtures "$gh_fixtures/none"
 
 # A 40-character commit id made of <char>, for a commit no clone has.
 make_fake_sha() { printf '%040d' 0 | tr 0 "$1"; }
@@ -129,7 +133,21 @@ written_pass_head=$fixed_head
 rm "$pass_dir/fixes.txt"
 expect_write written "a pass that found nothing needs no fixes record" "$round_one" --rounds 1 --open 0 --size small --pass "$pass_dir"
 expect_contains "the receipt records the pass's size" "size=small" "$(bash "$scripts/ready-receipt.sh" check "$round_one")"
-expect_eq "it prints only the receipt line" "receipt written: $KC_READY_DIR/$round_one" "$last_output"
+expect_eq "it prints only the receipt line (and the note that PR comments were not checked)" "receipt written: $KC_READY_DIR/$round_one" "$(printf '%s\n' "$last_output" | grep -v '^unanswered-pr-comments:')"
+
+# A PR comment its author has not answered refuses the receipt, for a pass and for --after.
+rm -f "$KC_READY_DIR/$round_one"
+export KC_GH_ROUTES="$gh_fixtures/unanswered/routes.tsv"
+expect_write refused "a pass is refused while the PR has an unanswered comment" "$round_one" --rounds 1 --open 0 --size small --pass "$pass_dir"
+expect_said "it names the inline comment by path:line and author" "src/total.ts:12 @review-bot[bot]"
+expect_said "it names the top-level comment" "top-level @coverage-bot[bot]"
+expect_eq "no receipt is written" absent "$([ -e "$KC_READY_DIR/$round_one" ] && echo present || echo absent)"
+export KC_GH_ROUTES="$gh_fixtures/answered/routes.tsv"
+expect_write written "the same pass is written once the author has replied to every comment" "$round_one" --rounds 1 --open 0 --size small --pass "$pass_dir"
+export KC_GH_ROUTES="$gh_fixtures/unanswered/routes.tsv"
+expect_write refused "an --after write is refused while the PR has an unanswered comment" "$fixed_head" --after "$round_one"
+expect_said "it names the unanswered comment" "src/total.ts:12 @review-bot[bot]"
+export KC_GH_ROUTES="$gh_fixtures/none/routes.tsv"
 
 # One gate round (§H1): a second is refused. The fixes are held by their record: a fix names a
 # test its commits changed (§H4), and what is left open says why and numbers --open (§H3).

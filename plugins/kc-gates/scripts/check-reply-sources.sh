@@ -12,6 +12,9 @@
 #     (payments, hosting, cloud, code host): the turn must have run that CLI itself, at the start
 #     of a command, or named a path in its config folder.
 #
+# A turn whose latest message was only a question (is_only_question) and that made Edit or Write
+# calls is noted too: a question is not a change request.
+#
 # And two things a reply must open with or check first:
 #
 #   - After a turn whose hooks asked for the reload status first (remind-reload.sh in the desktop app,
@@ -81,6 +84,13 @@ turn_tool_calls=$(jq -L "$(dirname "$0")/lib" -rs '
 ' "$transcript" 2>/dev/null) || exit 0
 
 misses=()
+
+# A turn whose latest message was only a question and that then edited files: the question gets
+# its answer, and nothing is changed until the person asks.
+prompt=$(jq -L "$(dirname "$0")/lib" -rs 'include "typed-message"; [.[] | select(is_typed_message)] | last | [typed_texts] | join("\n")' "$transcript" 2>/dev/null)
+if is_only_question "$prompt" && printf '%s\n' "$turn_tool_calls" | grep -Eq '^(Edit|Write|MultiEdit|NotebookEdit)	'; then
+  misses+=("You edited files after a question; answer and stop.")
+fi
 
 # True when a hook this turn asked for the reload status on the reply's first line.
 reload_line_asked=$(jq -L "$(dirname "$0")/lib" -rs '

@@ -1,0 +1,5 @@
+[
+ {"id": 1, "path": "src/total.ts", "line": 12, "user": {"login": "review-bot[bot]"}, "created_at": "2026-01-01T10:00:00Z", "body": "This rounds down.", "in_reply_to_id": null},
+ {"id": 2, "path": "src/tax.ts", "line": 3, "user": {"login": "sam"}, "created_at": "2026-01-01T10:05:00Z", "body": "Why not a constant?", "in_reply_to_id": null},
+ {"id": 3, "path": "src/tax.ts", "line": 3, "user": {"login": "me"}, "created_at": "2026-01-01T10:10:00Z", "body": "Done in abc.", "in_reply_to_id": 2}
+]

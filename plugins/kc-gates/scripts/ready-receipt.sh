@@ -80,6 +80,9 @@
 #     1's diff that is not a test, or bring a risk pass-size.sh reports that round 1's diff did
 #     not have (a new kind: payments, data deletion), --scope-approved carries
 #     the user's words approving that.
+# A write of a pass or an --after receipt is also refused while the PR has a comment its author has
+# not answered (unanswered-pr-comments.sh: inline and top-level, bot reviewers included); with no
+# PR or no network that check prints a note and passes.
 # It checks presence and shape, not whether the verdicts are true. Run it from
 # the repo root; the commits must be in the local clone.
 set -euo pipefail
@@ -391,11 +394,21 @@ write_pass_receipt() {
     printf '  %s\n' "${problems[@]}" >&2
     exit 1
   fi
+  refuse_unanswered_comments
   {
     printf 'sha=%s\ndate=%s\nrounds=%s\nopen=%s\npass=%s\n' "$sha" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$rounds" "$open" "$pass_dir"
     [ -z "$size" ] || printf 'size=%s\n' "$size"
     [ -z "$widened" ] || printf 'scope_approved=%s\n' "$scope_approved"
   } > "$receipts_dir/$sha"
+}
+
+# Refuses (exit 1) while the branch's PR has review comments no reply from its author follows.
+refuse_unanswered_comments() {
+  local unanswered
+  unanswered=$("$scripts_dir/unanswered-pr-comments.sh") && return 0
+  echo "ready-receipt: refused; the PR has comments its author has not answered (read each, fix or reply, then write the receipt):" >&2
+  printf '%s\n' "$unanswered" | sed 's/^/  /' >&2
+  exit 1
 }
 
 # Prints <sha>'s receipt, or fails when it has none or, with --pass, when it
@@ -627,6 +640,7 @@ write_receipt() {
       echo "ready-receipt: $sha does not descend from $after, so it holds more than fixes to that pass; run the pass on it" >&2
       exit 1
     fi
+    refuse_unanswered_comments
     printf 'sha=%s\ndate=%s\nafter=%s\n' "$sha" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$after" > "$receipts_dir/$sha"
     [ -n "$verdicts$task" ] || inherit_verdicts "$after" "$sha"
   else

@@ -37,3 +37,14 @@ asks_status() {
   case "$text" in status|status[?.!]*) return 0 ;; esac
   printf '%s' "$text" | grep -Eq "(^|[^[:alnum:]])(are we (done|finished)|what.s (next|left|remaining)|what (is|else is) (next|left)|what now|where are we|(current|any|your|the latest) status|status (of|on|update|check)|is (it|that|this|the (pr|ticket)) (merged|deployed|tested|approved|released|live|done))([^[:alnum:]]|$)"
 }
+
+# True when the prompt is only a question: it ends with `?` and asks for no change (no imperative
+# such as fix, build, add or "do it" anywhere in it). "Can you fix this?" is a request, "why does
+# this fail?" is a question. A "do/does/did" before a subject is a question word, not an order.
+is_only_question() {
+  local text
+  text=$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]' | sed -E 's/^[[:space:]]+//; s/[[:space:]]+$//')
+  case "$text" in *'?') ;; *) return 1 ;; esac
+  text=$(printf '%s' "$text" | sed -E 's/(^|[^[:alnum:]])(do|does|did)[[:space:]]+(you|we|i|they|it|he|she)([^[:alnum:]]|$)/ /g')
+  ! printf '%s' "$text" | grep -Eq "(^|[^[:alnum:]])(fix|build|change|add|remove|make|update|write|implement|create|delete|run|try|edit|rename|revert|apply|commit|push|do (it|this|that))([^[:alnum:]]|$)"
+}
