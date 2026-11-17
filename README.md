@@ -58,6 +58,29 @@ The rest of the kit supports these three: the rules they check against, and the 
 - **`kc-instructions`, `kc-usage-band` and `kc-image-preview` stand alone.** Use them or not; nothing else depends on them.
 - **`kc-autopilot`** (work in progress) sits on top of `kc-gates` and `kc-conventions`.
 
+## Who runs on which model
+
+Strongest model decides; mid model executes work it is handed. Details in [`kc-delegation`](plugins/kc-conventions/skills/kc-delegation/SKILL.md).
+
+```mermaid
+flowchart TD
+  M["Main session<br/>Opus or Fable · high<br/>orchestrates, routes work"]
+  T["Ticket and review sessions<br/>Opus · medium<br/>assess, judge, draft, decide"]
+  X["Mechanical sessions<br/>Sonnet · medium<br/>exact steps, e.g. cleanup"]
+  H["Hands-on agents<br/>Sonnet<br/>code, tests, walks"]
+  G["Review gate agents<br/>Sonnet<br/>grade one checklist"]
+  U["Unnamed agents<br/>Opus (default)<br/>no model named"]
+  M --> T
+  M --> X
+  T --> H
+  T --> G
+  T --> U
+  classDef decide fill:#dbeafe,stroke:#1d4ed8,color:#1e3a8a
+  classDef execute fill:#f3f4f6,stroke:#6b7280,color:#111827
+  class M,T,U decide
+  class X,H,G execute
+```
+
 ## Every skill, in one line
 
 Most skills start on their own when the topic comes up. You can also type any of them as `/plugin:skill`.
