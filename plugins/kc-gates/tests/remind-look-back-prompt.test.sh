@@ -76,6 +76,7 @@ expect_contains "the reminder points to step 6" "Order of work on a task, step 6
 expect_contains "the reminder says to list the feedback with the ledger" "feedback-ledger.sh list" "$reminder"
 expect_contains "the reminder says it stays on the task list until the ledger check passes" "stays on the visible task list until feedback-ledger.sh check passes" "$reminder"
 expect_contains "the reminder says an earlier look-back does not cover later feedback" "does not cover feedback that arrived after it" "$reminder"
+expect_contains "the reminder says to delete the files made only to hand on, without asking" "Delete the files this session made only to hand on, without asking" "$reminder"
 if command -v jq >/dev/null 2>&1; then
   expect_eq "the reminder is valid JSON with additionalContext" "UserPromptSubmit" "$(printf '%s' "$reminder" | jq -r '.hookSpecificOutput.hookEventName')"
 fi
