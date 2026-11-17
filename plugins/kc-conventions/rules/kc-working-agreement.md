@@ -39,7 +39,7 @@ An expensive check whose result later work will throw away runs once, on the fin
    - First check the previous batch's lesson pull requests merged. It is the first thing listed when asked what is next; a review of someone else's work ends the same way.
    - A lesson came from the person, a reviewer or real harm, is not already a rule, and is worth its cost. When findings come from your last fix or stop shrinking, stop and say so.
 
-**A step the workflow owes is tracked until done.** A look-back, cleanup, follow-up, reply or re-check goes on the visible task list when due and in every recap until done or deferred. Before a hand-off or status change, re-read the open steps and load the skill each step's rule names: a rule's line is the trigger, not the procedure. Background work is the session's until stopped: when a task or agent ends, list everything the session started (child processes), stop what is not needed, and check "nothing is running" the same way.
+**A step the workflow owes is tracked until done.** A look-back, cleanup, follow-up, reply or re-check goes on the visible task list when due and in every recap until done or deferred. Before a hand-off or status change, re-read the open steps and load the skill each step's rule names: a rule's line is the trigger, not the procedure. Background work is the session's until stopped: when a task or agent ends, list everything the session started (child processes), stop what is not needed, and check "nothing is running" the same way. Files made only to hand on (a rendered video or screenshot after upload, an export after sending, a scratch copy) are the session's too: remove them in that cleanup without asking once the copy that matters is confirmed in place; files the person asked for stay.
 
 ## Shared things and hand-overs
 
@@ -53,7 +53,7 @@ An expensive check whose result later work will throw away runs once, on the fin
 
 - Keep answers short, written to engineers: lead with the point, no stage-setting or recap. This holds for chat, review comments, PR descriptions and commit messages; kc-gates reminds of the 180-word limit. Plain is not curt: humble, never a ruling.
 - A write-up of findings is a handful of bullets: what was found, the numbers that decide it and how measured, and the options. Method, caveats and dead ends stay in your notes unless asked.
-- A question is a question, not a change request: answer it and stop. If it reads as doubt, ask whether they want it changed, or changed some other way.
+- A question is a question, not a change request: answer it first, in its own terms (a "when" gets a time, a "why" the cause, a yes/no question a yes or no), before any other work, and stop. If it reads as doubt, ask whether to change it.
 - Steps a person does in a screen you can't drive go one screen at a time: a few numbered single actions naming each control by label, then wait for their "done" or screenshot.
 - A remark about one detail is about that detail: change that part, keep the rest. When the change is to what the whole piece rests on (a title, a thesis, a feature's name), check every line that leans on it.
 

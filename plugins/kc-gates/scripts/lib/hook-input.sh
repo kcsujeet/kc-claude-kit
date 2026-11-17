@@ -24,12 +24,19 @@ is_merge_segment() {
   printf '%s' "$segment" | grep -Eq -- "(-X|--method)[[:space:]=]*[\"']?PUT"
 }
 
+# What the look-back reminders end with, so a merge, an approval, what the person says and what a
+# command's output shows all carry it. No quotes or backslashes: it goes into JSON as it is.
+# shellcheck disable=SC2034 # read by the scripts that source this file
+readonly LOOK_BACK_TRACKING='The look-back stays on the visible task list until feedback-ledger.sh check passes. A look-back run at an earlier hand-off (such as when the pull request went to review) does not cover feedback that arrived after it.'
+
 # Prints a top-level or tool_input string field of the payload: `command`
-# comes from tool_input, `cwd` from the top level.
+# comes from tool_input, `stdout` from tool_response (a string response counts as its stdout),
+# `cwd` and `prompt` from the top level.
 extract_field() {
   local input="$1" field="$2" path
   case "$field" in
     command) path='.tool_input.command' ;;
+    stdout) path='(.tool_response.stdout? // (.tool_response | strings))' ;;
     *) path=".$field" ;;
   esac
   if [ "${KC_GUARD_NO_JQ:-0}" != 1 ] && command -v jq >/dev/null 2>&1; then
