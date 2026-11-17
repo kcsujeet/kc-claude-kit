@@ -13,8 +13,8 @@
 #    or CLAUDE_CODE_AUTO_COMPACT_WINDOW; 200000 with CLAUDE_CODE_DISABLE_1M_CONTEXT=1; else the
 #    1M window), scaled by CLAUDE_AUTOCOMPACT_PCT_OVERRIDE when set. A window or percent that is
 #    not a number is flagged too.
-#  - subagents: CLAUDE_CODE_SUBAGENT_MODEL names a strongest-tier model (opus, fable, best), so
-#    every agent spawned without a model runs on it.
+#  - subagents: CLAUDE_CODE_SUBAGENT_MODEL names a mid or small model (sonnet, haiku), so an agent
+#    spawned without a model, which may be one that decides, runs below the strongest tier.
 #  - settings: a file that is not valid JSON, whose values are then not read.
 set -euo pipefail
 
@@ -23,7 +23,7 @@ command -v jq >/dev/null 2>&1 || { echo "check-cost-settings: jq is required; in
 max_compact_tokens=300000
 full_window_tokens=1000000
 capped_1m_window_tokens=200000
-strong_models='opus|fable|best'
+weak_models='sonnet|haiku'
 
 if [ $# -gt 0 ]; then
   files=("$@")
@@ -56,7 +56,7 @@ subagent_model=${CLAUDE_CODE_SUBAGENT_MODEL:-$subagent_model}
 
 is_count() { case "$1" in "" | *[!0-9]*) return 1 ;; *) return 0 ;; esac; }
 has_cap_setting() { [ -n "$compact_window$compact_pct_override" ] || [ "$disable_1m" = "1" ]; }
-is_strong_model() { [ -n "$1" ] && printf '%s' "$1" | grep -Eiq "$strong_models"; }
+is_weak_model() { [ -n "$1" ] && printf '%s' "$1" | grep -Eiq "$weak_models"; }
 
 # Prints a token count for "200000", "200k" or "1M" (the forms /autocompact accepts), or nothing.
 to_tokens() {
@@ -95,6 +95,6 @@ else
   fi
 fi
 
-if is_strong_model "$subagent_model"; then
-  echo "subagents: CLAUDE_CODE_SUBAGENT_MODEL=$subagent_model runs every agent spawned without a model on the strongest tier. Set it to a mid model (sonnet) and name a stronger one per agent where judgment needs it."
+if is_weak_model "$subagent_model"; then
+  echo "subagents: CLAUDE_CODE_SUBAGENT_MODEL=$subagent_model runs every agent spawned without a model, deciding ones included, below the strongest tier. Set it to the strongest (opus) or remove it, and name a mid model per agent for hands-on work."
 fi
