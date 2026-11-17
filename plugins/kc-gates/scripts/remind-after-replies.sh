@@ -23,20 +23,23 @@ set -u
 # shellcheck source=lib/hook-input.sh
 . "$(dirname "$0")/lib/hook-input.sh"
 
-readonly REPLY_ENDPOINT='pulls/[0-9]+/comments/[0-9]+/replies([^/[:alnum:]]|$)'
-readonly PR_COMMENTS_ENDPOINT='pulls/[0-9]+/comments([^/[:alnum:]]|$)'
+# A number, or a shell variable reference ($PR, ${ID}) the command holds unexpanded.
+readonly ID='([0-9]+|\$\{?[[:alpha:]_][[:alnum:]_]*\}?)'
+readonly REPLY_ENDPOINT="pulls/$ID/comments/$ID/replies([^/[:alnum:]]|\$)"
+readonly PR_COMMENTS_ENDPOINT="pulls/$ID/comments([^/[:alnum:]]|\$)"
 
-# True when the `gh api` segment writes: it names POST, or passes a field or --input and names no
-# other method.
-api_segment_writes() {
+# True when the `gh api` segment writes: it names POST (any case), or passes a field or --input,
+# also attached as `-fbody=x`, and names no other method. The method and field patterns are the
+# ones guard-github-post.sh uses, narrowed to POST.
+is_write_segment() {
   local segment=$1
-  if printf '%s' "$segment" | grep -Eq -- "(-X|--method)[[:space:]=]*[\"']?POST"; then
+  if printf '%s' "$segment" | grep -Eiq -- "(-X|--method)[[:space:]=]*[\"']?POST"; then
     return 0
   fi
-  if printf '%s' "$segment" | grep -Eq -- "(-X|--method)[[:space:]=]*[\"']?[A-Za-z]"; then
+  if printf '%s' "$segment" | grep -Eiq -- "(-X|--method)[[:space:]=]*[\"']?[A-Za-z]"; then
     return 1
   fi
-  printf '%s' "$segment" | grep -Eq -- '[[:space:]](-f|-F|--field|--raw-field|--input)([[:space:]=]|$)'
+  printf '%s' "$segment" | grep -Eq -- '(^|[[:space:]])(-f|-F|--field|--raw-field|--input)([[:space:]=]|[^[:space:]-]|$)'
 }
 
 is_reply_segment() {
@@ -45,7 +48,7 @@ is_reply_segment() {
     return 0
   fi
   printf '%s' "$segment" | grep -Eq "${GH_COMMAND_START}api([[:space:]]|$)" || return 1
-  api_segment_writes "$segment" || return 1
+  is_write_segment "$segment" || return 1
   if printf '%s' "$segment" | grep -Eq "$REPLY_ENDPOINT"; then
     return 0
   fi
