@@ -2,13 +2,15 @@
 # Checks drafted review comments against kc-post-review's format rules, the ones a script can
 # decide, so a draft that breaks them never reaches a payload. build-comment-payloads.sh runs it.
 #
-# Usage: check-draft-format.sh <drafts.json>
+# Usage: check-draft-format.sh <drafts.json> [<head-sha>]
 #   <drafts.json>  the JSON array of {path, line, body, ...} that build-comment-payloads.sh takes;
 #                  a draft may carry "long": "<reason>" when its length is the stated exception,
 #                  and "code": "<reason>" when its code is; an `issue` or `suggestion` draft carries
 #                  "ran": what its asked-for change was run against and the result, or
 #                  "n/a: <why>" when it asks for no behaviour change, or asks for an outcome and a
-#                  test rather than code
+#                  test rather than code; a draft on a file people see rendered carries "seen"
+#   <head-sha>     the commit the comments anchor to; when given and the repo knows it, a "seen"
+#                  capture must be newer than that commit
 #
 # Each body must:
 #   - open with a label from kc-post-review's Labels table on its own line
@@ -22,15 +24,25 @@
 #     writes the fix;
 #   - when it is an `issue` or a `suggestion`, carry a "ran" record: a change asked for in a
 #     review is code the author writes on the reviewer's word, so it is run before it is asked
-#     for, not only read (kc-post-review's "Verified before suggested"). An "n/a" needs a reason.
+#     for, not only read (kc-post-review's "Verified before suggested"). An "n/a" needs a reason;
+#   - when it is an `issue`, carry a "ran" that is not "n/a": an issue says something is broken,
+#     so the break is reproduced (a failing test, a request, a capture) before it is claimed;
+#   - when it is on a file people see rendered (a component, template or stylesheet; not a test,
+#     spec or story) and is not a question, note, thought or praise, carry "seen": the path of a
+#     screenshot or recording of the running app showing it, taken after the head commit. Reading
+#     the code is not seeing the screen (kc-post-review's "Seen before drafted").
 #
 # Prints one line per problem (`draft <n> (<path>:<line>): <problem>`) and exits 1 when there is
 # any, 0 when every draft passes, 2 on a usage error or unreadable input.
 set -euo pipefail
 
 script_name=$(basename "$0")
-[ "$#" -eq 1 ] || { echo "usage: $script_name <drafts.json>" >&2; exit 2; }
+{ [ "$#" -eq 1 ] || [ "$#" -eq 2 ]; } || { echo "usage: $script_name <drafts.json> [<head-sha>]" >&2; exit 2; }
 [ -r "$1" ] || { echo "$script_name: cannot read $1" >&2; exit 2; }
+# The head commit's time, so a capture taken before the code under review existed doesn't count.
+KC_HEAD_TIME=""
+[ "$#" -eq 2 ] && KC_HEAD_TIME=$(git show -s --format=%ct "$2" 2>/dev/null) || true
+export KC_HEAD_TIME
 
 perl -MJSON::PP -CS -e '
   use strict; use warnings;
@@ -81,6 +93,22 @@ perl -MJSON::PP -CS -e '
         push @found, "asks for a change with no \"ran\": run it on a scratch copy and say what it passed, or \"n/a: <why>\"";
       } elsif ($ran =~ m{^\s*n/?a\W*$}i) {
         push @found, "says \"ran\": n/a with no reason; give the why";
+      } elsif ($first =~ /^\*\*issue\b/ && $ran =~ m{^\s*n/?a\b}i) {
+        push @found, "is an issue with \"ran\": n/a; an issue says something is broken, so reproduce it (a failing test, a request, a screenshot) and say in \"ran\" what showed it, or use another label";
+      }
+    }
+    my $path = $draft->{path} // "";
+    my $rendered = $path =~ /\.(tsx|jsx|vue|svelte|astro|html?|erb|haml|slim|hbs|handlebars|mustache|twig|liquid|css|scss|sass|less|styl)$/i
+      && $path !~ m{(^|/)(__tests__|tests?|specs?|e2e|stories)/|\.(test|spec|stories|cy)\.[a-z]+$}i;
+    if ($rendered && $first !~ /^\*\*(question|note|thought|praise)\b/) {
+      my $seen = $draft->{seen} // "";
+      $seen = "" if ref $seen;
+      if ($seen !~ /\S/) {
+        push @found, "is on a screen with no \"seen\": open the running app, capture what the comment says, and give the file path";
+      } elsif ($seen !~ /\.(png|jpe?g|gif|webp|mp4|mov|webm)$/i || !-f $seen) {
+        push @found, "\"seen\" is not a screenshot or recording that exists: $seen";
+      } elsif ($ENV{KC_HEAD_TIME} =~ /^\d+$/ && (stat $seen)[9] < $ENV{KC_HEAD_TIME}) {
+        push @found, "\"seen\" was captured before the head commit, so it shows older code: $seen";
       }
     }
     for my $problem (@found) { print "$where: $problem\n"; $problems++ }

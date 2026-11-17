@@ -20,6 +20,13 @@
 # the guard never blocks what it can't read. Needs jq for the transcript; without jq the shown
 # check is skipped and only the token is enforced.
 #
+# With the token present, inline review comments must also come from build-comment-payloads.sh,
+# which runs the draft checks (format, a reproduced issue, a capture of any screen a comment is
+# about): a review posted with --input whose comments array is not empty needs the builder's
+# `<file>.checked` stamp, holding the file's SHA-256, so a payload written or edited by hand
+# is denied; and a new inline comment through the single-comment endpoint
+# (`pulls/<n>/comments` without an id) is denied, since the builder never makes one.
+#
 # Output: the PreToolUse deny JSON on a blocked write, nothing otherwise.
 # Always exits 0. Hook schema: https://code.claude.com/docs/en/hooks
 #
@@ -217,6 +224,43 @@ $(extract_bodies "$command")
 EOF
 }
 
+# Prints the SHA-256 of a file, with whichever tool the machine has.
+file_sha256() {
+  if command -v shasum >/dev/null 2>&1; then
+    shasum -a 256 "$1" | cut -d' ' -f1
+  else
+    sha256sum "$1" | cut -d' ' -f1
+  fi
+}
+
+# Prints the deny JSON when a token-carrying write posts inline review comments the payload
+# builder did not check; nothing otherwise.
+unchecked_comments_verdict() {
+  local command=$1 segment file reason=""
+  while IFS= read -r segment; do
+    is_review_write_segment "$segment" || continue
+    if printf '%s' "$segment" | grep -Eq 'pulls/[0-9]+/comments([^/0-9]|$)'; then
+      reason="this posts a new inline comment through the single-comment endpoint, which skips build-comment-payloads.sh and its checks (and shows on the PR as a review of its own)."
+      break
+    fi
+    printf '%s' "$segment" | grep -Eq 'pulls/[0-9]+/reviews([^/0-9]|$)' || continue
+    file=$(printf '%s' "$segment" | sed -nE "s/.*--input[[:space:]=]+[\"']?([^[:space:]\"']+).*/\1/p")
+    if [ -z "$file" ] || [ ! -f "$file" ] || ! command -v jq >/dev/null 2>&1; then
+      continue
+    fi
+    [ "$(jq '(.comments // []) | length' "$file" 2>/dev/null)" = 0 ] && continue
+    if [ ! -f "$file.checked" ] || [ "$(cat "$file.checked")" != "$(file_sha256 "$file")" ]; then
+      reason="the review payload $file was not built, or was changed after it was built, by build-comment-payloads.sh, so its drafts never passed the checks (a reproduced issue, a capture of any screen a comment is about)."
+      break
+    fi
+  done <<EOF
+$(split_segments "$command")
+EOF
+  [ -n "$reason" ] || return 0
+  printf 'Blocked by the kc-gates plugin: %s Write the drafts to a drafts file, run build-comment-payloads.sh, fix what it lists, show the drafts and its command to the user, and post only that command after their post signal.' "$reason" \
+    | jq -Rsc '{hookSpecificOutput: {hookEventName: "PreToolUse", permissionDecision: "deny", permissionDecisionReason: .}}'
+}
+
 print_deny() {
   cat <<'EOF'
 {"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Blocked by the kc-gates plugin: this command writes a PR or issue comment or review to GitHub without the approval token. Do not retry and do not add the token yourself. Show the user the full draft, the head SHA it anchors to and the posting shape, then stop and wait for an explicit, fresh post signal in their latest message. Only after that signal, prefix each write command with KC_REVIEW_POST_APPROVED=1 in the same command (see /kc-gates:kc-post-review)."}}
@@ -224,7 +268,7 @@ EOF
 }
 
 main() {
-  local input command transcript
+  local input command transcript verdict
   input="$(cat)"
   command="$(extract_field "$input" command)"
   if [ -z "$command" ]; then
@@ -233,6 +277,11 @@ main() {
   case "$command" in
     *"$APPROVAL_TOKEN"*)
       if contains_review_write "$command"; then
+        verdict=$(unchecked_comments_verdict "$command")
+        if [ -n "$verdict" ]; then
+          printf '%s' "$verdict"
+          exit 0
+        fi
         transcript="$(extract_field "$input" transcript_path)"
         unshown_body_verdict "$command" "$transcript"
       fi

@@ -23,7 +23,8 @@
 #   - a range has start_line before line (the REST docs do not say a range must
 #     stay inside one hunk, so that is not checked);
 #   - `body` is not empty.
-#   - the body passes kc-post-review's format rules (scripts/check-draft-format.sh);
+#   - the body passes kc-post-review's format rules (scripts/check-draft-format.sh), including
+#     a reproduced "ran" on an issue and a "seen" capture on a file people see rendered;
 #   - no name the body suggests is one letter from a name already in the repo
 #     (scripts/check-draft-names.sh, when run from inside the repo).
 # Every failing draft is listed on stderr, and nothing is written.
@@ -201,7 +202,7 @@ problems=$(jq -r --arg coverage "$coverage" '
 ' "$drafts_file")
 
 # kc-post-review's format rules (label line, no em dash, rule ids, emoji or praise opener, length).
-format_problems=$(bash "$(dirname "$0")/check-draft-format.sh" "$drafts_file") || true
+format_problems=$(bash "$(dirname "$0")/check-draft-format.sh" "$drafts_file" "$head_sha") || true
 if [ -n "$format_problems" ]; then
   problems=$(printf '%s\n%s\n' "$problems" "$format_problems" | grep . | sort -t' ' -k2,2n -s)
 fi
@@ -259,6 +260,12 @@ jq -s --arg commit_id "$head_sha" --arg body "$review_body" '
   {commit_id: $commit_id, event: "COMMENT", comments: map(del(.commit_id))}
   + (if ($body | test("\\S")) then {body: $body} else {} end)
 ' "${payload_files[@]}" > "$review_file"
+# The post guard (guard-github-post.sh) posts only a payload carrying this stamp of its content.
+if command -v shasum >/dev/null 2>&1; then
+  shasum -a 256 "$review_file" | cut -d' ' -f1 > "$review_file.checked"
+else
+  sha256sum "$review_file" | cut -d' ' -f1 > "$review_file.checked"
+fi
 body_note=""
 [ "$(jq 'has("body")' "$review_file")" = true ] && body_note=", with a body"
 echo "wrote $review_file (one review, $draft_count comment(s)$body_note)"

@@ -110,6 +110,15 @@ if command -v jq >/dev/null 2>&1; then
     user_line "yes"; } > "$work/placeholder.jsonl"
   printf '{"body":"Renamed the helper.","comments":[{"path":"a.rb","body":"Fixed in 1a2b3c4d5e6f."},{"path":"b.rb","body":"Never shown."}]}' > "$work/review.json"
   printf '{"body":"Renamed the helper.","comments":[{"path":"a.rb","body":"Fixed in 1a2b3c4d5e6f."}]}' > "$work/review-ok.json"
+  stamp() { if command -v shasum >/dev/null 2>&1; then shasum -a 256 "$1"; else sha256sum "$1"; fi | cut -d' ' -f1 > "$1.checked"; }
+  stamp "$work/review.json"
+  stamp "$work/review-ok.json"
+  # Built by the payload builder and then edited by hand, or never built by it.
+  cp "$work/review-ok.json" "$work/review-edited.json"
+  stamp "$work/review-edited.json"
+  printf '{"body":"Renamed the helper.","comments":[{"path":"a.rb","body":"Renamed the helper."}]}' > "$work/review-edited.json"
+  cp "$work/review-ok.json" "$work/review-unbuilt.json"
+  printf '{"body":"Renamed the helper."}' > "$work/review-body-only.json"
 
   # check_with_transcript <expectation> <label> <command> <transcript>
   check_with_transcript() {
@@ -158,6 +167,16 @@ if command -v jq >/dev/null 2>&1; then
     "$token gh api repos/acme/widgets/pulls/12/reviews -X POST --input $work/review.json" "$work/before.jsonl"
   check_with_transcript allow "shown: --input review whose bodies were all shown" \
     "$token gh api repos/acme/widgets/pulls/12/reviews -X POST --input $work/review-ok.json" "$work/before.jsonl"
+  check_with_transcript deny  "unchecked: a review payload the builder never stamped" \
+    "$token gh api repos/acme/widgets/pulls/12/reviews -X POST --input $work/review-unbuilt.json" "$work/before.jsonl"
+  check_with_transcript deny  "unchecked: a review payload edited after the builder stamped it" \
+    "$token gh api repos/acme/widgets/pulls/12/reviews -X POST --input $work/review-edited.json" "$work/before.jsonl"
+  check_with_transcript allow "unchecked: a body-only review needs no stamp" \
+    "$token gh api repos/acme/widgets/pulls/12/reviews -X POST --input $work/review-body-only.json" "$work/before.jsonl"
+  check_with_transcript deny  "unchecked: a new inline comment through the single-comment endpoint" \
+    "$token gh api repos/acme/widgets/pulls/12/comments -X POST -f body='Fixed in 1a2b3c4d5e6f.' -F line=4" "$work/before.jsonl"
+  check_with_transcript allow "unchecked: a reply in a thread is not an inline comment" \
+    "$token gh api repos/acme/widgets/pulls/12/comments/55/replies -X POST -f body='Fixed in 1a2b3c4d5e6f.'" "$work/before.jsonl"
   check_with_transcript deny  "not shown: second write in a chain" \
     "$token gh pr comment 12 -b 'Fixed in 1a2b3c4d5e6f.' && $token gh pr comment 12 -b 'Never shown.'" "$work/before.jsonl"
   check_with_transcript allow "unreadable: body from a file is not checked" \
