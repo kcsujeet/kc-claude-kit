@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Checks kc-delegation's delegation tree: each role keeps its model tier (deciding roles on the
-# strongest, executing roles on a mid model), and the README's graph of the tree agrees.
+# strongest, executing roles on a mid model), sessions keep their effort, and the README's graph
+# of the tree agrees.
 set -euo pipefail
 
 tests_dir=$(cd "$(dirname "$0")" && pwd)
@@ -31,6 +32,14 @@ expect_tier "Unnamed agent" strongest
 expect_tier "Mechanical session" mid
 expect_tier "Hands-on agent" mid
 expect_tier "Review gate agent" mid
+# Sessions keep their effort: high for the orchestrator, medium for child and mechanical sessions.
+effort_of() { awk -F'|' -v role="$1" 'index($2, " " role) == 1 { gsub(/ /, "", $4); print $4; exit }' "$skill"; }
+for role_effort in "Orchestrating (main) session=high" "Child session that decides=medium" "Mechanical session=medium"; do
+  role=${role_effort%=*}
+  effort=$(effort_of "$role")
+  [ "$effort" = "${role_effort#*=}" ] || fail "kc-delegation tree: \"$role\" effort is \"$effort\", not ${role_effort#*=}"
+done
+
 grep -q 'Whatever decides .* runs on the strongest model' "$skill" || fail "kc-delegation: the decide-on-strongest rule is missing"
 
 # The README graph: deciding nodes in the decide class, executing nodes in the execute class.
