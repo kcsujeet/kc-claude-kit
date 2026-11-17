@@ -27,7 +27,7 @@ is_merge_segment() {
 # What the look-back reminders end with, so a merge, an approval, what the person says and what a
 # command's output shows all carry it. No quotes or backslashes: it goes into JSON as it is.
 # shellcheck disable=SC2034 # read by the scripts that source this file
-readonly LOOK_BACK_TRACKING='The look-back stays on the visible task list until feedback-ledger.sh check passes. A look-back run at an earlier hand-off (such as when the pull request went to review) does not cover feedback that arrived after it.'
+readonly LOOK_BACK_TRACKING='The look-back stays on the visible task list until feedback-ledger.sh check passes. A look-back run at an earlier hand-off (such as when the pull request went to review) does not cover feedback that arrived after it. Delete the files this session made only to hand on, without asking.'
 
 # Prints a top-level or tool_input string field of the payload: `command`
 # comes from tool_input, `stdout` from tool_response (a string response counts as its stdout),

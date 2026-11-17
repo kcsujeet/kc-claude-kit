@@ -139,6 +139,13 @@ expect_contains "the output reminder says the look-back stays on the task list u
 expect_contains "the output reminder says an earlier look-back does not cover later feedback" \
   "does not cover feedback that arrived after it" \
   "$(build_payload "gh pr view 12 --json state" '{"state":"MERGED"}' | bash "$hook")"
+expect_contains "the output reminder says to delete the files made only to hand on, without asking" \
+  "Delete the files this session made only to hand on, without asking" \
+  "$(build_payload "gh pr view 12 --json state" '{"state":"MERGED"}' | bash "$hook")"
+expect_contains "the merge reminder carries the cleanup clause too" "Delete the files this session made only to hand on, without asking" \
+  "$(build_payload "gh pr merge 12 --merge" | bash "$hook")"
+expect_contains "the approval reminder carries the cleanup clause too" "Delete the files this session made only to hand on, without asking" \
+  "$(build_payload "gh pr review 12 --approve" | bash "$hook")"
 expect_contains "the merge reminder carries the tracking text too" "stays on the visible task list" \
   "$(build_payload "gh pr merge 12 --merge" | bash "$hook")"
 expect_contains "the approval reminder carries the tracking text too" "does not cover feedback that arrived after it" \

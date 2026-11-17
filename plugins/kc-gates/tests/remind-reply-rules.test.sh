@@ -51,4 +51,15 @@ for mode in jq sed; do
 done
 expect_eq "a payload with no prompt gets no answer-first trigger" "" "$(printf '{}' | bash "$hook" | grep 'answers exactly that question' || true)"
 
+# --- a prompt about status gets one line to read it first -------------------------------------------
+for mode in jq sed; do
+  for status_prompt in "are we done" "What's left?" "what's next" "Where are we on this" "status" "is it merged" "is the PR approved?" "what now" "what is the current status of the ticket"; do
+    expect_contains "[$mode] a status prompt gets the read-first line: $status_prompt" "read the ticket's and PR's current state with a tool before stating it" "$(run_prompt "$mode" "$status_prompt")"
+  done
+  for other_prompt in "Fix the failing test" "next" "why did the build fail?" "the statuses table needs a column" "update the status page copy please" "merge it"; do
+    expect_eq "[$mode] no status line for: $other_prompt" "" "$(run_prompt "$mode" "$other_prompt" | grep 'asks where work stands' || true)"
+  done
+done
+expect_eq "a payload with no prompt gets no status line" "" "$(printf '{}' | bash "$hook" | grep 'asks where work stands' || true)"
+
 finish
