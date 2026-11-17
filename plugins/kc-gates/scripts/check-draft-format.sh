@@ -107,7 +107,7 @@ perl -MJSON::PP -CS -e '
         push @found, "is on a screen with no \"seen\": open the running app, capture what the comment says, and give the file path";
       } elsif ($seen !~ /\.(png|jpe?g|gif|webp|mp4|mov|webm)$/i || !-f $seen) {
         push @found, "\"seen\" is not a screenshot or recording that exists: $seen";
-      } elsif ($ENV{KC_HEAD_TIME} =~ /^\d+$/ && (stat $seen)[9] < $ENV{KC_HEAD_TIME}) {
+      } elsif ($ENV{KC_HEAD_TIME} =~ /^\d+$/ && (stat $seen)[9] < $ENV{KC_HEAD_TIME}) {  # [9]: mtime
         push @found, "\"seen\" was captured before the head commit, so it shows older code: $seen";
       }
     }

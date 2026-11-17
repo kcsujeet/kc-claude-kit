@@ -36,6 +36,8 @@ set -u
 
 # shellcheck source=lib/hook-input.sh
 . "$(dirname "$0")/lib/hook-input.sh"
+# shellcheck source=lib/file-sha256.sh
+. "$(dirname "$0")/lib/file-sha256.sh"
 
 readonly APPROVAL_TOKEN='KC_REVIEW_POST_APPROVED=1'
 
@@ -224,19 +226,10 @@ $(extract_bodies "$command")
 EOF
 }
 
-# Prints the SHA-256 of a file, with whichever tool the machine has.
-file_sha256() {
-  if command -v shasum >/dev/null 2>&1; then
-    shasum -a 256 "$1" | cut -d' ' -f1
-  else
-    sha256sum "$1" | cut -d' ' -f1
-  fi
-}
-
 # Prints the deny JSON when a token-carrying write posts inline review comments the payload
 # builder did not check; nothing otherwise.
 unchecked_comments_verdict() {
-  local command=$1 segment file reason=""
+  local command=$1 segment review_payload_file reason=""
   while IFS= read -r segment; do
     is_review_write_segment "$segment" || continue
     if printf '%s' "$segment" | grep -Eq 'pulls/[0-9]+/comments([^/0-9]|$)'; then
@@ -244,13 +237,17 @@ unchecked_comments_verdict() {
       break
     fi
     printf '%s' "$segment" | grep -Eq 'pulls/[0-9]+/reviews([^/0-9]|$)' || continue
-    file=$(printf '%s' "$segment" | sed -nE "s/.*--input[[:space:]=]+[\"']?([^[:space:]\"']+).*/\1/p")
-    if [ -z "$file" ] || [ ! -f "$file" ] || ! command -v jq >/dev/null 2>&1; then
-      continue
+    if printf '%s' "$segment" | grep -Eq "(^|[[:space:]])(-f|-F|--field|--raw-field)[[:space:]=]*[\"']?comments\\["; then
+      reason="this sends inline review comments as fields, which skips build-comment-payloads.sh and its checks."
+      break
     fi
-    [ "$(jq '(.comments // []) | length' "$file" 2>/dev/null)" = 0 ] && continue
-    if [ ! -f "$file.checked" ] || [ "$(cat "$file.checked")" != "$(file_sha256 "$file")" ]; then
-      reason="the review payload $file was not built, or was changed after it was built, by build-comment-payloads.sh, so its drafts never passed the checks (a reproduced issue, a capture of any screen a comment is about)."
+    review_payload_file=$(printf '%s' "$segment" | sed -nE "s/.*--input[[:space:]=]+[\"']?([^[:space:]\"']+).*/\\1/p")
+    # No --input and no comment fields: a review with only a top-level body.
+    [ -n "$review_payload_file" ] || continue
+    command -v jq >/dev/null 2>&1 || continue
+    [ "$(jq '(.comments // []) | length' "$review_payload_file" 2>/dev/null)" = 0 ] && continue
+    if [ ! -f "$review_payload_file.checked" ] || [ "$(cat "$review_payload_file.checked")" != "$(print_file_sha256 "$review_payload_file")" ]; then
+      reason="the review payload $review_payload_file was not built, or was changed after it was built, by build-comment-payloads.sh, so its drafts never passed the checks (a reproduced issue, a capture of any screen a comment is about)."
       break
     fi
   done <<EOF

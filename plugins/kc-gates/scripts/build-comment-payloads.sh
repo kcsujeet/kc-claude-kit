@@ -261,11 +261,9 @@ jq -s --arg commit_id "$head_sha" --arg body "$review_body" '
   + (if ($body | test("\\S")) then {body: $body} else {} end)
 ' "${payload_files[@]}" > "$review_file"
 # The post guard (guard-github-post.sh) posts only a payload carrying this stamp of its content.
-if command -v shasum >/dev/null 2>&1; then
-  shasum -a 256 "$review_file" | cut -d' ' -f1 > "$review_file.checked"
-else
-  sha256sum "$review_file" | cut -d' ' -f1 > "$review_file.checked"
-fi
+# shellcheck source=lib/file-sha256.sh
+. "$(dirname "$0")/lib/file-sha256.sh"
+print_file_sha256 "$review_file" > "$review_file.checked"
 body_note=""
 [ "$(jq 'has("body")' "$review_file")" = true ] && body_note=", with a body"
 echo "wrote $review_file (one review, $draft_count comment(s)$body_note)"

@@ -40,8 +40,9 @@ expect_eq "valid: a single-line payload has exactly the five fields" "body,commi
 
 expect_eq "valid: the review is a COMMENT with every comment and no body" "COMMENT,5,false,1111111111111111111111111111111111111111" \
   "$(jq -r '[.event, (.comments | length), has("body"), .commit_id] | map(tostring) | join(",")' "$out/review.json")"
+# shellcheck source=../scripts/lib/file-sha256.sh
 expect_eq "valid: the review carries the stamp the post guard checks" \
-  "$(if command -v shasum >/dev/null 2>&1; then shasum -a 256 "$out/review.json"; else sha256sum "$out/review.json"; fi | cut -d' ' -f1)" \
+  "$(. "$(dirname "$builder")/lib/file-sha256.sh"; print_file_sha256 "$out/review.json")" \
   "$(cat "$out/review.json.checked")"
 expect_eq "valid: review comments carry no commit_id of their own" "false" \
   "$(jq -r '[.comments[] | has("commit_id")] | any | tostring' "$out/review.json")"

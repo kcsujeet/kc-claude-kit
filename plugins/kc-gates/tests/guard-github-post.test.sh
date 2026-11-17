@@ -69,7 +69,7 @@ check deny  "blocked: write chained after a read" \
   "gh pr view 12 && gh api repos/acme/widgets/issues/12/comments -X POST -f body='hi'"
 
 check allow "allowed: token in the same command" \
-  "KC_REVIEW_POST_APPROVED=1 gh api repos/acme/widgets/pulls/12/reviews -X POST --input /tmp/review-12.json"
+  "KC_REVIEW_POST_APPROVED=1 gh pr comment 12 --body-file /tmp/note.md"
 check allow "allowed: gh pr create" \
   "gh pr create --title 'Add widgets' --body-file /tmp/body.md"
 check allow "allowed: gh pr merge" \
@@ -110,12 +110,14 @@ if command -v jq >/dev/null 2>&1; then
     user_line "yes"; } > "$work/placeholder.jsonl"
   printf '{"body":"Renamed the helper.","comments":[{"path":"a.rb","body":"Fixed in 1a2b3c4d5e6f."},{"path":"b.rb","body":"Never shown."}]}' > "$work/review.json"
   printf '{"body":"Renamed the helper.","comments":[{"path":"a.rb","body":"Fixed in 1a2b3c4d5e6f."}]}' > "$work/review-ok.json"
-  stamp() { if command -v shasum >/dev/null 2>&1; then shasum -a 256 "$1"; else sha256sum "$1"; fi | cut -d' ' -f1 > "$1.checked"; }
-  stamp "$work/review.json"
-  stamp "$work/review-ok.json"
+  # shellcheck source=../scripts/lib/file-sha256.sh
+  . "$(dirname "$guard")/lib/file-sha256.sh"
+  stamp_review_checked() { print_file_sha256 "$1" > "$1.checked"; }
+  stamp_review_checked "$work/review.json"
+  stamp_review_checked "$work/review-ok.json"
   # Built by the payload builder and then edited by hand, or never built by it.
   cp "$work/review-ok.json" "$work/review-edited.json"
-  stamp "$work/review-edited.json"
+  stamp_review_checked "$work/review-edited.json"
   printf '{"body":"Renamed the helper.","comments":[{"path":"a.rb","body":"Renamed the helper."}]}' > "$work/review-edited.json"
   cp "$work/review-ok.json" "$work/review-unbuilt.json"
   printf '{"body":"Renamed the helper."}' > "$work/review-body-only.json"
@@ -173,6 +175,14 @@ if command -v jq >/dev/null 2>&1; then
     "$token gh api repos/acme/widgets/pulls/12/reviews -X POST --input $work/review-edited.json" "$work/before.jsonl"
   check_with_transcript allow "unchecked: a body-only review needs no stamp" \
     "$token gh api repos/acme/widgets/pulls/12/reviews -X POST --input $work/review-body-only.json" "$work/before.jsonl"
+  check_with_transcript deny  "unchecked: a review payload read from stdin" \
+    "$token gh api repos/acme/widgets/pulls/12/reviews -X POST --input - < $work/review-ok.json" "$work/before.jsonl"
+  check_with_transcript deny  "unchecked: a review payload file that does not exist before the command" \
+    "$token gh api repos/acme/widgets/pulls/12/reviews -X POST --input $work/written-later.json" "$work/before.jsonl"
+  check_with_transcript deny  "unchecked: inline comments sent as fields" \
+    "$token gh api repos/acme/widgets/pulls/12/reviews -X POST -f event=COMMENT -f 'comments[][path]=a.rb' -f 'comments[][body]=Renamed the helper.'" "$work/before.jsonl"
+  check_with_transcript allow "unchecked: a review with only a body field needs no stamp" \
+    "$token gh api repos/acme/widgets/pulls/12/reviews -X POST -f event=COMMENT -f body='Renamed the helper.'" "$work/before.jsonl"
   check_with_transcript deny  "unchecked: a new inline comment through the single-comment endpoint" \
     "$token gh api repos/acme/widgets/pulls/12/comments -X POST -f body='Fixed in 1a2b3c4d5e6f.' -F line=4" "$work/before.jsonl"
   check_with_transcript allow "unchecked: a reply in a thread is not an inline comment" \
