@@ -14,22 +14,25 @@ export HOME="$work_dir"
 
 # Wraps a shell command in the PostToolUse stdin payload: its double quotes escaped, and `\n` in
 # it left as JSON's newline escape.
+# The optional second argument is what the command printed (stdout), escaped the same way.
 build_payload() {
-  local command
+  local command stdout
   command=$(printf '%s' "$1" | sed 's/"/\\"/g')
-  printf '{"session_id":"s","cwd":"%s","hook_event_name":"PostToolUse","tool_name":"Bash","tool_input":{"command":"%s","description":"test"},"tool_response":{"stdout":"","stderr":""},"tool_use_id":"t"}' "$work_dir" "$command"
+  # JSON strings hold no raw newline or tab: both go in as their escapes.
+  stdout=$(printf '%s' "${2:-}" | sed 's/\\/\\\\/g; s/"/\\"/g' | awk '{ gsub(/\t/, "\\t") } NR > 1 { printf "\\n" } { printf "%s", $0 }')
+  printf '{"session_id":"s","cwd":"%s","hook_event_name":"PostToolUse","tool_name":"Bash","tool_input":{"command":"%s","description":"test"},"tool_response":{"stdout":"%s","stderr":""},"tool_use_id":"t"}' "$work_dir" "$command" "$stdout"
 }
 
 expect_hook() {
-  local expectation=$1 label=$2 command=$3 mode output verdict
+  local expectation=$1 label=$2 command=$3 stdout=${4:-} mode output verdict
   for mode in jq sed; do
     if [ "$mode" = jq ] && ! command -v jq >/dev/null 2>&1; then
       continue
     fi
     if [ "$mode" = sed ]; then
-      output=$(build_payload "$command" | KC_GUARD_NO_JQ=1 bash "$hook")
+      output=$(build_payload "$command" "$stdout" | KC_GUARD_NO_JQ=1 bash "$hook")
     else
-      output=$(build_payload "$command" | bash "$hook")
+      output=$(build_payload "$command" "$stdout" | bash "$hook")
     fi
     if [ -z "$output" ]; then
       verdict=quiet
@@ -39,6 +42,10 @@ expect_hook() {
       verdict=remind-merge
     elif printf '%s' "$output" | grep -q '"hookEventName":"PostToolUse","additionalContext":"kc-gates: this set a pull request to merge once its requirements are met'; then
       verdict=remind-queued-merge
+    elif printf '%s' "$output" | grep -q '"hookEventName":"PostToolUse","additionalContext":"kc-gates: this output shows a pull request merged'; then
+      verdict=remind-seen-merged
+    elif printf '%s' "$output" | grep -q '"hookEventName":"PostToolUse","additionalContext":"kc-gates: this output shows a pull request approved'; then
+      verdict=remind-seen-approved
     else
       verdict="unexpected output: $output"
     fi
@@ -111,6 +118,46 @@ expect_hook quiet "APPROVE in a later command than the reviews read" "gh api rep
 expect_hook quiet "an approve payload echoed, not sent" "echo repos/shop/web/pulls/12/reviews event=APPROVE"
 expect_hook quiet "a review's comments, not its events" "gh api repos/shop/web/pulls/12/reviews/7/comments -f event=APPROVE"
 expect_hook quiet "an unrelated command" "git status"
+
+# --- what the output shows -----------------------------------------------------------------------
+# A merge or an approval that happened outside the session shows only in what a read prints.
+expect_hook remind-seen-merged "gh pr view --json state printing MERGED" "gh pr view 12 --json state" '{"state":"MERGED"}'
+expect_hook remind-seen-merged "gh pr view's text output" "gh pr view 12" "title:	Add checkout
+state:	MERGED
+number:	12"
+expect_hook remind-seen-merged "gh pr view with a merged flag" "gh pr view 12 --json merged" '{"merged": true}'
+expect_hook remind-seen-merged "gh pr list showing a merged row" "gh pr list --state all" "12	Add checkout	checkout	MERGED"
+expect_hook remind-seen-merged "gh pr status printing MERGED" "gh pr status" "Current branch
+  #12  Add checkout [checkout] - MERGED"
+expect_hook remind-seen-approved "gh pr view's review decision" "gh pr view 12 --json reviewDecision" '{"reviewDecision":"APPROVED"}'
+expect_hook remind-seen-approved "a review decision with spaces around the colon" "gh pr list --json reviewDecision" '[{"reviewDecision": "APPROVED"}]'
+expect_hook remind-seen-merged "merged wins when the output shows both" "gh pr view 12 --json state,reviewDecision" '{"state":"MERGED","reviewDecision":"APPROVED"}'
+expect_hook remind-seen-merged "a read after another command" "cd /tmp && gh pr view 12 --json state" '{"state":"MERGED"}'
+expect_contains "the output reminder says the look-back stays on the task list until the ledger check passes" \
+  "stays on the visible task list until feedback-ledger.sh check passes" \
+  "$(build_payload "gh pr view 12 --json state" '{"state":"MERGED"}' | bash "$hook")"
+expect_contains "the output reminder says an earlier look-back does not cover later feedback" \
+  "does not cover feedback that arrived after it" \
+  "$(build_payload "gh pr view 12 --json state" '{"state":"MERGED"}' | bash "$hook")"
+expect_contains "the merge reminder carries the tracking text too" "stays on the visible task list" \
+  "$(build_payload "gh pr merge 12 --merge" | bash "$hook")"
+expect_contains "the approval reminder carries the tracking text too" "does not cover feedback that arrived after it" \
+  "$(build_payload "gh pr review 12 --approve" | bash "$hook")"
+
+expect_hook quiet "an open pull request" "gh pr view 12 --json state,reviewDecision" '{"state":"OPEN","reviewDecision":"REVIEW_REQUIRED"}'
+expect_hook quiet "a change-requested pull request" "gh pr view 12 --json reviewDecision" '{"reviewDecision":"CHANGES_REQUESTED"}'
+expect_hook quiet "an unmerged flag" "gh pr view 12 --json merged" '{"merged": false}'
+expect_hook quiet "a word that only contains MERGED" "gh pr view 12" "title: UNMERGED branches cleanup"
+expect_hook quiet "MERGED printed by a command that reads no pull request" "cat notes.txt" '{"state":"MERGED"}'
+expect_hook quiet "a merged state printed by git" "git log --oneline" "abc123 MERGED branch main"
+expect_hook quiet "a pull request's checks" "gh pr checks 12" "build	pass	MERGED"
+expect_hook quiet "a pull request view with no output" "gh pr view 12 --json state" ""
+expect_hook quiet "a read written into a heredoc, not run" "cat > notes.txt <<EOF\ngh pr view 12\nEOF" '{"state":"MERGED"}'
+
+# A response that is a bare string (not an object with stdout) still counts as the output.
+string_response='{"session_id":"s","cwd":"/","hook_event_name":"PostToolUse","tool_name":"Bash","tool_input":{"command":"gh pr view 12 --json state"},"tool_response":"{\"state\":\"MERGED\"}"}'
+expect_contains "[jq] a string tool_response counts as the output" "this output shows a pull request merged" \
+  "$(printf '%s' "$string_response" | bash "$hook")"
 
 stray_error=$(build_payload "gh api repos/shop/web/pulls/12/reviews -X POST --input" | bash "$hook" 2>&1 >/dev/null)
 expect_eq "an --input with no path prints nothing on stderr" "" "$stray_error"

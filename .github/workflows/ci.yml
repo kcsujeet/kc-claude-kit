@@ -61,7 +61,7 @@ jobs:
       # (--budget-rules, --budget-descriptions, --max-description, --budget-hooks, --budget-tool-hooks,
       # --max-skill-body, --max-agent-body).
       - name: Always-on size report
-        run: bash scripts/check-always-on.sh --budget-rules 10000 --budget-descriptions 11000 --max-description 320 --budget-hooks 1000 --budget-tool-hooks 0 --max-skill-body 56000 --max-agent-body 30000
+        run: bash scripts/check-always-on.sh --budget-rules 10400 --budget-descriptions 11000 --max-description 320 --budget-hooks 1000 --budget-tool-hooks 0 --max-skill-body 56000 --max-agent-body 30000
 
   scripts:
     name: Shell scripts and their tests

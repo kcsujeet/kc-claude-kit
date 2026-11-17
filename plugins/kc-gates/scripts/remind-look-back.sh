@@ -20,8 +20,14 @@
 # line), and a command that only writes the words `gh pr merge` merged nothing. The guards keep
 # reading them, since a guard that misses a command lets it through.
 #
-# Output: PostToolUse JSON with the reminder as additionalContext after an approval, nothing
-# otherwise. Always exits 0. Hook schema: https://code.claude.com/docs/en/hooks
+# A command that only reads a pull request's state gets the reminder when its output shows a merge
+# or an approval: `gh pr view`, `gh pr status` or `gh pr list` printing MERGED, `"merged": true`,
+# or a review decision of APPROVED. The merge or approval then happened outside this session (on
+# GitHub, by someone else), and nothing else would mark the hand-off. Every such read reminds
+# again, which costs a line and is harmless.
+#
+# Output: PostToolUse JSON with the reminder as additionalContext after an approval or a merge,
+# nothing otherwise. Always exits 0. Hook schema: https://code.claude.com/docs/en/hooks
 #
 # KC_GUARD_NO_JQ=1 forces the sed fallback (used by the tests).
 
@@ -84,6 +90,34 @@ drop_heredoc_bodies() {
     END { print_held() }'
 }
 
+# True when a segment reads a pull request's state: `gh pr view`, `gh pr status` or `gh pr list`.
+is_state_read_segment() {
+  printf '%s' "$1" | grep -Eq "${GH_COMMAND_START}pr[[:space:]]+(view|status|list)([[:space:]]|$)"
+}
+
+# Reminds when the command read a pull request's state and its output shows a merge or an approval.
+remind_from_output() {
+  local input=$1 command=$2 segment reads_state="" output seen
+  while IFS= read -r segment; do
+    if is_state_read_segment "$segment"; then reads_state=1; fi
+  done <<EOF
+$(split_segments "$(drop_heredoc_bodies "$command")")
+EOF
+  [ -n "$reads_state" ] || return 0
+  # Without jq the tabs of gh's columns arrive still escaped, as a backslash and a t.
+  output="$(extract_field "$input" stdout | sed 's/\\t/ /g')"
+  if printf '%s' "$output" | grep -Eq '(^|[^[:alnum:]_])MERGED([^[:alnum:]_]|$)|"merged"[[:space:]]*:[[:space:]]*true'; then
+    seen=merged
+  elif printf '%s' "$output" | grep -Eq 'reviewDecision[^[:alnum:]]*APPROVED'; then
+    seen=approved
+  else
+    return 0
+  fi
+  cat <<EOF
+{"hookSpecificOutput":{"hookEventName":"PostToolUse","additionalContext":"kc-gates: this output shows a pull request $seen, outside this session, so its task is handed off and the look-back is due (working agreement, Order of work on a task, step 6). Before saying what comes next, list every piece of feedback the session got (feedback-ledger.sh list over its transcript), give each one a verdict, and write the lessons that pass step 6's bar, without being asked. $LOOK_BACK_TRACKING"}}
+EOF
+}
+
 main() {
   local input command cwd segment
   input="$(cat)"
@@ -92,8 +126,8 @@ main() {
   [ -n "$cwd" ] || cwd=$PWD
   while IFS= read -r segment; do
     if is_approval_segment "$segment" "$cwd"; then
-      cat <<'EOF'
-{"hookSpecificOutput":{"hookEventName":"PostToolUse","additionalContext":"kc-gates: this approved a pull request, so the review's look-back is due once it closes (working agreement, Order of work on a task, step 6). Before calling the review done, list your own misses across its rounds (a finding the author fixed only where it named, a suggestion that caused a later finding, a gap a later round found that an earlier one could have) and write the ones that pass step 6's bar as lessons, without being asked."}}
+      cat <<EOF
+{"hookSpecificOutput":{"hookEventName":"PostToolUse","additionalContext":"kc-gates: this approved a pull request, so the review's look-back is due once it closes (working agreement, Order of work on a task, step 6). Before calling the review done, list your own misses across its rounds (a finding the author fixed only where it named, a suggestion that caused a later finding, a gap a later round found that an earlier one could have) and write the ones that pass step 6's bar as lessons, without being asked. $LOOK_BACK_TRACKING"}}
 EOF
       exit 0
     fi
@@ -104,13 +138,14 @@ EOF
         merge_lead="this set a pull request to merge once its requirements are met (--auto); once it has merged, its task is handed off and the look-back is due"
       fi
       cat <<EOF
-{"hookSpecificOutput":{"hookEventName":"PostToolUse","additionalContext":"kc-gates: $merge_lead (working agreement, Order of work on a task, step 6). Before saying what comes next, list every piece of feedback the session got (feedback-ledger.sh list over its transcript), give each one a verdict, and write the lessons that pass step 6's bar, without being asked; what the merged change left open meets that bar too."}}
+{"hookSpecificOutput":{"hookEventName":"PostToolUse","additionalContext":"kc-gates: $merge_lead (working agreement, Order of work on a task, step 6). Before saying what comes next, list every piece of feedback the session got (feedback-ledger.sh list over its transcript), give each one a verdict, and write the lessons that pass step 6's bar, without being asked; what the merged change left open meets that bar too. $LOOK_BACK_TRACKING"}}
 EOF
       exit 0
     fi
   done <<EOF
 $(split_segments "$(drop_heredoc_bodies "$command")")
 EOF
+  remind_from_output "$input" "$command"
   exit 0
 }
 

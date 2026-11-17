@@ -32,4 +32,23 @@ expect_eq "a payload with no session id names no misses and reports no error" ""
   "$(printf '{}' | bash "$hook" 2>&1 | grep -v '^Reply rules for this turn' || true)"
 expect_contains "without a plugin data folder the rules still print" "Reply rules for this turn" "$(jq -cn '{session_id: "s"}' | CLAUDE_PLUGIN_DATA='' bash "$hook")"
 
+# --- a question gets its own answer first ----------------------------------------------------------
+run_prompt() {
+  local mode=$1 prompt=$2 no_jq=0
+  [ "$mode" = sed ] && no_jq=1
+  jq -cn --arg p "$prompt" '{session_id: "q", hook_event_name: "UserPromptSubmit", prompt: $p}' | KC_GUARD_NO_JQ=$no_jq bash "$hook"
+}
+for mode in jq sed; do
+  for question in "When are you thinking of doing the look back?" "why did the build fail" "Is it safe to merge" "does the cache expire on write?" "Do you think this is right" "which branch is this on" "  Can we ship today?  "; do
+    expect_contains "[$mode] a question gets the answer-first trigger: $question" "your first sentence answers exactly that question" "$(run_prompt "$mode" "$question")"
+  done
+  expect_contains "[$mode] the trigger names a time for a when, a cause for a why" 'a "when" gets a time, a "why" the cause' "$(run_prompt "$mode" "when is it done?")"
+  expect_contains "[$mode] the trigger says no work starts before the answer" "no tool work or other action starts before it unless answering needs a lookup" "$(run_prompt "$mode" "what changed?")"
+  for instruction in "Fix the failing test" "do this now" "Update the changelog and push" "whenever you are ready, start" "next"; do
+    expect_eq "[$mode] an instruction gets no answer-first trigger: $instruction" "" "$(run_prompt "$mode" "$instruction" | grep 'answers exactly that question' || true)"
+  done
+  expect_contains "[$mode] a question still gets the reply rules" "Reply rules for this turn" "$(run_prompt "$mode" "why?")"
+done
+expect_eq "a payload with no prompt gets no answer-first trigger" "" "$(printf '{}' | bash "$hook" | grep 'answers exactly that question' || true)"
+
 finish

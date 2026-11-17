@@ -1,5 +1,5 @@
 {
-  "description": "Reminds every session to run kc-ready-for-review before a PR goes to a reviewer, and the kit's maintainer to ship lessons; keeps its marketplace's plugins updated during a session and says when the session runs an older kc-gates than is installed; blocks GitHub review writes (PR and issue comments, reviews) that lack the KC_REVIEW_POST_APPROVED=1 approval token or that post a body the user was not shown before their latest message, a branch's first git push, any gh pr create, and PR hand-offs to review (gh pr ready, adding a reviewer) whose commit has no kc-ready-for-review receipt or whose hand-off checklist has an unmet box; blocks a tracker issue's move to a review status the same way; after a command that approves or merges a pull request, reminds Claude that the look-back is due, and after a merge installs what it brought to this marketplace at once, stating the reload; and starts every turn with the reply rules, naming what the last reply missed: a claim about what instructions require with nothing read that turn, an account CLI's command handed over unchecked, or more than 180 words of prose (noted at Stop, never blocked, so no reply is shown twice)",
+  "description": "Reminds every session to run kc-ready-for-review before a PR goes to a reviewer, and the kit's maintainer to ship lessons; keeps its marketplace's plugins updated during a session and says when the session runs an older kc-gates than is installed; blocks GitHub review writes (PR and issue comments, reviews) that lack the KC_REVIEW_POST_APPROVED=1 approval token or that post a body the user was not shown before their latest message, a branch's first git push, any gh pr create, and PR hand-offs to review (gh pr ready, adding a reviewer) whose commit has no kc-ready-for-review receipt or whose hand-off checklist has an unmet box; blocks a tracker issue's move to a review status the same way; after a command that approves or merges a pull request, when a command's output shows one merged or approved, or when the person says one was, reminds Claude that the look-back is due, and after a merge installs what it brought to this marketplace at once, stating the reload; and starts every turn with the reply rules (a question gets its own answer first), naming what the last reply missed: a claim about what instructions require with nothing read that turn, an account CLI's command handed over unchecked, or more than 180 words of prose (noted at Stop, never blocked, so no reply is shown twice)",
   "hooks": {
     "SessionStart": [
       {
@@ -54,6 +54,12 @@
           {
             "type": "command",
             "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/remind-reply-rules.sh\"",
+            "shell": "bash",
+            "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/remind-look-back-prompt.sh\"",
             "shell": "bash",
             "timeout": 10
           },
