@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Tests scripts/check-cost-settings.sh: each finding's full line (no cap, a cap too high, a cap or
-# percent that is not a number, a strongest-tier subagent default, a file that is not JSON), the
+# percent that is not a number, a mid- or small-tier subagent default, a file that is not JSON), the
 # settings that count as a cap ("200k", "1M", 1M disabled, a low percent), file and environment
 # precedence, a missing file, and the exit when jq is missing.
 set -euo pipefail
@@ -29,9 +29,9 @@ write_settings_file() { printf '%s\n' "$2" > "$work_dir/$1"; echo "$work_dir/$1"
 
 no_cap_line='context: no auto-compact cap, so a 1M-window session re-reads up to 1M cached tokens per call. Set "autoCompactWindow": 200000 in ~/.claude/settings.json.'
 too_high_line() { echo "context: auto-compaction fires at about $1 tokens, above 300000, so each call can re-read that much. Set \"autoCompactWindow\": 200000."; }
-strong_line() { echo "subagents: CLAUDE_CODE_SUBAGENT_MODEL=$1 runs every agent spawned without a model on the strongest tier. Set it to a mid model (sonnet) and name a stronger one per agent where judgment needs it."; }
+weak_line() { echo "subagents: CLAUDE_CODE_SUBAGENT_MODEL=$1 runs every agent spawned without a model, deciding ones included, below the strongest tier. Set it to the strongest (opus) or remove it, and name a mid model per agent for hands-on work."; }
 
-capped_settings=$(write_settings_file capped.json '{"autoCompactWindow":200000,"env":{"CLAUDE_CODE_SUBAGENT_MODEL":"sonnet"}}')
+capped_settings=$(write_settings_file capped.json '{"autoCompactWindow":200000,"env":{"CLAUDE_CODE_SUBAGENT_MODEL":"opus"}}')
 uncapped_settings=$(write_settings_file uncapped.json '{"model":"opus[1m]"}')
 over_limit_settings=$(write_settings_file over-limit.json '{"autoCompactWindow":800000}')
 non_numeric_cap_settings=$(write_settings_file non-numeric.json '{"autoCompactWindow":"large"}')
@@ -43,11 +43,12 @@ disabled_1m_settings=$(write_settings_file disabled-1m.json '{"env":{"CLAUDE_COD
 low_pct_settings=$(write_settings_file low-pct.json '{"env":{"CLAUDE_AUTOCOMPACT_PCT_OVERRIDE":"20"}}')
 high_pct_settings=$(write_settings_file high-pct.json '{"env":{"CLAUDE_AUTOCOMPACT_PCT_OVERRIDE":"95"}}')
 word_pct_settings=$(write_settings_file word-pct.json '{"autoCompactWindow":200000,"env":{"CLAUDE_AUTOCOMPACT_PCT_OVERRIDE":"most"}}')
-strong_subagent_settings=$(write_settings_file strong.json '{"autoCompactWindow":200000,"env":{"CLAUDE_CODE_SUBAGENT_MODEL":"opus"}}')
-fable_subagent_settings=$(write_settings_file fable.json '{"env":{"CLAUDE_CODE_SUBAGENT_MODEL":"fable"}}')
+mid_subagent_settings=$(write_settings_file mid.json '{"autoCompactWindow":200000,"env":{"CLAUDE_CODE_SUBAGENT_MODEL":"sonnet"}}')
+haiku_subagent_settings=$(write_settings_file haiku.json '{"env":{"CLAUDE_CODE_SUBAGENT_MODEL":"haiku"}}')
+capped_no_subagent_settings=$(write_settings_file capped-no-subagent.json '{"autoCompactWindow":200000}')
 broken_settings=$(write_settings_file broken.json '{bad')
 
-expect "capped window and mid subagent model: silent" "" "$(run_with_clean_env bash "$script" "$capped_settings")"
+expect "capped window and strongest subagent model: silent" "" "$(run_with_clean_env bash "$script" "$capped_settings")"
 expect "no cap" "$no_cap_line" "$(run_with_clean_env bash "$script" "$uncapped_settings")"
 expect "cap above the limit" "$(too_high_line 800000)" "$(run_with_clean_env bash "$script" "$over_limit_settings")"
 expect "cap that is not a count" 'context: autoCompactWindow "large" is not a token count. Set "autoCompactWindow": 200000.' \
@@ -64,16 +65,19 @@ expect "high percent of the 1M window is still too high" "$(too_high_line 950000
 expect "percent that is not a number" \
   'context: CLAUDE_AUTOCOMPACT_PCT_OVERRIDE "most" is not a percentage. Set "autoCompactWindow": 200000 instead.' \
   "$(run_with_clean_env bash "$script" "$word_pct_settings")"
-expect "strongest-tier subagent default" "$(strong_line opus)" "$(run_with_clean_env bash "$script" "$strong_subagent_settings")"
+expect "mid-tier subagent default" "$(weak_line sonnet)" "$(run_with_clean_env bash "$script" "$mid_subagent_settings")"
+expect "no subagent default: silent" "" "$(run_with_clean_env bash "$script" "$capped_no_subagent_settings")"
 
 expect "later file wins over an earlier one" "" "$(run_with_clean_env bash "$script" "$uncapped_settings" "$capped_settings")"
 expect "earlier capped file, later over-limit one" "$(too_high_line 800000)" \
   "$(run_with_clean_env bash "$script" "$capped_settings" "$over_limit_settings")"
 expect "environment wins over files" "" "$(run_with_clean_env CLAUDE_CODE_AUTO_COMPACT_WINDOW=200000 bash "$script" "$uncapped_settings")"
-expect "environment strong subagent model" "$(strong_line claude-opus-5-5)" \
-  "$(run_with_clean_env CLAUDE_CODE_SUBAGENT_MODEL=claude-opus-5-5 bash "$script" "$capped_settings")"
+expect "environment mid subagent model wins over a file's strongest" "$(weak_line claude-sonnet-5-5)" \
+  "$(run_with_clean_env CLAUDE_CODE_SUBAGENT_MODEL=claude-sonnet-5-5 bash "$script" "$capped_settings")"
+expect "environment strongest subagent model wins over a file's mid: silent" "" \
+  "$(run_with_clean_env CLAUDE_CODE_SUBAGENT_MODEL=claude-opus-5-5 bash "$script" "$mid_subagent_settings")"
 expect "both problems: two lines" "$no_cap_line
-$(strong_line fable)" "$(run_with_clean_env bash "$script" "$uncapped_settings" "$fable_subagent_settings")"
+$(weak_line haiku)" "$(run_with_clean_env bash "$script" "$uncapped_settings" "$haiku_subagent_settings")"
 
 expect "file that is not JSON is named and skipped" "settings: $broken_settings is not valid JSON, so its settings were not read. Fix the file." \
   "$(run_with_clean_env bash "$script" "$capped_settings" "$broken_settings")"
