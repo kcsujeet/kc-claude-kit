@@ -8,7 +8,7 @@
 #   environment wins over every file.
 #
 # Findings:
-#  - context: the point where auto-compaction fires is above 300000 tokens, so every call can
+#  - context: the point where auto-compaction fires is above 500000 tokens, so every call can
 #    re-read that much cached context. The point is the auto-compact window (`autoCompactWindow`
 #    or CLAUDE_CODE_AUTO_COMPACT_WINDOW; 200000 with CLAUDE_CODE_DISABLE_1M_CONTEXT=1; else the
 #    1M window), scaled by CLAUDE_AUTOCOMPACT_PCT_OVERRIDE when set. A window or percent that is
@@ -20,7 +20,7 @@ set -euo pipefail
 
 command -v jq >/dev/null 2>&1 || { echo "check-cost-settings: jq is required; install it (for example: brew install jq)" >&2; exit 2; }
 
-max_compact_tokens=300000
+max_compact_tokens=500000
 full_window_tokens=1000000
 capped_1m_window_tokens=200000
 weak_models='sonnet|haiku'
@@ -71,7 +71,7 @@ to_tokens() {
 
 compact_window_tokens=$(to_tokens "$compact_window")
 if [ -n "$compact_window" ] && [ -z "$compact_window_tokens" ]; then
-  echo "context: autoCompactWindow \"$compact_window\" is not a token count. Set \"autoCompactWindow\": 200000."
+  echo "context: autoCompactWindow \"$compact_window\" is not a token count. Set \"autoCompactWindow\": 500000."
 else
   window_tokens=${compact_window_tokens:-$full_window_tokens}
   is_1m_disabled_without_window=$([ -z "$compact_window" ] && [ "$disable_1m" = "1" ] && echo yes || true)
@@ -83,14 +83,14 @@ else
     if is_count "$compact_pct_override"; then
       compact_at_tokens=$((window_tokens * compact_pct_override / 100))
     else
-      echo "context: CLAUDE_AUTOCOMPACT_PCT_OVERRIDE \"$compact_pct_override\" is not a percentage. Set \"autoCompactWindow\": 200000 instead."
+      echo "context: CLAUDE_AUTOCOMPACT_PCT_OVERRIDE \"$compact_pct_override\" is not a percentage. Set \"autoCompactWindow\": 500000 instead."
     fi
   fi
   if [ "$compact_at_tokens" -gt "$max_compact_tokens" ]; then
     if has_cap_setting; then
-      echo "context: auto-compaction fires at about $compact_at_tokens tokens, above $max_compact_tokens, so each call can re-read that much. Set \"autoCompactWindow\": 200000."
+      echo "context: auto-compaction fires at about $compact_at_tokens tokens, above $max_compact_tokens, so each call can re-read that much. Set \"autoCompactWindow\": 500000."
     else
-      echo "context: no auto-compact cap, so a 1M-window session re-reads up to 1M cached tokens per call. Set \"autoCompactWindow\": 200000 in ~/.claude/settings.json."
+      echo "context: no auto-compact cap, so a 1M-window session re-reads up to 1M cached tokens per call. Set \"autoCompactWindow\": 500000 in ~/.claude/settings.json."
     fi
   fi
 fi

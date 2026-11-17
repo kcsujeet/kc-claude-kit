@@ -27,8 +27,8 @@ expect() {
 run_with_clean_env() { env -u CLAUDE_CODE_AUTO_COMPACT_WINDOW -u CLAUDE_CODE_DISABLE_1M_CONTEXT -u CLAUDE_AUTOCOMPACT_PCT_OVERRIDE -u CLAUDE_CODE_SUBAGENT_MODEL "$@"; }
 write_settings_file() { printf '%s\n' "$2" > "$work_dir/$1"; echo "$work_dir/$1"; }
 
-no_cap_line='context: no auto-compact cap, so a 1M-window session re-reads up to 1M cached tokens per call. Set "autoCompactWindow": 200000 in ~/.claude/settings.json.'
-too_high_line() { echo "context: auto-compaction fires at about $1 tokens, above 300000, so each call can re-read that much. Set \"autoCompactWindow\": 200000."; }
+no_cap_line='context: no auto-compact cap, so a 1M-window session re-reads up to 1M cached tokens per call. Set "autoCompactWindow": 500000 in ~/.claude/settings.json.'
+too_high_line() { echo "context: auto-compaction fires at about $1 tokens, above 500000, so each call can re-read that much. Set \"autoCompactWindow\": 500000."; }
 weak_line() { echo "subagents: CLAUDE_CODE_SUBAGENT_MODEL=$1 runs every agent spawned without a model, deciding ones included, below the strongest tier. Set it to the strongest (opus) or remove it, and name a mid model per agent for hands-on work."; }
 
 capped_settings=$(write_settings_file capped.json '{"autoCompactWindow":200000,"env":{"CLAUDE_CODE_SUBAGENT_MODEL":"opus"}}')
@@ -46,15 +46,19 @@ word_pct_settings=$(write_settings_file word-pct.json '{"autoCompactWindow":2000
 mid_subagent_settings=$(write_settings_file mid.json '{"autoCompactWindow":200000,"env":{"CLAUDE_CODE_SUBAGENT_MODEL":"sonnet"}}')
 haiku_subagent_settings=$(write_settings_file haiku.json '{"env":{"CLAUDE_CODE_SUBAGENT_MODEL":"haiku"}}')
 capped_no_subagent_settings=$(write_settings_file capped-no-subagent.json '{"autoCompactWindow":200000}')
+exact_limit_settings=$(write_settings_file exact-limit.json '{"autoCompactWindow":500000}')
+just_over_settings=$(write_settings_file just-over.json '{"autoCompactWindow":600000}')
 broken_settings=$(write_settings_file broken.json '{bad')
 
 expect "capped window and strongest subagent model: silent" "" "$(run_with_clean_env bash "$script" "$capped_settings")"
 expect "no cap" "$no_cap_line" "$(run_with_clean_env bash "$script" "$uncapped_settings")"
 expect "cap above the limit" "$(too_high_line 800000)" "$(run_with_clean_env bash "$script" "$over_limit_settings")"
-expect "cap that is not a count" 'context: autoCompactWindow "large" is not a token count. Set "autoCompactWindow": 200000.' \
+expect "cap of exactly 500000: silent" "" "$(run_with_clean_env bash "$script" "$exact_limit_settings")"
+expect "cap of 600000 is above the limit" "$(too_high_line 600000)" "$(run_with_clean_env bash "$script" "$just_over_settings")"
+expect "cap that is not a count" 'context: autoCompactWindow "large" is not a token count. Set "autoCompactWindow": 500000.' \
   "$(run_with_clean_env bash "$script" "$non_numeric_cap_settings")"
 expect "decimal with a suffix is not a count, and the script still exits 0" \
-  'context: autoCompactWindow "1.5M" is not a token count. Set "autoCompactWindow": 200000.' \
+  'context: autoCompactWindow "1.5M" is not a token count. Set "autoCompactWindow": 500000.' \
   "$(run_with_clean_env bash "$script" "$decimal_cap_settings")"
 expect "\"200k\" is read as 200000: silent" "" "$(run_with_clean_env bash "$script" "$k_suffix_cap_settings")"
 expect "\"1M\" is read as 1000000" "$(too_high_line 1000000)" "$(run_with_clean_env bash "$script" "$m_suffix_cap_settings")"
@@ -63,7 +67,7 @@ expect "1M disabled caps at 200000: silent" "" "$(run_with_clean_env bash "$scri
 expect "low percent of the 1M window: silent" "" "$(run_with_clean_env bash "$script" "$low_pct_settings")"
 expect "high percent of the 1M window is still too high" "$(too_high_line 950000)" "$(run_with_clean_env bash "$script" "$high_pct_settings")"
 expect "percent that is not a number" \
-  'context: CLAUDE_AUTOCOMPACT_PCT_OVERRIDE "most" is not a percentage. Set "autoCompactWindow": 200000 instead.' \
+  'context: CLAUDE_AUTOCOMPACT_PCT_OVERRIDE "most" is not a percentage. Set "autoCompactWindow": 500000 instead.' \
   "$(run_with_clean_env bash "$script" "$word_pct_settings")"
 expect "mid-tier subagent default" "$(weak_line sonnet)" "$(run_with_clean_env bash "$script" "$mid_subagent_settings")"
 expect "no subagent default: silent" "" "$(run_with_clean_env bash "$script" "$capped_no_subagent_settings")"
