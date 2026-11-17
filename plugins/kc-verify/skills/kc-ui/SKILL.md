@@ -103,7 +103,7 @@ Scan each capture for these, by name, rather than glancing at it:
 - an image with no dimensions causing layout shift
 - contrast that fails in one theme but not the other
 - a background or border that stops before the content does (scroll to the very end of the page)
-- a new or changed field sized unlike its neighbours: a short picker as wide as the input beside it, a width set as a share of the row instead of by its content
+- a new or changed field sized unlike its neighbours: a short picker as wide as the input beside it, a width set as a share of the row instead of by its content, or an unchanged field the change moved into a new container (inside a radio option, a label, a flex row) that now shrinks to its content
 
 ### Step 6 — report
 
@@ -145,7 +145,7 @@ Do not report a UI change verified until every box is ticked:
 - [ ] If a design exists, the state matrix is written from it, covering every switch in both positions, every layout-changing option, every role, empty/one/many, and every drawer and dialog.
 - [ ] Every drawer and dialog was opened and filled in: empty, one item picked, several picked, and editing an existing item.
 - [ ] The app, running the change's own code (every branch it needs), was put in every state of the matrix and compared to the design section by section and, within each, element by element (presence, order, colour, variant, weight, copy, state), not only the state you happened to land in or which sections and columns show; the code and the author's screenshots count for no state; and where a screen shows items matching a reference (a template, a guide, a total, a sheet), each item was measured against it in numbers, with the measurement kept as a test that fails when an item moves off it.
-- [ ] Every new or changed component was measured against its siblings on the same screen (title, subtitle, field labels, spacing, and each field's width against what it holds).
+- [ ] Every new or changed component, and every one the change moved into a new container, was measured against its siblings on the same screen (title, subtitle, field labels, spacing, and each field's width against what it holds).
 - [ ] Every behaviour the change touches was set off every way a person can (click, hand scroll, keyboard, deep link, reload), while loading and once settled, on every page that shares the component.
 - [ ] Each finding is about structure or behaviour; cosmetic differences where the app has an existing pattern (titles, labels, casing, icons) follow the app.
 - [ ] Loading, empty and error states were each seen.

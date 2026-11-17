@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Changed (a field a change moves is measured like a new one)
+
+- `kc-verify` 2.2.9: `kc-ui` Step 5 and its sibling-measure box now include a field whose own code is unchanged but which the change moved into a new container (inside a radio option, a label, a flex row), since it can shrink to its content there while every alignment check passes. Other cases: an input moved into a card header, a select moved into a toolbar, a button moved into a table cell. Wording only, no gate grades it.
+
 ### Changed (a value is read under the rules it was written by; code goes where its subject lives; fixes prove what they remove)
 
 - `kc-conventions` 2.5.8: the auto-compact cap is no longer recommended or checked. `kc-delegation` drops it, and `check-cost-settings.sh` keeps only the subagent-model and invalid-JSON findings: the window can't exceed the model's own, so on a 200k model the cap did nothing. Held by `plugins/kc-conventions/tests/check-cost-settings.test.sh`.
