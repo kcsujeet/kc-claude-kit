@@ -2,16 +2,19 @@
 # SessionStart hook: what every session should know from kc-gates, printed as context.
 #
 # 1. Everyone: run kc-ready-for-review on the committed branch before its first push and PR.
-# 2. The kit's maintainer only: turn feedback worth keeping into kit lessons, shipped as merged
+# 2. Everyone: lessons are checks first, prose last.
+# 3. The kit's maintainer only: turn feedback worth keeping into kit lessons, shipped as merged
 #    PRs. The maintainer is the GitHub user signed in to gh when that user owns the repo this copy
 #    came from (the plugin directory's own clone, or its marketplace's source). Anyone else
 #    installed the kit to use it, not to change it.
 #
-# Without jq or gh, only the first line prints. Always exits 0.
+# Without jq or gh, only the first two lines print. Always exits 0.
 
 set -u
 
-echo 'Before a branch'"'"'s first push and its PR, run /kc-gates:kc-ready-for-review once on the committed branch, without asking: one gate round, then you fix; nothing runs per commit. It also gates marking ready, requesting a reviewer and moving a ticket to review.'
+echo 'Before a branch'"'"'s first push and its PR, run /kc-gates:kc-ready-for-review once on the committed branch, without asking: one gate round, then you fix; nothing runs per commit. It also gates marking ready, a reviewer request and a move to review.'
+
+echo "Lessons are checks first: a lint rule, test, script or hook; prose only when no check can hold it (feedback-ledger.sh check enforces it)."
 
 plugin_root=${CLAUDE_PLUGIN_ROOT:-$(cd "$(dirname "$0")/.." && pwd)}
 config=${CLAUDE_CONFIG_DIR:-$HOME/.claude}

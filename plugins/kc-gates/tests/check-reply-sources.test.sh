@@ -154,6 +154,21 @@ expect_reason "it asks for every source checked" "check every source that could 
 expect_eq "\"not sure whether\" is noted" noted "$(run_hook "I'm not sure whether it reloaded.")"
 expect_eq "a reply that settles it is out" out "$(run_hook "It reloaded: the app log shows it at 12:13:34.")"
 
+# A question gets its answer and no edits that turn.
+{ write_typed_message "why does the total round down?"; write_tool_call Edit file_path "/repo/src/total.ts"; write_tool_result; } > "$transcript"
+expect_eq "an edit after a question is noted" noted "$(run_hook "It rounds per line.")"
+expect_reason "it says to answer and stop" "You edited files after a question; answer and stop"
+{ write_typed_message "why does the total round down?"; write_tool_call Write file_path "/repo/notes.md"; write_tool_result; } > "$transcript"
+expect_eq "a write after a question is noted" noted "$(run_hook "It rounds per line.")"
+{ write_typed_message "why does the total round down?"; write_tool_call Read file_path "/repo/src/total.ts"; write_tool_result; } > "$transcript"
+expect_eq "a read after a question goes out" out "$(run_hook "It rounds per line.")"
+{ write_typed_message "can you fix the total rounding?"; write_tool_call Edit file_path "/repo/src/total.ts"; write_tool_result; } > "$transcript"
+expect_eq "an edit after a question that asks for a fix goes out" out "$(run_hook "Fixed.")"
+{ write_typed_message "fix the rounding"; write_tool_call Edit file_path "/repo/src/total.ts"; write_tool_result; } > "$transcript"
+expect_eq "an edit after an instruction goes out" out "$(run_hook "Fixed.")"
+{ write_typed_message "why does it round down?"; write_tool_call Edit file_path "/repo/a.ts"; write_tool_result; write_typed_message "ok, fix it"; write_tool_call Edit file_path "/repo/a.ts"; write_tool_result; } > "$transcript"
+expect_eq "an earlier question does not make a later fix a miss" out "$(run_hook "Fixed.")"
+
 # It never blocks on what it can't read.
 rm -f "$misses_file"
 jq -cn --arg reply "$heroku_reply" '{session_id: "s", transcript_path: "/nonexistent", last_assistant_message: $reply}' | bash "$hook" > "$hook_output"

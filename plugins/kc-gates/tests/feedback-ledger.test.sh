@@ -52,7 +52,7 @@ expect_eq "items are numbered F1 onwards" "F1 F11" "$(cut -f1 "$list" | sed -n '
 
 # check: a lesson diff that adds §B13 and WF14, and rule files that hold §R11 and **QA1.**
 diff_file=$work_dir/lesson.diff
-printf -- '--- a/rules.md\n+++ b/rules.md\n+- [ ] §B13 A new kind of actor\n+- **WF14.** The look-back lists\n- removed §B9 line\n' > "$diff_file"
+printf -- '--- a/rules.md\n+++ b/rules.md\n+- [ ] §B13 A new kind of actor\n+- **WF14.** The look-back lists\n- removed §B9 line\n--- a/plugin/tests/rules.test.sh\n+++ b/plugin/tests/rules.test.sh\n+echo held\n' > "$diff_file"
 rules_dir=$work_dir/repo
 mkdir -p "$rules_dir/rules"
 printf -- '- [ ] §R11 Reads and writes\n- **QA1.** Sheets\n- [ ] §R16 other, see §R17\n' > "$rules_dir/rules/topic.md"
@@ -259,5 +259,30 @@ expect_contains "list without jq says so" "needs jq" "$(PATH=$no_jq_bin "$BASH" 
 
 expect_eq "a missing transcript is a usage error" 2 "$(bash "$script" list "$work_dir/none.jsonl" >/dev/null 2>&1; echo $?)"
 expect_eq "an unknown command is a usage error" 2 "$(bash "$script" tally >/dev/null 2>&1; echo $?)"
+
+# Lessons are checks first: a prose-only lesson diff needs a prose-only field on the line.
+prose_diff=$work_dir/prose.diff
+printf -- '--- a/rules.md\n+++ b/rules.md\n+- [ ] §B13 A new kind of actor\n+- **WF14.** The look-back lists\n' > "$prose_diff"
+run_prose_check() { output=$(bash "$script" check "$list" "$ledger" --diff "$prose_diff" --rules "$rules_dir" 2>&1) && actual=passed || actual=failed; }
+complete_ledger > "$ledger"
+run_prose_check
+expect_eq "a lesson whose diff adds only rule text and has no prose-only field fails" failed "$actual"
+expect_contains "it says the lesson is prose with no check" "F2: lesson is prose with no check" "$output"
+complete_ledger | sed -E 's/^(F2\tlesson\t§B13)$/\1\tprose-only: no script can tell whether a name is honest/; s/^(F3\tlesson\tB13,WF14)$/\1\tprose-only: judgment/; s/^(F9\tlesson\tWF14)$/\1\tprose-only: judgment/; s/^(F4\tcovered\t§R11\t[^\t]*\tlesson:§B13)$/\1\tprose-only: judgment/' > "$ledger"
+run_prose_check
+expect_eq "prose-only fields with a reason pass a prose diff" passed "$actual"
+complete_ledger | sed -E 's/^(F2\tlesson\t§B13)$/\1\tprose-only:   /' > "$ledger"
+run_prose_check
+expect_eq "a prose-only field with no reason fails" failed "$actual"
+complete_ledger | sed -E 's/^(F2\tlesson\t§B13)$/\1\tprose-only: judgment/; s/^(F3\tlesson\tB13,WF14)$/\1\tprose-only: judgment/; s/^(F9\tlesson\tWF14)$/\1\tprose-only: judgment/' > "$ledger"
+run_prose_check
+expect_eq "a covered line's lesson: catch also needs a check or a prose-only field" failed "$actual"
+expect_contains "it names the covered item" "F4: lesson is prose with no check" "$output"
+for held_path in plugin/scripts/check.sh plugin/hooks/hooks.json plugin/evals/case/setup.sh src/total.test.ts biome.json; do
+  printf -- '--- a/rules.md\n+++ b/rules.md\n+- [ ] §B13 A new kind of actor\n+- **WF14.** The look-back lists\n--- a/%s\n+++ b/%s\n+x\n' "$held_path" "$held_path" > "$prose_diff"
+  complete_ledger > "$ledger"
+  run_prose_check
+  expect_eq "a diff that changes $held_path holds the lessons" passed "$actual"
+done
 
 finish
