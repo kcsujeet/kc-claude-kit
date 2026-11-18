@@ -9,17 +9,19 @@ KC_RISK_GENERATED_PATHS='((^|/)(package-lock\.json|pnpm-lock\.yaml|yarn\.lock|Ge
 KC_RISK_UNCOUNTED_PATHS="($KC_RISK_TEST_PATHS|$KC_RISK_LOCALE_PATHS|$KC_RISK_GENERATED_PATHS)"
 
 # kc_added_code <diff-file>: the added lines of files that are not tests, without the `+`.
+# The path patterns go through ENVIRON, not -v: -v expands backslash escapes, so GNU awk warns on
+# \. (onto stderr, which select-gates.sh's callers read) and reads it as any character.
 kc_added_code() {
-  awk -v tests="$KC_RISK_TEST_PATHS" '
-    /^\+\+\+ / { path = substr($0, 5); sub(/^b\//, "", path); code = (path !~ tests && path != "/dev/null"); next }
+  KC_TESTS=$KC_RISK_TEST_PATHS awk '
+    /^\+\+\+ / { path = substr($0, 5); sub(/^b\//, "", path); code = (path !~ ENVIRON["KC_TESTS"] && path != "/dev/null"); next }
     /^\+/ { if (code) print substr($0, 2) }' "$1"
 }
 
 # kc_added_source_code <diff-file>: kc_added_code limited to source files (the languages the
 # conventions cover), so prose, config and data files never read as code.
 kc_added_source_code() {
-  awk -v tests="$KC_RISK_TEST_PATHS" -v source='\\.(sh|bash|js|jsx|ts|tsx|mjs|cjs|rb|erb|py|swift|go|java|kt|php|cs|rs|vue|svelte|html)$' '
-    /^\+\+\+ / { path = substr($0, 5); sub(/^b\//, "", path); code = (path !~ tests && path ~ source); next }
+  KC_TESTS=$KC_RISK_TEST_PATHS KC_SOURCE='\.(sh|bash|js|jsx|ts|tsx|mjs|cjs|rb|erb|py|swift|go|java|kt|php|cs|rs|vue|svelte|html)$' awk '
+    /^\+\+\+ / { path = substr($0, 5); sub(/^b\//, "", path); code = (path !~ ENVIRON["KC_TESTS"] && path ~ ENVIRON["KC_SOURCE"]); next }
     /^\+/ { if (code) print substr($0, 2) }' "$1"
 }
 
