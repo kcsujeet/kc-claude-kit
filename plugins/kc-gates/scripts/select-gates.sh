@@ -15,9 +15,9 @@
 # clarity, structure, simplicity, testing and correctness always run; the
 # verification gate is phase 2 and always runs, so it is not listed.
 #
-# Then `WALK=required` or `WALK=not-required` and a `walk: <why>` line. Required when the diff
-# puts code on a path a signed-out visitor reaches (the same test pass-size.sh makes, from
-# lib/risk-paths.sh): the review then walks the change in the running app as every audience that
+# Then `WALK=required` or `WALK=not-required` and a `walk: <why>` line. Required when a changed
+# file path is one a signed-out visitor reaches (the same path test pass-size.sh makes, from
+# lib/risk-paths.sh: built-in patterns plus the repo's .claude/public-paths.txt): the review then walks the change in the running app as every audience that
 # can reach it, signed out included, before its verdict.
 #
 # Exits 0 on success, 2 on a usage error or a missing input file.
@@ -183,7 +183,7 @@ gates_csv=$(IFS=,; printf '%s' "${selected_gates[*]}")
 printf 'GATES=%s\n' "$gates_csv"
 printf '%s\n' "${gate_lines[@]}"
 
-walk_hit=$(kc_public_path_hit "$changed_files" "$diff_file")
+walk_hit=$(kc_public_path_hit "$changed_files" "$repo_root")
 if [ -n "$walk_hit" ]; then
   echo "WALK=required"
   echo "walk: public or guest path, walk it as every audience that can reach it, signed out included ($walk_hit)"

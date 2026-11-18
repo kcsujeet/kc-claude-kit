@@ -260,25 +260,20 @@ expect_contains "list without jq says so" "needs jq" "$(PATH=$no_jq_bin "$BASH" 
 expect_eq "a missing transcript is a usage error" 2 "$(bash "$script" list "$work_dir/none.jsonl" >/dev/null 2>&1; echo $?)"
 expect_eq "an unknown command is a usage error" 2 "$(bash "$script" tally >/dev/null 2>&1; echo $?)"
 
-# Lessons are checks first: a prose-only lesson diff needs a prose-only field on the line.
+# Lessons are checks first, with no prose-only escape: a diff with no check file fails, whatever the line says.
 prose_diff=$work_dir/prose.diff
 printf -- '--- a/rules.md\n+++ b/rules.md\n+- [ ] §B13 A new kind of actor\n+- **WF14.** The look-back lists\n' > "$prose_diff"
 run_prose_check() { output=$(bash "$script" check "$list" "$ledger" --diff "$prose_diff" --rules "$rules_dir" 2>&1) && actual=passed || actual=failed; }
 complete_ledger > "$ledger"
 run_prose_check
-expect_eq "a lesson whose diff adds only rule text and has no prose-only field fails" failed "$actual"
+expect_eq "a lesson whose diff adds only rule text fails" failed "$actual"
 expect_contains "it says the lesson is prose with no check" "F2: lesson is prose with no check" "$output"
 complete_ledger | sed -E 's/^(F2\tlesson\t§B13)$/\1\tprose-only: no script can tell whether a name is honest/; s/^(F3\tlesson\tB13,WF14)$/\1\tprose-only: judgment/; s/^(F9\tlesson\tWF14)$/\1\tprose-only: judgment/; s/^(F4\tcovered\t§R11\t[^\t]*\tlesson:§B13)$/\1\tprose-only: judgment/' > "$ledger"
 run_prose_check
-expect_eq "prose-only fields with a reason pass a prose diff" passed "$actual"
-complete_ledger | sed -E 's/^(F2\tlesson\t§B13)$/\1\tprose-only:   /' > "$ledger"
-run_prose_check
-expect_eq "a prose-only field with no reason fails" failed "$actual"
-complete_ledger | sed -E 's/^(F2\tlesson\t§B13)$/\1\tprose-only: judgment/; s/^(F3\tlesson\tB13,WF14)$/\1\tprose-only: judgment/; s/^(F9\tlesson\tWF14)$/\1\tprose-only: judgment/' > "$ledger"
-run_prose_check
-expect_eq "a covered line's lesson: catch also needs a check or a prose-only field" failed "$actual"
-expect_contains "it names the covered item" "F4: lesson is prose with no check" "$output"
-for held_path in plugin/scripts/check.sh plugin/hooks/hooks.json plugin/evals/case/setup.sh src/total.test.ts biome.json; do
+expect_eq "a prose-only field with a reason no longer passes a prose diff" failed "$actual"
+expect_contains "it still says the lesson is prose with no check" "F2: lesson is prose with no check" "$output"
+expect_contains "a covered line's lesson: catch needs a check too" "F4: lesson is prose with no check" "$output"
+for held_path in plugin/scripts/check.sh plugin/hooks/hooks.json plugin/evals/case/setup.sh src/total.test.ts biome.json .github/workflows/ci.yml; do
   printf -- '--- a/rules.md\n+++ b/rules.md\n+- [ ] §B13 A new kind of actor\n+- **WF14.** The look-back lists\n--- a/%s\n+++ b/%s\n+x\n' "$held_path" "$held_path" > "$prose_diff"
   complete_ledger > "$ledger"
   run_prose_check

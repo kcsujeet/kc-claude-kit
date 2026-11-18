@@ -177,6 +177,7 @@ The kit knows general rules, not your project. Three optional files in your repo
 | `.claude/review-conventions.md` | Your project's own review rules. They win over the built-in ones. |
 | `.claude/hand-off-checklist.md` | What to check before a PR goes to review: the description, the ticket, linked PRs. |
 | `.claude/sensitive-paths.txt` | Paths to treat as risky, beyond the built-in list (payments, permissions, migrations). |
+| `.claude/public-paths.txt` | Paths a signed-out visitor reaches (one extended regex per line), beyond the built-in list; a change to one makes the review walk the page signed out. |
 
 ## More detail
 

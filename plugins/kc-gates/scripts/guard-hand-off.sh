@@ -56,13 +56,6 @@ readonly WRITE_METHOD='(-X|--method)[[:space:]=]*(POST|PATCH|PUT|DELETE)'
 readonly FIELD_FLAG='(^|[[:space:]])(-f|-F|--field|--raw-field|--input)([[:space:]=]|[^[:space:]-]|$)'
 readonly REVIEWERS_ENDPOINT='repos/([^/[:space:]]+/[^/[:space:]]+)/pulls/([0-9]+)/requested_reviewers'
 
-# The words after `gh` in a segment, quotes dropped; empty when it runs no gh.
-gh_words() {
-  printf '%s' "$1" \
-    | tr -d "\"'" \
-    | sed -nE 's/^(.*[^[:alnum:]_.-])?gh[[:space:]]+(.*)$/\2/p'
-}
-
 has_word() {
   local needle=$1 word
   shift
@@ -176,14 +169,6 @@ check_checklist() {
   lines=$(printf '%s' "$unmet" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g' | awk '{ printf "%s%s", (NR > 1 ? "\\n" : ""), "- " $0 }')
   print_deny_reason "commit $sha has a review receipt but its hand-off checklist is not met:\\n$lines\\nGrade every box PASS, or N/A: reason (copy the box lines, replacing [ ] with [PASS], [FAIL] or [N/A: reason]), fix a FAIL, then record it: bash $scripts_dir/ready-receipt.sh write $sha --verdicts <graded-checklist-file>."
   return 1
-}
-
-# The words after `git` when the segment starts with it (after any VAR=value
-# prefixes), quotes dropped; empty otherwise.
-git_words() {
-  printf '%s' "$1" \
-    | tr -d "\"'" \
-    | sed -nE 's/^[[:space:]]*([A-Za-z_][A-Za-z0-9_]*=[^[:space:]]*[[:space:]]+)*git[[:space:]]+(.*)$/\2/p'
 }
 
 # Denies a push whose changed files fail the repo's lint (lint-changed-files.sh). The push base is

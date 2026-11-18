@@ -52,6 +52,68 @@ extract_field() {
 /g' -e 's/\\"/"/g'
 }
 
+# The words after `gh` in a segment, quotes dropped; empty when it runs no gh.
+gh_words() {
+  printf '%s' "$1" \
+    | tr -d "\"'" \
+    | sed -nE 's/^(.*[^[:alnum:]_.-])?gh[[:space:]]+(.*)$/\2/p'
+}
+
+# The words after `git` when the segment starts with it (after any VAR=value
+# prefixes), quotes dropped; empty otherwise.
+git_words() {
+  printf '%s' "$1" \
+    | tr -d "\"'" \
+    | sed -nE 's/^[[:space:]]*([A-Za-z_][A-Za-z0-9_]*=[^[:space:]]*[[:space:]]+)*git[[:space:]]+(.*)$/\2/p'
+}
+
+# parse_git_command <dir> <word>...: reads the words after `git` the way git does, skipping -C <path>
+# and -c <key=value>. Sets GIT_DIR to the directory the command runs in and GIT_ARGS to the
+# subcommand and its words (empty when there is none).
+parse_git_command() {
+  GIT_DIR=$1
+  shift
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      -C)
+        case "${2:-}" in
+          "") ;;
+          /*) GIT_DIR=$2 ;;
+          *) GIT_DIR="$GIT_DIR/$2" ;;
+        esac
+        shift ;;
+      -c) shift ;;
+      -*) ;;
+      *) break ;;
+    esac
+    shift
+  done
+  # shellcheck disable=SC2034 # read by the scripts that source this file
+  GIT_ARGS=("$@")
+}
+
+# commit_diff <dir> "<diff options>" <word>...: the diff a `git commit` with these words after
+# `commit` would record: the staged diff, or with -a/--all the working tree against HEAD. A
+# repository with no commit yet is diffed against the empty tree.
+commit_diff() {
+  local dir=$1 options=$2 word all=false base=HEAD
+  shift 2
+  for word in "$@"; do
+    case "$word" in
+      --all) all=true ;;
+      --*) ;;
+      -*a*) all=true ;;
+    esac
+  done
+  git -C "$dir" rev-parse -q --verify HEAD >/dev/null 2>&1 || base=4b825dc642cb6eb9a060e54bf8d69288fbee4904
+  # shellcheck disable=SC2086 # $options is a list of diff options
+  if $all; then
+    git -C "$dir" diff $options --no-color --no-ext-diff --no-renames "$base"
+  else
+    git -C "$dir" diff --cached $options --no-color --no-ext-diff --no-renames "$base"
+  fi
+}
+
 # One shell segment per line: split on newlines, ;, &&, || and |.
 split_segments() {
   printf '%s\n' "$1" | sed -e 's/&&/\

@@ -154,11 +154,12 @@ expect_eq "a page under a public route: WALK=required" "WALK=required" "$(walk_l
 expect_contains "WALK=required carries its reason" "walk: public or guest path, walk it as every audience that can reach it, signed out included (src/app/public/orders/page.tsx)" \
   "$(select_gates_output "$work_dir/walk-route")"
 
+# Only the path decides: no text on a changed line does.
 make_case "$work_dir/walk-skip" '  skip_before_action :authenticate_user!' app/controllers/pay_controller.rb
-expect_eq "an added skip of the authenticate filter: WALK=required" "WALK=required" "$(walk_line_for "$work_dir/walk-skip")"
+expect_eq "an added skip of the authenticate filter in an ordinary controller: WALK=not-required" "WALK=not-required" "$(walk_line_for "$work_dir/walk-skip")"
 
 make_case "$work_dir/walk-flag" '  const canEdit = !isPublic && !locked' src/orders/edit.ts
-expect_eq "an added public flag: WALK=required" "WALK=required" "$(walk_line_for "$work_dir/walk-flag")"
+expect_eq "an added public flag in an ordinary file: WALK=not-required" "WALK=not-required" "$(walk_line_for "$work_dir/walk-flag")"
 
 expect_eq "a model change: WALK=not-required" "WALK=not-required" "$(walk_line_for "$work_dir/model-only")"
 expect_eq "a controller with no public path: WALK=not-required" "WALK=not-required" "$(walk_line_for "$work_dir/controller")"
@@ -169,16 +170,30 @@ expect_eq "a test under a public route: WALK=not-required" "WALK=not-required" "
 make_case "$work_dir/walk-asset" 'x' public/images/logo.svg
 expect_eq "a static asset under public/: WALK=not-required" "WALK=not-required" "$(walk_line_for "$work_dir/walk-asset")"
 
-# Only source files put code on a path: a doc or skill naming a guest flag or the authenticate skip does not.
 make_case "$work_dir/walk-docs" 'An anonymous visitor hits skip_before_action :authenticate and sees isPublic pages.' docs/auth.md
-expect_eq "a doc naming public flags: WALK=not-required" "WALK=not-required" "$(walk_line_for "$work_dir/walk-docs")"
+expect_eq "a markdown file naming public flags: WALK=not-required" "WALK=not-required" "$(walk_line_for "$work_dir/walk-docs")"
+
+make_case "$work_dir/walk-script" '# anonymous: skip_before_action :authenticate, isPublic, guest_token' scripts/check-flags.sh
+expect_eq "a shell script whose text holds the old patterns: WALK=not-required" "WALK=not-required" "$(walk_line_for "$work_dir/walk-script")"
+
+make_case "$work_dir/walk-controller" '  def show; end' app/controllers/public/orders_controller.rb
+expect_eq "a controller under public/: WALK=required" "WALK=required" "$(walk_line_for "$work_dir/walk-controller")"
+make_case "$work_dir/walk-routes" 'get "/orders"' config/routes.rb
+expect_eq "a route file: WALK=required" "WALK=required" "$(walk_line_for "$work_dir/walk-routes")"
 
 make_case "$work_dir/walk-vue" '  const isPublic = route.meta.open' src/pages/OrderPage.vue
-expect_eq "a public flag in a .vue component: WALK=required" "WALK=required" "$(walk_line_for "$work_dir/walk-vue")"
+expect_eq "a .vue page with a public flag but no public path: WALK=not-required" "WALK=not-required" "$(walk_line_for "$work_dir/walk-vue")"
+
+make_case "$work_dir/walk-declared" 'x = 1' src/share/view.ts
+expect_eq "a path no list names: WALK=not-required" "WALK=not-required" "$(walk_line_for "$work_dir/walk-declared")"
+mkdir -p "$work_dir/walk-declared/repo/.claude"
+printf '# shared links are open\n(^|/)share/\n' > "$work_dir/walk-declared/repo/.claude/public-paths.txt"
+expect_eq "a path in .claude/public-paths.txt: WALK=required" "WALK=required" "$(walk_line_for "$work_dir/walk-declared")"
+expect_contains "the declared path is the reason" "(src/share/view.ts)" "$(select_gates_output "$work_dir/walk-declared")"
 
 # select-gates and pass-size.sh decide "public path" with the same function.
 pass_size="$(dirname "$tests_dir")/scripts/pass-size.sh"
-for walk_case in walk-route walk-skip walk-flag model-only walk-spec walk-asset walk-docs walk-vue; do
+for walk_case in walk-route walk-skip walk-flag model-only walk-spec walk-asset walk-docs walk-script walk-controller walk-routes walk-vue walk-declared; do
   walk_verdict=$(walk_line_for "$work_dir/$walk_case")
   risk_verdict=$(bash "$pass_size" "$work_dir/$walk_case/review.diff" "$work_dir/$walk_case/changed-files.txt" "$work_dir/$walk_case/repo" | grep -c '^risk: public or guest path' || true)
   if [ "$walk_verdict" = "WALK=required" ]; then expected_risk=1; else expected_risk=0; fi

@@ -7,17 +7,18 @@
 #
 #   <diff-file>      The unified diff (gather-review.sh's review.diff).
 #   <changed-files>  One path per line (gather-review.sh's changed-files.txt).
-#   <repo-root>      Where .claude/sensitive-paths.txt is read (default: the current directory).
-#                    Each non-blank, non-# line in it is an extended regex for paths this repo
-#                    treats as sensitive, on top of the built-in ones.
+#   <repo-root>      Where .claude/sensitive-paths.txt and .claude/public-paths.txt are read
+#                    (default: the current directory). Each non-blank, non-# line in them is an
+#                    extended regex for paths this repo treats as sensitive, or as reached by a
+#                    signed-out visitor, on top of the built-in ones.
 #
 # Prints:
 #   SIZE=small|full
 #   MUTATION=run|skip
 #   files: <n> counted (<n> test, locale or generated left out)
 #   lines: <n> changed in counted files
-#   risk: none | <reason>        one line per sensitive hit; a public or guest path or flag gets
-#                                one too, which makes the QA step walk the page signed out
+#   risk: none | <reason>        one line per sensitive hit; a public or guest path (by its
+#                                file path, never its text) gets one too, which makes the QA step walk the page signed out
 #   mutation: <why>
 #
 # Small means at most KC_SMALL_FILES files (default 5) and KC_SMALL_LINES changed lines
@@ -90,7 +91,7 @@ deleted_file=$(awk '/^--- a\// { from = substr($0, 7) } /^\+\+\+ \/dev\/null/ { 
 data_delete=$(printf '%s\n' "$added_code" | grep -E -i '\b(drop_table|remove_column|drop table|drop column|delete from|truncate|destroy_all|delete_all)\b' | head -n 1 | sed -E 's/^[[:space:]]+//' | cut -c1-"$KC_SNIPPET_WIDTH" || true)
 [ -z "$data_delete" ] || risk_lines+=("risk: deletes data ($data_delete)")
 # A page a signed-out visitor reaches is walked signed out in a fresh browser profile.
-public_hit=$(kc_public_path_hit "$changed_files" "$diff_file")
+public_hit=$(kc_public_path_hit "$changed_files" "$repo_root")
 [ -z "$public_hit" ] || risk_lines+=("risk: public or guest path, walk it signed out in a fresh browser profile ($public_hit)")
 
 code_lines=$(printf '%s\n' "$added_code" | grep -vE '^[[:space:]]*(#|//|/\*|\*|--)' || true)

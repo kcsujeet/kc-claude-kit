@@ -34,10 +34,10 @@
 #                                                     written would have caught it>`
 #         <id> one-off <reason>
 #         <id> not-feedback <reason>
-#       Lessons are checks first, prose last: a `lesson` (and a `covered` line's `lesson:`
-#       catch) passes only when a --diff adds or changes a script, hook, test, eval or lint-rule
-#       file, or its line carries a field `prose-only: <why no check can hold it>`, which is the
-#       4th field of a `lesson` line and the 6th of a `covered` line.
+#       Future rules are a check that blocks the mistake: a `lesson` (and a `covered` line's
+#       `lesson:` catch) passes only when a --diff adds or changes a script, hook, test, eval,
+#       CI workflow or lint-rule file. There is no prose-only escape; a lesson no check can hold
+#       is not written as a rule.
 #       A rule id is written as the rules write it (`§B13`, `B13`, `WF14`). A line defines it when
 #       it starts with it, after any list marker, checkbox or heading marks (`- [ ] §B13 ...`,
 #       `### §B13. ...`, `- **B13.** ...`); a line that only cites it does not. --rules defaults
@@ -154,13 +154,13 @@ run_check() {
     (cd "$input_path" 2>/dev/null && find . -name '*.md' -type f | sed "s|^\.|$(basename "$(pwd -P)")|" | grep -E "$RULE_FILE_PATH") >> "$rule_paths_before" || true
   done
 
-  # A path a check lives in: a script, hook, test, eval or lint-rule file.
+  # A path a check lives in: a script, hook, test, eval, CI workflow or lint-rule file.
   local has_check_file=false
-  if grep -Eq '(^|/)(tests?|evals|hooks|scripts)/|\.(sh|bats)$|\.(test|spec)\.[A-Za-z]+$|_(test|spec)\.[A-Za-z]+$|(^|/)(biome\.json|eslint[^/]*|\.rubocop\.yml)$' "$changed_paths"; then
+  if grep -Eq '(^|/)(tests?|evals|hooks|scripts)/|(^|/)\.github/workflows/|\.(sh|bats)$|\.(test|spec)\.[A-Za-z]+$|_(test|spec)\.[A-Za-z]+$|(^|/)(biome\.json|eslint[^/]*|\.rubocop\.yml)$' "$changed_paths"; then
     has_check_file=true
   fi
 
-  local problems=0 ledger_line item_id verdict verdict_detail why_missed what_catches_it prose_field seen=" "
+  local problems=0 ledger_line item_id verdict verdict_detail why_missed what_catches_it seen=" "
   record_problem() { echo "$1"; problems=$((problems + 1)); }
   # Each rule a lesson names is added by the lesson diff: an id it defines, or a file it changes.
   check_lesson_rules() {
@@ -175,18 +175,15 @@ run_check() {
       esac
     done
   }
-  # A lesson is held by a check in the diff, or says why none can hold it.
+  # A lesson is held by a check in the diff; a ledger field cannot stand in for one.
   check_lesson_is_held() {
     [ "$has_check_file" = true ] && return 0
-    case "$2" in
-      prose-only:*[![:space:]]*) ;;
-      *) record_problem "$1: lesson is prose with no check: the lesson diff adds or changes no script, hook, test or eval file, and the line has no 'prose-only: <why no check can hold it>' field" ;;
-    esac
+    record_problem "$1: lesson is prose with no check: the lesson diff adds or changes no script, hook, test, eval, CI workflow or lint-rule file"
   }
   while IFS= read -r ledger_line || [ -n "$ledger_line" ]; do
     [ -n "$ledger_line" ] || continue
     # A separator that is not whitespace, so `read` keeps an empty field instead of skipping it.
-    IFS=$'\x1f' read -r item_id verdict verdict_detail why_missed what_catches_it prose_field <<< "${ledger_line//$'\t'/$'\x1f'}"
+    IFS=$'\x1f' read -r item_id verdict verdict_detail why_missed what_catches_it _ <<< "${ledger_line//$'\t'/$'\x1f'}"
     case "$seen" in *" $item_id "*) record_problem "$item_id: listed twice in the ledger"; continue ;; esac
     seen="$seen$item_id "
     grep -q "^$item_id"$'\t' "$feedback_list" || { record_problem "$item_id: not on the feedback list"; continue; }
@@ -194,7 +191,7 @@ run_check() {
       lesson)
         [ -n "$verdict_detail" ] || { record_problem "$item_id: lesson names no rule id"; continue; }
         check_lesson_rules "$item_id" "$verdict_detail"
-        check_lesson_is_held "$item_id" "$why_missed" ;;
+        check_lesson_is_held "$item_id" ;;
       covered)
         [ -n "$verdict_detail" ] || { record_problem "$item_id: covered names no rule id"; continue; }
         case "$verdict_detail" in
@@ -207,7 +204,7 @@ run_check() {
         case "$what_catches_it" in
           lesson:?*)
             check_lesson_rules "$item_id" "${what_catches_it#lesson:}"
-            check_lesson_is_held "$item_id" "$prose_field" ;;
+            check_lesson_is_held "$item_id" ;;
           no-change:?*) ;;
           *) record_problem "$item_id: covered by $verdict_detail says nothing on what catches the miss now (lesson:<rule id> or no-change:<why>)" ;;
         esac ;;
