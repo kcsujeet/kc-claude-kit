@@ -2,7 +2,8 @@
 # A Rails shop repo whose feature branch adds a payment confirmation action with three security
 # violations a review should flag (kc-security §SEC2 ids that must belong together, §SEC3 a write a
 # repeated request triggers again, §SEC5 a value the server owns taken from the request), and a
-# receipt action scoped to the signed-in shopper that returns named fields, which it should not flag.
+# receipt action scoped to the signed-in shopper that returns named fields, with its request spec,
+# which it should not flag.
 # Every action sits behind the sign-in filter on main, so no path is open to signed-out visitors.
 set -euo pipefail
 
@@ -100,6 +101,28 @@ class ReceiptsController < ApplicationController
   def show
     order = current_user.orders.find(params[:order_id])
     render json: order.slice(:id, :status, :total_cents, :paid_cents)
+  end
+end
+RUBY
+mkdir -p spec/requests
+cat > spec/requests/receipts_spec.rb <<'RUBY'
+require "rails_helper"
+
+RSpec.describe "Receipts", type: :request do
+  let(:shopper) { create(:user) }
+  let(:order) { create(:order, user: shopper, status: "paid", total_cents: 4200, paid_cents: 4200) }
+
+  before { sign_in shopper }
+
+  it "returns the shopper's own receipt with its named fields" do
+    get order_receipt_path(order)
+    expect(response.parsed_body).to eq("id" => order.id, "status" => "paid", "total_cents" => 4200, "paid_cents" => 4200)
+  end
+
+  it "does not find another shopper's order" do
+    other_order = create(:order, user: create(:user))
+    get order_receipt_path(other_order)
+    expect(response).to have_http_status(:not_found)
   end
 end
 RUBY
