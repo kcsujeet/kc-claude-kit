@@ -157,8 +157,8 @@ fi
 run_gate testing "always"
 run_gate correctness "always"
 
-# A request handler, or the code around one: request_surface_pattern is the one the security
-# sweep (kc-conventions' request-surface.sh) uses, so the gate runs when the sweep has a hit.
+# A request handler, or the code around one: request_surface_pattern is the pattern the security
+# sweep (kc-conventions' request-surface.sh) matches request input with.
 # Controllers, routes, API and route handlers, middleware, and auth, session, token and webhook code.
 security_path_pattern='(^|/)(controllers?|routes?|routing|api|middleware|handlers?|endpoints?|webhooks?|callbacks?|policies|guards?)(/|\.[A-Za-z0-9]+$)|(^|/)[^/]*(_controller|[-_.]routes?|[-_.]middleware|[-_.]handler|[-_.]policy)\.[A-Za-z0-9]+$|(^|/)(routes|middleware|route)\.[A-Za-z0-9]+$|(^|/)[^/]*(auth|session|login|password|oauth|sso|jwt|webhook|permission|(access|api|refresh|bearer|csrf|id)[-_]?token)[^/]*\.(rb|erb|py|go|java|kt|php|cs|rs|js|jsx|ts|tsx|mjs|cjs|swift)$'
 security_path=$(grep -vE "$KC_RISK_TEST_PATHS" "$changed_files" | grep -E '\.(sh|bash|js|jsx|ts|tsx|mjs|cjs|rb|erb|py|swift|go|java|kt|php|cs|rs)$' | grep -E "$security_path_pattern" | head -n 1 || true)

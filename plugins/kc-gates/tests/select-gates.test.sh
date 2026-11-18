@@ -23,7 +23,6 @@ make_case() {
   done
 }
 
-# select_gates_output <case-dir>: everything select-gates.sh prints for a case.
 select_gates_output() {
   bash "$select_gates" "$1/review.diff" "$1/changed-files.txt" "$1/repo"
 }
@@ -185,6 +184,13 @@ for walk_case in walk-route walk-skip walk-flag model-only walk-spec walk-asset 
   if [ "$walk_verdict" = "WALK=required" ]; then expected_risk=1; else expected_risk=0; fi
   expect_eq "$walk_case: WALK agrees with pass-size.sh's public-path risk" "$expected_risk" "$risk_verdict"
 done
+
+# A diff that only removes lines has no added line to read; select-gates still prints its gates.
+mkdir -p "$work_dir/removal/repo"
+printf 'app/models/order.rb\n' > "$work_dir/removal/changed-files.txt"
+printf -- '--- a/app/models/order.rb\n+++ b/app/models/order.rb\n@@ -1 +0,0 @@\n-  def total = 0\n' > "$work_dir/removal/review.diff"
+expect_eq "a diff with no added line still selects its gates" \
+  "GATES=naming,clarity,structure,simplicity,rails,testing,correctness" "$(gates_for "$work_dir/removal")"
 
 # --- one diff with every kind --------------------------------------------------
 make_case "$work_dir/mixed" "import { useState } from 'react'" src/orders/Orders.tsx db/migrate/1_add_orders.rb

@@ -6,7 +6,6 @@
 KC_RISK_TEST_PATHS='(\.(test|spec)\.[A-Za-z0-9]+$|_(test|spec)\.[A-Za-z0-9]+$|(^|/)test_[^/]*\.py$|(^|/)(test|tests|spec|__tests__|e2e)/)'
 KC_RISK_LOCALE_PATHS='((^|/)(locales?|i18n|translations|lang)/|\.(po|pot|xlf|xliff)$)'
 KC_RISK_GENERATED_PATHS='((^|/)(package-lock\.json|pnpm-lock\.yaml|yarn\.lock|Gemfile\.lock|Cargo\.lock|poetry\.lock|composer\.lock)$|\.snap$|\.min\.(js|css)$|(^|/)(dist|build|generated|__generated__)/)'
-# Source files in the languages the conventions cover.
 KC_RISK_SOURCE_PATHS='\.(sh|bash|js|jsx|ts|tsx|mjs|cjs|rb|erb|py|swift|go|java|kt|php|cs|rs|vue|svelte|html)$'
 # Width a line is cut to when a script quotes it as the reason for a verdict.
 KC_SNIPPET_WIDTH=80

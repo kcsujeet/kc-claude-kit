@@ -11,7 +11,6 @@ review="$plugin_dir/skills/kc-code-review/SKILL.md"
 verification="$plugin_dir/agents/verification-gate.md"
 gate="$plugin_dir/agents/security-gate.md"
 
-# kc-code-review's SKILL.md stays under this many lines.
 max_skill_lines=500
 failures=0
 fail() { echo "FAIL $1"; failures=$((failures + 1)); }
