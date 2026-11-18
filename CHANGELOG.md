@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Changed (a review claim about a screen is seen, and a claimed bug is reproduced, before it is posted)
+
+- `kc-gates` 3.12.2: `check-draft-format.sh` (run by `build-comment-payloads.sh`) refuses an `issue` whose `"ran"` is "n/a", and a draft on a file people see rendered (a component, template or stylesheet, not a test or story) with no `"seen"`: an existing screenshot or recording newer than the head commit. The builder stamps `review.json` with its SHA-256 (`review.json.checked`), and `guard-github-post.sh` denies a token-carrying review whose inline comments lack that stamp or changed after it, and any new inline comment through the single-comment endpoint, so drafts can't skip the checks. `kc-post-review` §PC4 and a `kc-code-review` hard rule state it. Other cases it catches: a field limit claimed to cut off input, a margin claimed never to apply, a card claimed to show in the wrong state, an endpoint claimed to leak a field. Held by `tests/check-draft-format.test.sh`, `tests/guard-github-post.test.sh` and `tests/build-comment-payloads.test.sh`; each new branch was broken once and a test failed.
+
 ### Changed (a field a change moves is measured like a new one)
 
 - `kc-verify` 2.2.9: `kc-ui` Step 5 and its sibling-measure box now include a field whose own code is unchanged but which the change moved into a new container (inside a radio option, a label, a flex row), since it can shrink to its content there while every alignment check passes. Other cases: an input moved into a card header, a select moved into a toolbar, a button moved into a table cell. Wording only, no gate grades it.

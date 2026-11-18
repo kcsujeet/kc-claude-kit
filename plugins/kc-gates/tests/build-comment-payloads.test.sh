@@ -23,8 +23,12 @@ chmod +x "$trap_bin/gh"
 export PATH="$trap_bin:$PATH"
 
 # --- valid drafts ---------------------------------------------------------------
+# The component draft carries a capture of the running app, which the format check asks for.
+printf 'png' > "$work_dir/header.png"
+valid="$work_dir/valid.json"
+jq --arg seen "$work_dir/header.png" 'map(if (.path | endswith(".tsx")) then . + {seen: $seen} else . end)' "$fixtures/valid.json" > "$valid"
 out="$work_dir/out"
-bash "$builder" "$fixtures/valid.json" "$fixtures/review.diff" "$head_sha" --pr 12 --out-dir "$out" > "$work_dir/valid.txt"
+bash "$builder" "$valid" "$fixtures/review.diff" "$head_sha" --pr 12 --out-dir "$out" > "$work_dir/valid.txt"
 sed "s|{out}|$out|g" "$fixtures/expected-valid.txt" > "$work_dir/expected-valid.txt"
 expect_file "valid: one checked comment per draft, one review and one approval command" "$work_dir/expected-valid.txt" "$work_dir/valid.txt"
 expect_contains "valid: after the command, the user is asked whether the work item changes hands" \
@@ -36,22 +40,26 @@ expect_eq "valid: a single-line payload has exactly the five fields" "body,commi
 
 expect_eq "valid: the review is a COMMENT with every comment and no body" "COMMENT,5,false,1111111111111111111111111111111111111111" \
   "$(jq -r '[.event, (.comments | length), has("body"), .commit_id] | map(tostring) | join(",")' "$out/review.json")"
+# shellcheck source=../scripts/lib/file-sha256.sh
+expect_eq "valid: the review carries the stamp the post guard checks" \
+  "$(. "$(dirname "$builder")/lib/file-sha256.sh"; print_file_sha256 "$out/review.json")" \
+  "$(cat "$out/review.json.checked")"
 expect_eq "valid: review comments carry no commit_id of their own" "false" \
   "$(jq -r '[.comments[] | has("commit_id")] | any | tostring' "$out/review.json")"
 expect_eq "valid: review comments keep their order and range fields" "3,2-4,2,1,5" \
   "$(jq -r '[.comments[] | if .start_line then "\(.start_line)-\(.line)" else "\(.line)" end] | join(",")' "$out/review.json")"
 
 printf 'A note about the PR as a whole.\n' > "$work_dir/body.md"
-bash "$builder" "$fixtures/valid.json" "$fixtures/review.diff" "$head_sha" --pr 12 --body-file "$work_dir/body.md" --out-dir "$work_dir/out-body" > "$work_dir/body.txt"
+bash "$builder" "$valid" "$fixtures/review.diff" "$head_sha" --pr 12 --body-file "$work_dir/body.md" --out-dir "$work_dir/out-body" > "$work_dir/body.txt"
 expect_eq "body: --body-file puts the body on the review" "A note about the PR as a whole." \
   "$(jq -r '.body' "$work_dir/out-body/review.json")"
 expect_contains "body: the summary line says it has a body" "one review, 5 comment(s), with a body" "$(cat "$work_dir/body.txt")"
 printf '  \n' > "$work_dir/blank.md"
-bash "$builder" "$fixtures/valid.json" "$fixtures/review.diff" "$head_sha" --pr 12 --body-file "$work_dir/blank.md" --out-dir "$work_dir/out-blank" > /dev/null
+bash "$builder" "$valid" "$fixtures/review.diff" "$head_sha" --pr 12 --body-file "$work_dir/blank.md" --out-dir "$work_dir/out-blank" > /dev/null
 expect_eq "body: a blank body file adds no body" "false" "$(jq -r 'has("body") | tostring' "$work_dir/out-blank/review.json")"
 
 mkdir -p "$work_dir/tmp"
-TMPDIR="$work_dir/tmp" bash "$builder" "$fixtures/valid.json" "$fixtures/review.diff" "$head_sha" --pr 12 > /dev/null
+TMPDIR="$work_dir/tmp" bash "$builder" "$valid" "$fixtures/review.diff" "$head_sha" --pr 12 > /dev/null
 if [ -f "$work_dir/tmp/kc-review-$head_sha/comment-5.json" ]; then
   record "valid: default out dir is \$TMPDIR/kc-review-<sha>" ok
 else
@@ -110,9 +118,9 @@ check_status() {
   expect_eq "$label" "$expected" "$status"
 }
 check_status "usage: no arguments exits 2" 2
-check_status "usage: missing --pr exits 2" 2 "$fixtures/valid.json" "$fixtures/review.diff" "$head_sha"
-check_status "usage: a short SHA exits 2" 2 "$fixtures/valid.json" "$fixtures/review.diff" 1111111 --pr 12
-check_status "usage: an unreadable body file exits 2" 2 "$fixtures/valid.json" "$fixtures/review.diff" "$head_sha" --pr 12 --body-file "$work_dir/missing.md"
+check_status "usage: missing --pr exits 2" 2 "$valid" "$fixtures/review.diff" "$head_sha"
+check_status "usage: a short SHA exits 2" 2 "$valid" "$fixtures/review.diff" 1111111 --pr 12
+check_status "usage: an unreadable body file exits 2" 2 "$valid" "$fixtures/review.diff" "$head_sha" --pr 12 --body-file "$work_dir/missing.md"
 check_status "usage: a drafts file that is not an array exits 2" 2 "$fixtures/expected-comment-2.json" "$fixtures/review.diff" "$head_sha" --pr 12
 
 if [ -e "$work_dir/gh-called" ]; then
@@ -122,7 +130,7 @@ else
 fi
 
 # A draft anchored on a real line but written against kc-post-review's format gets no payload.
-jq '.[0:1] | .[0].body = "**suggestion:**\nCould we name this `widgetTotal` \u2014 it reads as a value?"' "$fixtures/valid.json" > "$work_dir/em-dash.json"
+jq '.[0:1] | .[0].body = "**suggestion:**\nCould we name this `widgetTotal` \u2014 it reads as a value?"' "$valid" > "$work_dir/em-dash.json"
 format_status=0
 bash "$builder" "$work_dir/em-dash.json" "$fixtures/review.diff" "$head_sha" --pr 12 --out-dir "$work_dir/out-format" 2> "$work_dir/format.err" > /dev/null || format_status=$?
 expect_eq "format: a well-anchored draft with an em dash fails" 1 "$format_status"
@@ -138,7 +146,7 @@ git -C "$names_repo" init -q
 git -C "$names_repo" add -A
 git -C "$names_repo" -c user.name=t -c user.email=t@example.com commit -q -m base
 names_sha=$(git -C "$names_repo" rev-parse HEAD)
-jq '.[0:1] | .[0].body = "**suggestion:**\nCould we name this `widgetTotal`? It reads as a value."' "$fixtures/valid.json" > "$work_dir/near-name.json"
+jq '.[0:1] | .[0].body = "**suggestion:**\nCould we name this `widgetTotal`? It reads as a value."' "$valid" > "$work_dir/near-name.json"
 names_status=0
 (cd "$names_repo" && bash "$builder" "$work_dir/near-name.json" "$fixtures/review.diff" "$names_sha" --pr 12 --out-dir "$work_dir/out-names") 2> "$work_dir/names.err" > /dev/null || names_status=$?
 expect_eq "names: a draft suggesting a near twin of an existing name fails" 1 "$names_status"

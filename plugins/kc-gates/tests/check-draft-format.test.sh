@@ -12,7 +12,7 @@ require_jq
 # Writes one draft with <body> to <file>, plus the fields of the jq object <extra> (default: an
 # "n/a" run record, which an issue or suggestion needs).
 draft() {
-  local file=$1 body=$2 extra=${3:-'{ran: "n/a: asks for no behaviour change"}'}
+  local file=$1 body=$2 extra=${3:-'{ran: "cart spec with an empty cart: fails before, passes after"}'}
   jq -n --arg body "$body" "[{path: \"src/cart/total.ts\", line: 12, body: \$body} + $extra]" > "$file"
 }
 
@@ -34,8 +34,56 @@ draft "$work_dir/cc-layout.json" $'**suggestion (non-blocking):**\nCould this re
 expect_eq "the Conventional Comments layout the skill's examples use is clean" clean "$(result "$work_dir/cc-layout.json")"
 
 long_body=$'**issue**:\nThis retries forever when the payment provider is down. Each retry opens a new charge attempt. A customer can be charged twice if the first one lands late. The provider docs say to reuse the idempotency key on retries.'
-draft "$work_dir/long-ok.json" "$long_body" '{ran: "n/a: asks for an outcome, not code", long: "explains a double charge the author cannot see from the diff"}'
+draft "$work_dir/long-ok.json" "$long_body" '{ran: "checkout spec with the provider stubbed down: two charges", long: "explains a double charge the author cannot see from the diff"}'
 expect_eq "four sentences with a stated reason in \"long\" are clean" clean "$(result "$work_dir/long-ok.json")"
+
+# --- an issue is reproduced, and a screen is seen (kc-post-review §PC4) ------------------------
+draft "$work_dir/issue-na.json" $'**issue**:\nAn empty cart still shows the old total.' '{ran: "n/a: asks for an outcome and its test"}'
+expect_contains "§PC4: an issue whose \"ran\" is n/a is flagged" "is an issue with \"ran\": n/a" "$(result "$work_dir/issue-na.json")"
+draft "$work_dir/suggestion-na.json" $'**suggestion**:\nThis could read `visibleItems` like the list does.' '{ran: "n/a: no behaviour change"}'
+expect_eq "§PC4: a suggestion may still say n/a with a reason" clean "$(result "$work_dir/suggestion-na.json")"
+
+write_rendered_file_draft() {
+  local extra=${4:-'{}'}
+  jq -n --arg body "$2" --arg path "$3" --argjson extra "$extra" \
+    '[{path: $path, line: 12, body: $body, ran: "n/a: layout only"} + $extra]' > "$1"
+}
+ui_body=$'**suggestion**:\nThe price wraps under the button on a narrow screen. Keeping them on one row would match the list.'
+write_rendered_file_draft "$work_dir/ui-unseen.json" "$ui_body" "src/storefront/OrderRow.tsx"
+expect_contains "§PC4: a draft on a component with no \"seen\" is flagged" "is on a screen with no \"seen\"" "$(result "$work_dir/ui-unseen.json")"
+for path in src/storefront/order.html.erb src/storefront/order.vue src/storefront/order.scss; do
+  write_rendered_file_draft "$work_dir/ui-other.json" "$ui_body" "$path"
+  expect_contains "§PC4: a draft on $path with no \"seen\" is flagged" "no \"seen\"" "$(result "$work_dir/ui-other.json")"
+done
+write_rendered_file_draft "$work_dir/ui-missing.json" "$ui_body" "src/storefront/OrderRow.tsx" "{\"seen\": \"$work_dir/nope.png\"}"
+expect_contains "§PC4: a \"seen\" file that does not exist is flagged" "is not a screenshot or recording that exists" "$(result "$work_dir/ui-missing.json")"
+printf 'x' > "$work_dir/notes.txt"
+write_rendered_file_draft "$work_dir/ui-text.json" "$ui_body" "src/storefront/OrderRow.tsx" "{\"seen\": \"$work_dir/notes.txt\"}"
+expect_contains "§PC4: a \"seen\" that is not an image or video is flagged" "is not a screenshot or recording" "$(result "$work_dir/ui-text.json")"
+printf 'png' > "$work_dir/order-row.png"
+write_rendered_file_draft "$work_dir/ui-seen.json" "$ui_body" "src/storefront/OrderRow.tsx" "{\"seen\": \"$work_dir/order-row.png\"}"
+expect_eq "§PC4: a draft on a component with a capture is clean" clean "$(result "$work_dir/ui-seen.json")"
+write_rendered_file_draft "$work_dir/ui-test.json" "$ui_body" "src/storefront/OrderRow.test.tsx"
+expect_eq "§PC4: a draft on a test file needs no \"seen\"" clean "$(result "$work_dir/ui-test.json")"
+write_rendered_file_draft "$work_dir/ui-question.json" $'**question**:\nIs the row meant to wrap here?' "src/storefront/OrderRow.tsx"
+expect_eq "§PC4: a question on a component needs no \"seen\"" clean "$(result "$work_dir/ui-question.json")"
+
+write_rendered_file_draft "$work_dir/ui-list.json" "$ui_body" "src/storefront/OrderRow.tsx" '{"seen": ["order-row.png"]}'
+expect_contains "§PC4: a \"seen\" that is not a path is flagged" "no \"seen\"" "$(result "$work_dir/ui-list.json")"
+
+# A capture older than the head commit shows older code.
+repo="$work_dir/repo"; git init -q "$repo"
+git -C "$repo" -c user.email=t@example.com -c user.name=t commit -q --allow-empty -m one
+sha=$(git -C "$repo" rev-parse HEAD)
+touch -t 200001010000 "$work_dir/old.png"
+write_rendered_file_draft "$work_dir/ui-old.json" "$ui_body" "src/storefront/OrderRow.tsx" "{\"seen\": \"$work_dir/old.png\"}"
+old_capture_problems=$(cd "$repo" && bash "$check" "$work_dir/ui-old.json" "$sha" || true)
+expect_contains "§PC4: a capture older than the head commit is flagged" "captured before the head commit" "$old_capture_problems"
+touch "$work_dir/order-row.png"
+fresh_capture_result=$(cd "$repo" && bash "$check" "$work_dir/ui-seen.json" "$sha" && echo clean || true)
+expect_eq "§PC4: a capture newer than the head commit is clean" clean "$fresh_capture_result"
+unknown_head_result=$(cd "$repo" && bash "$check" "$work_dir/ui-old.json" 0000000000000000000000000000000000000000 && echo clean || true)
+expect_eq "§PC4: a head the repo doesn't know skips the age check" clean "$unknown_head_result"
 
 # --- slips the checklist exists for ---------------------------------------------------------
 draft "$work_dir/no-label.json" 'Good catch on the rounding. Could this use the shared formatter?'
