@@ -5,6 +5,7 @@
 # receipt action scoped to the signed-in shopper that returns named fields, with its request spec,
 # which it should not flag.
 # Every action sits behind the sign-in filter on main, so no path is open to signed-out visitors.
+# Graders accept a finding bullet that names the file, or bullets under a line that names it.
 set -euo pipefail
 
 git init -q -b main

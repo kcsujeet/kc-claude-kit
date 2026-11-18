@@ -1,7 +1,7 @@
 {
   "case": "plugins/kc-gates/evals/security-boxes",
-  "commit": "53a7c01a26d392c45b10b4d7b899079ec0be1107",
-  "case_hash": "f87dbcb7bed34d5254587473f2d20b330233cfcf",
+  "commit": "97a23fef9c39b82e88dcaa21bb3bab42d154be6a",
+  "case_hash": "e9a67d8f64437f1668e05c0ae04294b2220a75f6",
   "plugins_hash": "a3fe9cef7306296b5e3ba937a0590162cda7e9a7",
   "claude": "2.1.327 (Claude Code)",
   "model": "sonnet",
