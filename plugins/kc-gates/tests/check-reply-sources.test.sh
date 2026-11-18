@@ -179,4 +179,17 @@ rm -rf "$CLAUDE_PLUGIN_DATA"
 expect_eq "with no session id it prints nothing, errors included" "" "$(jq -cn --arg reply "$kit_claim" --arg path "$transcript" '{transcript_path: $path, last_assistant_message: $reply}' | bash "$hook" 2>&1)"
 expect_eq "with no session id no misses folder is made" absent "$([ -e "$CLAUDE_PLUGIN_DATA/reply-misses" ] && echo present || echo absent)"
 
+# A look-back written from memory: lessons listed with no ledger run in the session.
+lookback_reply='Look-back: two lessons, the untested fix and the claim about the last round.'
+{ write_typed_message "what did we learn?"; } > "$transcript"
+expect_eq "lessons listed with no ledger run are noted" noted "$(run_hook "$lookback_reply")"
+expect_reason "it names the ledger" "feedback-ledger.sh list"
+{ write_typed_message "start"; write_tool_call Bash command "bash feedback-ledger.sh list session.jsonl"; write_tool_result; write_typed_message "what did we learn?"; } > "$transcript"
+expect_eq "lessons after a ledger run earlier in the session go out" out "$(run_hook "$lookback_reply")"
+{ write_typed_message "what did we learn?"; } > "$transcript"
+expect_eq "a reply that only names the look-back goes out" out "$(run_hook "The look-back is next.")"
+expect_eq "lessons with no look-back wording go out" out "$(run_hook "Two lessons came up: the untested fix.")"
+{ write_typed_message "start"; write_tool_call Bash command "bash feedback-ledger.sh check list.tsv ledger.tsv --rules checklist.md"; write_tool_result; write_typed_message "what did we learn?"; } > "$transcript"
+expect_eq "a ledger call that never ran list doesn't count" noted "$(run_hook "$lookback_reply")"
+
 finish
