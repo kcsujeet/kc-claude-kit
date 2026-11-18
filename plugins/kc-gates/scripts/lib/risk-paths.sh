@@ -18,18 +18,19 @@ kc_added_code() {
 # kc_added_source_code <diff-file>: kc_added_code limited to source files (the languages the
 # conventions cover), so prose, config and data files never read as code.
 kc_added_source_code() {
-  awk -v tests="$KC_RISK_TEST_PATHS" -v source='\\.(sh|bash|js|jsx|ts|tsx|mjs|cjs|rb|erb|py|swift|go|java|kt|php|cs|rs)$' '
+  awk -v tests="$KC_RISK_TEST_PATHS" -v source='\\.(sh|bash|js|jsx|ts|tsx|mjs|cjs|rb|erb|py|swift|go|java|kt|php|cs|rs|vue|svelte|html)$' '
     /^\+\+\+ / { path = substr($0, 5); sub(/^b\//, "", path); code = (path !~ tests && path ~ source); next }
     /^\+/ { if (code) print substr($0, 2) }' "$1"
 }
 
-# kc_public_path_hit <changed-files> <added-code>: the first thing in the change that puts code on
+# kc_public_path_hit <changed-files> <diff-file>: the first thing in the change that puts code on
 # a path a signed-out visitor reaches (a changed file under public/, guest/ or anonymous/, or an
 # added line naming a public or guest flag or skipping the authentication filter), or nothing.
-# Tests, locale and generated files are not checked.
+# Tests, locale and generated files are not checked, and added lines are read from source files
+# only (kc_added_source_code): a doc or skill that mentions a guest flag puts no code anywhere.
 kc_public_path_hit() {
-  local changed_files=$1 added_code=$2 public_path public_code
+  local changed_files=$1 diff_file=$2 public_path public_code
   public_path=$(grep -vE "$KC_RISK_UNCOUNTED_PATHS" "$changed_files" | grep -E '(^|/)(public|guests?|anonymous)/.*\.(ts|tsx|js|jsx|vue|svelte|rb|erb|py|go|php|html)$' | head -n 1 || true)
-  public_code=$(printf '%s\n' "$added_code" | grep -E '\b(is_?[Pp]ublic|is_?[Gg]uest|guest_?[Tt]oken|[Aa]nonymous|[Uu]nauthenticated|[Ss]igned_?[Oo]ut|AllowAnonymous|permitAll)\b|skip_before_action[[:space:]]+:authenticate|/public/' | head -n 1 | sed -E 's/^[[:space:]]+//' | cut -c1-80 || true)
+  public_code=$(kc_added_source_code "$diff_file" | grep -E '\b(is_?[Pp]ublic|is_?[Gg]uest|guest_?[Tt]oken|[Aa]nonymous|[Uu]nauthenticated|[Ss]igned_?[Oo]ut|AllowAnonymous|permitAll)\b|skip_before_action[[:space:]]+:authenticate|/public/' | head -n 1 | sed -E 's/^[[:space:]]+//' | cut -c1-80 || true)
   printf '%s\n' "${public_path:-$public_code}"
 }

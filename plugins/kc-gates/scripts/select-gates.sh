@@ -176,7 +176,7 @@ gates_csv=$(IFS=,; printf '%s' "${selected_gates[*]}")
 printf 'GATES=%s\n' "$gates_csv"
 printf '%s\n' "${gate_lines[@]}"
 
-walk_hit=$(kc_public_path_hit "$changed_files" "$(kc_added_code "$diff_file")")
+walk_hit=$(kc_public_path_hit "$changed_files" "$diff_file")
 if [ -n "$walk_hit" ]; then
   echo "WALK=required"
   echo "walk: public or guest path, walk it as every audience that can reach it, signed out included ($walk_hit)"

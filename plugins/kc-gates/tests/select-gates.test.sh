@@ -156,9 +156,16 @@ expect_eq "a test under a public route: WALK=not-required" "WALK=not-required" "
 make_case "$work_dir/walk-asset" 'x' public/images/logo.svg
 expect_eq "a static asset under public/: WALK=not-required" "WALK=not-required" "$(walk_for "$work_dir/walk-asset")"
 
+# Only source files put code on a path: a doc or skill naming a guest flag or the authenticate skip does not.
+make_case "$work_dir/walk-docs" 'An anonymous visitor hits skip_before_action :authenticate and sees isPublic pages.' docs/auth.md
+expect_eq "a doc naming public flags: WALK=not-required" "WALK=not-required" "$(walk_for "$work_dir/walk-docs")"
+
+make_case "$work_dir/walk-vue" '  const isPublic = route.meta.open' src/pages/OrderPage.vue
+expect_eq "a public flag in a .vue component: WALK=required" "WALK=required" "$(walk_for "$work_dir/walk-vue")"
+
 # select-gates and pass-size.sh decide "public path" with the same function.
 pass_size="$(dirname "$tests_dir")/scripts/pass-size.sh"
-for walk_case in walk-route walk-skip walk-flag model-only walk-spec walk-asset; do
+for walk_case in walk-route walk-skip walk-flag model-only walk-spec walk-asset walk-docs walk-vue; do
   walk_verdict=$(walk_for "$work_dir/$walk_case")
   risk_verdict=$(bash "$pass_size" "$work_dir/$walk_case/review.diff" "$work_dir/$walk_case/changed-files.txt" "$work_dir/$walk_case/repo" | grep -c '^risk: public or guest path' || true)
   if [ "$walk_verdict" = "WALK=required" ]; then expected_risk=1; else expected_risk=0; fi
