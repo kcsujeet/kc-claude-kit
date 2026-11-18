@@ -21,7 +21,9 @@ fixture_count=0
 
 for fixture_dir in "$tests_dir"/sweeps/*/*/; do
   fixture_dir=${fixture_dir%/}
-  sweep_name=$(basename "$fixture_dir")
+  fixture_name=$(basename "$fixture_dir")
+  # `<sweep>.<case>` is a further fixture of the sweep `<sweep>`.
+  sweep_name=${fixture_name%%.*}
   topic=$(basename "$(dirname "$fixture_dir")")
   sweep_script="$plugin_dir/skills/$topic/scripts/$sweep_name.sh"
   # `_shared` fixtures test the topic-independent scripts in scripts/.
@@ -36,7 +38,7 @@ for fixture_dir in "$tests_dir"/sweeps/*/*/; do
 
   sweep_args=("$fixture_dir/input.diff")
   if [ -d "$fixture_dir/repo" ]; then
-    repo_copy="$work_dir/$topic-$sweep_name"
+    repo_copy="$work_dir/$topic-$fixture_name"
     cp -R "$fixture_dir/repo" "$repo_copy"
     git -C "$repo_copy" init -q
     untracked_list="$fixture_dir/untracked.txt"
@@ -47,17 +49,17 @@ for fixture_dir in "$tests_dir"/sweeps/*/*/; do
     sweep_args+=("$repo_copy")
   fi
 
-  actual_output="$work_dir/$topic-$sweep_name.out"
+  actual_output="$work_dir/$topic-$fixture_name.out"
   if ! bash "$sweep_script" "${sweep_args[@]}" > "$actual_output"; then
-    echo "FAIL $topic/$sweep_name: script exited non-zero"
+    echo "FAIL $topic/$fixture_name: script exited non-zero"
     failures=$((failures + 1))
     continue
   fi
 
   if diff -u "$fixture_dir/expected.txt" "$actual_output" > "$work_dir/diff.txt"; then
-    echo "ok   $topic/$sweep_name"
+    echo "ok   $topic/$fixture_name"
   else
-    echo "FAIL $topic/$sweep_name: output differs from expected.txt"
+    echo "FAIL $topic/$fixture_name: output differs from expected.txt"
     sed 's/^/     /' "$work_dir/diff.txt"
     failures=$((failures + 1))
   fi

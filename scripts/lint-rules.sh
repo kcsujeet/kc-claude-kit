@@ -19,7 +19,7 @@
 # Prints one line per problem and exits 1 when there is any, 0 otherwise.
 set -euo pipefail
 
-id_pattern='§[A-Z]{1,2}[0-9]+[a-z]?'
+id_pattern='§[A-Z]{1,3}[0-9]+[a-z]?'
 problems=0
 report() {
   echo "$1"

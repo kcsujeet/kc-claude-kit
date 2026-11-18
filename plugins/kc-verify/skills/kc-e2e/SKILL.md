@@ -71,5 +71,6 @@ Do not report a flow verified until every box is ticked:
 - [ ] The path from interaction to durable effect is written down, layer by layer.
 - [ ] Every state that changes the flow is listed (from the design when there is one), and the flow was walked in each state the change can reach.
 - [ ] The durable effect was confirmed at the far end in each state, not inferred from the UI.
+- [ ] Every write a link, callback or return URL triggers was replayed with another record's id and once more with the same id, and the far end checked after each (N/A: the flow has no such write).
 - [ ] The unhappy paths chosen and skipped are named.
 - [ ] The report lists each step, each finding with its state and step, and what could not be exercised.

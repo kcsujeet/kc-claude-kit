@@ -1,0 +1,65 @@
+{
+  "case": "plugins/kc-gates/evals/security-boxes",
+  "commit": "3400cd2d09ac7efdd2015f0923175e26285d5aec",
+  "case_hash": "14eb04d058cc918763122199b4490a99d1a9d707",
+  "plugins_hash": "3a896cbca5b8ef94d04b1e74679d13ba801739e3",
+  "claude": "2.1.327 (Claude Code)",
+  "model": "sonnet",
+  "verdict": "ok",
+  "runs": {
+    "with": [
+      {
+        "error": null,
+        "graders": [
+          {
+            "name": "flags-client-amount",
+            "passed": true,
+            "scored": true
+          },
+          {
+            "name": "flags-repeat-confirm",
+            "passed": true,
+            "scored": true
+          },
+          {
+            "name": "flags-unlinked-payment",
+            "passed": true,
+            "scored": true
+          },
+          {
+            "name": "no-finding-on-clean-unit",
+            "passed": true,
+            "scored": false
+          },
+          {
+            "name": "verdict-failed",
+            "passed": true,
+            "scored": false
+          }
+        ]
+      }
+    ],
+    "without": [
+      {
+        "error": null,
+        "graders": [
+          {
+            "name": "flags-client-amount",
+            "passed": false,
+            "scored": true
+          },
+          {
+            "name": "flags-repeat-confirm",
+            "passed": false,
+            "scored": true
+          },
+          {
+            "name": "flags-unlinked-payment",
+            "passed": false,
+            "scored": true
+          }
+        ]
+      }
+    ]
+  }
+}

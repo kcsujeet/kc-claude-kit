@@ -1,0 +1,6 @@
+schema_version: "1.1"
+name: security-boxes
+description: A guard for what the kit already catches in some runs, not proof the security rules are needed (the script tests hold those boxes). A Rails shop branch whose payment confirmation action, reached by a signed-in shopper, attaches a payment the request names without checking it belongs to the order, marks the order paid with an amount the request sends, and awards points and sends the receipt again on every repeat of the request; it also adds a receipt action scoped to the shopper that returns named fields. The review fails, flags each of the three on the payment action and raises nothing on the receipt action.
+tags: [review, gate, security, guard]
+context:
+  scaffold_script: setup.sh

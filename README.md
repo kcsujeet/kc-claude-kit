@@ -112,6 +112,7 @@ Most skills start on their own when the topic comes up. You can also type any of
 | `kc-correctness` | Bugs: edge cases, wrong conditions, and other code that breaks when this code changes. |
 | `kc-testing` | Tests that fail when the code is broken. |
 | `kc-datetime` | Dates, times and time zones. |
+| `kc-security` | Request handlers: who may call them, ids that belong together, replay, scoping, server-owned values, secrets, redirects, injection. |
 | `kc-i18n` | Translations and locale files. |
 | `kc-react` | React components, hooks, data fetching and forms. |
 | `kc-rails` | Rails models, queries, migrations and specs. |

@@ -15,6 +15,11 @@
 # clarity, structure, simplicity, testing and correctness always run; the
 # verification gate is phase 2 and always runs, so it is not listed.
 #
+# Then `WALK=required` or `WALK=not-required` and a `walk: <why>` line. Required when the diff
+# puts code on a path a signed-out visitor reaches (the same test pass-size.sh makes, from
+# lib/risk-paths.sh): the review then walks the change in the running app as every audience that
+# can reach it, signed out included, before its verdict.
+#
 # Exits 0 on success, 2 on a usage error or a missing input file.
 set -euo pipefail
 
@@ -30,8 +35,19 @@ repo_root=${3:-.}
 [ -f "$diff_file" ] || { echo "$script_name: no such diff: $diff_file" >&2; exit 2; }
 [ -f "$changed_files" ] || { echo "$script_name: no such file list: $changed_files" >&2; exit 2; }
 
+# shellcheck source=lib/risk-paths.sh
+. "$(dirname "$0")/lib/risk-paths.sh"
+
 # The diff's added lines, without the `+++ b/path` headers.
 added_lines=$(grep -E '^\+' "$diff_file" | grep -vE '^\+\+\+ ' || true)
+
+# Added lines of non-test source files, for the checks that read code and not prose.
+added_source=$(kc_added_source_code "$diff_file")
+
+# Prints the first added source line matching an extended regex, trimmed, or nothing.
+first_source_line() {
+  printf '%s\n' "$added_source" | grep -E "$1" | head -n 1 | sed -E 's/^[[:space:]]+//' | cut -c1-80 || true
+}
 
 # Prints the first changed path matching an extended regex, or nothing.
 first_changed_path() {
@@ -133,6 +149,23 @@ fi
 run_gate testing "always"
 run_gate correctness "always"
 
+# A request handler, or the code around one. Keep request_surface_pattern identical to the one in
+# kc-conventions' skills/kc-security/scripts/request-surface.sh; select-gates.test.sh checks it.
+request_surface_pattern='(^|[^A-Za-z0-9_$])(params|cookies|session|headers)(\[|\.[A-Za-z_])|(^|[^A-Za-z0-9_$])(cookies|headers)\(|(^|[^A-Za-z0-9_$])(req|request|ctx|context|event)\.(params|query|body|headers|cookies|session|ip|url|originalUrl|nextUrl|args|form|json|data|GET|POST|FILES|formData|text|queryStringParameters|pathParameters|remote_ip|referer|referrer|original_url|host|authorization|user_agent)|(^|[^A-Za-z0-9_$])(searchParams|nextUrl|query_params|URLParam|FormValue|PostForm)|\.URL\.Query\(|\.Header\.Get\(|(^|[^A-Za-z0-9_$])(app|router|server|api)\.(get|post|put|patch|delete|all|use|route)\(|export[[:space:]]+(async[[:space:]]+)?(function|const)[[:space:]]+(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)([^A-Za-z0-9_]|$)|export[[:space:]]+(default[[:space:]]+)?(async[[:space:]]+)?function[[:space:]]+(handler|middleware)([^A-Za-z0-9_]|$)|NextApiRequest|NextRequest|@(Get|Post|Put|Patch|Delete|Controller|RequestMapping)\(|@(app|router)\.(route|get|post|put|patch|delete)\(|HandleFunc\(|class[[:space:]]+[A-Za-z0-9_:]*Controller|(before|around|prepend_before)_action|skip_(before|after|around)_(action|filter)|skip_forgery_protection|skip_authorization|skip_authentication|skip_verify_authorized|allow_unauthenticated_access|protect_from_forgery|csrf_exempt|AllowAnonymous|permitAll|@Public\(|public:[[:space:]]*true|(auth|authenticate|requireAuth):[[:space:]]*false|skipAuth'
+# Controllers, routes, API and route handlers, middleware, and auth, session, token and webhook code.
+security_path_pattern='(^|/)(controllers?|routes?|routing|api|middleware|handlers?|endpoints?|webhooks?|callbacks?|policies|guards?)(/|\.[A-Za-z0-9]+$)|(^|/)[^/]*(_controller|[-_.]routes?|[-_.]middleware|[-_.]handler|[-_.]policy)\.[A-Za-z0-9]+$|(^|/)(routes|middleware|route)\.[A-Za-z0-9]+$|(^|/)[^/]*(auth|session|login|password|oauth|sso|jwt|webhook|permission|(access|api|refresh|bearer|csrf|id)[-_]?token)[^/]*\.(rb|erb|py|go|java|kt|php|cs|rs|js|jsx|ts|tsx|mjs|cjs|swift)$'
+security_path=$(grep -vE "$KC_RISK_TEST_PATHS" "$changed_files" | grep -E '\.(sh|bash|js|jsx|ts|tsx|mjs|cjs|rb|erb|py|swift|go|java|kt|php|cs|rs)$' | grep -E "$security_path_pattern" | head -n 1 || true)
+if [ -n "$security_path" ]; then
+  run_gate security "$security_path"
+else
+  security_hit=$(first_source_line "$request_surface_pattern")
+  if [ -n "$security_hit" ]; then
+    run_gate security "an added line reads request input or declares a handler: $security_hit"
+  else
+    skip_gate security "no controller, route, handler, middleware or auth file changed and no added line reads request input"
+  fi
+fi
+
 if [ -f "$repo_root/.claude/review-conventions.md" ]; then
   run_gate project-conventions ".claude/review-conventions.md exists"
 else
@@ -142,3 +175,12 @@ fi
 gates_csv=$(IFS=,; printf '%s' "${selected_gates[*]}")
 printf 'GATES=%s\n' "$gates_csv"
 printf '%s\n' "${gate_lines[@]}"
+
+walk_hit=$(kc_public_path_hit "$changed_files" "$diff_file")
+if [ -n "$walk_hit" ]; then
+  echo "WALK=required"
+  echo "walk: public or guest path, walk it as every audience that can reach it, signed out included ($walk_hit)"
+else
+  echo "WALK=not-required"
+  echo "walk: no public or guest path in the diff"
+fi

@@ -1,0 +1,50 @@
+diff --git a/app/controllers/payments_controller.rb b/app/controllers/payments_controller.rb
+new file mode 100644
+index 0000000..1111111
+--- /dev/null
++++ b/app/controllers/payments_controller.rb
+@@ -0,0 +1,16 @@
++class PaymentsController < ApplicationController
++  skip_before_action :authenticate_user!, only: :return
++
++  def return
++    payment = Payment.find(params[:payment_id])
++    order = Order.find(params[:order_id])
++    order.update!(paid_at: Time.current, payment_id: payment.id)
++    redirect_to params[:return_to]
++  end
++
++  private
++
++  def order_params
++    params.require(:order).permit(:note)
++  end
++end
+diff --git a/config/routes.rb b/config/routes.rb
+index 1111111..2222222 100644
+--- a/config/routes.rb
++++ b/config/routes.rb
+@@ -10,3 +10,6 @@
+ Rails.application.routes.draw do
+   root "orders#index"
++  get "/payments/return", to: "payments#return"
++  resources :invoices, only: [:show]
++  # the invoice page is public
+ end
+diff --git a/app/models/order.rb b/app/models/order.rb
+new file mode 100644
+index 0000000..1111111
+--- /dev/null
++++ b/app/models/order.rb
+@@ -0,0 +1,3 @@
++class Order < ApplicationRecord
++  def paid? = paid_at.present?
++end
+diff --git a/spec/requests/payments_spec.rb b/spec/requests/payments_spec.rb
+new file mode 100644
+index 0000000..1111111
+--- /dev/null
++++ b/spec/requests/payments_spec.rb
+@@ -0,0 +1,2 @@
++  get "/payments/return", params: { payment_id: payment.id }
++  expect(session[:order_id]).to be_nil

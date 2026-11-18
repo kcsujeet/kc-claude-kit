@@ -40,11 +40,9 @@ repo_root=${3:-.}
 max_files=${KC_SMALL_FILES:-5}
 max_lines=${KC_SMALL_LINES:-200}
 
-# Mirrors KC_TEST_PATHS in kc-conventions' scripts/lib/diff-lines.sh.
-test_paths='(\.(test|spec)\.[A-Za-z0-9]+$|_(test|spec)\.[A-Za-z0-9]+$|(^|/)test_[^/]*\.py$|(^|/)(test|tests|spec|__tests__|e2e)/)'
-locale_paths='((^|/)(locales?|i18n|translations|lang)/|\.(po|pot|xlf|xliff)$)'
-generated_paths='((^|/)(package-lock\.json|pnpm-lock\.yaml|yarn\.lock|Gemfile\.lock|Cargo\.lock|poetry\.lock|composer\.lock)$|\.snap$|\.min\.(js|css)$|(^|/)(dist|build|generated|__generated__)/)'
-uncounted_paths="($test_paths|$locale_paths|$generated_paths)"
+# shellcheck source=lib/risk-paths.sh
+. "$(dirname "$0")/lib/risk-paths.sh"
+uncounted_paths=$KC_RISK_UNCOUNTED_PATHS
 
 # Sensitive paths: a change here is never small, whatever its size. Tests, locale and generated
 # files are not checked: a spec of the sign-in controller changes no sign-in.
@@ -78,9 +76,7 @@ changed_lines=$(awk -v skip="$uncounted_paths" '
   /^--- / { if ($0 ~ /^--- a\//) { path = substr($0, 7); counted = (path !~ skip) } next }
   /^[+-]/ { if (counted) n++ }
   END { print n + 0 }' "$diff_file")
-added_code=$(awk -v tests="$test_paths" '
-  /^\+\+\+ / { path = substr($0, 5); sub(/^b\//, "", path); code = (path !~ tests && path != "/dev/null"); next }
-  /^\+/ { if (code) print substr($0, 2) }' "$diff_file")
+added_code=$(kc_added_code "$diff_file")
 
 risk_lines=()
 for rule in "${sensitive_rules[@]}"; do
@@ -94,9 +90,7 @@ deleted_file=$(awk '/^--- a\// { from = substr($0, 7) } /^\+\+\+ \/dev\/null/ { 
 data_delete=$(printf '%s\n' "$added_code" | grep -E -i '\b(drop_table|remove_column|drop table|drop column|delete from|truncate|destroy_all|delete_all)\b' | head -n 1 | sed -E 's/^[[:space:]]+//' | cut -c1-80 || true)
 [ -z "$data_delete" ] || risk_lines+=("risk: deletes data ($data_delete)")
 # A page a signed-out visitor reaches is walked signed out in a fresh browser profile.
-public_path=$(grep -vE "$uncounted_paths" "$changed_files" | grep -E '(^|/)(public|guests?|anonymous)/.*\.(ts|tsx|js|jsx|vue|svelte|rb|erb|py|go|php|html)$' | head -n 1 || true)
-public_code=$(printf '%s\n' "$added_code" | grep -E '\b(is_?[Pp]ublic|is_?[Gg]uest|guest_?[Tt]oken|[Aa]nonymous|[Uu]nauthenticated|[Ss]igned_?[Oo]ut|AllowAnonymous|permitAll)\b|skip_before_action[[:space:]]+:authenticate|/public/' | head -n 1 | sed -E 's/^[[:space:]]+//' | cut -c1-80 || true)
-public_hit=${public_path:-$public_code}
+public_hit=$(kc_public_path_hit "$changed_files" "$diff_file")
 [ -z "$public_hit" ] || risk_lines+=("risk: public or guest path, walk it signed out in a fresh browser profile ($public_hit)")
 
 code_lines=$(printf '%s\n' "$added_code" | grep -vE '^[[:space:]]*(#|//|/\*|\*|--)' || true)

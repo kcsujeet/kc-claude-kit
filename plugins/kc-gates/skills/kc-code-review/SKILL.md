@@ -40,6 +40,7 @@ The correctness gate hunts bugs on every diff. The other gates catch what slips 
 - **A sweep is complete or it did not happen.** Every hit a sweep prints gets its own `file:line` verdict. Never pipe a sweep through `head` or `tail`, take the "first N", sample, or stop reading at the first find: the hit count must equal the verdict count. A sampled sweep fails its box exactly like a sweep never run, because the line nobody read is where the miss is.
 - **Any fix proposed must itself pass every rule, of every gate, and break nothing.** A suggestion is code the author will write because we asked, so it gets the bug check our own change would. Before a suggested change goes into a finding (yours or a gate's), whether written as code or in words, walk it against all the checklists, not only the rule that surfaced it, and list the uses of what it changes (`trace-uses.sh --symbols <names>`), each with a verdict. When it changes behaviour, list every state that reaches the changed line with its result before and after (correctness §B15): a state the fix is not for whose result moves means the suggestion introduces a bug, so rewrite it or drop it. A replacement that still holds a multi-line ternary, a conditional spread, a hand-rolled helper or a subject-less name like `isOn` is worse than no suggestion, because it launders the violation as the reviewer's own recommendation; a replacement that breaks another state is worse still, because the author ships it on the reviewer's word. A name, key, file or location a finding suggests is checked the same way: search the names already beside it (one a letter or a word apart from an existing one reads as a typo, `customerEmail` beside `customersEmail`), and check what would import from the suggested place (a data module importing from a view folder). Examples: a translation key suggested next to one that differs by an "s"; a helper suggested "next to the component" that a data hook then imports; a config key suggested that another setting already uses.
 - **A finding asks for the whole fix, in one comment.** The author fixes what the comment names, so a finding that names one place or one symptom gets one place fixed, and the next round finds the rest. Before it is written, list every place in the diff with the same case (the same state handled in two components, the same field read by two queries) and the whole of what the broken rule asks (the wrapper the rule forbids, not only the helper inside it), and name them all. A finding that asks for a test names the break the test must catch, what the code would wrongly do ("shows the login address when a sending address is set"), not the line or branch to cover: a test written to cover a line can pass with the original bug still in. Examples: a failed-load state flagged on a status badge but not on the form field that shows the same record; a lookup asked out of a data wrapper the rule says should not exist, so the wrapper stays; "test the fallback" answered with a fixture where both values are the same, so swapping their order still passes.
+- **A change a signed-out visitor can reach is walked in the running app before the verdict.** When `select-gates.sh` prints `WALK=required`, the review runs the change in the running app as every audience that can reach it, signed out in a fresh browser profile included, with `kc-verify:kc-ui` and `kc-verify:kc-e2e` (replaying each write a link, callback or return URL triggers with another record's id and once more with the same id), before it writes the verdict. The report's Checklist carries the walk receipt: the audiences walked, what each saw, and what each write did on the replays. A review that printed `WALK=required` and has no receipt is not finished, whatever the gates returned. Reading a handler is not walking it: a public endpoint can pass every gate and still accept another record's id in its return URL.
 - **Cite line numbers, file paths, and head SHA** for every finding. Vague feedback is useless.
 - **Locale diffs require a per-key audit table, never an aggregate grep, never your memory.** This is enforced by the i18n gate agent: if the diff touches translation/locale files, that agent must produce a per-key audit table (one row per new key, checking namespace placement, pluralization, naming, and duplication; see the `kc-conventions:kc-i18n` skill's §I1) as its evidence, and a missing/incomplete table is a gate FAIL. You may NOT write any locale verdict, including "no new keys", "no issues this round", or silently dropping i18n from the checklist, without the table. An aggregate report ("greped N keys, all unique") is an automatic incomplete review: a direct-duplicate grep alone cannot catch a generic noun that belongs in a shared strings file, a singular-only label that should be a plural-aware key, or a key whose name doesn't match its own value. "It matches the neighbors" / "low-value" / "no new keys" are the three rationalizations that have caused this miss; none of them is valid without the table.
 
@@ -78,7 +79,7 @@ If a script fails, relay its message; fall back to the equivalent `gh`/`git` com
 
 ### Step 2: dispatch the gate agents in two phases (mandatory: every gate the diff needs, EVERY round)
 
-First decide which phase-1 gates this diff needs, by script, never by judgment: `bash "${CLAUDE_PLUGIN_ROOT}/scripts/select-gates.sh" "$DIFF_FILE" "$CHANGED_FILES"`, from the target repo's root. It prints `GATES=` (the gates to dispatch) and one line per gate saying why it runs or why it is N/A, read from the changed files and the added lines (a React gate only when the diff has `.jsx`/`.tsx` files or a changed module imports React, a Rails gate only for Ruby, rake, Gemfile or `db/` files, and so on).
+First decide which phase-1 gates this diff needs, by script, never by judgment: `bash "${CLAUDE_PLUGIN_ROOT}/scripts/select-gates.sh" "$DIFF_FILE" "$CHANGED_FILES"`, from the target repo's root. It prints `GATES=` (the gates to dispatch) and one line per gate saying why it runs or why it is N/A, then `WALK=required` or `WALK=not-required` with its reason (see the hard rule on the walk), read from the changed files and the added lines (a React gate only when the diff has `.jsx`/`.tsx` files or a changed module imports React, a Rails gate only for Ruby, rake, Gemfile or `db/` files, and so on).
 
 Dispatch each listed gate with the Agent tool, `subagent_type` set to the agent name below. Phase 1 runs in parallel: issue every listed gate's Agent call in a single message. Phase 2 (verification) runs only after every phase-1 agent has returned, because it audits their returned verdict blocks rather than re-deriving findings.
 
@@ -98,6 +99,7 @@ Each topic gate preloads its `kc-conventions:kc-<topic>` skill, so it already ho
 | i18n | `kc-gates:i18n-gate` | when a locale file changed or an added line calls a translation |
 | testing | `kc-gates:testing-gate` | always; agent returns PASS (N/A) if the diff changes no behavior and touches no test file |
 | correctness | `kc-gates:correctness-gate` | always |
+| security | `kc-gates:security-gate` | when a controller, route, API or route handler, middleware or auth, session, token or webhook file changed, or an added line reads request input or declares a handler |
 | project-conventions | `kc-gates:project-conventions-gate` | when the target repo has `.claude/review-conventions.md` |
 
 **Phase 2: dispatch only after every phase-1 agent has returned.**
@@ -210,6 +212,7 @@ Report directly in chat. No file output. **Be terse.** The reader is the user, n
 | i18n | ... |
 | testing | ... |
 | correctness | ... |
+| security | ... |
 | project-conventions | ... |
 | verification | ... |
 
@@ -230,6 +233,7 @@ Report directly in chat. No file output. **Be terse.** The reader is the user, n
 - Scope: <§G1-§G5 results, e.g. "not stacked (author has no other open PR); title matches; no linked issue; diff read whole; approach: weighed one grouping step for both cases, the diff's two are needed because <reason>">.
 - <trigger group>: <receipt, or "n/a, diff does not touch X">.
 - Uses: <n> names, <n> uses, <n> break, <n> change; <n> tests run, <n> failed (or why they couldn't run).
+- Walk: <`WALK=not-required`, or the audiences walked (signed out included), what each saw, and each replayed write's result>.
 - Integrity: <n> fixes re-checked; <n> rewrites checked; <n> findings, <n> verified, <n> dropped, <n> fail safe.
 
 **Dropped:** (only when a finding failed the lead-not-fact check) `<file>:L<n>` <finding>: <one-clause reason>. One entry per dropped finding.
@@ -274,7 +278,7 @@ This skill does not draft or post PR comments. To turn findings into comments, o
 
 ## What this skill is not
 
-- It is not a generic style linter substitute and it is not a security review. Stay focused on the gates above plus any repo-declared conventions.
+- It is not a generic style linter substitute and it is not a penetration test: the security gate grades the diff against `kc-security`, nothing more. Stay focused on the gates above plus any repo-declared conventions.
 - It does not post to GitHub on its own.
 
 ## Notes for iteration
@@ -291,6 +295,7 @@ This skill is in active iteration. When the user gives feedback ("you missed X",
    - Rails models, layers, queries and N+1s, request risks, backfills, Rails specs → `plugins/kc-conventions/skills/kc-rails/SKILL.md`
    - Translations / locale keys → `plugins/kc-conventions/skills/kc-i18n/SKILL.md`
    - Test coverage, assertions, test setup, test placement → `plugins/kc-conventions/skills/kc-testing/SKILL.md`
+   - Who may call a handler, ids that must belong together, replay, scoping, server-owned values, secrets, redirects, injection → `plugins/kc-conventions/skills/kc-security/SKILL.md`
    - Logic bugs, edge cases, data-shape mismatches, regressions of fixed bugs → `plugins/kc-conventions/skills/kc-correctness/SKILL.md`
    - A new deterministic sweep → a script in that topic's `scripts/`, listed under its `## Sweeps`, with a fixture in `plugins/kc-conventions/tests/sweeps/`
    - Receipts one gate must show for another → `plugins/kc-gates/agents/verification-gate.md`

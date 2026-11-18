@@ -70,6 +70,7 @@ Convention topics, each a skill at `plugins/kc-conventions/skills/kc-<topic>/SKI
 | i18n | yes | `kc-gates:i18n-gate` |
 | testing | yes | `kc-gates:testing-gate` |
 | correctness | yes | `kc-gates:correctness-gate` |
+| security | yes | `kc-gates:security-gate` |
 | type-safety | no (rules only) | |
 | error-handling | no (rules only) | |
 | performance | no (rules only) | |

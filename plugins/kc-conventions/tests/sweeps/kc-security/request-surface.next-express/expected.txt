@@ -1,0 +1,13 @@
+app/api/orders/[id]/route.ts:1: import { NextRequest, NextResponse } from "next/server"
+app/api/orders/[id]/route.ts:3: export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+app/api/orders/[id]/route.ts:4:   const token = request.headers.get("authorization")
+app/api/orders/[id]/route.ts:5:   const returnTo = new URL(request.url).searchParams.get("return_to")
+app/api/orders/[id]/route.ts:6:   const order = await db.order.findUnique({ where: { id: params.id } })
+app/api/orders/[id]/route.ts:10: export const POST = async (request: NextRequest) => {
+app/api/orders/[id]/route.ts:11:   const body = await request.json()
+src/server/orders-router.js:2: router.get("/orders/:id", requireAuth, async (req, res) => {
+src/server/orders-router.js:3:   const order = await Order.findById(req.params.id)
+src/server/orders-router.js:6: router.post("/orders/:id/pay", async (req, res) => {
+src/server/orders-router.js:7:   const session = req.cookies.checkout
+src/server/orders-router.js:8:   await charge(order, req.body.amount)
+src/server/orders-router.js:10: app.use(express.json())
