@@ -4,6 +4,7 @@
 # repeated request triggers again, §SEC5 a value the server owns taken from the request), and a
 # receipt action scoped to the signed-in shopper that returns named fields, with its request spec,
 # which it should not flag.
+# A guard: the kit without the security rules catches these in some runs, so it proves no §SEC box.
 # Every action sits behind the sign-in filter on main, so no path is open to signed-out visitors.
 # Graders accept a finding bullet that names the file, or bullets under a line that names it.
 set -euo pipefail
