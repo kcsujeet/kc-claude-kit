@@ -278,7 +278,7 @@ This skill does not draft or post PR comments. To turn findings into comments, o
 
 ## What this skill is not
 
-- It is not a generic style linter substitute and it is not a security review. Stay focused on the gates above plus any repo-declared conventions.
+- It is not a generic style linter substitute and it is not a penetration test: the security gate grades the diff against `kc-security`, nothing more. Stay focused on the gates above plus any repo-declared conventions.
 - It does not post to GitHub on its own.
 
 ## Notes for iteration

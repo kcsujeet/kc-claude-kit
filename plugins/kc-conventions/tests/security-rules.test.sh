@@ -35,6 +35,7 @@ box §SEC9 'grepped request surface: 0 hits'
 for section in §SEC1 §SEC2 §SEC3 §SEC4 §SEC5 §SEC6 §SEC7 §SEC8 §SEC9; do
   grep -qE "^### $section\. " "$skill" || fail "$section has a checklist box but no detail section"
 done
+! sed -n '/^### §SEC7\. /,/^### §SEC8\. /p' "$skill" | grep -qE ' \? .+ : ' || fail "§SEC7's Prefer example must not be a ternary (clarity §C15): gates copy it into fixes"
 sed -n '/^## Sweeps/,$p' "$skill" | grep -q 'skills/kc-security/scripts/request-surface.sh' || fail "Sweeps must list request-surface.sh"
 [ -x "$plugin_dir/skills/kc-security/scripts/request-surface.sh" ] || fail "request-surface.sh must be executable"
 grep -q 'ids the request supplies that must belong together are checked together' "$rule" \

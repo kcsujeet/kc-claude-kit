@@ -27,6 +27,8 @@ grep -q 'kc-conventions:kc-security' "$gate" || fail "security-gate preloads kc-
 [ "$(wc -l < "$review")" -lt 500 ] || fail "kc-code-review SKILL.md must stay under 500 lines"
 grep -q '§SEC9' "$plugin_dir/../kc-conventions/skills/kc-security/SKILL.md" || fail "the security skill's §SEC9 box is missing"
 grep -q 'replayed with another record' "$plugin_dir/../kc-verify/skills/kc-e2e/SKILL.md" || fail "kc-e2e: the replay box"
+! grep -q 'it is not a security review' "$review" || fail "kc-code-review: 'What this skill is not' must not deny the security gate it runs"
+grep -q 'correctness, security, project-conventions, this gate) was walked' "$verification" || fail "verification-gate self-review: the gate list includes security"
 
 [ "$failures" -eq 0 ] && echo "ok   security walk text"
 exit "$failures"

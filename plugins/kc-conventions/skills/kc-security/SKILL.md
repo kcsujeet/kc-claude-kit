@@ -129,7 +129,9 @@ Serialize named fields, never a whole record: the next column added to the table
 redirect_to params[:return_to]
 return_to.start_with?("https://shop.example")
 # Prefer: a relative path only, or a parsed host in an allowlist
-redirect_to(allowed_return_path?(params[:return_to]) ? params[:return_to] : root_path)
+return_to = params[:return_to]
+return redirect_to(root_path) unless allowed_return_path?(return_to)
+redirect_to return_to
 ```
 
 Parse the URL and compare its host, or accept only relative paths that start with a single `/` (not `//`). The same applies to callback and webhook targets the caller names.
