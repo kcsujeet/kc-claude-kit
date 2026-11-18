@@ -211,6 +211,11 @@ name_problems=$(bash "$(dirname "$0")/check-draft-names.sh" "$drafts_file" "$hea
 if [ -n "$name_problems" ]; then
   problems=$(printf '%s\n%s\n' "$problems" "$name_problems" | grep . | sort -t' ' -k2,2n -s)
 fi
+# Code shown in a comment that appears nowhere in the repo (run from the repo; skipped elsewhere).
+code_problems=$(bash "$(dirname "$0")/check-draft-code.sh" "$drafts_file" "$head_sha") || true
+if [ -n "$code_problems" ]; then
+  problems=$(printf '%s\n%s\n' "$problems" "$code_problems" | grep . | sort -t' ' -k2,2n -s)
+fi
 
 if [ -n "$problems" ]; then
   failing_count=$(printf '%s\n' "$problems" | sed 's/^draft \([0-9]*\).*/\1/' | sort -u | wc -l | tr -d ' ')

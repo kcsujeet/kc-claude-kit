@@ -25,6 +25,12 @@
 #   - when it is an `issue` or a `suggestion`, carry a "ran" record: a change asked for in a
 #     review is code the author writes on the reviewer's word, so it is run before it is asked
 #     for, not only read (kc-post-review's "Verified before suggested"). An "n/a" needs a reason;
+#   - use none of a short list of hard words (gated, callers, derive, invariant, predicate and the
+#     like): a comment is read by a person, so it says the thing in everyday words;
+#   - when it asks for a test, carry a "ran" that says the test failed with the bug put back: a
+#     suggested test that still passes with the bug in place guards nothing;
+#   - when it says something about an earlier review ("last round", "I was wrong"), carry a "ran"
+#     that is not "n/a": a claim that reverses or repeats an earlier comment is checked again first;
 #   - when it is an `issue`, carry a "ran" that is not "n/a": an issue says something is broken,
 #     so the break is reproduced (a failing test, a request, a capture) before it is claimed;
 #   - when it is on a file people see rendered (a component, template or stylesheet; not a test,
@@ -96,6 +102,18 @@ perl -MJSON::PP -CS -e '
       } elsif ($first =~ /^\*\*issue\b/ && $ran =~ m{^\s*n/?a\b}i) {
         push @found, "is an issue with \"ran\": n/a; an issue says something is broken, so reproduce it (a failing test, a request, a screenshot) and say in \"ran\" what showed it, or use another label";
       }
+    }
+    my $ran_record = ref $draft->{ran} ? "" : ($draft->{ran} // "");
+    # Words a reader has to stop and decode; each has an everyday way to say it.
+    my $hard_words = qr/\b(gated|ungated|callers?|derived?|derives|semantics|invariants?|predicates?|passthrough|upstream|downstream|idempotent|coerced?|coerces|hydrated?|truthy|falsy|mutates?|memoi[sz]ed?)\b/i;
+    if ($prose =~ $hard_words) {
+      push @found, "uses the hard word \"$1\"; say it in everyday words (who sees what, what happens)";
+    }
+    if ($prose =~ /\b(a|an|one|another|the) (new )?(test|spec)\b|\btests? (for|that|here|like)\b/i && $ran_record !~ /\bfail/i) {
+      push @found, "asks for a test with no proof it catches the bug: write it, put the bug back, and say in \"ran\" that it failed";
+    }
+    if ($prose =~ /\b(last|earlier|previous|first|second) (round|review)\b|\bI was wrong\b/i && ($ran_record !~ /\S/ || $ran_record =~ m{^\s*n/?a\b}i)) {
+      push @found, "says something about an earlier review with nothing run behind it: check that claim again and say in \"ran\" what showed it";
     }
     my $path = $draft->{path} // "";
     my $rendered = $path =~ /\.(tsx|jsx|vue|svelte|astro|html?|erb|haml|slim|hbs|handlebars|mustache|twig|liquid|css|scss|sass|less|styl)$/i
