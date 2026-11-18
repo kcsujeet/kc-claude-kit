@@ -23,17 +23,18 @@ edit_line() { sed "$3s/.*/changed/" "$1/$2" > "$work_dir/edit.tmp" && mv "$work_
 # Leaves the repo clean at HEAD.
 reset_repo() { git -C "$1" reset -q --hard HEAD; }
 
-# A repo on main with a remote: commit A writes f.txt and q.sql (receipted), commit B writes g.txt (no receipt).
+# A repo on main with a remote: commit A writes f.txt and q.sql (receipted), commit B writes g.txt and a first line of q.sql (no receipt).
 make_repo() {
   git init -q -b main "$1"
   git init -q --bare "$1.git"
   git -C "$1" remote add origin "$1.git"
   write_lines "$1/f.txt" a
-  printf -- '-- c1\nselect 1;\nselect 2;\nselect 3;\nselect 4;\nselect 5;\n' > "$1/q.sql"
+  printf -- 'select 1;\nselect 2;\nselect 3;\nselect 4;\nselect 5;\n' > "$1/q.sql"
   run_git_in "$1" add f.txt q.sql
   run_git_in "$1" commit -q -m "fix f"
   write_lines "$1/g.txt" b
-  run_git_in "$1" add g.txt
+  printf -- '-- c1\n' | cat - "$1/q.sql" > "$1/q.sql.new" && mv "$1/q.sql.new" "$1/q.sql"
+  run_git_in "$1" add g.txt q.sql
   run_git_in "$1" commit -q -m "add g"
   git -C "$1" push -q origin main
 }
