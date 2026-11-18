@@ -85,6 +85,25 @@ expect_eq "§PC4: a capture newer than the head commit is clean" clean "$fresh_c
 unknown_head_result=$(cd "$repo" && bash "$check" "$work_dir/ui-old.json" 0000000000000000000000000000000000000000 && echo clean || true)
 expect_eq "§PC4: a head the repo doesn't know skips the age check" clean "$unknown_head_result"
 
+# --- a draft is read by a person, and every claim in it was run (kc-post-review §PC5) -----------
+draft "$work_dir/hard-word.json" $'**suggestion**:\nThe discount is ungated, so every caller sees it.'
+expect_contains "§PC5: a hard word is flagged" 'uses the hard word "ungated"' "$(result "$work_dir/hard-word.json")"
+draft "$work_dir/plain.json" $'**suggestion**:\nThe discount shows to everyone, guests included.'
+expect_eq "§PC5: the same point in everyday words is clean" clean "$(result "$work_dir/plain.json")"
+draft "$work_dir/test-ask.json" $'**todo**:\nA test that empties the cart would catch the old total.' '{}'
+expect_contains "§PC5: asking for a test with no failing run is flagged" "asks for a test with no proof" "$(result "$work_dir/test-ask.json")"
+draft "$work_dir/test-ask-ok.json" $'**todo**:\nA test that empties the cart would catch the old total.' '{ran: "wrote it; with the reset removed it failed, with it in place it passed"}'
+expect_eq "§PC5: asking for a test that was seen to fail is clean" clean "$(result "$work_dir/test-ask-ok.json")"
+draft "$work_dir/earlier.json" $'**question**:\nI was wrong last round about the totals. Do archived items count?' '{}'
+expect_contains "§PC5: a claim about an earlier review with nothing run is flagged" "earlier review with nothing run" "$(result "$work_dir/earlier.json")"
+draft "$work_dir/earlier-ok.json" $'**question**:\nI was wrong last round about the totals. Do archived items count?' '{ran: "cart spec with an archived item: the total leaves it out"}'
+expect_eq "§PC5: a claim about an earlier review with a run is clean" clean "$(result "$work_dir/earlier-ok.json")"
+
+draft "$work_dir/earlier-na.json" $'**question**:\nI was wrong last round about the totals. Do archived items count?' '{ran: "n/a: no change"}'
+expect_contains "§PC5: a claim about an earlier review with \"ran\": n/a is flagged" "earlier review with nothing run" "$(result "$work_dir/earlier-na.json")"
+draft "$work_dir/names-test.json" $'**suggestion**:\nThe test above sets the archived flag, so the total looks right by luck.' '{ran: "n/a: asks for no behaviour change"}'
+expect_eq "§PC5: naming an existing test is not asking for one" clean "$(result "$work_dir/names-test.json")"
+
 # --- slips the checklist exists for ---------------------------------------------------------
 draft "$work_dir/no-label.json" 'Good catch on the rounding. Could this use the shared formatter?'
 no_label=$(result "$work_dir/no-label.json")

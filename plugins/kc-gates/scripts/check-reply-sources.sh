@@ -12,6 +12,9 @@
 #     (payments, hosting, cloud, code host): the turn must have run that CLI itself, at the start
 #     of a command, or named a path in its config folder.
 #
+# A reply that lists look-back lessons when the session never ran `feedback-ledger.sh list` is
+# noted: a look-back written from memory keeps the feedback that stood out and drops the rest.
+#
 # A turn whose latest message was only a question (is_only_question) and that made Edit or Write
 # calls is noted too: a question is not a change request.
 #
@@ -101,6 +104,18 @@ reload_line_asked=$(jq -L "$(dirname "$0")/lib" -rs '
 first_line=$(printf '%s\n' "$reply" | grep -m1 -v '^[[:space:]]*$')
 if [ "$reload_line_asked" = true ] && ! printf '%s' "$first_line" | grep -Eiq 'reload|install'; then
   misses+=("Plugins were installed in that turn, and the reply's first line didn't give the reload status.")
+fi
+
+# Any tool call in the whole session (not only this turn) whose input ran the ledger's list.
+ledger_listed=$(jq -rs '[.[] | select(.type == "assistant") | .message.content[]? | select(.type == "tool_use")
+  | .input | tostring | select(test("feedback-ledger\\.sh\"?[ \\t]+list\\b"))] | length > 0' "$transcript" 2>/dev/null)
+lists_look_back_lessons=false
+reply_one_line=$(printf '%s' "$reply" | tr '\n' ' ')
+if printf '%s' "$reply_one_line" | grep -Eiq 'look[- ]?back' && printf '%s' "$reply_one_line" | grep -Eiq 'lessons?'; then
+  lists_look_back_lessons=true
+fi
+if [ "$lists_look_back_lessons" = true ] && [ "$ledger_listed" != true ]; then
+  misses+=("It listed look-back lessons without running feedback-ledger.sh list over the session; run it, then give every item, the person's feedback included, a verdict.")
 fi
 
 if printf '%s' "$reply" | tr '\n' ' ' | grep -Eiq "$UNCERTAIN_CLAIM"; then

@@ -153,4 +153,22 @@ expect_eq "names: a draft suggesting a near twin of an existing name fails" 1 "$
 expect_contains "names: the existing name is given" "one letter from \`widgetTotals\`" "$(cat "$work_dir/names.err")"
 expect_eq "names: nothing is written" "absent" "$([ -e "$work_dir/out-names/review.json" ] && echo present || echo absent)"
 
+# --- the code check runs from the repo (kc-post-review §PC5) -------------------------------------
+code_repo=$work_dir/code-repo
+git init -q "$code_repo"
+printf 'line one\nline two\n' > "$code_repo/cart.rb"
+git -C "$code_repo" add -A
+git -C "$code_repo" -c user.email=t@example.com -c user.name=t commit -q -m one
+code_sha=$(git -C "$code_repo" rev-parse HEAD)
+printf 'diff --git a/cart.rb b/cart.rb\n--- a/cart.rb\n+++ b/cart.rb\n@@ -1,2 +1,2 @@\n line one\n-line two\n+line 2\n' > "$work_dir/code.diff"
+jq -n '[{path: "cart.rb", line: 2, body: "**question**:\nCould this use `discount(cart) { false }` here?"}]' > "$work_dir/invented-code.json"
+code_status=0
+(cd "$code_repo" && bash "$builder" "$work_dir/invented-code.json" "$work_dir/code.diff" "$code_sha" --pr 12 --out-dir "$work_dir/out-code") > /dev/null 2> "$work_dir/code-stderr.txt" || code_status=$?
+expect_eq "§PC5: the builder refuses code found nowhere in the repo" 1 "$code_status"
+expect_contains "§PC5: it says why" "appears nowhere in the repo" "$(cat "$work_dir/code-stderr.txt")"
+jq '.[0].new = "the comment says it is new"' "$work_dir/invented-code.json" > "$work_dir/new-code.json"
+new_status=0
+(cd "$code_repo" && bash "$builder" "$work_dir/new-code.json" "$work_dir/code.diff" "$code_sha" --pr 12 --out-dir "$work_dir/out-new") > /dev/null 2>&1 || new_status=$?
+expect_eq "§PC5: new code with a reason builds" 0 "$new_status"
+
 finish
