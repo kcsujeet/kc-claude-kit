@@ -7,8 +7,8 @@
 #   - An instruction file is CLAUDE.md or AGENTS.md, anything under a .claude/rules/ folder,
 #     .claude/review-conventions.md, .claude/hand-off-checklist.md, a SKILL.md under a skills/
 #     folder, or a Markdown file directly in a rules/ folder.
-#   - A check file is a script, hook, test, eval, CI workflow or lint-rule file (lib/check-paths.sh,
-#     the list feedback-ledger.sh check reads too).
+#   - A check file is a script, hook, test, eval, CI workflow or lint-rule file (KC_CHECK_PATHS in
+#     lib/risk-paths.sh, the list feedback-ledger.sh check reads too).
 #   - Deletions and rewording pass: the count is added minus removed non-blank lines, over every
 #     instruction file in the commit, and it must be above 0 to block.
 #
@@ -27,10 +27,8 @@ set -u
 scripts_dir=$(dirname "$0")
 # shellcheck source=lib/hook-input.sh
 . "$scripts_dir/lib/hook-input.sh"
-# shellcheck source=lib/commit-diff.sh
-. "$scripts_dir/lib/commit-diff.sh"
-# shellcheck source=lib/check-paths.sh
-. "$scripts_dir/lib/check-paths.sh"
+# shellcheck source=lib/risk-paths.sh
+. "$scripts_dir/lib/risk-paths.sh"
 
 readonly APPROVAL_TOKEN='KC_PROSE_APPROVED=1'
 readonly INSTRUCTION_PATHS='(^|/)(CLAUDE|AGENTS)\.md$|(^|/)\.claude/(rules/|review-conventions\.md$|hand-off-checklist\.md$)|(^|/)skills/(.*/)?SKILL\.md$|(^|/)rules/[^/]+\.md$'

@@ -11,6 +11,11 @@ KC_RISK_SOURCE_PATHS='\.(sh|bash|js|jsx|ts|tsx|mjs|cjs|rb|erb|py|swift|go|java|k
 # Width a line is cut to when a script quotes it as the reason for a verdict.
 # shellcheck disable=SC2034 # read by pass-size.sh
 KC_SNIPPET_WIDTH=80
+# The paths a check lives in: a script, hook, test, eval, CI workflow or lint-rule file. Read by
+# feedback-ledger.sh (a lesson needs one in its diff) and guard-prose-rule.sh (a new rule needs one
+# in its commit), so the two never disagree about what counts.
+# shellcheck disable=SC2034 # read by the scripts that source this file
+KC_CHECK_PATHS='(^|/)(tests?|evals|hooks|scripts)/|(^|/)\.github/workflows/|\.(sh|bats)$|\.(test|spec)\.[A-Za-z]+$|_(test|spec)\.[A-Za-z]+$|(^|/)(biome\.json|eslint[^/]*|\.rubocop\.yml)$'
 KC_RISK_UNCOUNTED_PATHS="($KC_RISK_TEST_PATHS|$KC_RISK_LOCALE_PATHS|$KC_RISK_GENERATED_PATHS)"
 
 # kc_added_code <diff-file> [<path-ERE>]: the added lines of files that are not tests, without the `+`;

@@ -120,8 +120,8 @@ escape_file_name() {
 readonly RULE_FILE_PATH='(^|/)(rules|\.claude)/|(^|/)(CLAUDE|AGENTS|SKILL)\.md$'
 
 run_check() {
-  # shellcheck source=lib/check-paths.sh
-  . "$(dirname "$0")/lib/check-paths.sh"
+  # shellcheck source=lib/risk-paths.sh
+  . "$(dirname "$0")/lib/risk-paths.sh"
   local feedback_list=${1:-} ledger=${2:-} diffs=() rules_dirs=()
   [ -n "$feedback_list" ] && [ -n "$ledger" ] || usage
   shift 2

@@ -30,8 +30,6 @@ set -u
 scripts_dir=$(dirname "$0")
 # shellcheck source=lib/hook-input.sh
 . "$scripts_dir/lib/hook-input.sh"
-# shellcheck source=lib/commit-diff.sh
-. "$scripts_dir/lib/commit-diff.sh"
 
 readonly APPROVAL_TOKEN='KC_LOOP_APPROVED=1'
 readonly HANDED_OFF_DAYS=7
