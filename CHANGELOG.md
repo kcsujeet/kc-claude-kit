@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Changed (security gate cleanup: one request-surface pattern, one added-code function)
+
+- `kc-conventions` 2.6.1: the `request_surface_pattern` lives once, in the new sourced `scripts/lib/request-surface-pattern.sh`, read by `request-surface.sh`; its awk conditions are named. Behavior is unchanged.
+- `kc-gates` 3.13.1 (depends on `kc-conventions` ^2.6.1): `select-gates.sh` sources that pattern from the installed kc-conventions (beside this plugin in a checkout, the highest version in the plugin cache) instead of keeping a copy, so the drift test is gone. `risk-paths.sh` has one `kc_added_code <diff> [<path-ERE>]` and one source-extension list, and names the 80-column snippet width; `first_added_line` takes the lines to read, replacing `first_source_line`. Tests: a shared helper for select-gates calls and clearer test names, and a plugin-cache-layout case. Behavior is unchanged.
+
 ### Added (a security gate, and a running-app walk for public paths)
 
 - `kc-conventions` 2.6.0 (a minor: a new skill): `kc-security` holds the rules and nine review boxes (§SEC1 to §SEC9) for request-handling code: who may call an action, ids the request supplies that must belong together, replay of a write a link or callback can trigger, scoping of every lookup, values the server must own, secrets and personal data in responses, logs and URLs, redirect targets, and injection. Its sweep `request-surface.sh` lists every added line that reads request input, declares a route or handler, or skips an authentication filter, so each hit gets a verdict; fixtures cover Rails, Next route handlers, express and a no-hit diff, and `run-sweeps.sh` now accepts `<sweep>.<case>` fixture folders. `rules/kc-security.md` is generated. `lint-rules.sh` reads box ids of up to three letters. It catches a public payment endpoint that passed every gate because no gate owned authorization, replay or tampering; it also catches a download endpoint that checks sign-in but not ownership and a callback that trusts a client-sent amount.

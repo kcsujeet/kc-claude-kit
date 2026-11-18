@@ -35,28 +35,36 @@ repo_root=${3:-.}
 [ -f "$diff_file" ] || { echo "$script_name: no such diff: $diff_file" >&2; exit 2; }
 [ -f "$changed_files" ] || { echo "$script_name: no such file list: $changed_files" >&2; exit 2; }
 
+plugin_root=$(cd "$(dirname "$0")/.." && pwd)
 # shellcheck source=lib/risk-paths.sh
-. "$(dirname "$0")/lib/risk-paths.sh"
+. "$plugin_root/scripts/lib/risk-paths.sh"
 
-# The diff's added lines, without the `+++ b/path` headers.
-added_lines=$(grep -E '^\+' "$diff_file" | grep -vE '^\+\+\+ ' || true)
+# kc-conventions is installed beside this plugin: next to it in a checkout, or under the highest
+# version of its own folder in the plugin cache (cache/<marketplace>/<plugin>/<version>).
+conventions_root=$plugin_root/../kc-conventions
+if [ ! -d "$conventions_root" ]; then
+  conventions_root=$(find "$plugin_root/../../kc-conventions" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | sort -V | tail -n 1 || true)
+fi
+pattern_lib=$conventions_root/scripts/lib/request-surface-pattern.sh
+[ -f "$pattern_lib" ] || { echo "$script_name: kc-conventions (scripts/lib/request-surface-pattern.sh) not found beside $plugin_root" >&2; exit 2; }
+# shellcheck source=../../kc-conventions/scripts/lib/request-surface-pattern.sh
+. "$pattern_lib"
+
+# The diff's added lines, without the `+++ b/path` headers or the `+`.
+added_lines=$(grep -E '^\+' "$diff_file" | grep -vE '^\+\+\+ ' | sed 's/^+//' || true)
 
 # Added lines of non-test source files, for the checks that read code and not prose.
-added_source=$(kc_added_source_code "$diff_file")
-
-# Prints the first added source line matching an extended regex, trimmed, or nothing.
-first_source_line() {
-  printf '%s\n' "$added_source" | grep -E "$1" | head -n 1 | sed -E 's/^[[:space:]]+//' | cut -c1-80 || true
-}
+added_source=$(kc_added_code "$diff_file" "$KC_RISK_SOURCE_PATHS")
 
 # Prints the first changed path matching an extended regex, or nothing.
 first_changed_path() {
   grep -E "$1" "$changed_files" | head -n 1 || true
 }
 
-# Prints the first added line matching an extended regex, trimmed, or nothing.
+# first_added_line <regex> [<lines>]: the first of <lines> (default: every added line) matching an
+# extended regex, trimmed, or nothing. Pass "$added_source" to read code and not prose.
 first_added_line() {
-  printf '%s\n' "$added_lines" | grep -E "$1" | head -n 1 | sed -E 's/^\+[[:space:]]*//' | cut -c1-80 || true
+  printf '%s\n' "${2-$added_lines}" | grep -E "$1" | head -n 1 | sed -E 's/^[[:space:]]+//' | cut -c1-"$KC_SNIPPET_WIDTH" || true
 }
 
 # True when any package.json in the repo depends on React, so a `use…` function there is a React
@@ -149,16 +157,15 @@ fi
 run_gate testing "always"
 run_gate correctness "always"
 
-# A request handler, or the code around one. Keep request_surface_pattern identical to the one in
-# kc-conventions' skills/kc-security/scripts/request-surface.sh; select-gates.test.sh checks it.
-request_surface_pattern='(^|[^A-Za-z0-9_$])(params|cookies|session|headers)(\[|\.[A-Za-z_])|(^|[^A-Za-z0-9_$])(cookies|headers)\(|(^|[^A-Za-z0-9_$])(req|request|ctx|context|event)\.(params|query|body|headers|cookies|session|ip|url|originalUrl|nextUrl|args|form|json|data|GET|POST|FILES|formData|text|queryStringParameters|pathParameters|remote_ip|referer|referrer|original_url|host|authorization|user_agent)|(^|[^A-Za-z0-9_$])(searchParams|nextUrl|query_params|URLParam|FormValue|PostForm)|\.URL\.Query\(|\.Header\.Get\(|(^|[^A-Za-z0-9_$])(app|router|server|api)\.(get|post|put|patch|delete|all|use|route)\(|export[[:space:]]+(async[[:space:]]+)?(function|const)[[:space:]]+(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS)([^A-Za-z0-9_]|$)|export[[:space:]]+(default[[:space:]]+)?(async[[:space:]]+)?function[[:space:]]+(handler|middleware)([^A-Za-z0-9_]|$)|NextApiRequest|NextRequest|@(Get|Post|Put|Patch|Delete|Controller|RequestMapping)\(|@(app|router)\.(route|get|post|put|patch|delete)\(|HandleFunc\(|class[[:space:]]+[A-Za-z0-9_:]*Controller|(before|around|prepend_before)_action|skip_(before|after|around)_(action|filter)|skip_forgery_protection|skip_authorization|skip_authentication|skip_verify_authorized|allow_unauthenticated_access|protect_from_forgery|csrf_exempt|AllowAnonymous|permitAll|@Public\(|public:[[:space:]]*true|(auth|authenticate|requireAuth):[[:space:]]*false|skipAuth'
+# A request handler, or the code around one: request_surface_pattern is the pattern the security
+# sweep (kc-conventions' request-surface.sh) matches request input with.
 # Controllers, routes, API and route handlers, middleware, and auth, session, token and webhook code.
 security_path_pattern='(^|/)(controllers?|routes?|routing|api|middleware|handlers?|endpoints?|webhooks?|callbacks?|policies|guards?)(/|\.[A-Za-z0-9]+$)|(^|/)[^/]*(_controller|[-_.]routes?|[-_.]middleware|[-_.]handler|[-_.]policy)\.[A-Za-z0-9]+$|(^|/)(routes|middleware|route)\.[A-Za-z0-9]+$|(^|/)[^/]*(auth|session|login|password|oauth|sso|jwt|webhook|permission|(access|api|refresh|bearer|csrf|id)[-_]?token)[^/]*\.(rb|erb|py|go|java|kt|php|cs|rs|js|jsx|ts|tsx|mjs|cjs|swift)$'
 security_path=$(grep -vE "$KC_RISK_TEST_PATHS" "$changed_files" | grep -E '\.(sh|bash|js|jsx|ts|tsx|mjs|cjs|rb|erb|py|swift|go|java|kt|php|cs|rs)$' | grep -E "$security_path_pattern" | head -n 1 || true)
 if [ -n "$security_path" ]; then
   run_gate security "$security_path"
 else
-  security_hit=$(first_source_line "$request_surface_pattern")
+  security_hit=$(first_added_line "$request_surface_pattern" "$added_source")
   if [ -n "$security_hit" ]; then
     run_gate security "an added line reads request input or declares a handler: $security_hit"
   else

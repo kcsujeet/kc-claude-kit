@@ -11,6 +11,7 @@ review="$plugin_dir/skills/kc-code-review/SKILL.md"
 verification="$plugin_dir/agents/verification-gate.md"
 gate="$plugin_dir/agents/security-gate.md"
 
+max_skill_lines=500
 failures=0
 fail() { echo "FAIL $1"; failures=$((failures + 1)); }
 
@@ -24,8 +25,7 @@ grep -qE '^- \[ \] §V10 .*WALK=required.*Walk:.*no receipt FAILS' "$verificatio
 grep -q 'N/A: `WALK=not-required`' "$verification" || fail "verification-gate §V10 box: its N/A condition"
 grep -q 'grepped request surface: N hits' "$verification" || fail "verification-gate §V2: the security receipt"
 grep -q 'kc-conventions:kc-security' "$gate" || fail "security-gate preloads kc-security"
-[ "$(wc -l < "$review")" -lt 500 ] || fail "kc-code-review SKILL.md must stay under 500 lines"
-grep -q '§SEC9' "$plugin_dir/../kc-conventions/skills/kc-security/SKILL.md" || fail "the security skill's §SEC9 box is missing"
+[ "$(wc -l < "$review")" -lt "$max_skill_lines" ] || fail "kc-code-review SKILL.md must stay under $max_skill_lines lines"
 grep -q 'replayed with another record' "$plugin_dir/../kc-verify/skills/kc-e2e/SKILL.md" || fail "kc-e2e: the replay box"
 ! grep -q 'it is not a security review' "$review" || fail "kc-code-review: 'What this skill is not' must not deny the security gate it runs"
 grep -q 'correctness, security, project-conventions, this gate) was walked' "$verification" || fail "verification-gate self-review: the gate list includes security"

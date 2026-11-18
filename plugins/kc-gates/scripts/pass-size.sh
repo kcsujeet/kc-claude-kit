@@ -87,14 +87,14 @@ for rule in "${sensitive_rules[@]}"; do
 done
 deleted_file=$(awk '/^--- a\// { from = substr($0, 7) } /^\+\+\+ \/dev\/null/ { print from; exit }' "$diff_file")
 [ -z "$deleted_file" ] || risk_lines+=("risk: deletes a file ($deleted_file)")
-data_delete=$(printf '%s\n' "$added_code" | grep -E -i '\b(drop_table|remove_column|drop table|drop column|delete from|truncate|destroy_all|delete_all)\b' | head -n 1 | sed -E 's/^[[:space:]]+//' | cut -c1-80 || true)
+data_delete=$(printf '%s\n' "$added_code" | grep -E -i '\b(drop_table|remove_column|drop table|drop column|delete from|truncate|destroy_all|delete_all)\b' | head -n 1 | sed -E 's/^[[:space:]]+//' | cut -c1-"$KC_SNIPPET_WIDTH" || true)
 [ -z "$data_delete" ] || risk_lines+=("risk: deletes data ($data_delete)")
 # A page a signed-out visitor reaches is walked signed out in a fresh browser profile.
 public_hit=$(kc_public_path_hit "$changed_files" "$diff_file")
 [ -z "$public_hit" ] || risk_lines+=("risk: public or guest path, walk it signed out in a fresh browser profile ($public_hit)")
 
 code_lines=$(printf '%s\n' "$added_code" | grep -vE '^[[:space:]]*(#|//|/\*|\*|--)' || true)
-branch_line=$(printf '%s\n' "$code_lines" | grep -E '\b(if|elsif|elif|else|unless|case|when|switch|while|until|rescue|catch|except|guard)\b|&&|\|\||\?\?|[[:space:]]\?[[:space:]]|\b(and|or)\b[[:space:]]' | head -n 1 | sed -E 's/^[[:space:]]+//' | cut -c1-80 || true)
+branch_line=$(printf '%s\n' "$code_lines" | grep -E '\b(if|elsif|elif|else|unless|case|when|switch|while|until|rescue|catch|except|guard)\b|&&|\|\||\?\?|[[:space:]]\?[[:space:]]|\b(and|or)\b[[:space:]]' | head -n 1 | sed -E 's/^[[:space:]]+//' | cut -c1-"$KC_SNIPPET_WIDTH" || true)
 
 size=small
 [ "$counted_files" -le "$max_files" ] || size=full

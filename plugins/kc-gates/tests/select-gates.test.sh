@@ -23,14 +23,17 @@ make_case() {
   done
 }
 
+select_gates_output() {
+  bash "$select_gates" "$1/review.diff" "$1/changed-files.txt" "$1/repo"
+}
+
 gates_for() {
-  local case_dir=$1
-  bash "$select_gates" "$case_dir/review.diff" "$case_dir/changed-files.txt" "$case_dir/repo" | sed -n 1p
+  select_gates_output "$1" | sed -n 1p
 }
 
 # --- a Ruby-only change ------------------------------------------------------
 make_case "$work_dir/ruby" '  def total = items.sum(&:price)' app/models/order.rb
-ruby_output=$(bash "$select_gates" "$work_dir/ruby/review.diff" "$work_dir/ruby/changed-files.txt" "$work_dir/ruby/repo")
+ruby_output=$(select_gates_output "$work_dir/ruby")
 expect_eq "ruby: rails runs, react, datetime and i18n don't" \
   "GATES=naming,clarity,structure,simplicity,rails,testing,correctness" "$(printf '%s\n' "$ruby_output" | sed -n 1p)"
 expect_contains "ruby: react's N/A reason is printed" \
@@ -92,7 +95,7 @@ expect_contains "review-conventions.md runs project-conventions" \
 make_case "$work_dir/controller" '  def show; end' app/controllers/orders_controller.rb
 expect_contains "a controller file runs security, after correctness" "correctness,security" "$(gates_for "$work_dir/controller")"
 expect_contains "security names the file that triggered it" "security: run (app/controllers/orders_controller.rb)" \
-  "$(bash "$select_gates" "$work_dir/controller/review.diff" "$work_dir/controller/changed-files.txt" "$work_dir/controller/repo")"
+  "$(select_gates_output "$work_dir/controller")"
 
 make_case "$work_dir/route-handler" '  return Response.json({})' src/app/api/orders/route.ts
 expect_contains "an API route handler runs security" ",security" "$(gates_for "$work_dir/route-handler")"
@@ -101,7 +104,7 @@ make_case "$work_dir/auth-file" '  const ok = true' src/lib/session-store.ts
 expect_contains "an auth or session file runs security" ",security" "$(gates_for "$work_dir/auth-file")"
 
 make_case "$work_dir/reads-params" '  total = params[:total]' lib/orders/total.rb
-reads_params=$(bash "$select_gates" "$work_dir/reads-params/review.diff" "$work_dir/reads-params/changed-files.txt" "$work_dir/reads-params/repo")
+reads_params=$(select_gates_output "$work_dir/reads-params")
 expect_contains "an added line reading request input runs security, outside any handler path" ",security" "$(printf '%s\n' "$reads_params" | sed -n 1p)"
 expect_contains "security names the line that triggered it" "security: run (an added line reads request input or declares a handler: total = params[:total])" "$reads_params"
 
@@ -109,7 +112,7 @@ make_case "$work_dir/express" '  app.get("/orders/:id", show)' src/server.js
 expect_contains "an express route added to a plain file runs security" ",security" "$(gates_for "$work_dir/express")"
 
 make_case "$work_dir/model-only" '  def total = items.sum(&:price)' app/models/order.rb
-model_only=$(bash "$select_gates" "$work_dir/model-only/review.diff" "$work_dir/model-only/changed-files.txt" "$work_dir/model-only/repo")
+model_only=$(select_gates_output "$work_dir/model-only")
 expect_contains "a model with no request input skips security, with a reason" \
   "security: N/A (no controller, route, handler, middleware or auth file changed and no added line reads request input)" "$model_only"
 expect_eq "a model with no request input: security is not in GATES" \
@@ -129,48 +132,65 @@ printf '# Conventions\n' > "$work_dir/security-and-conventions/repo/.claude/revi
 expect_contains "security sits between correctness and project-conventions" "correctness,security,project-conventions" \
   "$(gates_for "$work_dir/security-and-conventions")"
 
-# The gate runs when the sweep it is graded with would have a hit, so the two patterns must not drift.
-sweep_script="$(dirname "$tests_dir")/../kc-conventions/skills/kc-security/scripts/request-surface.sh"
-expect_eq "select-gates and the security sweep share one request_surface_pattern" \
-  "$(grep '^request_surface_pattern=' "$sweep_script")" "$(grep '^request_surface_pattern=' "$select_gates")"
+# In the plugin cache layout (cache/<marketplace>/<plugin>/<version>) kc-conventions is not a
+# sibling folder but the highest version under its own name.
+cache_dir="$work_dir/cache/shop-kit"
+mkdir -p "$cache_dir/kc-gates" "$cache_dir/kc-conventions/2.6.0/scripts/lib" "$cache_dir/kc-conventions/2.6.1/scripts/lib"
+cp -R "$(dirname "$tests_dir")" "$cache_dir/kc-gates/3.0.0"
+printf "request_surface_pattern='CACHED_OLD'\n" > "$cache_dir/kc-conventions/2.6.0/scripts/lib/request-surface-pattern.sh"
+printf "request_surface_pattern='cached_newest'\n" > "$cache_dir/kc-conventions/2.6.1/scripts/lib/request-surface-pattern.sh"
+make_case "$work_dir/cached" '  cached_newest = 1' lib/orders/total.rb
+cached_output=$(bash "$cache_dir/kc-gates/3.0.0/scripts/select-gates.sh" "$work_dir/cached/review.diff" "$work_dir/cached/changed-files.txt" "$work_dir/cached/repo")
+expect_contains "cache layout: the highest kc-conventions version's request_surface_pattern runs security" \
+  "security: run (an added line reads request input or declares a handler: cached_newest = 1)" "$cached_output"
+rm -rf "$cache_dir/kc-conventions"
+expect_contains "cache layout: no kc-conventions is a usage error naming it" "kc-conventions" \
+  "$(bash "$cache_dir/kc-gates/3.0.0/scripts/select-gates.sh" "$work_dir/cached/review.diff" "$work_dir/cached/changed-files.txt" "$work_dir/cached/repo" 2>&1 || true)"
 
 # --- WALK: a path a signed-out visitor reaches must be walked ------------------
-walk_for() { bash "$select_gates" "$1/review.diff" "$1/changed-files.txt" "$1/repo" | grep '^WALK='; }
+walk_line_for() { select_gates_output "$1" | grep '^WALK='; }
 make_case "$work_dir/walk-route" 'x = 1' src/app/public/orders/page.tsx
-expect_eq "a page under a public route: WALK=required" "WALK=required" "$(walk_for "$work_dir/walk-route")"
+expect_eq "a page under a public route: WALK=required" "WALK=required" "$(walk_line_for "$work_dir/walk-route")"
 expect_contains "WALK=required carries its reason" "walk: public or guest path, walk it as every audience that can reach it, signed out included (src/app/public/orders/page.tsx)" \
-  "$(bash "$select_gates" "$work_dir/walk-route/review.diff" "$work_dir/walk-route/changed-files.txt" "$work_dir/walk-route/repo")"
+  "$(select_gates_output "$work_dir/walk-route")"
 
 make_case "$work_dir/walk-skip" '  skip_before_action :authenticate_user!' app/controllers/pay_controller.rb
-expect_eq "an added skip of the authenticate filter: WALK=required" "WALK=required" "$(walk_for "$work_dir/walk-skip")"
+expect_eq "an added skip of the authenticate filter: WALK=required" "WALK=required" "$(walk_line_for "$work_dir/walk-skip")"
 
 make_case "$work_dir/walk-flag" '  const canEdit = !isPublic && !locked' src/orders/edit.ts
-expect_eq "an added public flag: WALK=required" "WALK=required" "$(walk_for "$work_dir/walk-flag")"
+expect_eq "an added public flag: WALK=required" "WALK=required" "$(walk_line_for "$work_dir/walk-flag")"
 
-expect_eq "a model change: WALK=not-required" "WALK=not-required" "$(walk_for "$work_dir/model-only")"
-expect_eq "a controller with no public path: WALK=not-required" "WALK=not-required" "$(walk_for "$work_dir/controller")"
+expect_eq "a model change: WALK=not-required" "WALK=not-required" "$(walk_line_for "$work_dir/model-only")"
+expect_eq "a controller with no public path: WALK=not-required" "WALK=not-required" "$(walk_line_for "$work_dir/controller")"
 
 make_case "$work_dir/walk-spec" 'x = 1' src/app/public/orders/page.test.tsx
-expect_eq "a test under a public route: WALK=not-required" "WALK=not-required" "$(walk_for "$work_dir/walk-spec")"
+expect_eq "a test under a public route: WALK=not-required" "WALK=not-required" "$(walk_line_for "$work_dir/walk-spec")"
 
 make_case "$work_dir/walk-asset" 'x' public/images/logo.svg
-expect_eq "a static asset under public/: WALK=not-required" "WALK=not-required" "$(walk_for "$work_dir/walk-asset")"
+expect_eq "a static asset under public/: WALK=not-required" "WALK=not-required" "$(walk_line_for "$work_dir/walk-asset")"
 
 # Only source files put code on a path: a doc or skill naming a guest flag or the authenticate skip does not.
 make_case "$work_dir/walk-docs" 'An anonymous visitor hits skip_before_action :authenticate and sees isPublic pages.' docs/auth.md
-expect_eq "a doc naming public flags: WALK=not-required" "WALK=not-required" "$(walk_for "$work_dir/walk-docs")"
+expect_eq "a doc naming public flags: WALK=not-required" "WALK=not-required" "$(walk_line_for "$work_dir/walk-docs")"
 
 make_case "$work_dir/walk-vue" '  const isPublic = route.meta.open' src/pages/OrderPage.vue
-expect_eq "a public flag in a .vue component: WALK=required" "WALK=required" "$(walk_for "$work_dir/walk-vue")"
+expect_eq "a public flag in a .vue component: WALK=required" "WALK=required" "$(walk_line_for "$work_dir/walk-vue")"
 
 # select-gates and pass-size.sh decide "public path" with the same function.
 pass_size="$(dirname "$tests_dir")/scripts/pass-size.sh"
 for walk_case in walk-route walk-skip walk-flag model-only walk-spec walk-asset walk-docs walk-vue; do
-  walk_verdict=$(walk_for "$work_dir/$walk_case")
+  walk_verdict=$(walk_line_for "$work_dir/$walk_case")
   risk_verdict=$(bash "$pass_size" "$work_dir/$walk_case/review.diff" "$work_dir/$walk_case/changed-files.txt" "$work_dir/$walk_case/repo" | grep -c '^risk: public or guest path' || true)
   if [ "$walk_verdict" = "WALK=required" ]; then expected_risk=1; else expected_risk=0; fi
   expect_eq "$walk_case: WALK agrees with pass-size.sh's public-path risk" "$expected_risk" "$risk_verdict"
 done
+
+# A diff that only removes lines has no added line to read; select-gates still prints its gates.
+mkdir -p "$work_dir/removal/repo"
+printf 'app/models/order.rb\n' > "$work_dir/removal/changed-files.txt"
+printf -- '--- a/app/models/order.rb\n+++ b/app/models/order.rb\n@@ -1 +0,0 @@\n-  def total = 0\n' > "$work_dir/removal/review.diff"
+expect_eq "a diff with no added line still selects its gates" \
+  "GATES=naming,clarity,structure,simplicity,rails,testing,correctness" "$(gates_for "$work_dir/removal")"
 
 # --- one diff with every kind --------------------------------------------------
 make_case "$work_dir/mixed" "import { useState } from 'react'" src/orders/Orders.tsx db/migrate/1_add_orders.rb
