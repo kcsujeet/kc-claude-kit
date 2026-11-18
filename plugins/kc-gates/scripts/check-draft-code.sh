@@ -9,6 +9,7 @@
 #   <head-sha>     the commit the comments anchor to; code is looked up in its tree
 #
 # Code is an inline code span holding a call or a block (a `(` or a `{`), outside fenced blocks.
+# A draft on the old side (side LEFT) quotes removed code, so it is not looked up.
 # One that appears nowhere in the head commit's tree is reported: the comment either points at
 # code that exists, or says it is new and why. Run from inside the repo; when <head-sha> is not a
 # commit here, it prints nothing and exits 0.
@@ -30,24 +31,25 @@ code_spans=$(perl -MJSON::PP -CS -e '
   local $/; open(my $fh, "<:encoding(UTF-8)", $ARGV[0]) or exit 2;
   my $drafts = eval { JSON::PP->new->decode(<$fh>) };
   if (ref $drafts ne "ARRAY") { print STDERR "drafts file is not a JSON array\n"; exit 2 }
-  my $index = 0;
+  my $draft_number = 0;
   for my $draft (@$drafts) {
-    $index++;
+    $draft_number++;
     next if ($draft->{new} // "") =~ /\S/;
+    next if ($draft->{side} // "") eq "LEFT";
     (my $body = $draft->{body} // "") =~ s/```.*?```//gs;
     while ($body =~ /`([^`\n]*[({][^`\n]*)`/g) {
-      printf "%d\t%s:%s\t%s\n", $index, $draft->{path} // "?", $draft->{line} // "?", $1;
+      printf "%d\t%s:%s\t%s\n", $draft_number, $draft->{path} // "?", $draft->{line} // "?", $1;
     }
   }
 ' "$drafts_file")
 
-problems=0
-while IFS=$'\t' read -r number where code; do
-  [ -n "$number" ] || continue
-  git grep -q -F -e "$code" "$head_sha" -- ':/' 2>/dev/null && continue
-  echo "draft $number ($where): shows \`$code\`, which appears nowhere in the repo; point at code that exists, ask for the outcome instead, or say in \"new\" why it is new (and say so in the comment)"
-  problems=$((problems + 1))
+unfound_code_count=0
+while IFS=$'\t' read -r draft_number draft_location code_span; do
+  [ -n "$draft_number" ] || continue
+  git grep -q -F -e "$code_span" "$head_sha" -- ':/' 2>/dev/null && continue
+  echo "draft $draft_number ($draft_location): shows \`$code_span\`, which appears nowhere in the repo; point at code that exists, ask for the outcome instead, or say in \"new\" why it is new (and say so in the comment)"
+  unfound_code_count=$((unfound_code_count + 1))
 done <<EOF
 $code_spans
 EOF
-[ "$problems" -eq 0 ]
+[ "$unfound_code_count" -eq 0 ]

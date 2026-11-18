@@ -188,5 +188,8 @@ expect_reason "it names the ledger" "feedback-ledger.sh list"
 expect_eq "lessons after a ledger run earlier in the session go out" out "$(run_hook "$lookback_reply")"
 { write_typed_message "what did we learn?"; } > "$transcript"
 expect_eq "a reply that only names the look-back goes out" out "$(run_hook "The look-back is next.")"
+expect_eq "lessons with no look-back wording go out" out "$(run_hook "Two lessons came up: the untested fix.")"
+{ write_typed_message "start"; write_tool_call Bash command "bash feedback-ledger.sh check list.tsv ledger.tsv --rules checklist.md"; write_tool_result; write_typed_message "what did we learn?"; } > "$transcript"
+expect_eq "a ledger call that never ran list doesn't count" noted "$(run_hook "$lookback_reply")"
 
 finish

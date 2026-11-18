@@ -99,6 +99,11 @@ expect_contains "§PC5: a claim about an earlier review with nothing run is flag
 draft "$work_dir/earlier-ok.json" $'**question**:\nI was wrong last round about the totals. Do archived items count?' '{ran: "cart spec with an archived item: the total leaves it out"}'
 expect_eq "§PC5: a claim about an earlier review with a run is clean" clean "$(result "$work_dir/earlier-ok.json")"
 
+draft "$work_dir/earlier-na.json" $'**question**:\nI was wrong last round about the totals. Do archived items count?' '{ran: "n/a: no change"}'
+expect_contains "§PC5: a claim about an earlier review with \"ran\": n/a is flagged" "earlier review with nothing run" "$(result "$work_dir/earlier-na.json")"
+draft "$work_dir/names-test.json" $'**suggestion**:\nThe test above sets the archived flag, so the total looks right by luck.' '{ran: "n/a: asks for no behaviour change"}'
+expect_eq "§PC5: naming an existing test is not asking for one" clean "$(result "$work_dir/names-test.json")"
+
 # --- slips the checklist exists for ---------------------------------------------------------
 draft "$work_dir/no-label.json" 'Good catch on the rounding. Could this use the shared formatter?'
 no_label=$(result "$work_dir/no-label.json")

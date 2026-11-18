@@ -108,9 +108,13 @@ fi
 
 # Any tool call in the whole session (not only this turn) whose input ran the ledger's list.
 ledger_listed=$(jq -rs '[.[] | select(.type == "assistant") | .message.content[]? | select(.type == "tool_use")
-  | .input | tostring | select(test("feedback-ledger\\.sh[^\"]*list"))] | length > 0' "$transcript" 2>/dev/null)
-if printf '%s' "$reply" | tr '\n' ' ' | grep -Eiq 'look[- ]?back' \
-  && printf '%s' "$reply" | grep -Eiq 'lessons?' && [ "$ledger_listed" != true ]; then
+  | .input | tostring | select(test("feedback-ledger\\.sh\"?[ \\t]+list\\b"))] | length > 0' "$transcript" 2>/dev/null)
+lists_look_back_lessons=false
+reply_one_line=$(printf '%s' "$reply" | tr '\n' ' ')
+if printf '%s' "$reply_one_line" | grep -Eiq 'look[- ]?back' && printf '%s' "$reply_one_line" | grep -Eiq 'lessons?'; then
+  lists_look_back_lessons=true
+fi
+if [ "$lists_look_back_lessons" = true ] && [ "$ledger_listed" != true ]; then
   misses+=("It listed look-back lessons without running feedback-ledger.sh list over the session; run it, then give every item, the person's feedback included, a verdict.")
 fi
 

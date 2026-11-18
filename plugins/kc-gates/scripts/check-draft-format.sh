@@ -109,10 +109,14 @@ perl -MJSON::PP -CS -e '
     if ($prose =~ $hard_words) {
       push @found, "uses the hard word \"$1\"; say it in everyday words (who sees what, what happens)";
     }
-    if ($prose =~ /\b(a|an|one|another|the) (new )?(test|spec)\b|\btests? (for|that|here|like)\b/i && $ran_record !~ /\bfail/i) {
+    my $asks_for_test = $prose =~ /\b(add|write|needs?|missing|a|an|another|one) (new )?(test|spec)\b/i;
+    my $test_seen_failing = $ran_record =~ /\bfail/i;
+    if ($asks_for_test && !$test_seen_failing) {
       push @found, "asks for a test with no proof it catches the bug: write it, put the bug back, and say in \"ran\" that it failed";
     }
-    if ($prose =~ /\b(last|earlier|previous|first|second) (round|review)\b|\bI was wrong\b/i && ($ran_record !~ /\S/ || $ran_record =~ m{^\s*n/?a\b}i)) {
+    my $mentions_earlier_review = $prose =~ /\b(last|earlier|previous|first|second) (round|review)\b|\bI was wrong\b/i;
+    my $has_real_run = $ran_record =~ /\S/ && $ran_record !~ m{^\s*n/?a\b}i;
+    if ($mentions_earlier_review && !$has_real_run) {
       push @found, "says something about an earlier review with nothing run behind it: check that claim again and say in \"ran\" what showed it";
     }
     my $path = $draft->{path} // "";

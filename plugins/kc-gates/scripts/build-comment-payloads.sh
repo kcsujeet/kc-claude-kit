@@ -201,21 +201,13 @@ problems=$(jq -r --arg coverage "$coverage" '
     end
 ' "$drafts_file")
 
-# kc-post-review's format rules (label line, no em dash, rule ids, emoji or praise opener, length).
-format_problems=$(bash "$(dirname "$0")/check-draft-format.sh" "$drafts_file" "$head_sha") || true
-if [ -n "$format_problems" ]; then
-  problems=$(printf '%s\n%s\n' "$problems" "$format_problems" | grep . | sort -t' ' -k2,2n -s)
-fi
-# A suggested name one letter from a name already in the repo (run from the repo; skipped elsewhere).
-name_problems=$(bash "$(dirname "$0")/check-draft-names.sh" "$drafts_file" "$head_sha") || true
-if [ -n "$name_problems" ]; then
-  problems=$(printf '%s\n%s\n' "$problems" "$name_problems" | grep . | sort -t' ' -k2,2n -s)
-fi
-# Code shown in a comment that appears nowhere in the repo (run from the repo; skipped elsewhere).
-code_problems=$(bash "$(dirname "$0")/check-draft-code.sh" "$drafts_file" "$head_sha") || true
-if [ -n "$code_problems" ]; then
-  problems=$(printf '%s\n%s\n' "$problems" "$code_problems" | grep . | sort -t' ' -k2,2n -s)
-fi
+# The draft checks: kc-post-review's format rules (label, length, a run behind each claim, a capture
+# of any screen); a suggested name one letter from one in the repo; code shown that appears nowhere in
+# the repo. The last two read the repo, so they check nothing when run elsewhere.
+for draft_check in check-draft-format check-draft-names check-draft-code; do
+  check_problems=$(bash "$(dirname "$0")/$draft_check.sh" "$drafts_file" "$head_sha") || true
+  [ -z "$check_problems" ] || problems=$(printf '%s\n%s\n' "$problems" "$check_problems" | grep . | sort -t' ' -k2,2n -s)
+done
 
 if [ -n "$problems" ]; then
   failing_count=$(printf '%s\n' "$problems" | sed 's/^draft \([0-9]*\).*/\1/' | sort -u | wc -l | tr -d ' ')
