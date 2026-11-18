@@ -20,7 +20,7 @@ This applies identically to two scenarios:
 The dispatch prompt gives you:
 
 - `select-gates.sh`'s output: which phase-1 gates the diff needs, and why each other gate is N/A;
-- every dispatched phase-1 gate's returned verdict block, verbatim (from naming, clarity, structure, simplicity, datetime, react, rails, i18n, testing, correctness, project-conventions). A gate `select-gates.sh` marks N/A has no block, and its absence is not a missing receipt; a gate it lists with no block is.
+- every dispatched phase-1 gate's returned verdict block, verbatim (from naming, clarity, structure, simplicity, datetime, react, rails, i18n, testing, correctness, security, project-conventions). A gate `select-gates.sh` marks N/A has no block, and its absence is not a missing receipt; a gate it lists with no block is.
 - the orchestrator's `SCOPE:` block (§G1-§G5);
 - on a re-review, the orchestrator's classification of each carried-over finding (fixed, declined-with-reason, still open);
 - the head SHA, the path to the saved unified diff file, and the changed-file list, so you can tell which trigger groups the diff hits.
@@ -55,6 +55,7 @@ For §V2, list which trigger groups applied and cite each group's receipt, or it
   - dead wrappers kept anywhere in the diff → what each earns its place stated (N/A: no wrapper-shaped code in diff)
   - switch or if/else-if chain added → `grepped switch/else-if/IIFE: N hits` and `nested-if scan: N hits`, and the structure gate's lookup-object boxes walked per chain (N/A: no chain added)
   - test files touched or behavior changed → `grepped class assertions: N hits` / `grepped loose assertions: N hits` with per-hit verdicts, and either the mutation sweep's summary line with a verdict per survivor and per line it did not reach (when the dispatch gave its output and it ran) or the gated conditions named with the test covering each side (N/A: no test file touched and no behavior change)
+  - security gate ran → `grepped request surface: N hits`, a verdict per hit naming its §SEC box (N/A: gate did not run, or 0 hits stated)
   - exported APIs added → doc-comment box walked (N/A: no new exported API)
   - fixed-value discriminator added → enum boxes walked, call sites checked (N/A: no new discriminator type)
   - self-review only → lint/typecheck receipt, fan-out run only on request or once before a PR, UI looked at rendered, commit/push/PR permission confirmed (N/A: this is a peer review of someone else's diff, not a self-review)
@@ -65,6 +66,7 @@ For §V2, list which trigger groups applied and cite each group's receipt, or it
 - [ ] §V7 The orchestrator's `SCOPE:` block is present and walks §G1-§G5 from the kc-code-review skill's Step 1 one box at a time, each with evidence (the command run or the issue quoted) or its N/A reason; a missing block or a box with no evidence FAILS. (N/A: never; every review has a scope)
 - [ ] §V8 Fixes and rewrites were re-checked: on a re-review, code verified as fixed this round was walked against every gate's checklist like any new line (`<n> fixes re-checked`), and every rewrite a gate proposed in a finding passes every gate's checklist itself, not only the rule that surfaced it (`<n> rewrites checked`). A proposed fix that changes behaviour carries its before/after per state, including when each input arrives (correctness §B15), and its run (`ran:` the test for the break and the suite it passed on a scratch copy), unless it asks for an outcome and a test with no code; one with no such table or run, or whose table moves a state the fix is not for, FAILS. (N/A: first round with no proposed rewrite)
 - [ ] §V9 On a re-review, each finding says where it came from: new code in this round's commits, a line an earlier round saw and let pass, or a change our own earlier comment asked for. Run `bash "${CLAUDE_PLUGIN_ROOT}/scripts/rename-only-lines.sh" "$DIFF_FILE"` yourself: a line it lists keeps the verdict the earlier round gave it, unless the rename itself is the problem (`<n> rename-only lines kept`); a finding on one, or a finding with no origin, FAILS. (N/A: first round)
+- [ ] §V10 A review whose `select-gates.sh` output says `WALK=required` has a `Walk:` receipt in its Checklist: each audience that can reach the change (signed out included) with what it saw in the running app, and the two replays (another record's id, the same id again) of each write a link, callback or return URL triggers; no receipt FAILS whatever the gates returned. (N/A: `WALK=not-required`)
 
 ---
 
@@ -202,6 +204,9 @@ Code you verify as a fix is new code. On a re-review, a replacement that resolve
 
 A rename puts every line it touches back in the delta, and an old line in the delta reads as new code. A re-review once flagged a variable name round one had passed, only because the rename round one asked for brought that line back, and the round looked bigger than it was. Each finding names its origin, so the author and the user can see which part of a round is new, which is a miss of ours, and which our own suggestions caused: new code, missed earlier, or from our suggestion. Run `bash "${CLAUDE_PLUGIN_ROOT}/scripts/rename-only-lines.sh" "$DIFF_FILE"` on the delta: each line it lists changed only by a rename, keeps its earlier verdict, and is judged only for the rename. Receipt: `<n> rename-only lines kept`, and an origin on every finding.
 
+## §V10. A public path is walked, not only read
+
+Gates read code; what another record's id or a second opening of a link does shows only when the change runs. The Checklist's `Walk:` line names each audience walked with what it saw (signed out included) and, for each write a link, callback or return URL triggers, both replays with their results. "Reviewed the handler", or audiences with no observed result, fails like an aggregated receipt (§V3).
 ## How to use this in the output
 
 The review ends with a **Checklist** subsection that names every group applicable to this diff (Always, plus each trigger group hit) with either a one-line receipt or `"n/a, diff does not touch X"`. A group that appears as an eyeballed aggregate instead of an enumerated receipt is unacceptable and fails this gate, even if every other gate reported PASS.
@@ -225,6 +230,8 @@ Example (generic file names):
 - Exported APIs: n/a, diff adds no new export.
 - Fixed-value discriminator: n/a, diff adds no new discriminator type.
 - Self-review: lint (`npm run lint`) pass, typecheck (`npm run typecheck`) pass; fan-out run because the user asked for a review; widget list checked rendered at 375 and 1024 px, no wrapping or overflow; no commit/push/PR performed, none requested.
+- Request surface: grepped request surface: 2 hits: payments_controller.rb:5 §SEC2 FAIL (payment and order looked up apart), :8 §SEC7 FAIL (open redirect).
+- Walk: WALK=required; walked signed out and as another account; the return link with another order's id was refused, opened twice it recorded once.
 - Fixes and rewrites: 2 fixes re-checked (all gates); 1 rewrite checked (all gates).
 ```
 

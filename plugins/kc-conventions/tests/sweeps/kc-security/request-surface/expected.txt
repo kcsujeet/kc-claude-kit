@@ -1,0 +1,10 @@
+app/controllers/payments_controller.rb:1: class PaymentsController < ApplicationController
+app/controllers/payments_controller.rb:2:   skip_before_action :authenticate_user!, only: :return
+app/controllers/payments_controller.rb:4:   def return
+app/controllers/payments_controller.rb:5:     payment = Payment.find(params[:payment_id])
+app/controllers/payments_controller.rb:6:     order = Order.find(params[:order_id])
+app/controllers/payments_controller.rb:8:     redirect_to params[:return_to]
+app/controllers/payments_controller.rb:13:   def order_params
+app/controllers/payments_controller.rb:14:     params.require(:order).permit(:note)
+config/routes.rb:12:   get "/payments/return", to: "payments#return"
+config/routes.rb:13:   resources :invoices, only: [:show]
