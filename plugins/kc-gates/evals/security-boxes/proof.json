@@ -1,11 +1,11 @@
 {
   "case": "plugins/kc-gates/evals/security-boxes",
-  "commit": "97a23fef9c39b82e88dcaa21bb3bab42d154be6a",
-  "case_hash": "e9a67d8f64437f1668e05c0ae04294b2220a75f6",
+  "commit": "4040b1eb1218f9dd16ce68a685a6a69da7e30df0",
+  "case_hash": "427b3c602ad0cc639f7b025a6ce36880ad4658d0",
   "plugins_hash": "a3fe9cef7306296b5e3ba937a0590162cda7e9a7",
   "claude": "2.1.327 (Claude Code)",
   "model": "sonnet",
-  "verdict": "with the plugin, graders failed: flags-client-amount, flags-repeat-confirm, flags-unlinked-payment",
+  "verdict": "ok",
   "runs": {
     "with": [
       {
@@ -13,17 +13,17 @@
         "graders": [
           {
             "name": "flags-client-amount",
-            "passed": false,
+            "passed": true,
             "scored": true
           },
           {
             "name": "flags-repeat-confirm",
-            "passed": false,
+            "passed": true,
             "scored": true
           },
           {
             "name": "flags-unlinked-payment",
-            "passed": false,
+            "passed": true,
             "scored": true
           },
           {
@@ -56,6 +56,38 @@
           {
             "name": "flags-unlinked-payment",
             "passed": false,
+            "scored": true
+          }
+        ]
+      }
+    ],
+    "base_rules": [
+      {
+        "error": null,
+        "graders": [
+          {
+            "name": "flags-client-amount",
+            "passed": false,
+            "scored": true
+          },
+          {
+            "name": "flags-repeat-confirm",
+            "passed": false,
+            "scored": true
+          },
+          {
+            "name": "flags-unlinked-payment",
+            "passed": false,
+            "scored": true
+          },
+          {
+            "name": "no-finding-on-clean-unit",
+            "passed": true,
+            "scored": true
+          },
+          {
+            "name": "verdict-failed",
+            "passed": true,
             "scored": true
           }
         ]
