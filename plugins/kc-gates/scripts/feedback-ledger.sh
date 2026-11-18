@@ -120,6 +120,8 @@ escape_file_name() {
 readonly RULE_FILE_PATH='(^|/)(rules|\.claude)/|(^|/)(CLAUDE|AGENTS|SKILL)\.md$'
 
 run_check() {
+  # shellcheck source=lib/check-paths.sh
+  . "$(dirname "$0")/lib/check-paths.sh"
   local feedback_list=${1:-} ledger=${2:-} diffs=() rules_dirs=()
   [ -n "$feedback_list" ] && [ -n "$ledger" ] || usage
   shift 2
@@ -156,7 +158,7 @@ run_check() {
 
   # A path a check lives in: a script, hook, test, eval, CI workflow or lint-rule file.
   local has_check_file=false
-  if grep -Eq '(^|/)(tests?|evals|hooks|scripts)/|(^|/)\.github/workflows/|\.(sh|bats)$|\.(test|spec)\.[A-Za-z]+$|_(test|spec)\.[A-Za-z]+$|(^|/)(biome\.json|eslint[^/]*|\.rubocop\.yml)$' "$changed_paths"; then
+  if grep -Eq "$KC_CHECK_PATHS" "$changed_paths"; then
     has_check_file=true
   fi
 

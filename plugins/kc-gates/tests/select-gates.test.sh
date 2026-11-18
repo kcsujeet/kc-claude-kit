@@ -184,16 +184,22 @@ expect_eq "a route file: WALK=required" "WALK=required" "$(walk_line_for "$work_
 make_case "$work_dir/walk-vue" '  const isPublic = route.meta.open' src/pages/OrderPage.vue
 expect_eq "a .vue page with a public flag but no public path: WALK=not-required" "WALK=not-required" "$(walk_line_for "$work_dir/walk-vue")"
 
+for visitor_path in src/anonymous/view.ts src/portal/home.tsx src/orders.routes.ts src/routes/orders.ts src/guest/index.vue; do
+  walk_branch_case="$work_dir/walk-branch-$(printf '%s' "$visitor_path" | tr '/.' '--')"
+  make_case "$walk_branch_case" 'x = 1' "$visitor_path"
+  expect_eq "$visitor_path: WALK=required" "WALK=required" "$(walk_line_for "$walk_branch_case")"
+done
+
 make_case "$work_dir/walk-declared" 'x = 1' src/share/view.ts
 expect_eq "a path no list names: WALK=not-required" "WALK=not-required" "$(walk_line_for "$work_dir/walk-declared")"
 mkdir -p "$work_dir/walk-declared/repo/.claude"
-printf '# shared links are open\n(^|/)share/\n' > "$work_dir/walk-declared/repo/.claude/public-paths.txt"
-expect_eq "a path in .claude/public-paths.txt: WALK=required" "WALK=required" "$(walk_line_for "$work_dir/walk-declared")"
+printf '# shared links are open\n\n(^|/)other/\n(^|/)share/' > "$work_dir/walk-declared/repo/.claude/public-paths.txt"
+expect_eq "a path in .claude/public-paths.txt, after a comment and a blank line, on a last line with no newline: WALK=required" "WALK=required" "$(walk_line_for "$work_dir/walk-declared")"
 expect_contains "the declared path is the reason" "(src/share/view.ts)" "$(select_gates_output "$work_dir/walk-declared")"
 
 # select-gates and pass-size.sh decide "public path" with the same function.
 pass_size="$(dirname "$tests_dir")/scripts/pass-size.sh"
-for walk_case in walk-route walk-skip walk-flag model-only walk-spec walk-asset walk-docs walk-script walk-controller walk-routes walk-vue walk-declared; do
+for walk_case in walk-branch-src-anonymous-view-ts walk-branch-src-portal-home-tsx walk-branch-src-orders-routes-ts walk-branch-src-routes-orders-ts walk-branch-src-guest-index-vue walk-route walk-skip walk-flag model-only walk-spec walk-asset walk-docs walk-script walk-controller walk-routes walk-vue walk-declared; do
   walk_verdict=$(walk_line_for "$work_dir/$walk_case")
   risk_verdict=$(bash "$pass_size" "$work_dir/$walk_case/review.diff" "$work_dir/$walk_case/changed-files.txt" "$work_dir/$walk_case/repo" | grep -c '^risk: public or guest path' || true)
   if [ "$walk_verdict" = "WALK=required" ]; then expected_risk=1; else expected_risk=0; fi

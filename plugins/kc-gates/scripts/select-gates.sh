@@ -17,8 +17,9 @@
 #
 # Then `WALK=required` or `WALK=not-required` and a `walk: <why>` line. Required when a changed
 # file path is one a signed-out visitor reaches (the same path test pass-size.sh makes, from
-# lib/risk-paths.sh: built-in patterns plus the repo's .claude/public-paths.txt): the review then walks the change in the running app as every audience that
-# can reach it, signed out included, before its verdict.
+# lib/risk-paths.sh: built-in patterns plus the repo's .claude/public-paths.txt): the review then
+# walks the change in the running app as every audience that can reach it, signed out included,
+# before its verdict.
 #
 # Exits 0 on success, 2 on a usage error or a missing input file.
 set -euo pipefail

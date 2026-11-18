@@ -68,6 +68,32 @@ require_jq() {
   fi
 }
 
+# Wraps a shell command (no double quotes or backslashes in it) and a working directory in the
+# PreToolUse stdin payload.
+build_hook_payload() {
+  printf '{"session_id":"s","cwd":"%s","hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"%s","description":"test"},"tool_use_id":"t"}' "$2" "$1"
+}
+
+# expect_hook_verdict <hook script> <deny|allow> <label> <command> <cwd>: runs the hook twice, with
+# jq and through the sed fallback, and expects its verdict each time. Leaves the jq run's output in
+# $last_hook_output.
+expect_hook_verdict() {
+  local hook_script=$1 expectation=$2 label=$3 command=$4 cwd=$5 mode output verdict
+  for mode in jq sed; do
+    if [ "$mode" = sed ]; then
+      output=$(build_hook_payload "$command" "$cwd" | KC_GUARD_NO_JQ=1 bash "$hook_script" 2>/dev/null)
+    else
+      output=$(build_hook_payload "$command" "$cwd" | bash "$hook_script" 2>/dev/null)
+      # shellcheck disable=SC2034 # read by the tests that source this file
+      last_hook_output=$output
+    fi
+    if [ -z "$output" ]; then verdict=allow
+    elif printf '%s' "$output" | grep -q '"permissionDecision":"deny"'; then verdict=deny
+    else verdict="unexpected output: $output"; fi
+    expect_eq "[$mode] $label" "$expectation" "$verdict"
+  done
+}
+
 finish() {
   echo "$passes passed, $failures failed"
   [ "$failures" -eq 0 ]

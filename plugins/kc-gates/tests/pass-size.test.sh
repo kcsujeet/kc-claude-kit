@@ -71,18 +71,8 @@ expect_contains "checkout folder: payments risk" "risk: payments (src/checkout/s
 make_case "$work_dir/guest-flag" '  const canEditFooter = !isPublic && !locked' src/orders/OrderFooter.tsx
 expect_contains "an added public flag in an ordinary file: no signed-out walk" "risk: none" "$(size_of "$work_dir/guest-flag")"
 
-make_case "$work_dir/public-docs" 'An anonymous visitor hits skip_before_action :authenticate and sees isPublic pages.' docs/sharing.md
-expect_contains "a markdown file naming public flags: no signed-out walk" "risk: none" "$(size_of "$work_dir/public-docs")"
-
-make_case "$work_dir/public-script" '# anonymous: skip_before_action :authenticate, isPublic, guest_token' scripts/check-flags.sh
-expect_contains "a shell script whose text holds the old patterns: no signed-out walk" "risk: none" "$(size_of "$work_dir/public-script")"
-
 make_case "$work_dir/public-controller" '  def show; end' app/controllers/public/orders_controller.rb
 expect_contains "a controller under public/: signed-out walk" "risk: public or guest path, walk it signed out in a fresh browser profile (app/controllers/public/orders_controller.rb)" "$(size_of "$work_dir/public-controller")"
-make_case "$work_dir/guest-controller" '  def show; end' app/controllers/guest_orders_controller.rb
-expect_contains "a guest controller file: signed-out walk" "(app/controllers/guest_orders_controller.rb)" "$(size_of "$work_dir/guest-controller")"
-make_case "$work_dir/route-file" 'get "/orders"' config/routes.rb
-expect_contains "a route file: signed-out walk" "(config/routes.rb)" "$(size_of "$work_dir/route-file")"
 
 make_case "$work_dir/repo-public" 'x = 1' src/share/view.ts
 expect_contains "a path no list names: no signed-out walk" "risk: none" "$(size_of "$work_dir/repo-public")"

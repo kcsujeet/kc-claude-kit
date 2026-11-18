@@ -3,3 +3,5 @@ plugins/kc-conventions/scripts/lib/diff-lines.sh sourced by every sweep; tests/r
 plugins/kc-gates/scripts/lib/hook-input.sh sourced by the hook scripts; their tests feed it real hook payloads
 plugins/kc-conventions/scripts/build-rules.sh CI runs `build-rules.sh --check` against the real skills on every PR
 plugins/kc-conventions/scripts/lib/request-surface-pattern.sh sourced by request-surface.sh and select-gates.sh; their tests run it
+plugins/kc-gates/scripts/lib/check-paths.sh sourced by feedback-ledger.sh and guard-prose-rule.sh; their tests run it
+plugins/kc-gates/scripts/lib/commit-diff.sh sourced by guard-loop-stop.sh and guard-prose-rule.sh; their tests run it

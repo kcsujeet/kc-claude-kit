@@ -1,6 +1,6 @@
 # shellcheck shell=bash
-# Reads a Bash hook's payload (PreToolUse or PostToolUse) for the kit's hooks. Sourced, never
-# executed.
+# Reads a Bash hook's payload (PreToolUse or PostToolUse) and the command it carries, for the
+# kit's hooks. Sourced, never executed.
 #
 # KC_GUARD_NO_JQ=1 forces the sed fallback (used by the tests).
 
@@ -92,26 +92,32 @@ parse_git_command() {
   GIT_ARGS=("$@")
 }
 
-# commit_diff <dir> "<diff options>" <word>...: the diff a `git commit` with these words after
-# `commit` would record: the staged diff, or with -a/--all the working tree against HEAD. A
-# repository with no commit yet is diffed against the empty tree.
-commit_diff() {
-  local dir=$1 options=$2 word all=false base=HEAD
-  shift 2
-  for word in "$@"; do
-    case "$word" in
-      --all) all=true ;;
-      --*) ;;
-      -*a*) all=true ;;
-    esac
-  done
-  git -C "$dir" rev-parse -q --verify HEAD >/dev/null 2>&1 || base=4b825dc642cb6eb9a060e54bf8d69288fbee4904
-  # shellcheck disable=SC2086 # $options is a list of diff options
-  if $all; then
-    git -C "$dir" diff $options --no-color --no-ext-diff --no-renames "$base"
-  else
-    git -C "$dir" diff --cached $options --no-color --no-ext-diff --no-renames "$base"
-  fi
+# walk_segments <command> <dir> <callback>: calls <callback> <segment> <dir> for each shell segment of
+# the command, following any `cd` before it (the directory the segment runs in). Stops and fails as
+# soon as the callback fails; succeeds when every segment passed.
+walk_segments() {
+  local command=$1 dir=$2 callback=$3 segment target
+  while IFS= read -r segment; do
+    target=$(printf '%s' "$segment" | sed -nE 's/^[[:space:]]*cd[[:space:]]+([^[:space:]]+)[[:space:]]*$/\1/p' | tr -d "\"'")
+    if [ -n "$target" ]; then
+      case "$target" in
+        "~"*) target="$HOME${target#"~"}" ;;
+        /*) ;;
+        *) target="$dir/$target" ;;
+      esac
+      dir=$target
+      continue
+    fi
+    "$callback" "$segment" "$dir" || return 1
+  done <<EOF
+$(split_segments "$command")
+EOF
+}
+
+# print_pretooluse_deny <reason>: the PreToolUse deny JSON for a reason in plain text.
+print_pretooluse_deny() {
+  printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"%s"}}\n' \
+    "$(printf '%s' "$1" | LC_ALL=C tr -d '\000-\037' | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g')"
 }
 
 # One shell segment per line: split on newlines, ;, &&, || and |.

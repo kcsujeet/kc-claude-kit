@@ -17,8 +17,9 @@
 #   MUTATION=run|skip
 #   files: <n> counted (<n> test, locale or generated left out)
 #   lines: <n> changed in counted files
-#   risk: none | <reason>        one line per sensitive hit; a public or guest path (by its
-#                                file path, never its text) gets one too, which makes the QA step walk the page signed out
+#   risk: none | <reason>        one line per sensitive hit; a public or guest path (judged by its
+#                                file path, never its text) gets one too, which makes the QA
+#                                step walk the page signed out
 #   mutation: <why>
 #
 # Small means at most KC_SMALL_FILES files (default 5) and KC_SMALL_LINES changed lines

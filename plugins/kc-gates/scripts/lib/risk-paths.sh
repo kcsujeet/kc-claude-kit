@@ -29,6 +29,8 @@ kc_added_code() {
 }
 
 # Paths a signed-out visitor reaches, built in; a repo adds its own in .claude/public-paths.txt.
+# The extension list is narrower than KC_RISK_SOURCE_PATHS on purpose: a shell script serves no
+# visitor.
 # Source files only (a doc, an image or a stylesheet puts no code on a path), and only by where the
 # file is: under app/public/, public/, guest/, anonymous/ or portal/ folders, in a public, guest,
 # anonymous or portal controller, route, handler or page file, or a route file (Rails routes, a
@@ -46,7 +48,7 @@ kc_public_path_hit() {
   candidates=$(grep -vE "$KC_RISK_UNCOUNTED_PATHS" "$changed_files" || true)
   hit=$(printf '%s\n' "$candidates" | grep -E "$KC_PUBLIC_BUILTIN_PATHS" | head -n 1 || true)
   if [ -z "$hit" ] && [ -f "$repo_root/.claude/public-paths.txt" ]; then
-    while IFS= read -r public_pattern; do
+    while IFS= read -r public_pattern || [ -n "$public_pattern" ]; do
       case "$public_pattern" in '' | '#'*) continue ;; esac
       hit=$(printf '%s\n' "$candidates" | grep -E "$public_pattern" | head -n 1 || true)
       [ -z "$hit" ] || break
