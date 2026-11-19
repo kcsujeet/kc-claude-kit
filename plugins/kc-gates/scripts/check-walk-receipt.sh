@@ -15,8 +15,12 @@
 #
 # Prints one line per problem (`walk-item <path>: <problem>`): no receipt line, nothing seen, or
 # evidence that is neither. Exits 0 when every item has a full line, 1 when any does not, 2 on a
-# usage error or an unreadable input.
+# usage error or an unreadable <select-gates-output>. A missing or unreadable receipt is not an
+# error: every item then has no receipt line, which exits 1.
 set -euo pipefail
+
+# shellcheck source=lib/capture-paths.sh
+. "$(dirname "$0")/lib/capture-paths.sh"
 
 script_name=$(basename "$0")
 [ "$#" -eq 2 ] || { echo "usage: $script_name <select-gates-output> <walk-receipt.tsv>" >&2; exit 2; }
@@ -26,12 +30,10 @@ receipt=$2
 receipt_dir=$(dirname "$receipt")
 
 items=$(sed -n 's/^walk-item: //p' "$select_output")
-[ -n "$items" ] || exit 0
 
-media_pattern='\.(png|jpe?g|gif|webp|mp4|mov|webm)$'
 request_pattern='^(GET|HEAD|POST|PUT|PATCH|DELETE)[[:space:]]+[^[:space:]]+.*[[:space:]][1-5][0-9][0-9]([^0-9]|$)'
 problems=0
-problem() { echo "walk-item $1: $2"; problems=$((problems + 1)); }
+record_walk_problem() { echo "walk-item $1: $2"; problems=$((problems + 1)); }
 
 while IFS= read -r item; do
   [ -n "$item" ] || continue
@@ -40,21 +42,23 @@ while IFS= read -r item; do
     line=$(awk -F'\t' -v item="$item" '$1 == item { print; exit }' "$receipt")
   fi
   if [ -z "$line" ]; then
-    problem "$item" "no receipt line in $receipt: walk it in the running app or at the API, then write <path><TAB><what was seen><TAB><evidence>"
+    record_walk_problem "$item" "no receipt line in $receipt: walk it in the running app or at the API, then write <path><TAB><what was seen><TAB><evidence>"
     continue
   fi
   seen=$(printf '%s' "$line" | awk -F'\t' '{ print $2 }')
   evidence=$(printf '%s' "$line" | awk -F'\t' '{ print $3 }')
   if ! printf '%s' "$seen" | grep -q '[^[:space:]]'; then
-    problem "$item" "nothing seen: say what the app or the API showed for this file's behaviour"
+    record_walk_problem "$item" "nothing seen: say what the app or the API showed for this file's behaviour"
     continue
   fi
-  if printf '%s' "$evidence" | grep -Eiq "$media_pattern"; then
-    if [ ! -f "$evidence" ] && [ ! -f "$receipt_dir/$evidence" ]; then
-      problem "$item" "evidence file does not exist: $evidence"
+  if printf '%s' "$evidence" | grep -Eiq "$KC_CAPTURE_PATH"; then
+    evidence_exists=false
+    if [ -f "$evidence" ] || [ -f "$receipt_dir/$evidence" ]; then evidence_exists=true; fi
+    if [ "$evidence_exists" = false ]; then
+      record_walk_problem "$item" "evidence file does not exist: $evidence"
     fi
   elif ! printf '%s' "$evidence" | grep -Eq "$request_pattern"; then
-    problem "$item" "evidence is neither an existing screenshot or recording nor a request line with its status (GET /path 200): $evidence"
+    record_walk_problem "$item" "evidence is neither an existing screenshot or recording nor a request line with its status (GET /path 200): $evidence"
   fi
 done <<EOF
 $items

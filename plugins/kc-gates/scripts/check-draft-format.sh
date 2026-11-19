@@ -55,6 +55,9 @@ script_name=$(basename "$0")
 KC_HEAD_TIME=""
 [ "$#" -eq 2 ] && KC_HEAD_TIME=$(git show -s --format=%ct "$2" 2>/dev/null) || true
 export KC_HEAD_TIME
+# shellcheck source=lib/capture-paths.sh
+. "$(dirname "$0")/lib/capture-paths.sh"
+export KC_CAPTURE_PATH
 
 perl -MJSON::PP -CS -e '
   use strict; use warnings;
@@ -108,8 +111,6 @@ perl -MJSON::PP -CS -e '
       } elsif ($first =~ /^\*\*issue\b/ && $ran =~ m{^\s*n/?a\b}i) {
         push @found, "is an issue with \"ran\": n/a; an issue says something is broken, so reproduce it (a failing test, a request, a screenshot) and say in \"ran\" what showed it, or use another label";
       }
-    }
-    if ($first =~ /^\*\*(issue|suggestion)\b/) {
       my $walked = $draft->{walked} // "";
       $walked = "" if ref $walked;
       if ($walked !~ /\S/) {
@@ -142,7 +143,7 @@ perl -MJSON::PP -CS -e '
       $seen = "" if ref $seen;
       if ($seen !~ /\S/) {
         push @found, "is on a screen with no \"seen\": open the running app, capture what the comment says, and give the file path";
-      } elsif ($seen !~ /\.(png|jpe?g|gif|webp|mp4|mov|webm)$/i || !-f $seen) {
+      } elsif ($seen !~ /$ENV{KC_CAPTURE_PATH}/i || !-f $seen) {
         push @found, "\"seen\" is not a screenshot or recording that exists: $seen";
       } elsif ($ENV{KC_HEAD_TIME} =~ /^\d+$/ && (stat $seen)[9] < $ENV{KC_HEAD_TIME}) {  # [9]: mtime
         push @found, "\"seen\" was captured before the head commit, so it shows older code: $seen";

@@ -144,7 +144,11 @@ run_check() {
     esac
   done
   [ "${#rules_dirs[@]}" -gt 0 ] || rules_dirs=(.)
-  { [ -z "$repo_dir" ] && [ -z "$base_ref" ]; } || { [ -n "$repo_dir" ] && [ -n "$base_ref" ]; } || usage
+  # --repo and --base go together: both or neither.
+  local neither_option_given=false both_options_given=false
+  if [ -z "$repo_dir" ] && [ -z "$base_ref" ]; then neither_option_given=true; fi
+  if [ -n "$repo_dir" ] && [ -n "$base_ref" ]; then both_options_given=true; fi
+  "$neither_option_given" || "$both_options_given" || usage
   local input_path
   for input_path in "$feedback_list" "$ledger" ${diffs[@]+"${diffs[@]}"}; do
     [ -r "$input_path" ] || { echo "$script_name: cannot read $input_path" >&2; exit 2; }
@@ -206,7 +210,7 @@ run_check() {
     rm -rf "$reverted"; mkdir -p "$reverted"
     git -C "$repo_dir" archive HEAD | tar -x -C "$reverted"
     while IFS= read -r path; do
-      [ -n "$path" ] && [ "$path" != "$test_file" ] || continue
+      [ "$path" != "$test_file" ] || continue
       if printf '%s\n' "$path" | grep -Eq "$KC_RISK_TEST_PATHS"; then continue; fi
       if git -C "$repo_dir" cat-file -e "$base_ref:$path" 2>/dev/null; then
         mkdir -p "$reverted/$(dirname "$path")"

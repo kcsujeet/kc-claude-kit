@@ -284,10 +284,10 @@ done
 held_repo=$work_dir/held-repo
 mkdir -p "$held_repo/tests"
 git init -q "$held_repo"
-git_in_held() { git -C "$held_repo" -c user.email=t@example.com -c user.name=t "$@"; }
+run_git_in_held_repo() { git -C "$held_repo" -c user.email=t@example.com -c user.name=t "$@"; }
 printf 'echo 1\n' > "$held_repo/tool.sh"
-git_in_held add -A && git_in_held commit -q -m base
-git_in_held branch base
+run_git_in_held_repo add -A && run_git_in_held_repo commit -q -m base
+run_git_in_held_repo branch base
 printf 'echo 2\n' > "$held_repo/tool.sh"
 # shellcheck disable=SC2016 # the fixture tests are written literally
 printf '[ "$(bash "$(dirname "$0")/../tool.sh")" = 2 ]\n' > "$held_repo/tests/good.test.sh"
@@ -297,10 +297,19 @@ printf 'bash "$(dirname "$0")/../tool.sh" > /dev/null\n' > "$held_repo/tests/vac
 printf '[ "$(bash "$(dirname "$0")/../tool.sh")" = 3 ]\n' > "$held_repo/tests/broken.test.sh"
 # shellcheck disable=SC2016
 printf '[ "$1" = case-a ]\n' > "$held_repo/tests/cased.test.sh"
-git_in_held add -A && git_in_held commit -q -m lesson
+# A test that reads a helper the lesson also changes: the helper is a test file, so it stays.
+mkdir -p "$held_repo/tests/lib" "$held_repo/checks"
+printf 'true\n' > "$held_repo/tests/lib/helper.sh"
+# shellcheck disable=SC2016
+printf '. "$(dirname "$0")/lib/helper.sh" || exit 1\nbash "$(dirname "$0")/../tool.sh" > /dev/null\n' > "$held_repo/tests/helped.test.sh"
+# A held check outside any tests folder: it is the check, so it stays too.
+# shellcheck disable=SC2016
+printf 'bash "$(dirname "$0")/../tool.sh" > /dev/null\n' > "$held_repo/checks/vacuous.sh"
+run_git_in_held_repo add -A && run_git_in_held_repo commit -q -m lesson
 held_diff=$work_dir/held.diff
 printf -- '--- a/rules.md\n+++ b/rules.md\n+- [ ] §B13 A new kind of actor\n--- a/tool.sh\n+++ b/tool.sh\n+echo 2\n' > "$held_diff"
-for held_test in good vacuous broken cased; do printf -- '--- /dev/null\n+++ b/tests/%s.test.sh\n+x\n' "$held_test" >> "$held_diff"; done
+for held_test in good vacuous broken cased helped; do printf -- '--- /dev/null\n+++ b/tests/%s.test.sh\n+x\n' "$held_test" >> "$held_diff"; done
+printf -- '--- /dev/null\n+++ b/tests/lib/helper.sh\n+true\n--- /dev/null\n+++ b/checks/vacuous.sh\n+x\n' >> "$held_diff"
 printf 'F1\ttyped\tdon'"'"'t do that\n' > "$work_dir/held-list.tsv"
 held_rules=$work_dir/held-rules; mkdir -p "$held_rules"
 run_held() {
@@ -321,8 +330,26 @@ expect_contains "it asks for the field" "F1: lesson has no held-by" "$held_outpu
 run_held 'held-by:tests/other.test.sh'
 expect_eq "held-by: a test the lesson diff does not change fails" failed "$held_actual"
 expect_contains "it names the test" "F1: held-by tests/other.test.sh is not a test the lesson diff adds or changes" "$held_output"
+# The case name reaches the test as $1: it passes at HEAD only because it does.
 run_held 'held-by:tests/cased.test.sh::case-a'
-expect_eq "held-by: a case name is passed to the test as its first argument (it passes at HEAD, and with the change reverted too)" failed "$held_actual"
+expect_eq "held-by: a case test that passes with the change reverted fails as vacuous" failed "$held_actual"
 expect_contains "the case test is run, and caught as vacuous" "tests/cased.test.sh passes at HEAD and still passes" "$held_output"
+run_held 'held-by:'
+expect_eq "held-by: an empty held-by field fails" failed "$held_actual"
+expect_contains "it says held-by names no test file" "F1: held-by names no test file" "$held_output"
+run_held 'held-by:tests/helped.test.sh'
+expect_eq "held-by: another test file the lesson changes is not reverted, so a test reading it still fails as vacuous" failed "$held_actual"
+expect_contains "the helper test is caught as vacuous, not failed by a missing helper" "tests/helped.test.sh passes at HEAD and still passes" "$held_output"
+run_held 'held-by:checks/vacuous.sh'
+expect_eq "held-by: the held file is not reverted even outside a tests folder, so it fails as vacuous" failed "$held_actual"
+expect_contains "the held file is caught as vacuous, not failed by being reverted away" "checks/vacuous.sh passes at HEAD and still passes" "$held_output"
+
+# --repo and --base go together: one without the other is a usage error.
+status=0
+bash "$script" check "$work_dir/held-list.tsv" "$work_dir/held-ledger.tsv" --repo "$held_repo" > /dev/null 2>&1 || status=$?
+expect_eq "--repo without --base is a usage error" 2 "$status"
+status=0
+bash "$script" check "$work_dir/held-list.tsv" "$work_dir/held-ledger.tsv" --base base > /dev/null 2>&1 || status=$?
+expect_eq "--base without --repo is a usage error" 2 "$status"
 
 finish

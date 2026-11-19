@@ -30,6 +30,7 @@ run_guard() {
   fi
 }
 
+last_output=""
 check() {
   local expectation=$1 label=$2 command=$3 mode output verdict
   for mode in jq sed; do
@@ -37,6 +38,7 @@ check() {
       continue
     fi
     output=$(run_guard "$command" "$mode")
+    last_output=$output
     if [ -z "$output" ]; then
       verdict=allow
     elif printf '%s' "$output" | grep -q '"permissionDecision":"deny"'; then
@@ -209,50 +211,123 @@ if command -v jq >/dev/null 2>&1; then
 fi
 
 # --- walk receipt: a review with walk-items cannot be posted or approved without a full receipt ---
-# gather-review.sh's folder (kc-review-<sha>) is found under TMPDIR; select-gates.sh names the items.
+# gather-review.sh's folders (kc-review-<sha>) are found under TMPDIR for this repo, whose origin
+# the guard reads from the directory it runs in; select-gates.sh names the items.
+base_tmp=$TMPDIR
 walk_tmp=$(mktemp -d)
-mkdir -p "$walk_tmp/kc-review-abc123"
-review_folder=$walk_tmp/kc-review-abc123
+walk_repo=$(mktemp -d)
+git init -q "$walk_repo"
+git -C "$walk_repo" remote add origin https://github.com/acme/widgets.git
+export TMPDIR=$walk_tmp
+cd "$walk_repo"
 walk_token=KC_REVIEW_POST_APPROVED=1
-write_review() {  # <changed path>
-  printf -- '--- a/%s\n+++ b/%s\n@@ -0,0 +1 @@\n+x\n' "$1" "$1" > "$review_folder/review.diff"
-  printf '%s\n' "$1" > "$review_folder/changed-files.txt"
-  printf 'HEAD_SHA=abc123\nPR=12\n' > "$review_folder/meta.env"
+review_folder=$walk_tmp/kc-review-abc123
+# Saves a review the way gather-review.sh does: write_review <changed path> [<folder> <pr> <repo>].
+write_review() {
+  local folder=$walk_tmp/${2:-kc-review-abc123}
+  mkdir -p "$folder"
+  printf -- '--- a/%s\n+++ b/%s\n@@ -0,0 +1 @@\n+x\n' "$1" "$1" > "$folder/review.diff"
+  printf '%s\n' "$1" > "$folder/changed-files.txt"
+  printf 'HEAD_SHA=abc123\nPR=%s\nURL=https://github.com/%s/pull/%s\n' "${3:-12}" "${4:-acme/widgets}" "${3:-12}" > "$folder/meta.env"
 }
-check_in_walk_tmp() {
-  local expectation=$1 label=$2 command=$3 output verdict
-  output=$(build_payload "$command" | TMPDIR=$walk_tmp bash "$guard")
-  if [ -z "$output" ]; then verdict=allow; elif printf '%s' "$output" | grep -q '"permissionDecision":"deny"'; then verdict=deny; else verdict="unexpected output: $output"; fi
-  if [ "$verdict" = "$expectation" ]; then
-    echo "ok   [walk] $label"; passes=$((passes + 1))
-  else
-    echo "FAIL [walk] $label"; echo "     expected: $expectation"; echo "     actual:   $verdict"; failures=$((failures + 1))
-  fi
+# Makes a folder's meta.env <seconds> old, so which review is newest does not depend on timing.
+age_review() { perl -e 'utime(time - $ARGV[1], time - $ARGV[1], $ARGV[0] . "/meta.env")' "$walk_tmp/$1" "$2"; }
+expect_last_reason() {
+  case "$last_output" in
+    *"$2"*) record_walk_ok "$1" ;;
+    *) echo "FAIL $1"; echo "     missing: $2"; echo "     in:      $last_output"; failures=$((failures + 1)) ;;
+  esac
 }
-approve_command="$walk_token gh pr review 12 --approve"
-comment_command="$walk_token gh pr comment 12 --body 'Looks fine.'"
+record_walk_ok() { echo "ok   $1"; passes=$((passes + 1)); }
+no_receipt_reason="no receipt line in $review_folder/walk-receipt.tsv"
+
 write_review app/models/order.rb
 rm -f "$review_folder/walk-receipt.tsv"
-check_in_walk_tmp deny  "walk: approving a review with a walk-item and no receipt is denied" "$approve_command"
-check_in_walk_tmp deny  "walk: commenting on a review with a walk-item and no receipt is denied" "$comment_command"
-check_in_walk_tmp deny  "walk: an approval through gh api is denied too" \
-  "$walk_token gh api repos/acme/widgets/pulls/12/reviews -X POST -f event=APPROVE"
+write_forms=(
+  "gh pr review 12 --approve"
+  "gh pr review --approve 12"
+  "gh pr review -R acme/widgets 12 --approve"
+  "gh pr review --repo acme/widgets --approve 12"
+  "gh pr comment --body hi 12"
+  "gh pr comment -b 'see 99 first' 12"
+  "gh pr comment https://github.com/acme/widgets/pull/12 --body hi"
+  "gh pr review --approve"
+  "gh pr comment --body hi"
+  "gh issue comment 12 --body hi"
+  "gh api repos/acme/widgets/pulls/12/reviews -X POST -f event=APPROVE"
+  "gh api repos/{owner}/{repo}/pulls/12/reviews -X POST -f event=APPROVE"
+)
+for form in "${write_forms[@]}"; do
+  check deny "walk: no receipt denies: $form" "$walk_token $form"
+  expect_last_reason "walk: the denial for '$form' names the item with no receipt line" "walk-item app/models/order.rb: $no_receipt_reason"
+done
 printf 'app/models/order.rb\tcreated an order with a free item\tno evidence\n' > "$review_folder/walk-receipt.tsv"
-check_in_walk_tmp deny  "walk: a receipt line with bad evidence is denied" "$approve_command"
+check deny  "walk: a receipt line with bad evidence is denied" "$walk_token gh pr review 12 --approve"
+expect_last_reason "walk: the denial for bad evidence says what the evidence must be" "evidence is neither an existing screenshot or recording nor a request line"
 printf 'app/models/order.rb\tcreated an order with a free item\tPOST /orders 201\n' > "$review_folder/walk-receipt.tsv"
-check_in_walk_tmp allow "walk: a full receipt allows the approval" "$approve_command"
-check_in_walk_tmp allow "walk: a full receipt allows the comment" "$comment_command"
+for form in "${write_forms[@]}"; do
+  check allow "walk: a full receipt allows: $form" "$walk_token $form"
+done
 write_review docs/notes.md
 rm -f "$review_folder/walk-receipt.tsv"
-check_in_walk_tmp allow "walk: WALK=not-required needs no receipt" "$approve_command"
+check allow "walk: WALK=not-required needs no receipt" "$walk_token gh pr review 12 --approve"
 write_review app/models/order.rb
-check_in_walk_tmp deny  "walk: the denial returns when a source change is back" "$approve_command"
-check_in_walk_tmp deny  "walk: no token is still the old deny" "gh pr review 12 --approve"
+check deny  "walk: the denial returns when a source change is back" "$walk_token gh pr review 12 --approve"
+check deny  "walk: no token is still the old deny" "gh pr review 12 --approve"
+expect_last_reason "walk: no token gives the approval-token deny, not the receipt one" "without the approval token"
+check allow "walk: a review of another pull request needs no receipt" "$walk_token gh pr review 99 --approve"
+
+# KC_REVIEW_DIR names the review whatever pull request the command names.
+export KC_REVIEW_DIR=$review_folder
+check deny  "walk: KC_REVIEW_DIR is checked for a command naming another pull request" "$walk_token gh pr review 99 --approve"
+export KC_REVIEW_DIR=$walk_tmp/kc-review-missing
+check allow "walk: a KC_REVIEW_DIR with no review in it means no check" "$walk_token gh pr review 12 --approve"
+unset KC_REVIEW_DIR
+
+# Two saved reviews of one pull request (a re-review of a newer head): the newest decides.
+write_review app/models/order.rb kc-review-old
+write_review docs/notes.md kc-review-new
 rm -rf "$review_folder"
-check_in_walk_tmp allow "walk: a review of another pull request needs no receipt" "$walk_token gh pr review 99 --approve"
+age_review kc-review-old 7200
+check allow "walk: the newer review (docs only) decides over an older one with a source change" "$walk_token gh pr review 12 --approve"
+write_review docs/notes.md kc-review-old
+write_review app/models/order.rb kc-review-new
+age_review kc-review-old 7200
+check deny  "walk: the newer review (source change) decides over an older docs-only one" "$walk_token gh pr review 12 --approve"
+rm -rf "$walk_tmp"/kc-review-*
+
+# A newer folder gather-review.sh has not finished (no diff yet) is not the review.
+write_review app/models/order.rb kc-review-complete
+age_review kc-review-complete 7200
+mkdir "$walk_tmp/kc-review-partial"
+printf 'PR=12\nURL=https://github.com/acme/widgets/pull/12\n' > "$walk_tmp/kc-review-partial/meta.env"
+check deny  "walk: a newer folder with no diff is skipped for the complete review" "$walk_token gh pr review 12 --approve"
+rm -rf "$walk_tmp"/kc-review-*
+
+# Another repository's review of the same pull request number is not this review.
+write_review app/models/order.rb kc-review-other 12 acme/other
+check allow "walk: another repo's review of the same pull request number is ignored" "$walk_token gh pr review 12 --approve"
+write_review docs/notes.md kc-review-own
+age_review kc-review-own 7200
+check allow "walk: a newer unwalked review of another repo does not decide over this repo's" "$walk_token gh pr review 12 --approve"
+age_review kc-review-other 14400
+write_review app/models/order.rb kc-review-other 12 acme/other
+check allow "walk: a newer unwalked review of another repo is ignored, without a number too" "$walk_token gh pr review --approve"
+check deny  "walk: -R names the other repo, whose review is the one checked" "$walk_token gh pr review -R acme/other 12 --approve"
+rm -rf "$walk_tmp"/kc-review-*
+
+# select-gates.sh cannot read the review: the guard never blocks what it can't check.
+write_review app/models/order.rb
+if [ "$(id -u)" -ne 0 ]; then
+  chmod 000 "$review_folder/review.diff"
+  check allow "walk: a review whose diff cannot be read means no check" "$walk_token gh pr review 12 --approve"
+  chmod 644 "$review_folder/review.diff"
+fi
 rm -rf "$review_folder"
-check_in_walk_tmp allow "walk: no saved review folder means no check" "$approve_command"
-rm -rf "$walk_tmp"
+check allow "walk: no saved review folder means no check" "$walk_token gh pr review 12 --approve"
+cd "$tests_dir"
+TMPDIR=$base_tmp
+rm -rf "$walk_tmp" "$walk_repo"
 
 echo "$passes passed, $failures failed"
 [ "$failures" -eq 0 ]

@@ -24,7 +24,9 @@
 #     stay inside one hunk, so that is not checked);
 #   - `body` is not empty.
 #   - the body passes kc-post-review's format rules (scripts/check-draft-format.sh), including
-#     a reproduced "ran" on an issue and a "seen" capture on a file people see rendered;
+#     a reproduced "ran" on an issue, a "walked" (the states the asked-for change reaches, or
+#     n/a with a reason) beside "ran" on an issue or suggestion, and a "seen" capture on a file
+#     people see rendered;
 #   - no name the body suggests is one letter from a name already in the repo
 #     (scripts/check-draft-names.sh, when run from inside the repo).
 # Every failing draft is listed on stderr, and nothing is written.
