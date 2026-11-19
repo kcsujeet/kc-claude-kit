@@ -43,15 +43,15 @@ asks_status() {
 asks_fix() {
   local text
   text=$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')
-  printf '%s' "$text" | grep -Eq "(^|[^[:alnum:]])(fix|debug|bugs?|broken|regress(ed|ion)?|crash(es|ed)?|fail(s|ed|ing|ure)?|errors?|not working|doesn.t work|qa|feedbacks?|findings?|review comments?)([^[:alnum:]]|$)"
+  printf '%s' "$text" | grep -Eq "(^|[^[:alnum:]])(fix(es|ed|ing)?|debug(ging)?|bugs?|broken|regress(ed|ion)?|crash(es|ed)?|fail(s|ed|ing|ure)?|errors?|not working|doesn.t work|qa|feedbacks?|findings?|review comments?)([^[:alnum:]]|$)"
 }
 
-# True when a reply proposes a cause and a fix: it names a cause and a fix for something.
+# A cause word and a fix word anywhere in the reply, in any order, newlines folded to spaces.
 proposes_cause_and_fix() {
   local text
   text=$(printf '%s' "$1" | tr '\n' ' ')
-  printf '%s' "$text" | grep -Eiq "(^|[^[:alnum:]])(root cause|cause[sd]?|caused by)([^[:alnum:]]|$)" \
-    && printf '%s' "$text" | grep -Eiq "(^|[^[:alnum:]])(fix|fixes|fixed by)([^[:alnum:]]|$)"
+  printf '%s' "$text" | grep -Eiq "(^|[^[:alnum:]])cause[sd]?([^[:alnum:]]|$)" \
+    && printf '%s' "$text" | grep -Eiq "(^|[^[:alnum:]])fix(es|ed)?([^[:alnum:]]|$)"
 }
 
 # True when a reply names how the problem was reproduced: a "Reproduced:" or "Not reproduced:"

@@ -202,6 +202,7 @@ expect_eq "a bold Reproduced label goes out" out "$(run_hook "$(printf '%s\n**Re
 expect_eq "Not reproduced with a reason goes out" out "$(run_hook "$(printf '%s\nNot reproduced: no OpenAI key locally.' "$proposal")")"
 expect_eq "a fix with no cause goes out" out "$(run_hook "Fixed in abc123; the test passes.")"
 expect_eq "a cause with no fix goes out" out "$(run_hook "The cause is a stale cache entry.")"
+expect_eq "a cause with \"fixed it\" is a proposal too" noted "$(run_hook "Root cause: a stale cache. I fixed it in abc123.")"
 expect_eq "the word reproduced in prose is not the line" noted "$(run_hook "$(printf '%s I reproduced nothing yet.' "$proposal")")"
 
 finish
