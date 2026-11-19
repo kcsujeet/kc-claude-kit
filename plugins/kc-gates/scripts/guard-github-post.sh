@@ -48,6 +48,8 @@ set -u
 . "$(dirname "$0")/lib/hook-input.sh"
 # shellcheck source=lib/file-sha256.sh
 . "$(dirname "$0")/lib/file-sha256.sh"
+# shellcheck source=lib/review-dir.sh
+. "$(dirname "$0")/lib/review-dir.sh"
 
 readonly APPROVAL_TOKEN='KC_REVIEW_POST_APPROVED=1'
 
@@ -268,11 +270,6 @@ EOF
     | jq -Rsc '{hookSpecificOutput: {hookEventName: "PreToolUse", permissionDecision: "deny", permissionDecisionReason: .}}'
 }
 
-# True when <dir> holds what gather-review.sh saved of a review: its diff and changed files.
-has_review_files() {
-  [ -n "$1" ] && [ -f "$1/review.diff" ] && [ -f "$1/changed-files.txt" ]
-}
-
 # Prints "<owner/repo>|<number>" for the first review write in the command: the number after the
 # subcommand wherever its flags sit, or in a pull or issue URL or an api path; the repository from
 # -R/--repo, the URL or the api path. A part the command does not name is empty.
@@ -327,26 +324,6 @@ read_remote_repo() {
   git remote get-url origin 2>/dev/null | sed -nE 's#^.*github\.com[:/]([^/]+/[^/]+)$#\1#p' | sed 's#\.git$##'
 }
 
-
-# Prints the saved review folder (gather-review.sh's kc-review-*, from the last day) with the
-# newest meta.env among those for this repo and, when given, this pull request; nothing if none.
-find_review_dir() {
-  local repo=$1 number=$2 candidate meta
-  local -a metas=()
-  while IFS= read -r candidate; do
-    has_review_files "$candidate" || continue
-    meta=$candidate/meta.env
-    [ -f "$meta" ] || continue
-    if [ -n "$number" ] && ! grep -qx "PR=$number" "$meta"; then continue; fi
-    if [ -n "$repo" ] && ! grep '^URL=' "$meta" | grep -qiF "github.com/$repo/"; then continue; fi
-    metas+=("$meta")
-  done <<EOF
-$(find "${TMPDIR:-/tmp}" -maxdepth 1 -type d -name 'kc-review-*' -mtime -1 2>/dev/null)
-EOF
-  [ "${#metas[@]}" -gt 0 ] || return 0
-  # shellcheck disable=SC2012 # ls -t sorts by mtime; the paths are the guard's own temp folders
-  dirname "$(ls -t "${metas[@]}" | head -n 1)"
-}
 
 # Prints the deny JSON when the saved review has walk-items without a full receipt line; nothing
 # otherwise, and nothing when no review folder or no select-gates.sh can be found.
