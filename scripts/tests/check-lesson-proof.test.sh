@@ -123,17 +123,27 @@ expect_verdict pass "an unnamed box held by a file the change adds to" $'wording
 
 create_branch box-rewritten
 write_repo_file plugins/shop/skills/checkout/references/rounding.md 'Round half up.\n\n- [ ] §T1 Totals round half up, per line.\n- [ ] §T12 Refunds round down.\n'
-write_repo_file plugins/shop/tests/rounding.test.sh 'grep per-line # §T12\n'
+write_repo_file plugins/shop/tests/rounding.test.sh 'grep per-line §T12\n'
 commit_change "a rewritten box; the test names a longer id"
 expect_verdict fail "a rewritten box whose id only appears inside a longer one"
 expect_output "the failure names the rewritten box alone" "naming them: §T1"
-write_repo_file plugins/shop/tests/rounding.test.sh 'grep per-line # §T1, §T12\n'
+write_repo_file plugins/shop/tests/rounding.test.sh 'grep per-line §T1 §T12\n'
 commit_change "the test names the box"
 expect_verdict pass "a rewritten box whose id a changed test names"
 
+create_branch box-in-comment
+echo "- [ ] §T3 Totals include fees." >> "$repo/plugins/shop/skills/checkout/references/rounding.md"
+write_repo_file plugins/shop/tests/fees.test.sh '# proves §T3\ngrep fees # §T3\n'
+commit_change "a box a test names only in comments"
+expect_verdict fail "a box a test script names only in a comment is not proof"
+expect_output "the failure names the commented box" "naming them: §T3"
+write_repo_file plugins/shop/tests/fees.test.sh 'expect "§T3: totals include fees"\n'
+commit_change "the test names the box in what it runs"
+expect_verdict pass "a box a test script names in a line it runs"
+
 create_branch dotted-box
 write_repo_file plugins/shop/skills/checkout/references/backfills.md '- [ ] §RL6.1a Backfill in batches.\n- [ ] §RL6.2b Log each batch.\n'
-write_repo_file plugins/shop/tests/backfills.test.sh 'grep batch # §RL6.2b\n'
+write_repo_file plugins/shop/tests/backfills.test.sh 'grep batch §RL6.2b\n'
 commit_change "two dotted boxes; the test names one"
 expect_verdict fail "a dotted box id is its own id, not its prefix"
 expect_output "the failure names the dotted box" "naming them: §RL6.1a"
@@ -166,7 +176,7 @@ expect_verdict fail "a test that is only renamed is not proof"
 create_branch proof-renamed-and-edited
 echo "- [ ] §T2 Totals include shipping." >> "$repo/plugins/shop/skills/checkout/references/rounding.md"
 git -C "$repo" mv plugins/shop/tests/old.test.sh plugins/shop/tests/renamed.test.sh
-write_repo_file plugins/shop/tests/renamed.test.sh 'grep tax\ngrep total # §T2\ngrep shipping # §T2\n'
+write_repo_file plugins/shop/tests/renamed.test.sh 'grep tax\ngrep total # §T2\ngrep shipping §T2\n'
 commit_change "a box with a renamed test that gains a case naming it"
 expect_verdict pass "a renamed test that gains lines naming the box is proof"
 
@@ -248,14 +258,14 @@ done
 create_branch prose-here-box-there
 echo "Include shipping." >> "$repo/plugins/shop/skills/checkout/SKILL.md"
 echo "- [ ] §T2 Totals include shipping." >> "$repo/plugins/shop/skills/checkout/references/rounding.md"
-write_repo_file plugins/shop/tests/totals.test.sh 'grep shipping # §T2\n'
+write_repo_file plugins/shop/tests/totals.test.sh 'grep shipping §T2\n'
 commit_change "prose in one rule file, a proven box in another"
 expect_verdict fail "a box in one file doesn't cover prose another file gains"
 expect_output "the failure names only the file with no box" "       plugins/shop/skills/checkout/SKILL.md"
 
 create_branch prose-with-its-box
 printf 'Shipping counts as part of the total.\n\n- [ ] §T2 Totals include shipping.\n' >> "$repo/plugins/shop/skills/checkout/references/rounding.md"
-write_repo_file plugins/shop/tests/totals.test.sh 'grep shipping # §T2\n'
+write_repo_file plugins/shop/tests/totals.test.sh 'grep shipping §T2\n'
 commit_change "prose and its proven box in one file"
 expect_verdict pass "prose beside the box it explains, proven"
 

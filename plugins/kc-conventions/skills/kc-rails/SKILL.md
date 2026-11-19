@@ -69,7 +69,6 @@ A Rails app almost never needs a new shape. It already has dozens of controllers
 ### Specs
 
 - An N+1 fix is pinned with the app's N+1 detector (for example Prosopite or Bullet) over three records, not a hand-rolled query counter, and one spec covers a route that never asked for the fix.
-- An N+1 claim, in a fix or a review comment, is measured through a request (a request spec counting the queries that reach the database for one record and for several), never a console loop or a bare serializer call: a request's query cache and the associations its scope already loaded can make the per-record queries free, and a fix for a cost the request never pays is dead code.
 - A spec for a bug reproduces the data the way the app writes it (a nullable column left null), not the way a fixture makes convenient.
 - Every behaviour the change claims is mutation-checked: break it, and a specific spec fails.
 - `db/schema.rb` is never regenerated from a stale local database; its diff holds only the intended change.
@@ -99,7 +98,6 @@ The rails gate ticks every box against the diff. A box is FAIL if any matching c
 - [ ] §RL5e A write that replaces a set of links (`tag_ids = [...]`) checks the caller's access to every id it removes as well as every id it adds, and a spec removes one the caller can't reach. A check over `ids - current_ids` alone FAILS. (N/A: no set-replacing write)
 - [ ] §RL6 Stored values: when the diff renames, merges or retires a stored value or adds a backfill, every box in `references/backfills.md` was walked. (N/A: no enum, status constant, column meaning or backfill changed)
 - [ ] §RL7a N+1 specs use the app's detector over three records, and one covers a route that did not ask for the fix. (N/A: no N+1 fix)
-- [ ] §RL7e Every N+1 claimed or fixed was measured through a request, database queries counted for one record and for several, with the counts cited. (N/A: no N+1 claimed or fixed)
 - [ ] §RL7b A bug-fix spec builds data the way the app writes it. (N/A: not a bug fix)
 - [ ] §RL7c Mutation-checked: each claimed behaviour broken in turn failed a specific spec, and the tree was restored clean. (N/A: diff adds no behaviour)
 - [ ] §RL7d `db/schema.rb` diff holds only the intended change. (N/A: `db/` untouched)

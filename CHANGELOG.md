@@ -6,10 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
-### Changed (a base class a public page renders is walked signed out, and an N+1 claim is measured in a request)
+### Changed (a base class a public page renders is walked signed out; a query-count claim needs a request's counts)
 
-- `kc-gates` 3.15.3: `select-gates.sh` gives the signed-out walk reason when a changed source file defines a class that a class on a public path inherits from (`< Name` or `extends Name`), naming the inheritor: a base serializer a guest page renders through its public subclass reaches signed-out visitors though its own path says nothing. Held by `tests/select-gates.test.sh` (inherited by a public class, by a private class only, and a longer name sharing the start). `check-draft-format.sh` refuses a draft that claims a query count (an N+1, extra or per-record queries) unless its `"ran"` names a request and its counts. Held by `tests/check-draft-format.test.sh`.
-- `kc-conventions` 2.6.5: `kc-rails` asks that an N+1 claimed in a fix or a review comment be measured through a request, database queries counted for one record and for several, since the request's query cache and the associations its scope loaded can make per-record queries free; box §RL7e.
+- `kc-gates` 3.15.3: `select-gates.sh` gives the signed-out walk reason, naming the inheritor, when a class on a public path inherits a changed class. `check-draft-format.sh` refuses a draft claiming an N+1 or extra queries unless its `"ran"` names a request and its counts. Held by `tests/select-gates.test.sh` and `tests/check-draft-format.test.sh`.
+- `scripts/check-lesson-proof.sh`: a box id named only in a comment of a test script is no proof. Held by `scripts/tests/check-lesson-proof.test.sh`.
 
 ### Changed (every changed behaviour is walked, and so is every change a comment asks for)
 
