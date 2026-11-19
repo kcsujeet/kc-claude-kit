@@ -86,8 +86,13 @@ if [ -n "$changed_proof_files" ]; then
   added_proof_lines=$(git -c core.quotePath=false diff --unified=0 -M --no-color --no-ext-diff "$merge_base" HEAD \
     | PROOF_FILES="$id_proof_files" awk '
         BEGIN { count = split(ENVIRON["PROOF_FILES"], list, "\n"); for (i = 1; i <= count; i++) if (list[i] != "") kept[list[i]] = 1 }
-        /^\+\+\+ / { in_kept_file = (substr($0, 7) in kept); next }
-        /^\+/ && in_kept_file { print substr($0, 2) }')
+        /^\+\+\+ / { path = substr($0, 7); in_kept_file = (path in kept); is_shell = (path ~ /\.sh$/); next }
+        /^\+/ && in_kept_file {
+          line = substr($0, 2)
+          # A comment in a test script runs nothing, so a box id named only there proves nothing.
+          if (is_shell) { sub(/^[[:space:]]*#.*/, "", line); sub(/[[:space:]]+#[^"\x27]*$/, "", line) }
+          print line
+        }')
   changed_box_ids=$(git diff --unified=0 --no-color --no-ext-diff "$merge_base" HEAD -- "${rule_paths[@]}" \
     | sed -nE 's/^\+[[:space:]]*- \[[ xX]\] (§[A-Z]+[0-9]+(\.[0-9]+)*[a-z]?)([^.0-9a-z].*|\.([^0-9].*)?)?$/\1/p' | sort -u)
   unproven_box_ids=""

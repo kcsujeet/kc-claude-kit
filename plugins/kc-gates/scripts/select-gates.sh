@@ -189,6 +189,7 @@ printf 'GATES=%s\n' "$gates_csv"
 printf '%s\n' "${gate_lines[@]}"
 
 walk_hit=$(kc_public_path_hit "$changed_files" "$repo_root")
+[ -n "$walk_hit" ] || walk_hit=$(kc_public_inheritor_hit "$changed_files" "$repo_root")
 walk_items=$(grep -vE "$KC_RISK_TEST_PATHS" "$changed_files" | grep -E "$KC_RISK_SOURCE_PATHS" || true)
 if [ -n "$walk_hit" ]; then
   echo "WALK=required"

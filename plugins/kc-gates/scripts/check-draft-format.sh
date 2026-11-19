@@ -35,6 +35,9 @@
 #     like): a comment is read by a person, so it says the thing in everyday words;
 #   - when it asks for a test, carry a "ran" that says the test failed with the bug put back: a
 #     suggested test that still passes with the bug in place guards nothing;
+#   - when it says something about query counts (an N+1, extra or per-record queries), carry a
+#     "ran" naming a request and its counts: a request's query cache and loaded associations can
+#     make per-record queries free, so a count taken in a console or a serializer call misleads;
 #   - when it says something about an earlier review ("last round", "I was wrong"), carry a "ran"
 #     that is not "n/a": a claim that reverses or repeats an earlier comment is checked again first;
 #   - when it is an `issue`, carry a "ran" that is not "n/a": an issue says something is broken,
@@ -134,6 +137,11 @@ perl -MJSON::PP -CS -e '
     my $has_real_run = $ran_record =~ /\S/ && $ran_record !~ m{^\s*n/?a\b}i;
     if ($mentions_earlier_review && !$has_real_run) {
       push @found, "says something about an earlier review with nothing run behind it: check that claim again and say in \"ran\" what showed it";
+    }
+    my $claims_query_cost = $prose =~ /\bN\s*\+\s*1\b|\b(extra|per[- ](record|row|item)|repeated) quer(y|ies)\b|\bquer(y|ies) (per|for each|once per) (record|row|item|booking|order)\b|\b\d+ (extra )?quer(y|ies)\b/i;
+    my $measured_in_request = $ran_record =~ /\brequest\b/i && $ran_record =~ /\d/;
+    if ($claims_query_cost && !$measured_in_request) {
+      push @found, "says something about query counts with no request measuring them: count the database queries through a request (a request spec) for one record and for several, and give the counts in \"ran\"; a console or serializer call has no query cache";
     }
     my $path = $draft->{path} // "";
     my $rendered = $path =~ /\.(tsx|jsx|vue|svelte|astro|html?|erb|haml|slim|hbs|handlebars|mustache|twig|liquid|css|scss|sass|less|styl)$/i
