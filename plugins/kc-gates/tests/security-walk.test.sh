@@ -15,7 +15,11 @@ max_skill_lines=500
 failures=0
 fail() { echo "FAIL $1"; failures=$((failures + 1)); }
 
-grep -q 'When `select-gates.sh` prints `WALK=required`, the review runs the change in the running app as every audience' "$review" || fail "kc-code-review: hard rule on WALK=required"
+grep -q 'When `select-gates.sh` prints `WALK=required`' "$review" || fail "kc-code-review: hard rule on WALK=required"
+grep -q 'the reviewer has seen each changed behaviour themselves' "$review" || fail "kc-code-review: every changed behaviour is walked by the reviewer"
+grep -q 'skipped a change made for someone else' "$review" || fail "kc-code-review: a re-review walks the delta, not only its own findings"
+grep -q 'the review runs it as every audience' "$review" || fail "kc-code-review: a public path is walked as every audience"
+grep -qE '^- \[ \] §V11 .*walk-item.*Walk:.*no receipt FAILS' "$verification" || fail "verification-gate §V11 box: a walk-item with no receipt FAILS"
 grep -q 'signed out in a fresh browser profile included' "$review" || fail "kc-code-review: the walk includes signed out"
 grep -q 'kc-verify:kc-ui` and `kc-verify:kc-e2e`' "$review" || fail "kc-code-review: the walk names kc-ui and kc-e2e"
 grep -q '^- Walk: ' "$review" || fail "kc-code-review: the Checklist template has a Walk line"

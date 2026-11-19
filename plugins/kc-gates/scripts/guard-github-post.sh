@@ -27,6 +27,14 @@
 # is denied; and a new inline comment through the single-comment endpoint
 # (`pulls/<n>/comments` without an id) is denied, since the builder never makes one.
 #
+# With the token present, a review write (a comment, a review, an approval) is also denied while
+# the review's walk receipt fails check-walk-receipt.sh. The review is the newest
+# `${TMPDIR:-/tmp}/kc-review-*` folder gather-review.sh saved in the last day whose meta.env says
+# `PR=<n>` for the pull request the command names (or `$KC_REVIEW_DIR`), holding review.diff,
+# changed-files.txt and walk-receipt.tsv: select-gates.sh is run on the first
+# two, and each `walk-item:` it prints needs a line in the receipt. No review folder, or no
+# walk-item (WALK=not-required), means no check.
+#
 # Output: the PreToolUse deny JSON on a blocked write, nothing otherwise.
 # Always exits 0. Hook schema: https://code.claude.com/docs/en/hooks
 #
@@ -258,6 +266,31 @@ EOF
     | jq -Rsc '{hookSpecificOutput: {hookEventName: "PreToolUse", permissionDecision: "deny", permissionDecisionReason: .}}'
 }
 
+# Prints the deny JSON when the saved review has walk-items without a full receipt line; nothing
+# otherwise, and nothing when no review folder or no select-gates.sh can be found.
+unwalked_review_verdict() {
+  local scripts_dir review_dir selected problems reason pr_number
+  scripts_dir=$(dirname "$0")
+  review_dir=${KC_REVIEW_DIR:-}
+  if [ -z "$review_dir" ]; then
+    pr_number=$(printf '%s' "$1" | sed -nE 's/.*(gh pr (review|comment)[[:space:]]+|(pulls|issues)\/)([0-9]+).*/\4/p' | head -n 1)
+    [ -n "$pr_number" ] || return 0
+    review_dir=$(find "${TMPDIR:-/tmp}" -maxdepth 1 -type d -name 'kc-review-*' -mtime -1 2>/dev/null | while IFS= read -r candidate; do
+      [ -f "$candidate/review.diff" ] && [ -f "$candidate/changed-files.txt" ] && grep -qx "PR=$pr_number" "$candidate/meta.env" 2>/dev/null && ls -d -t "$candidate"
+    done | head -n 1)
+  fi
+  [ -n "$review_dir" ] && [ -f "$review_dir/review.diff" ] && [ -f "$review_dir/changed-files.txt" ] || return 0
+  selected=$(mktemp)
+  if ! bash "$scripts_dir/select-gates.sh" "$review_dir/review.diff" "$review_dir/changed-files.txt" . > "$selected" 2>/dev/null; then
+    rm -f "$selected"
+    return 0
+  fi
+  problems=$(bash "$scripts_dir/check-walk-receipt.sh" "$selected" "$review_dir/walk-receipt.tsv" 2>&1) && { rm -f "$selected"; return 0; }
+  rm -f "$selected"
+  reason="Blocked by the kc-gates plugin: this review changed behaviour it has no walk receipt for, so it cannot be posted or approved yet. Walk each item in the running app or at the API and write one line per item to $review_dir/walk-receipt.tsv (path, what was seen, evidence: a screenshot or a request line with its status). $(printf '%s' "$problems" | tr '\n' ' ' | sed 's/["\\]//g' | cut -c1-600)"
+  printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"%s"}}' "$reason"
+}
+
 print_deny() {
   cat <<'EOF'
 {"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Blocked by the kc-gates plugin: this command writes a PR or issue comment or review to GitHub without the approval token. Do not retry and do not add the token yourself. Show the user the full draft, the head SHA it anchors to and the posting shape, then stop and wait for an explicit, fresh post signal in their latest message. Only after that signal, prefix each write command with KC_REVIEW_POST_APPROVED=1 in the same command (see /kc-gates:kc-post-review)."}}
@@ -275,6 +308,11 @@ main() {
     *"$APPROVAL_TOKEN"*)
       if contains_review_write "$command"; then
         verdict=$(unchecked_comments_verdict "$command")
+        if [ -n "$verdict" ]; then
+          printf '%s' "$verdict"
+          exit 0
+        fi
+        verdict=$(unwalked_review_verdict "$command")
         if [ -n "$verdict" ]; then
           printf '%s' "$verdict"
           exit 0

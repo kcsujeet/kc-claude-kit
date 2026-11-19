@@ -280,4 +280,49 @@ for held_path in plugin/scripts/check.sh plugin/hooks/hooks.json plugin/evals/ca
   expect_eq "a diff that changes $held_path holds the lessons" passed "$actual"
 done
 
+# --- held-by: the lesson's test must pass at HEAD and fail with the lesson's non-test changes reverted ---
+held_repo=$work_dir/held-repo
+mkdir -p "$held_repo/tests"
+git init -q "$held_repo"
+git_in_held() { git -C "$held_repo" -c user.email=t@example.com -c user.name=t "$@"; }
+printf 'echo 1\n' > "$held_repo/tool.sh"
+git_in_held add -A && git_in_held commit -q -m base
+git_in_held branch base
+printf 'echo 2\n' > "$held_repo/tool.sh"
+# shellcheck disable=SC2016 # the fixture tests are written literally
+printf '[ "$(bash "$(dirname "$0")/../tool.sh")" = 2 ]\n' > "$held_repo/tests/good.test.sh"
+# shellcheck disable=SC2016
+printf 'bash "$(dirname "$0")/../tool.sh" > /dev/null\n' > "$held_repo/tests/vacuous.test.sh"
+# shellcheck disable=SC2016
+printf '[ "$(bash "$(dirname "$0")/../tool.sh")" = 3 ]\n' > "$held_repo/tests/broken.test.sh"
+# shellcheck disable=SC2016
+printf '[ "$1" = case-a ]\n' > "$held_repo/tests/cased.test.sh"
+git_in_held add -A && git_in_held commit -q -m lesson
+held_diff=$work_dir/held.diff
+printf -- '--- a/rules.md\n+++ b/rules.md\n+- [ ] §B13 A new kind of actor\n--- a/tool.sh\n+++ b/tool.sh\n+echo 2\n' > "$held_diff"
+for held_test in good vacuous broken cased; do printf -- '--- /dev/null\n+++ b/tests/%s.test.sh\n+x\n' "$held_test" >> "$held_diff"; done
+printf 'F1\ttyped\tdon'"'"'t do that\n' > "$work_dir/held-list.tsv"
+held_rules=$work_dir/held-rules; mkdir -p "$held_rules"
+run_held() {
+  printf 'F1\tlesson\t§B13\t%s\n' "$1" > "$work_dir/held-ledger.tsv"
+  held_output=$(bash "$script" check "$work_dir/held-list.tsv" "$work_dir/held-ledger.tsv" --diff "$held_diff" --rules "$held_rules" --repo "$held_repo" --base base 2>&1) && held_actual=passed || held_actual=failed
+}
+run_held 'held-by:tests/good.test.sh'
+expect_eq "held-by: a test that fails with the change reverted passes" passed "$held_actual"
+run_held 'held-by:tests/vacuous.test.sh'
+expect_eq "held-by: a test that still passes with the change reverted fails" failed "$held_actual"
+expect_contains "it says the test does not block the mistake" "F1: held-by tests/vacuous.test.sh passes at HEAD and still passes with the lesson's non-test changes reverted" "$held_output"
+run_held 'held-by:tests/broken.test.sh'
+expect_eq "held-by: a test that fails at HEAD fails" failed "$held_actual"
+expect_contains "it says the test fails at HEAD" "F1: held-by tests/broken.test.sh fails at HEAD" "$held_output"
+run_held 'prose-only: judgment'
+expect_eq "held-by: a lesson with no held-by field fails" failed "$held_actual"
+expect_contains "it asks for the field" "F1: lesson has no held-by" "$held_output"
+run_held 'held-by:tests/other.test.sh'
+expect_eq "held-by: a test the lesson diff does not change fails" failed "$held_actual"
+expect_contains "it names the test" "F1: held-by tests/other.test.sh is not a test the lesson diff adds or changes" "$held_output"
+run_held 'held-by:tests/cased.test.sh::case-a'
+expect_eq "held-by: a case name is passed to the test as its first argument (it passes at HEAD, and with the change reverted too)" failed "$held_actual"
+expect_contains "the case test is run, and caught as vacuous" "tests/cased.test.sh passes at HEAD and still passes" "$held_output"
+
 finish

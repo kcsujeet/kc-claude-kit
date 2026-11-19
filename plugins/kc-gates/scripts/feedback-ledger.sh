@@ -14,7 +14,7 @@
 #       non-empty line of an --extra file (review comments, QA rows, one per line) is one item,
 #       its source the file's name. Listing only: nothing is judged here.
 #
-#   feedback-ledger.sh check <list> <ledger> [--diff <file>]... [--rules <dir>]...
+#   feedback-ledger.sh check <list> <ledger> [--diff <file>]... [--rules <dir>]... [--repo <dir> --base <ref>]
 #       Fails unless the ledger gives every listed item one verdict, as a tab-separated line:
 #         <id> lesson <rule id>[,<rule id>]...       a --diff (the lesson PR) adds a line that
 #                                                     defines each id; a rule file with no ids (a
@@ -38,6 +38,15 @@
 #       `lesson:` catch) passes only when a --diff adds or changes a script, hook, test, eval,
 #       CI workflow or lint-rule file. There is no prose-only escape; a lesson no check can hold
 #       is not written as a rule.
+#       With --repo (the lesson PR's checkout, at its head) and --base (the ref it branches from),
+#       a lesson must also prove its check blocks the mistake: its line carries a field
+#       `held-by:<test file>[::<case>]` (after the rule id; on a `covered` line, after the
+#       catch), naming a test the --diff adds or changes. The check runs that test at HEAD (it
+#       must pass), then again in a throwaway copy of HEAD with the lesson PR's non-test changes
+#       put back to --base (it must fail), and reports which went wrong: a test that fails at
+#       HEAD, or one that still passes with the change reverted, holds nothing. The test is run
+#       as `bash <file> [<case>]` from the checkout's root; the case, when given, is its first
+#       argument. Without --repo a lesson is held when the diff changes any check file.
 #       A rule id is written as the rules write it (`§B13`, `B13`, `WF14`). A line defines it when
 #       it starts with it, after any list marker, checkbox or heading marks (`- [ ] §B13 ...`,
 #       `### §B13. ...`, `- **B13.** ...`); a line that only cites it does not. --rules defaults
@@ -122,17 +131,20 @@ readonly RULE_FILE_PATH='(^|/)(rules|\.claude)/|(^|/)(CLAUDE|AGENTS|SKILL)\.md$'
 run_check() {
   # shellcheck source=lib/risk-paths.sh
   . "$(dirname "$0")/lib/risk-paths.sh"
-  local feedback_list=${1:-} ledger=${2:-} diffs=() rules_dirs=()
+  local feedback_list=${1:-} ledger=${2:-} diffs=() rules_dirs=() repo_dir="" base_ref=""
   [ -n "$feedback_list" ] && [ -n "$ledger" ] || usage
   shift 2
   while [ "$#" -gt 0 ]; do
     case "$1" in
       --diff) [ "$#" -ge 2 ] || usage; diffs+=("$2"); shift 2 ;;
       --rules) [ "$#" -ge 2 ] || usage; rules_dirs+=("$2"); shift 2 ;;
+      --repo) [ "$#" -ge 2 ] || usage; repo_dir=$2; shift 2 ;;
+      --base) [ "$#" -ge 2 ] || usage; base_ref=$2; shift 2 ;;
       *) usage ;;
     esac
   done
   [ "${#rules_dirs[@]}" -gt 0 ] || rules_dirs=(.)
+  { [ -z "$repo_dir" ] && [ -z "$base_ref" ]; } || { [ -n "$repo_dir" ] && [ -n "$base_ref" ]; } || usage
   local input_path
   for input_path in "$feedback_list" "$ledger" ${diffs[@]+"${diffs[@]}"}; do
     [ -r "$input_path" ] || { echo "$script_name: cannot read $input_path" >&2; exit 2; }
@@ -177,8 +189,48 @@ run_check() {
       esac
     done
   }
+  # Runs the held-by test at HEAD, then with the lesson's non-test changes reverted.
+  check_held_by_test() {
+    local item=$1 field=$2 spec test_file test_case path reverted
+    spec=${field#held-by:}
+    test_file=${spec%%::*}
+    test_case=""
+    case "$spec" in *::*) test_case=${spec#*::} ;; esac
+    [ -n "$test_file" ] || { record_problem "$item: held-by names no test file"; return; }
+    grep -Fxq "$test_file" "$changed_paths" || { record_problem "$item: held-by $test_file is not a test the lesson diff adds or changes"; return; }
+    if ! (cd "$repo_dir" && bash "$test_file" ${test_case:+"$test_case"}) > "$scratch_dir/head-run" 2>&1; then
+      record_problem "$item: held-by $test_file fails at HEAD, so it proves nothing: fix the test or the change"
+      return
+    fi
+    reverted=$scratch_dir/reverted
+    rm -rf "$reverted"; mkdir -p "$reverted"
+    git -C "$repo_dir" archive HEAD | tar -x -C "$reverted"
+    while IFS= read -r path; do
+      [ -n "$path" ] && [ "$path" != "$test_file" ] || continue
+      if printf '%s\n' "$path" | grep -Eq "$KC_RISK_TEST_PATHS"; then continue; fi
+      if git -C "$repo_dir" cat-file -e "$base_ref:$path" 2>/dev/null; then
+        mkdir -p "$reverted/$(dirname "$path")"
+        git -C "$repo_dir" show "$base_ref:$path" > "$reverted/$path"
+      else
+        rm -f "$reverted/$path"
+      fi
+    done < "$changed_paths"
+    if (cd "$reverted" && bash "$test_file" ${test_case:+"$test_case"}) > "$scratch_dir/reverted-run" 2>&1; then
+      record_problem "$item: held-by $test_file passes at HEAD and still passes with the lesson's non-test changes reverted, so it does not block the mistake: make it fail without the change"
+    fi
+  }
   # A lesson is held by a check in the diff; a ledger field cannot stand in for one.
   check_lesson_is_held() {
+    if [ -n "$repo_dir" ]; then
+      local held_field
+      held_field=$(printf '%s' "$ledger_line" | tr '\t' '\n' | grep '^held-by:' | tail -n 1 || true)
+      if [ -z "$held_field" ]; then
+        record_problem "$1: lesson has no held-by:<test file>[::<case>]: name the test that fails without the change"
+      else
+        check_held_by_test "$1" "$held_field"
+      fi
+      return 0
+    fi
     [ "$has_check_file" = true ] && return 0
     record_problem "$1: lesson is prose with no check: the lesson diff adds or changes no script, hook, test, eval, CI workflow or lint-rule file"
   }

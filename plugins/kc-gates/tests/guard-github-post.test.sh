@@ -11,6 +11,9 @@ guard="$(dirname "$tests_dir")/scripts/guard-github-post.sh"
 
 passes=0
 failures=0
+# No saved review folder from a real session may reach these cases.
+TMPDIR=$(mktemp -d)
+export TMPDIR
 
 # Wraps a shell command (no double quotes or backslashes in it) in the
 # PreToolUse stdin payload.
@@ -204,6 +207,52 @@ if command -v jq >/dev/null 2>&1; then
   check_with_transcript allow "non-GitHub command without token" \
     "git fetch origin" "$work/after.jsonl"
 fi
+
+# --- walk receipt: a review with walk-items cannot be posted or approved without a full receipt ---
+# gather-review.sh's folder (kc-review-<sha>) is found under TMPDIR; select-gates.sh names the items.
+walk_tmp=$(mktemp -d)
+mkdir -p "$walk_tmp/kc-review-abc123"
+review_folder=$walk_tmp/kc-review-abc123
+walk_token=KC_REVIEW_POST_APPROVED=1
+write_review() {  # <changed path>
+  printf -- '--- a/%s\n+++ b/%s\n@@ -0,0 +1 @@\n+x\n' "$1" "$1" > "$review_folder/review.diff"
+  printf '%s\n' "$1" > "$review_folder/changed-files.txt"
+  printf 'HEAD_SHA=abc123\nPR=12\n' > "$review_folder/meta.env"
+}
+check_in_walk_tmp() {
+  local expectation=$1 label=$2 command=$3 output verdict
+  output=$(build_payload "$command" | TMPDIR=$walk_tmp bash "$guard")
+  if [ -z "$output" ]; then verdict=allow; elif printf '%s' "$output" | grep -q '"permissionDecision":"deny"'; then verdict=deny; else verdict="unexpected output: $output"; fi
+  if [ "$verdict" = "$expectation" ]; then
+    echo "ok   [walk] $label"; passes=$((passes + 1))
+  else
+    echo "FAIL [walk] $label"; echo "     expected: $expectation"; echo "     actual:   $verdict"; failures=$((failures + 1))
+  fi
+}
+approve_command="$walk_token gh pr review 12 --approve"
+comment_command="$walk_token gh pr comment 12 --body 'Looks fine.'"
+write_review app/models/order.rb
+rm -f "$review_folder/walk-receipt.tsv"
+check_in_walk_tmp deny  "walk: approving a review with a walk-item and no receipt is denied" "$approve_command"
+check_in_walk_tmp deny  "walk: commenting on a review with a walk-item and no receipt is denied" "$comment_command"
+check_in_walk_tmp deny  "walk: an approval through gh api is denied too" \
+  "$walk_token gh api repos/acme/widgets/pulls/12/reviews -X POST -f event=APPROVE"
+printf 'app/models/order.rb\tcreated an order with a free item\tno evidence\n' > "$review_folder/walk-receipt.tsv"
+check_in_walk_tmp deny  "walk: a receipt line with bad evidence is denied" "$approve_command"
+printf 'app/models/order.rb\tcreated an order with a free item\tPOST /orders 201\n' > "$review_folder/walk-receipt.tsv"
+check_in_walk_tmp allow "walk: a full receipt allows the approval" "$approve_command"
+check_in_walk_tmp allow "walk: a full receipt allows the comment" "$comment_command"
+write_review docs/notes.md
+rm -f "$review_folder/walk-receipt.tsv"
+check_in_walk_tmp allow "walk: WALK=not-required needs no receipt" "$approve_command"
+write_review app/models/order.rb
+check_in_walk_tmp deny  "walk: the denial returns when a source change is back" "$approve_command"
+check_in_walk_tmp deny  "walk: no token is still the old deny" "gh pr review 12 --approve"
+rm -rf "$review_folder"
+check_in_walk_tmp allow "walk: a review of another pull request needs no receipt" "$walk_token gh pr review 99 --approve"
+rm -rf "$review_folder"
+check_in_walk_tmp allow "walk: no saved review folder means no check" "$approve_command"
+rm -rf "$walk_tmp"
 
 echo "$passes passed, $failures failed"
 [ "$failures" -eq 0 ]
