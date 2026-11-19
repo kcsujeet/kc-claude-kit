@@ -147,7 +147,7 @@ rm -rf "$cache_dir/kc-conventions"
 expect_contains "cache layout: no kc-conventions is a usage error naming it" "kc-conventions" \
   "$(bash "$cache_dir/kc-gates/3.0.0/scripts/select-gates.sh" "$work_dir/cached/review.diff" "$work_dir/cached/changed-files.txt" "$work_dir/cached/repo" 2>&1 || true)"
 
-# --- WALK: a path a signed-out visitor reaches must be walked ------------------
+# --- WALK: every changed non-test source file is walked; a public path is the stronger form ---
 walk_line_for() { select_gates_output "$1" | grep '^WALK='; }
 make_case "$work_dir/walk-route" 'x = 1' src/app/public/orders/page.tsx
 expect_eq "a page under a public route: WALK=required" "WALK=required" "$(walk_line_for "$work_dir/walk-route")"
@@ -156,13 +156,13 @@ expect_contains "WALK=required carries its reason" "walk: public or guest path, 
 
 # Only the path decides: no text on a changed line does.
 make_case "$work_dir/walk-skip" '  skip_before_action :authenticate_user!' app/controllers/pay_controller.rb
-expect_eq "an added skip of the authenticate filter in an ordinary controller: WALK=not-required" "WALK=not-required" "$(walk_line_for "$work_dir/walk-skip")"
+expect_eq "an added skip of the authenticate filter in an ordinary controller: WALK=required, without the signed-out reason" "WALK=required" "$(walk_line_for "$work_dir/walk-skip")"
 
 make_case "$work_dir/walk-flag" '  const canEdit = !isPublic && !locked' src/orders/edit.ts
-expect_eq "an added public flag in an ordinary file: WALK=not-required" "WALK=not-required" "$(walk_line_for "$work_dir/walk-flag")"
+expect_eq "an added public flag in an ordinary source file: WALK=required" "WALK=required" "$(walk_line_for "$work_dir/walk-flag")"
 
-expect_eq "a model change: WALK=not-required" "WALK=not-required" "$(walk_line_for "$work_dir/model-only")"
-expect_eq "a controller with no public path: WALK=not-required" "WALK=not-required" "$(walk_line_for "$work_dir/controller")"
+expect_eq "a model change: WALK=required" "WALK=required" "$(walk_line_for "$work_dir/model-only")"
+expect_eq "a controller with no public path: WALK=required" "WALK=required" "$(walk_line_for "$work_dir/controller")"
 
 make_case "$work_dir/walk-spec" 'x = 1' src/app/public/orders/page.test.tsx
 expect_eq "a test under a public route: WALK=not-required" "WALK=not-required" "$(walk_line_for "$work_dir/walk-spec")"
@@ -174,7 +174,7 @@ make_case "$work_dir/walk-docs" 'An anonymous visitor hits skip_before_action :a
 expect_eq "a markdown file naming public flags: WALK=not-required" "WALK=not-required" "$(walk_line_for "$work_dir/walk-docs")"
 
 make_case "$work_dir/walk-script" '# anonymous: skip_before_action :authenticate, isPublic, guest_token' scripts/check-flags.sh
-expect_eq "a shell script whose text holds the old patterns: WALK=not-required" "WALK=not-required" "$(walk_line_for "$work_dir/walk-script")"
+expect_eq "a shell script is source: WALK=required" "WALK=required" "$(walk_line_for "$work_dir/walk-script")"
 
 make_case "$work_dir/walk-controller" '  def show; end' app/controllers/public/orders_controller.rb
 expect_eq "a controller under public/: WALK=required" "WALK=required" "$(walk_line_for "$work_dir/walk-controller")"
@@ -182,7 +182,7 @@ make_case "$work_dir/walk-routes" 'get "/orders"' config/routes.rb
 expect_eq "a route file: WALK=required" "WALK=required" "$(walk_line_for "$work_dir/walk-routes")"
 
 make_case "$work_dir/walk-vue" '  const isPublic = route.meta.open' src/pages/OrderPage.vue
-expect_eq "a .vue page with a public flag but no public path: WALK=not-required" "WALK=not-required" "$(walk_line_for "$work_dir/walk-vue")"
+expect_eq "a .vue page with a public flag but no public path: WALK=required" "WALK=required" "$(walk_line_for "$work_dir/walk-vue")"
 
 for visitor_path in src/anonymous/view.ts src/portal/home.tsx src/orders.routes.ts src/routes/orders.ts src/guest/index.vue; do
   walk_branch_case="$work_dir/walk-branch-$(printf '%s' "$visitor_path" | tr '/.' '--')"
@@ -191,19 +191,41 @@ for visitor_path in src/anonymous/view.ts src/portal/home.tsx src/orders.routes.
 done
 
 make_case "$work_dir/walk-declared" 'x = 1' src/share/view.ts
-expect_eq "a path no list names: WALK=not-required" "WALK=not-required" "$(walk_line_for "$work_dir/walk-declared")"
+expect_eq "a path no list names is still source: WALK=required" "WALK=required" "$(walk_line_for "$work_dir/walk-declared")"
+expect_contains "a path no list names has no signed-out reason" "walk: the diff changes source behaviour" "$(select_gates_output "$work_dir/walk-declared")"
+expect_eq "a path no list names has no signed-out line" "0" "$(select_gates_output "$work_dir/walk-declared" | grep -c 'signed out included' || true)"
 mkdir -p "$work_dir/walk-declared/repo/.claude"
 printf '# shared links are open\n\n(^|/)other/\n(^|/)share/' > "$work_dir/walk-declared/repo/.claude/public-paths.txt"
 expect_eq "a path in .claude/public-paths.txt, after a comment and a blank line, on a last line with no newline: WALK=required" "WALK=required" "$(walk_line_for "$work_dir/walk-declared")"
 expect_contains "the declared path is the reason" "(src/share/view.ts)" "$(select_gates_output "$work_dir/walk-declared")"
 
-# select-gates and pass-size.sh decide "public path" with the same function.
+# Private source change: required, one walk-item per changed non-test source file.
+make_case "$work_dir/walk-private" '  def total = 0' app/models/order.rb app/services/pricing.rb spec/models/order_spec.rb
+walk_private=$(select_gates_output "$work_dir/walk-private")
+expect_eq "a private source change: WALK=required" "WALK=required" "$(printf '%s\n' "$walk_private" | grep '^WALK=')"
+expect_eq "a private source change: one walk-item per non-test source file, none for the spec" \
+  "walk-item: app/models/order.rb
+walk-item: app/services/pricing.rb" "$(printf '%s\n' "$walk_private" | grep '^walk-item:')"
+expect_eq "a private source change does not claim a signed-out audience" "0" "$(printf '%s\n' "$walk_private" | grep -c 'signed out' || true)"
+
+# Public case keeps its stronger reason and lists its walk-item too.
+expect_contains "a public source change lists its walk-item" "walk-item: src/app/public/orders/page.tsx" "$(select_gates_output "$work_dir/walk-route")"
+
+# Docs-only, lockfile-only, config-only and test-only diffs have nothing to walk.
+make_case "$work_dir/walk-lock" 'x' package-lock.json
+expect_eq "a lockfile-only diff: WALK=not-required" "WALK=not-required" "$(walk_line_for "$work_dir/walk-lock")"
+make_case "$work_dir/walk-config" 'x: 1' config/settings.yml
+expect_eq "a config-only diff: WALK=not-required" "WALK=not-required" "$(walk_line_for "$work_dir/walk-config")"
+expect_eq "a docs-only diff: no walk-item lines" "0" "$(select_gates_output "$work_dir/walk-docs" | grep -c '^walk-item:' || true)"
+expect_eq "a test-only diff: no walk-item lines" "0" "$(select_gates_output "$work_dir/walk-spec" | grep -c '^walk-item:' || true)"
+
+# select-gates and pass-size.sh decide "public path" with the same function: the signed-out
+# reason appears exactly when pass-size.sh reports a public-path risk.
 pass_size="$(dirname "$tests_dir")/scripts/pass-size.sh"
 for walk_case in walk-branch-src-anonymous-view-ts walk-branch-src-portal-home-tsx walk-branch-src-orders-routes-ts walk-branch-src-routes-orders-ts walk-branch-src-guest-index-vue walk-route walk-skip walk-flag model-only walk-spec walk-asset walk-docs walk-script walk-controller walk-routes walk-vue walk-declared; do
-  walk_verdict=$(walk_line_for "$work_dir/$walk_case")
   risk_verdict=$(bash "$pass_size" "$work_dir/$walk_case/review.diff" "$work_dir/$walk_case/changed-files.txt" "$work_dir/$walk_case/repo" | grep -c '^risk: public or guest path' || true)
-  if [ "$walk_verdict" = "WALK=required" ]; then expected_risk=1; else expected_risk=0; fi
-  expect_eq "$walk_case: WALK agrees with pass-size.sh's public-path risk" "$expected_risk" "$risk_verdict"
+  signed_out_reason=$(select_gates_output "$work_dir/$walk_case" | grep -c 'signed out included' || true)
+  expect_eq "$walk_case: signed-out reason agrees with pass-size.sh's public-path risk" "$signed_out_reason" "$risk_verdict"
 done
 
 # A diff that only removes lines has no added line to read; select-gates still prints its gates.

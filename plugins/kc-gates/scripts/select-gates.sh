@@ -15,11 +15,15 @@
 # clarity, structure, simplicity, testing and correctness always run; the
 # verification gate is phase 2 and always runs, so it is not listed.
 #
-# Then `WALK=required` or `WALK=not-required` and a `walk: <why>` line. Required when a changed
-# file path is one a signed-out visitor reaches (the same path test pass-size.sh makes, from
-# lib/risk-paths.sh: built-in patterns plus the repo's .claude/public-paths.txt): the review then
-# walks the change in the running app as every audience that can reach it, signed out included,
-# before its verdict.
+# Then `WALK=required` or `WALK=not-required` and a `walk: <why>` line. Required when the diff
+# changes any non-test source file (KC_RISK_TEST_PATHS and KC_RISK_SOURCE_PATHS from
+# lib/risk-paths.sh; docs, lockfiles, locale and config-only diffs are not-required): the review
+# then walks every behaviour the diff changes in the running app or at the API before its
+# verdict. The stronger form is a changed file path a signed-out visitor reaches (the same path
+# test pass-size.sh makes: built-in patterns plus the repo's .claude/public-paths.txt): the walk
+# is then as every audience that can reach it, signed out included. When required, one
+# `walk-item: <path>` line per changed non-test source file follows, so a receipt can be counted
+# against them.
 #
 # Exits 0 on success, 2 on a usage error or a missing input file.
 set -euo pipefail
@@ -185,10 +189,17 @@ printf 'GATES=%s\n' "$gates_csv"
 printf '%s\n' "${gate_lines[@]}"
 
 walk_hit=$(kc_public_path_hit "$changed_files" "$repo_root")
+walk_items=$(grep -vE "$KC_RISK_TEST_PATHS" "$changed_files" | grep -E "$KC_RISK_SOURCE_PATHS" || true)
 if [ -n "$walk_hit" ]; then
   echo "WALK=required"
   echo "walk: public or guest path, walk it as every audience that can reach it, signed out included ($walk_hit)"
+elif [ -n "$walk_items" ]; then
+  echo "WALK=required"
+  echo "walk: the diff changes source behaviour, walk each changed file's behaviour in the running app or at the API"
 else
   echo "WALK=not-required"
-  echo "walk: no public or guest path in the diff"
+  echo "walk: no non-test source file in the diff"
+fi
+if [ -n "$walk_items" ]; then
+  printf '%s\n' "$walk_items" | sed 's/^/walk-item: /'
 fi

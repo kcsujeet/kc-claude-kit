@@ -12,7 +12,7 @@ require_jq
 # Writes one draft with <body> to <file>, plus the fields of the jq object <extra> (default: an
 # "n/a" run record, which an issue or suggestion needs).
 draft() {
-  local file=$1 body=$2 extra=${3:-'{ran: "cart spec with an empty cart: fails before, passes after"}'}
+  local file=$1 body=$2 extra=${3:-'{ran: "cart spec with an empty cart: fails before, passes after", walked: "empty cart: 0 before, 0 after; cart with an archived item: counted before, skipped after"}'}
   jq -n --arg body "$body" "[{path: \"src/cart/total.ts\", line: 12, body: \$body} + $extra]" > "$file"
 }
 
@@ -34,19 +34,19 @@ draft "$work_dir/cc-layout.json" $'**suggestion (non-blocking):**\nCould this re
 expect_eq "the Conventional Comments layout the skill's examples use is clean" clean "$(result "$work_dir/cc-layout.json")"
 
 long_body=$'**issue**:\nThis retries forever when the payment provider is down. Each retry opens a new charge attempt. A customer can be charged twice if the first one lands late. The provider docs say to reuse the idempotency key on retries.'
-draft "$work_dir/long-ok.json" "$long_body" '{ran: "checkout spec with the provider stubbed down: two charges", long: "explains a double charge the author cannot see from the diff"}'
+draft "$work_dir/long-ok.json" "$long_body" '{ran: "checkout spec with the provider stubbed down: two charges", walked: "provider down: retries forever before, stops after; provider up: unchanged", long: "explains a double charge the author cannot see from the diff"}'
 expect_eq "four sentences with a stated reason in \"long\" are clean" clean "$(result "$work_dir/long-ok.json")"
 
 # --- an issue is reproduced, and a screen is seen (kc-post-review §PC4) ------------------------
 draft "$work_dir/issue-na.json" $'**issue**:\nAn empty cart still shows the old total.' '{ran: "n/a: asks for an outcome and its test"}'
 expect_contains "§PC4: an issue whose \"ran\" is n/a is flagged" "is an issue with \"ran\": n/a" "$(result "$work_dir/issue-na.json")"
-draft "$work_dir/suggestion-na.json" $'**suggestion**:\nThis could read `visibleItems` like the list does.' '{ran: "n/a: no behaviour change"}'
+draft "$work_dir/suggestion-na.json" $'**suggestion**:\nThis could read `visibleItems` like the list does.' '{ran: "n/a: no behaviour change", walked: "n/a: no behaviour change"}'
 expect_eq "§PC4: a suggestion may still say n/a with a reason" clean "$(result "$work_dir/suggestion-na.json")"
 
 write_rendered_file_draft() {
   local extra=${4:-'{}'}
   jq -n --arg body "$2" --arg path "$3" --argjson extra "$extra" \
-    '[{path: $path, line: 12, body: $body, ran: "n/a: layout only"} + $extra]' > "$1"
+    '[{path: $path, line: 12, body: $body, ran: "n/a: layout only", walked: "n/a: layout only"} + $extra]' > "$1"
 }
 ui_body=$'**suggestion**:\nThe price wraps under the button on a narrow screen. Keeping them on one row would match the list.'
 write_rendered_file_draft "$work_dir/ui-unseen.json" "$ui_body" "src/storefront/OrderRow.tsx"
@@ -63,6 +63,9 @@ expect_contains "§PC4: a \"seen\" that is not an image or video is flagged" "is
 printf 'png' > "$work_dir/order-row.png"
 write_rendered_file_draft "$work_dir/ui-seen.json" "$ui_body" "src/storefront/OrderRow.tsx" "{\"seen\": \"$work_dir/order-row.png\"}"
 expect_eq "§PC4: a draft on a component with a capture is clean" clean "$(result "$work_dir/ui-seen.json")"
+printf 'webm' > "$work_dir/order-row.webm"
+write_rendered_file_draft "$work_dir/ui-recording.json" "$ui_body" "src/storefront/OrderRow.tsx" "{\"seen\": \"$work_dir/order-row.webm\"}"
+expect_eq "§PC4: a recording in the shared capture formats (webm) is clean" clean "$(result "$work_dir/ui-recording.json")"
 write_rendered_file_draft "$work_dir/ui-test.json" "$ui_body" "src/storefront/OrderRow.test.tsx"
 expect_eq "§PC4: a draft on a test file needs no \"seen\"" clean "$(result "$work_dir/ui-test.json")"
 write_rendered_file_draft "$work_dir/ui-question.json" $'**question**:\nIs the row meant to wrap here?' "src/storefront/OrderRow.tsx"
@@ -101,8 +104,23 @@ expect_eq "§PC5: a claim about an earlier review with a run is clean" clean "$(
 
 draft "$work_dir/earlier-na.json" $'**question**:\nI was wrong last round about the totals. Do archived items count?' '{ran: "n/a: no change"}'
 expect_contains "§PC5: a claim about an earlier review with \"ran\": n/a is flagged" "earlier review with nothing run" "$(result "$work_dir/earlier-na.json")"
-draft "$work_dir/names-test.json" $'**suggestion**:\nThe test above sets the archived flag, so the total looks right by luck.' '{ran: "n/a: asks for no behaviour change"}'
+draft "$work_dir/names-test.json" $'**suggestion**:\nThe test above sets the archived flag, so the total looks right by luck.' '{ran: "n/a: asks for no behaviour change", walked: "n/a: names an existing test"}'
 expect_eq "§PC5: naming an existing test is not asking for one" clean "$(result "$work_dir/names-test.json")"
+
+# --- the asked-for change is walked, not only the bug (kc-post-review §PC6) ----------------------
+walk_body=$'**suggestion**:\nCould the total skip archived items like the list does?'
+draft "$work_dir/no-walked.json" "$walk_body" '{ran: "cart spec: fails before, passes after"}'
+expect_contains "§PC6: a suggestion with no \"walked\" is flagged" 'asks for a change with no "walked"' "$(result "$work_dir/no-walked.json")"
+draft "$work_dir/no-walked-issue.json" $'**issue**:\nAn empty cart still shows the old total.' '{ran: "cart spec: fails"}'
+expect_contains "§PC6: an issue with no \"walked\" is flagged" 'asks for a change with no "walked"' "$(result "$work_dir/no-walked-issue.json")"
+draft "$work_dir/walked-na.json" "$walk_body" '{ran: "cart spec: fails before, passes after", walked: "n/a"}'
+expect_contains "§PC6: \"walked\": n/a with no reason is flagged" 'says "walked": n/a with no reason' "$(result "$work_dir/walked-na.json")"
+draft "$work_dir/walked-na-why.json" $'**suggestion**:\nThis name could say what it holds.' '{ran: "n/a: a rename", walked: "n/a: a rename, no behaviour change"}'
+expect_eq "§PC6: \"walked\": n/a with a reason is clean" clean "$(result "$work_dir/walked-na-why.json")"
+draft "$work_dir/walked-ok.json" "$walk_body" '{ran: "cart spec: fails before, passes after", walked: "cart with archived items: 3 before, 2 after; empty cart: 0 before, 0 after; guest cart: unchanged"}'
+expect_eq "§PC6: a real \"walked\" is clean" clean "$(result "$work_dir/walked-ok.json")"
+draft "$work_dir/walked-question.json" $'**question:**\nIs the total meant to skip archived items?' '{}'
+expect_eq "§PC6: a question needs no \"walked\"" clean "$(result "$work_dir/walked-question.json")"
 
 # --- slips the checklist exists for ---------------------------------------------------------
 draft "$work_dir/no-label.json" 'Good catch on the rounding. Could this use the shared formatter?'
@@ -151,7 +169,7 @@ draft "$work_dir/blank-ran.json" "$run_fix" '{ran: "  "}'
 expect_contains "a blank \"ran\" is flagged" "asks for a change with no \"ran\"" "$(result "$work_dir/blank-ran.json")"
 draft "$work_dir/bare-na.json" "$run_fix" '{ran: "n/a"}'
 expect_contains "\"ran\": n/a with no reason is flagged" "n/a with no reason" "$(result "$work_dir/bare-na.json")"
-draft "$work_dir/ran.json" "$run_fix" '{ran: "applied on a scratch copy: new test for a draft opened before the list loads, and the suite, pass"}'
+draft "$work_dir/ran.json" "$run_fix" '{ran: "applied on a scratch copy: new test for a draft opened before the list loads, and the suite, pass", walked: "draft opened before the list loads: footer twice before, once after; draft opened after: unchanged"}'
 expect_eq "an issue with a run record is clean" clean "$(result "$work_dir/ran.json")"
 draft "$work_dir/question-no-ran.json" $'**question:**\nIs the swap meant to run on the first pass too?' '{}'
 expect_eq "a question needs no \"ran\"" clean "$(result "$work_dir/question-no-ran.json")"

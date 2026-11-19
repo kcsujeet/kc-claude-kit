@@ -8,7 +8,10 @@
 #                  and "code": "<reason>" when its code is; an `issue` or `suggestion` draft carries
 #                  "ran": what its asked-for change was run against and the result, or
 #                  "n/a: <why>" when it asks for no behaviour change, or asks for an outcome and a
-#                  test rather than code; a draft on a file people see rendered carries "seen"
+#                  test rather than code; it also carries "walked": the states the asked-for
+#                  change reaches with what each shows before and after, or "n/a: <why>" when no
+#                  behaviour change is asked (a rename, a missing test); a draft on a file people
+#                  see rendered carries "seen"
 #   <head-sha>     the commit the comments anchor to; when given and the repo knows it, a "seen"
 #                  capture must be newer than that commit
 #
@@ -22,6 +25,9 @@
 #   - hold at most 2 non-blank lines of code across its code blocks, unless "code" says why: a
 #     comment says what is wrong and what should happen, and the author, who knows the code,
 #     writes the fix;
+#   - when it is an `issue` or a `suggestion`, carry a "walked" record: the change it asks for is
+#     walked, not only the bug that prompted it, so each state the change reaches has what it
+#     showed before and after. An "n/a" needs a reason;
 #   - when it is an `issue` or a `suggestion`, carry a "ran" record: a change asked for in a
 #     review is code the author writes on the reviewer's word, so it is run before it is asked
 #     for, not only read (kc-post-review's "Verified before suggested"). An "n/a" needs a reason;
@@ -49,6 +55,9 @@ script_name=$(basename "$0")
 KC_HEAD_TIME=""
 [ "$#" -eq 2 ] && KC_HEAD_TIME=$(git show -s --format=%ct "$2" 2>/dev/null) || true
 export KC_HEAD_TIME
+# shellcheck source=lib/capture-paths.sh
+. "$(dirname "$0")/lib/capture-paths.sh"
+export KC_CAPTURE_PATH
 
 perl -MJSON::PP -CS -e '
   use strict; use warnings;
@@ -102,6 +111,13 @@ perl -MJSON::PP -CS -e '
       } elsif ($first =~ /^\*\*issue\b/ && $ran =~ m{^\s*n/?a\b}i) {
         push @found, "is an issue with \"ran\": n/a; an issue says something is broken, so reproduce it (a failing test, a request, a screenshot) and say in \"ran\" what showed it, or use another label";
       }
+      my $walked = $draft->{walked} // "";
+      $walked = "" if ref $walked;
+      if ($walked !~ /\S/) {
+        push @found, "asks for a change with no \"walked\": list each state the asked-for change reaches with what it shows before and after, or \"n/a: <why>\" when no behaviour change is asked";
+      } elsif ($walked =~ m{^\s*n/?a\W*$}i) {
+        push @found, "says \"walked\": n/a with no reason; give the why, or list the states the change reaches with before and after";
+      }
     }
     my $ran_record = ref $draft->{ran} ? "" : ($draft->{ran} // "");
     # Words a reader has to stop and decode; each has an everyday way to say it.
@@ -125,9 +141,11 @@ perl -MJSON::PP -CS -e '
     if ($rendered && $first !~ /^\*\*(question|note|thought|praise)\b/) {
       my $seen = $draft->{seen} // "";
       $seen = "" if ref $seen;
+      my $is_capture_name = $seen =~ /$ENV{KC_CAPTURE_PATH}/i;
+      my $capture_exists = -f $seen;
       if ($seen !~ /\S/) {
         push @found, "is on a screen with no \"seen\": open the running app, capture what the comment says, and give the file path";
-      } elsif ($seen !~ /\.(png|jpe?g|gif|webp|mp4|mov|webm)$/i || !-f $seen) {
+      } elsif (!$is_capture_name || !$capture_exists) {
         push @found, "\"seen\" is not a screenshot or recording that exists: $seen";
       } elsif ($ENV{KC_HEAD_TIME} =~ /^\d+$/ && (stat $seen)[9] < $ENV{KC_HEAD_TIME}) {  # [9]: mtime
         push @found, "\"seen\" was captured before the head commit, so it shows older code: $seen";

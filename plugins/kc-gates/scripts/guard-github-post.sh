@@ -27,6 +27,16 @@
 # is denied; and a new inline comment through the single-comment endpoint
 # (`pulls/<n>/comments` without an id) is denied, since the builder never makes one.
 #
+# With the token present, a review write (a comment, a review, an approval) is also denied while
+# the review's walk receipt fails check-walk-receipt.sh. The review is the `$KC_REVIEW_DIR` folder,
+# or else the saved `${TMPDIR:-/tmp}/kc-review-*` folder (gather-review.sh, last day) with the
+# newest meta.env whose `URL=` is this repo (the command's -R, URL or api path, else the origin
+# remote) and whose `PR=<n>` is the pull request the command names, wherever its flags sit or in
+# a URL or api path; a command that names none takes the newest folder of the repo. It holds
+# review.diff, changed-files.txt and walk-receipt.tsv: select-gates.sh is run on the first two, and
+# each `walk-item:` it prints needs a line in the receipt. No review folder, or no walk-item
+# (WALK=not-required), means no check.
+#
 # Output: the PreToolUse deny JSON on a blocked write, nothing otherwise.
 # Always exits 0. Hook schema: https://code.claude.com/docs/en/hooks
 #
@@ -258,6 +268,114 @@ EOF
     | jq -Rsc '{hookSpecificOutput: {hookEventName: "PreToolUse", permissionDecision: "deny", permissionDecisionReason: .}}'
 }
 
+# True when <dir> holds what gather-review.sh saved of a review: its diff and changed files.
+has_review_files() {
+  [ -n "$1" ] && [ -f "$1/review.diff" ] && [ -f "$1/changed-files.txt" ]
+}
+
+# Prints "<owner/repo>|<number>" for the first review write in the command: the number after the
+# subcommand wherever its flags sit, or in a pull or issue URL or an api path; the repository from
+# -R/--repo, the URL or the api path. A part the command does not name is empty.
+read_review_target() {
+  local -a tokens=() segment=()
+  local token word previous="" expecting="" repo="" number="" in_subcommand=false
+  local url_pattern='github\.com/([^/]+/[^/]+)/(pull|issues)/([0-9]+)'
+  local api_pattern='repos/([^/]+/[^/]+)/(pulls|issues)/([0-9]+)'
+  while IFS= read -r -d $'\036' token; do
+    tokens+=("$token")
+  done <<EOF
+$(tokenize "$1")
+EOF
+  tokens+=($'\035')
+  for token in "${tokens[@]}"; do
+    if [ "$token" != $'\035' ]; then
+      segment+=("$token")
+      continue
+    fi
+    if [ "${#segment[@]}" -gt 0 ] && is_review_write_segment "${segment[*]}"; then
+      for word in "${segment[@]}"; do
+        if [ -n "$expecting" ]; then
+          if [ "$expecting" = repo ] && [ -z "$repo" ]; then repo=$word; fi
+          expecting=""
+        elif [[ $word =~ $url_pattern || $word =~ $api_pattern ]]; then
+          [ -n "$repo" ] || repo=${BASH_REMATCH[1]}
+          [ -n "$number" ] || number=${BASH_REMATCH[3]}
+        else
+          case "$word" in
+            -R | --repo) expecting=repo ;;
+            --repo=*) [ -n "$repo" ] || repo=${word#--repo=} ;;
+            -R?*) [ -n "$repo" ] || repo=${word#-R} ;;
+            -b | --body | -F | --body-file | -f | --field | --raw-field | -H | --header | -X | --method | --input | -t | --title | --jq | -q | --template) expecting=skip ;;
+            -*) ;;
+            review | comment) case "$previous" in pr | issue) in_subcommand=true ;; esac ;;
+            *[!0-9]* | '') ;;
+            *) if [ "$in_subcommand" = true ] && [ -z "$number" ]; then number=$word; fi ;;
+          esac
+        fi
+        previous=$word
+      done
+      break
+    fi
+    segment=()
+  done
+  case "$repo" in *'{'*) repo="" ;; esac
+  printf '%s|%s' "$repo" "$number"
+}
+
+# The owner/repo of this checkout's origin remote on github.com; nothing for any other remote.
+read_remote_repo() {
+  git remote get-url origin 2>/dev/null | sed -nE 's#^.*github\.com[:/]([^/]+/[^/]+)$#\1#p' | sed 's#\.git$##'
+}
+
+
+# Prints the saved review folder (gather-review.sh's kc-review-*, from the last day) with the
+# newest meta.env among those for this repo and, when given, this pull request; nothing if none.
+find_review_dir() {
+  local repo=$1 number=$2 candidate meta
+  local -a metas=()
+  while IFS= read -r candidate; do
+    has_review_files "$candidate" || continue
+    meta=$candidate/meta.env
+    [ -f "$meta" ] || continue
+    if [ -n "$number" ] && ! grep -qx "PR=$number" "$meta"; then continue; fi
+    if [ -n "$repo" ] && ! grep '^URL=' "$meta" | grep -qiF "github.com/$repo/"; then continue; fi
+    metas+=("$meta")
+  done <<EOF
+$(find "${TMPDIR:-/tmp}" -maxdepth 1 -type d -name 'kc-review-*' -mtime -1 2>/dev/null)
+EOF
+  [ "${#metas[@]}" -gt 0 ] || return 0
+  # shellcheck disable=SC2012 # ls -t sorts by mtime; the paths are the guard's own temp folders
+  dirname "$(ls -t "${metas[@]}" | head -n 1)"
+}
+
+# Prints the deny JSON when the saved review has walk-items without a full receipt line; nothing
+# otherwise, and nothing when no review folder or no select-gates.sh can be found.
+get_unwalked_review_verdict() {
+  local scripts_dir review_dir selected problems reason problem_text target target_repo target_number
+  # The reason is shown as a hook message, so the problem list is cut to a short length.
+  local max_problem_chars=600
+  scripts_dir=$(dirname "$0")
+  review_dir=${KC_REVIEW_DIR:-}
+  if [ -z "$review_dir" ]; then
+    target=$(read_review_target "$1")
+    target_repo=${target%%|*}
+    target_number=${target#*|}
+    [ -n "$target_repo" ] || target_repo=$(read_remote_repo)
+    review_dir=$(find_review_dir "$target_repo" "$target_number")
+  fi
+  has_review_files "$review_dir" || return 0
+  selected=$(mktemp)
+  if ! bash "$scripts_dir/select-gates.sh" "$review_dir/review.diff" "$review_dir/changed-files.txt" . > "$selected" 2>/dev/null; then
+    rm -f "$selected"
+    return 0
+  fi
+  problems=$(bash "$scripts_dir/check-walk-receipt.sh" "$selected" "$review_dir/walk-receipt.tsv" 2>&1) && { rm -f "$selected"; return 0; }
+  rm -f "$selected"
+  problem_text=$(printf '%s' "$problems" | tr '\n' ' ' | sed 's/["\\]//g' | cut -c1-"$max_problem_chars")
+  reason="Blocked by the kc-gates plugin: this review changed behaviour it has no walk receipt for, so it cannot be posted or approved yet. Walk each item in the running app or at the API and write one line per item to $review_dir/walk-receipt.tsv (path, what was seen, evidence: a screenshot or a request line with its status). $problem_text"
+  printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"%s"}}' "$reason"
+}
+
 print_deny() {
   cat <<'EOF'
 {"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Blocked by the kc-gates plugin: this command writes a PR or issue comment or review to GitHub without the approval token. Do not retry and do not add the token yourself. Show the user the full draft, the head SHA it anchors to and the posting shape, then stop and wait for an explicit, fresh post signal in their latest message. Only after that signal, prefix each write command with KC_REVIEW_POST_APPROVED=1 in the same command (see /kc-gates:kc-post-review)."}}
@@ -275,6 +393,11 @@ main() {
     *"$APPROVAL_TOKEN"*)
       if contains_review_write "$command"; then
         verdict=$(unchecked_comments_verdict "$command")
+        if [ -n "$verdict" ]; then
+          printf '%s' "$verdict"
+          exit 0
+        fi
+        verdict=$(get_unwalked_review_verdict "$command")
         if [ -n "$verdict" ]; then
           printf '%s' "$verdict"
           exit 0

@@ -15,14 +15,20 @@ max_skill_lines=500
 failures=0
 fail() { echo "FAIL $1"; failures=$((failures + 1)); }
 
-grep -q 'When `select-gates.sh` prints `WALK=required`, the review runs the change in the running app as every audience' "$review" || fail "kc-code-review: hard rule on WALK=required"
+grep -q 'When `select-gates.sh` prints `WALK=required`' "$review" || fail "kc-code-review: hard rule on WALK=required"
+grep -q 'the reviewer has seen each changed behaviour themselves' "$review" || fail "kc-code-review: every changed behaviour is walked by the reviewer"
+grep -q 'skipped a change made for someone else' "$review" || fail "kc-code-review: a re-review walks the delta, not only its own findings"
+grep -q 'gives the public-path reason (`walk: public or guest path`), a signed-out visitor can reach the change, and only then the review also runs it as every audience' "$review" || fail "kc-code-review: only the public-path reason walks every audience"
+grep -q 'with the public-path reason, also the audiences walked (signed out included)' "$review" || fail "kc-code-review: the Walk line asks for audiences only with the public-path reason"
+grep -qE '^- \[ \] §V11 .*walk-item.*Walk:.*no receipt FAILS' "$verification" || fail "verification-gate §V11 box: a walk-item with no receipt FAILS"
 grep -q 'signed out in a fresh browser profile included' "$review" || fail "kc-code-review: the walk includes signed out"
 grep -q 'kc-verify:kc-ui` and `kc-verify:kc-e2e`' "$review" || fail "kc-code-review: the walk names kc-ui and kc-e2e"
 grep -q '^- Walk: ' "$review" || fail "kc-code-review: the Checklist template has a Walk line"
 grep -qE '^\| security \| `kc-gates:security-gate`' "$review" || fail "kc-code-review: security row in the phase-1 table"
 grep -qE '^\| security \| \.\.\. \|' "$review" || fail "kc-code-review: security row in the gate-status template"
-grep -qE '^- \[ \] §V10 .*WALK=required.*Walk:.*no receipt FAILS' "$verification" || fail "verification-gate §V10 box: WALK=required with no receipt FAILS"
-grep -q 'N/A: `WALK=not-required`' "$verification" || fail "verification-gate §V10 box: its N/A condition"
+grep -qE '^- \[ \] §V10 .*public-path walk reason.*Walk:.*no receipt FAILS' "$verification" || fail "verification-gate §V10 box: a public-path reason with no receipt FAILS"
+grep -q 'N/A: no public-path reason)' "$verification" || fail "verification-gate §V10 box: its N/A condition"
+grep -q 'other walk-items are §V11' "$verification" || fail "verification-gate §V10: every other walk-item is §V11's"
 grep -q 'grepped request surface: N hits' "$verification" || fail "verification-gate §V2: the security receipt"
 grep -q 'kc-conventions:kc-security' "$gate" || fail "security-gate preloads kc-security"
 [ "$(wc -l < "$review")" -lt "$max_skill_lines" ] || fail "kc-code-review SKILL.md must stay under $max_skill_lines lines"
