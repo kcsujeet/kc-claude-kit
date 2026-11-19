@@ -45,10 +45,18 @@ readonly VERSION_LINE='^[-+][[:space:]]*"?(version|VERSION)"?[[:space:]]*[:=][[:
 # whose changed lines all set a version. Hunk bodies are not copied: the blame reads only the headers.
 drop_version_bump_hunks() {
   awk -v version_line="$VERSION_LINE" '
-    function flush_hunk() { if (hunk_header != "" && !only_version) print hunk_header; hunk_header = ""; only_version = 1 }
+    function flush_hunk(   has_pending_header) {
+      has_pending_header = (hunk_header != "")
+      if (has_pending_header && !only_version) print hunk_header
+      hunk_header = ""; only_version = 1
+    }
     /^diff --git / { flush_hunk(); in_hunk = 0; print; next }
     /^@@ / { flush_hunk(); in_hunk = 1; hunk_header = $0; next }
-    in_hunk { if ($0 ~ /^[-+]/ && $0 !~ version_line) only_version = 0; next }
+    in_hunk {
+      is_changed_line = ($0 ~ /^[-+]/); sets_version = ($0 ~ version_line)
+      if (is_changed_line && !sets_version) only_version = 0
+      next
+    }
     { print }
     END { flush_hunk() }
   '

@@ -43,19 +43,17 @@ asks_status() {
 # feedback) with a verb that acts on it or reports it ("address the QA feedback", "it throws an
 # error"). The noun alone is a feature request ("add error handling", "add a QA checklist").
 asks_fix() {
-  local text
-  text=$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')
-  printf '%s' "$text" | grep -Eq "(^|[^[:alnum:]])(fix(es|ed|ing)?|debug(ging)?|bugs?|broken|regress(ed|ion)?|crash(es|ed)?|fail(s|ed|ing)|not working|doesn.t work)([^[:alnum:]]|$)" && return 0
-  printf '%s' "$text" | grep -Eq "(^|[^[:alnum:]])(errors?|failures?|qa|feedbacks?|findings?|review comments?)([^[:alnum:]]|$)" \
-    && printf '%s' "$text" | grep -Eq "(^|[^[:alnum:]])(address|handle|resolve|respond to|look at|go through|work through|act on|throws?|threw|returns?|returned|gets?|got|seeing|hits?)([^[:alnum:]]|$)"
+  local prompt_text
+  prompt_text=$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')
+  printf '%s' "$prompt_text" | grep -Eq "(^|[^[:alnum:]])(fix(es|ed|ing)?|debug(ging)?|bugs?|broken|regress(ed|ion)?|crash(es|ed)?|fail(s|ed|ing)|not working|doesn.t work)([^[:alnum:]]|$)" && return 0
+  printf '%s' "$prompt_text" | grep -Eq "(^|[^[:alnum:]])(errors?|failures?|qa|feedbacks?|findings?|review comments?)([^[:alnum:]]|$)" \
+    && printf '%s' "$prompt_text" | grep -Eq "(^|[^[:alnum:]])(address|handle|resolve|respond to|look at|go through|work through|act on|throws?|threw|returns?|returned|gets?|got|seeing|hits?)([^[:alnum:]]|$)"
 }
 
-# A cause word and a fix word anywhere in the reply, in any order, newlines folded to spaces.
+# A cause word and a fix word anywhere in the reply, in any order.
 proposes_cause_and_fix() {
-  local text
-  text=$(printf '%s' "$1" | tr '\n' ' ')
-  printf '%s' "$text" | grep -Eiq "(^|[^[:alnum:]])cause[sd]?([^[:alnum:]]|$)" \
-    && printf '%s' "$text" | grep -Eiq "(^|[^[:alnum:]])fix(es|ed)?([^[:alnum:]]|$)"
+  printf '%s' "$1" | grep -Eiq "(^|[^[:alnum:]])cause[sd]?([^[:alnum:]]|$)" \
+    && printf '%s' "$1" | grep -Eiq "(^|[^[:alnum:]])fix(es|ed)?([^[:alnum:]]|$)"
 }
 
 # True when a reply names how the problem was reproduced: a "Reproduced:" or "Not reproduced:"

@@ -158,7 +158,7 @@ bump_version p.toml
 run_git_in "$version_repo" add p.json p.toml
 check_verdict allow "allowed: a commit that only raises versions a receipted commit wrote" "git commit -m 'bump'" "$version_repo"
 reset_repo "$version_repo"
-sed 's/shop/store/' "$version_repo/p.json" > "$work_dir/p.tmp" && mv "$work_dir/p.tmp" "$version_repo/p.json"
+edit_line "$version_repo" p.json 2
 bump_version p.json
 run_git_in "$version_repo" add p.json
 check_verdict deny "blocked: a version bump beside another changed line of the same hunk" "git commit -m 'rename'" "$version_repo"
@@ -167,7 +167,7 @@ git -C "$version_repo" checkout -q -b bump main
 bump_version p.json
 run_git_in "$version_repo" commit -q -am "bump p"
 check_verdict allow "allowed: gh pr create for a branch that only raises a version" "gh pr create --fill" "$version_repo"
-sed 's/name = "shop"/name = "store"/' "$version_repo/p.toml" > "$work_dir/p.tmp" && mv "$work_dir/p.tmp" "$version_repo/p.toml"
+edit_line "$version_repo" p.toml 1
 run_git_in "$version_repo" commit -q -am "bump p and rename"
 check_verdict deny "blocked: gh pr create for a branch that also edits receipted lines" "gh pr create --fill" "$version_repo"
 
