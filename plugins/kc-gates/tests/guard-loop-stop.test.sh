@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Tests scripts/guard-loop-stop.sh: a `git commit` or `gh pr create` whose changed lines were
 # written by an already-handed-off commit (a kc-ready-for-review receipt, or a pull request merged
-# in the last 7 days) is denied unless the command carries KC_LOOP_APPROVED=1. Real repos in a temp
+# in the last 7 days) is denied unless the command carries KC_REWORK_APPROVED=1 and the user typed "approve rework". Real repos in a temp
 # folder, receipts written by hand into KC_READY_DIR, the stub gh in lib/ answering the merged-PR
 # lookups. Each case runs twice, once with jq and once through the sed fallback.
 set -euo pipefail
@@ -58,7 +58,7 @@ run_git_in "$repo" add f.txt
 check_verdict deny "blocked: a commit that edits lines a receipted commit wrote" "git commit -m 'again'" "$repo"
 expect_contains "the message names the loop-stop rule" "the loop-stop rule says stop and question the approach; ask the user" "$last_hook_output"
 expect_contains "the message names the earlier fix by sha and subject" "${fixed_commit_sha:0:9} fix f (f.txt:2)" "$last_hook_output"
-check_verdict allow "allowed: the same commit with KC_LOOP_APPROVED=1" "KC_LOOP_APPROVED=1 git commit -m 'again'" "$repo"
+expect_token_needs_typed_words "$scripts/guard-loop-stop.sh" KC_REWORK_APPROVED=1 "approve rework" "git commit -m 'again'" "$repo"
 check_verdict deny "blocked: cd into the repo first" "cd $repo && git commit -m 'again'" "$work_dir"
 check_verdict deny "blocked: git -C <repo> commit" "git -C $repo commit -m 'again'" "$work_dir"
 check_verdict allow "allowed: a command that is not a commit" "git status" "$repo"
@@ -92,7 +92,7 @@ edit_line "$repo" f.txt 4
 run_git_in "$repo" commit -q -am "feature edits f"
 check_verdict deny "blocked: gh pr create for a branch that edits receipted lines" "gh pr create --fill" "$repo"
 check_verdict deny "blocked: gh pr create --base main" "gh pr create --base main --fill" "$repo"
-check_verdict allow "allowed: gh pr create with KC_LOOP_APPROVED=1" "KC_LOOP_APPROVED=1 gh pr create --fill" "$repo"
+expect_token_needs_typed_words "$scripts/guard-loop-stop.sh" KC_REWORK_APPROVED=1 "approve rework" "gh pr create --fill" "$repo"
 git -C "$repo" checkout -q -b feature-g main
 edit_line "$repo" g.txt 4
 run_git_in "$repo" commit -q -am "feature edits g"
@@ -124,7 +124,6 @@ write_route() { # <merged_at or none>
 write_route "$now_iso"
 check_verdict deny "blocked: a commit that edits lines a PR merged this week wrote" "git commit -m 'fix the fix'" "$merged_repo"
 expect_contains "the message names the merged commit" "${merged_commit_sha:0:9} squash merged fix (#7) (m.txt:2)" "$last_hook_output"
-check_verdict allow "allowed: the same commit with KC_LOOP_APPROVED=1" "KC_LOOP_APPROVED=1 git commit -m 'fix the fix'" "$merged_repo"
 write_route "$old_iso"
 check_verdict allow "allowed: the PR merged more than 7 days ago" "git commit -m 'fix the fix'" "$merged_repo"
 write_route none

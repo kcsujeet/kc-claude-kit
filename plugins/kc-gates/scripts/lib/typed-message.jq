@@ -4,7 +4,7 @@
 # check-reply-sources.sh, so both agree on where the person's messages are.
 
 def is_not_typed:
-  test("^(<system-reminder>|<task-notification>|<local-command|<command-name>|<command-message>|Caveat: |Base directory for this skill: )");
+  test("^(<system-reminder>|<task-notification>|<local-command|<command-name>|<command-message>|<agent-message|Caveat: |Base directory for this skill: )");
 
 # The entry's text blocks, as strings.
 def message_texts:

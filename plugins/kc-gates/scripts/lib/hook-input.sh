@@ -142,6 +142,20 @@ get_commit_diff() {
   fi
 }
 
+# user_approved <transcript> <phrase>: succeeds only when the latest message the person typed in the
+# session transcript (a JSONL file) contains <phrase>, case-insensitive. A typed message is read the
+# way feedback-ledger.sh reads one (lib/typed-message.jq): not a tool result, a relayed or agent
+# message, or a system note. No transcript, no jq, or no typed message (a subagent session) means
+# not approved: only the person's own words approve what a guard blocks.
+user_approved() {
+  local transcript=$1 phrase=$2
+  [ -n "$transcript" ] && [ -r "$transcript" ] && command -v jq >/dev/null 2>&1 || return 1
+  jq -rs -L "$(dirname "${BASH_SOURCE[0]}")" 'include "typed-message";
+    (map(is_typed_message) | rindex(true)) as $last
+    | if $last == null then empty else .[$last] | typed_texts end' "$transcript" 2>/dev/null \
+    | grep -qiF -- "$phrase"
+}
+
 # One shell segment per line: split on newlines, ;, &&, || and |.
 split_segments() {
   printf '%s\n' "$1" | sed -e 's/&&/\

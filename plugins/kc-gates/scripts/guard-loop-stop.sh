@@ -15,9 +15,10 @@
 # not handed off: it never blocks what it can't read. Lines the change only adds have no old side,
 # and neither do new files.
 #
-# A command containing the literal KC_LOOP_APPROVED=1 passes. Like KC_READY_SKIP=1 it is added only
-# when the user's latest message says to go on with the fix; the guard checks the literal, not the
-# message.
+# A command containing the literal KC_REWORK_APPROVED=1 passes only when the user's own words approve
+# it: the latest message they typed in the session transcript (the payload's transcript_path)
+# contains "approve rework" (user_approved in lib/hook-input.sh). The token without those words, no
+# transcript, or a session with no typed message (a subagent) stays blocked.
 #
 # Output: the PreToolUse deny JSON on a blocked command, nothing otherwise. Always exits 0.
 # Hook schema: https://code.claude.com/docs/en/hooks
@@ -31,7 +32,8 @@ scripts_dir=$(dirname "$0")
 # shellcheck source=lib/hook-input.sh
 . "$scripts_dir/lib/hook-input.sh"
 
-readonly APPROVAL_TOKEN='KC_LOOP_APPROVED=1'
+readonly APPROVAL_TOKEN='KC_REWORK_APPROVED=1'
+readonly APPROVAL_PHRASE='approve rework'
 readonly HANDED_OFF_DAYS=7
 readonly HANDED_OFF_SECONDS=$((HANDED_OFF_DAYS * 24 * 60 * 60))
 
@@ -103,7 +105,7 @@ find_handed_off_fix() {
 }
 
 deny_edit_of_handed_off_fix() {
-  print_pretooluse_deny "Blocked by the kc-gates plugin: this edits lines an earlier, already-handed-off fix wrote ($1): the loop-stop rule says stop and question the approach; ask the user. Only when the user has said in their latest message to go on, prefix the command with KC_LOOP_APPROVED=1; never add it on your own."
+  print_pretooluse_deny "Blocked by the kc-gates plugin: this edits lines an earlier, already-handed-off fix wrote ($1): the loop-stop rule says stop and question the approach; ask the user. Ask the user: only their typed words approve it. When their latest message says \"approve rework\", prefix the command with KC_REWORK_APPROVED=1; the token without those words stays blocked."
 }
 
 # Checks a `git commit`; $1 is the directory, the rest the words after `git`.
@@ -166,7 +168,7 @@ main() {
   command="$(extract_field "$input" command)"
   [ -n "$command" ] || exit 0
   case "$command" in
-    *"$APPROVAL_TOKEN"*) exit 0 ;;
+    *"$APPROVAL_TOKEN"*) ! user_approved "$(extract_field "$input" transcript_path)" "$APPROVAL_PHRASE" || exit 0 ;;
   esac
   dir="$(extract_field "$input" cwd)"
   walk_segments "$command" "${dir:-$PWD}" check_segment || true

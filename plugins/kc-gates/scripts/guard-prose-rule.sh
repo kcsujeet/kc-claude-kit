@@ -12,9 +12,10 @@
 #   - Deletions and rewording pass: the count is added minus removed non-blank lines, over every
 #     instruction file in the commit, and it must be above 0 to block.
 #
-# A command containing the literal KC_PROSE_APPROVED=1 passes. Like KC_READY_SKIP=1 it is added
-# only when the user's latest message says prose alone is fine for this commit; the guard checks
-# the literal, not the message.
+# A command containing the literal KC_PROSE_APPROVED=1 passes only when the user's own words approve
+# it: the latest message they typed in the session transcript (the payload's transcript_path)
+# contains "approve prose" (user_approved in lib/hook-input.sh). The token without those words, no
+# transcript, or a session with no typed message (a subagent) stays blocked.
 #
 # Output: the PreToolUse deny JSON on a blocked command, nothing otherwise. Always exits 0.
 # Hook schema: https://code.claude.com/docs/en/hooks
@@ -31,10 +32,11 @@ scripts_dir=$(dirname "$0")
 . "$scripts_dir/lib/risk-paths.sh"
 
 readonly APPROVAL_TOKEN='KC_PROSE_APPROVED=1'
+readonly APPROVAL_PHRASE='approve prose'
 readonly INSTRUCTION_PATHS='(^|/)(CLAUDE|AGENTS)\.md$|(^|/)\.claude/(rules/|review-conventions\.md$|hand-off-checklist\.md$)|(^|/)skills/(.*/)?SKILL\.md$|(^|/)rules/[^/]+\.md$'
 
 deny_prose_only_rule() {
-  print_pretooluse_deny "Blocked by the kc-gates plugin: a new rule needs a check that blocks the mistake in the same commit (script, hook, test or CI); prose alone is not accepted. This commit adds rule lines to an instruction file and adds or changes no check file. Add the check, or, only when the user has said in their latest message that prose alone is fine here, prefix the command with KC_PROSE_APPROVED=1; never add it on your own."
+  print_pretooluse_deny "Blocked by the kc-gates plugin: a new rule needs a check that blocks the mistake in the same commit (script, hook, test or CI); prose alone is not accepted. This commit adds rule lines to an instruction file and adds or changes no check file. Add the check, or ask the user: only their typed words approve prose alone. When their latest message says \"approve prose\", prefix the command with KC_PROSE_APPROVED=1; the token without those words stays blocked."
 }
 
 # Succeeds when the `git diff -U0` on stdin adds net non-blank lines to instruction files and
@@ -77,7 +79,7 @@ main() {
   command="$(extract_field "$input" command)"
   [ -n "$command" ] || exit 0
   case "$command" in
-    *"$APPROVAL_TOKEN"*) exit 0 ;;
+    *"$APPROVAL_TOKEN"*) ! user_approved "$(extract_field "$input" transcript_path)" "$APPROVAL_PHRASE" || exit 0 ;;
   esac
   dir="$(extract_field "$input" cwd)"
   walk_segments "$command" "${dir:-$PWD}" check_segment || true

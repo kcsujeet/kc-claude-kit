@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Tests scripts/guard-prose-rule.sh: a `git commit` that adds net lines to an instruction file and
-# changes no check file is denied unless the command carries KC_PROSE_APPROVED=1. Real repos in a
+# changes no check file is denied unless the command carries KC_PROSE_APPROVED=1 and the user typed "approve prose". Real repos in a
 # temp folder. Each case runs twice, once with jq and once through the sed fallback.
 set -euo pipefail
 
@@ -27,7 +27,7 @@ echo '- Prefer early returns.' >> "$repo/CLAUDE.md"
 run_git_in "$repo" add CLAUDE.md
 check_verdict deny "blocked: a CLAUDE.md rule with no check" "git commit -m 'rule'"
 expect_contains "the message names the missing check" "a new rule needs a check that blocks the mistake in the same commit (script, hook, test or CI); prose alone is not accepted" "$last_hook_output"
-check_verdict allow "allowed: the same commit with KC_PROSE_APPROVED=1" "KC_PROSE_APPROVED=1 git commit -m 'rule'"
+expect_token_needs_typed_words "$scripts/guard-prose-rule.sh" KC_PROSE_APPROVED=1 "approve prose" "git commit -m 'rule'" "$repo"
 check_verdict deny "blocked: git -C <repo> commit" "git -C $repo commit -m 'rule'" "$work_dir"
 check_verdict deny "blocked: cd into the repo, then commit" "cd $repo && git commit -m 'rule'" "$work_dir"
 check_verdict allow "allowed: a command that is not a commit" "git status"
