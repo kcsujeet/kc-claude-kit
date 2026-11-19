@@ -234,11 +234,10 @@ write_review() {
 age_review() { perl -e 'utime(time - $ARGV[1], time - $ARGV[1], $ARGV[0] . "/meta.env")' "$walk_tmp/$1" "$2"; }
 expect_last_reason() {
   case "$last_output" in
-    *"$2"*) record_walk_ok "$1" ;;
+    *"$2"*) echo "ok   $1"; passes=$((passes + 1)) ;;
     *) echo "FAIL $1"; echo "     missing: $2"; echo "     in:      $last_output"; failures=$((failures + 1)) ;;
   esac
 }
-record_walk_ok() { echo "ok   $1"; passes=$((passes + 1)); }
 no_receipt_reason="no receipt line in $review_folder/walk-receipt.tsv"
 
 write_review app/models/order.rb

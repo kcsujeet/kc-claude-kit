@@ -295,7 +295,7 @@ EOF
     if [ "${#segment[@]}" -gt 0 ] && is_review_write_segment "${segment[*]}"; then
       for word in "${segment[@]}"; do
         if [ -n "$expecting" ]; then
-          [ "$expecting" != repo ] || [ -n "$repo" ] || repo=$word
+          if [ "$expecting" = repo ] && [ -z "$repo" ]; then repo=$word; fi
           expecting=""
         elif [[ $word =~ $url_pattern || $word =~ $api_pattern ]]; then
           [ -n "$repo" ] || repo=${BASH_REMATCH[1]}
@@ -307,7 +307,7 @@ EOF
             -R?*) [ -n "$repo" ] || repo=${word#-R} ;;
             -b | --body | -F | --body-file | -f | --field | --raw-field | -H | --header | -X | --method | --input | -t | --title | --jq | -q | --template) expecting=skip ;;
             -*) ;;
-            review | comment) if [ "$previous" = pr ] || [ "$previous" = issue ]; then in_subcommand=true; fi ;;
+            review | comment) if is_pr_or_issue "$previous"; then in_subcommand=true; fi ;;
             *[!0-9]* | '') ;;
             *) if [ "$in_subcommand" = true ] && [ -z "$number" ]; then number=$word; fi ;;
           esac
@@ -327,6 +327,12 @@ read_remote_repo() {
   git remote get-url origin 2>/dev/null | sed -nE 's#^.*github\.com[:/]([^/]+/[^/]+)$#\1#p' | sed 's#\.git$##'
 }
 
+# The word before a review or comment subcommand names a pull request or an issue.
+is_pr_or_issue() { case "$1" in pr | issue) return 0 ;; esac; return 1; }
+# A saved review's meta.env names this pull request, or this repo.
+meta_names_pr() { grep -qx "PR=$2" "$1"; }
+meta_names_repo() { grep '^URL=' "$1" | grep -qiF "github.com/$2/"; }
+
 # Prints the saved review folder (gather-review.sh's kc-review-*, from the last day) with the
 # newest meta.env among those for this repo and, when given, this pull request; nothing if none.
 find_review_dir() {
@@ -336,8 +342,8 @@ find_review_dir() {
     has_review_files "$candidate" || continue
     meta=$candidate/meta.env
     [ -f "$meta" ] || continue
-    [ -z "$number" ] || grep -qx "PR=$number" "$meta" || continue
-    [ -z "$repo" ] || grep '^URL=' "$meta" | grep -qiF "github.com/$repo/" || continue
+    if [ -n "$number" ] && ! meta_names_pr "$meta" "$number"; then continue; fi
+    if [ -n "$repo" ] && ! meta_names_repo "$meta" "$repo"; then continue; fi
     metas+=("$meta")
   done <<EOF
 $(find "${TMPDIR:-/tmp}" -maxdepth 1 -type d -name 'kc-review-*' -mtime -1 2>/dev/null)

@@ -330,7 +330,7 @@ expect_contains "it asks for the field" "F1: lesson has no held-by" "$held_outpu
 run_held 'held-by:tests/other.test.sh'
 expect_eq "held-by: a test the lesson diff does not change fails" failed "$held_actual"
 expect_contains "it names the test" "F1: held-by tests/other.test.sh is not a test the lesson diff adds or changes" "$held_output"
-# The case name reaches the test as $1: it passes at HEAD only because it does.
+# The case name reaches the test as $1; the test ignores tool.sh, so it passes with the change reverted too.
 run_held 'held-by:tests/cased.test.sh::case-a'
 expect_eq "held-by: a case test that passes with the change reverted fails as vacuous" failed "$held_actual"
 expect_contains "the case test is run, and caught as vacuous" "tests/cased.test.sh passes at HEAD and still passes" "$held_output"
