@@ -104,6 +104,13 @@ expect_eq "§PC5: a claim about an earlier review with a run is clean" clean "$(
 
 draft "$work_dir/earlier-na.json" $'**question**:\nI was wrong last round about the totals. Do archived items count?' '{ran: "n/a: no change"}'
 expect_contains "§PC5: a claim about an earlier review with \"ran\": n/a is flagged" "earlier review with nothing run" "$(result "$work_dir/earlier-na.json")"
+
+draft "$work_dir/n-plus-one.json" $'**note**:\nThis runs one query per order, an N+1 on the order list.' '{ran: "console loop over 25 orders: 25 queries"}'
+expect_contains "a query-count claim measured outside a request is flagged" "query counts with no request measuring them" "$(result "$work_dir/n-plus-one.json")"
+draft "$work_dir/n-plus-one-ok.json" $'**note**:\nThis runs one query per order, an N+1 on the order list.' '{ran: "request spec GET /orders, 1 vs 4 orders: 3 vs 6 database queries"}'
+expect_eq "a query-count claim measured through a request is clean" clean "$(result "$work_dir/n-plus-one-ok.json")"
+draft "$work_dir/no-query-claim.json" $'**note**:\nThe order list reads the totals from the cart.' '{}'
+expect_eq "a draft with no query-count claim needs no request" clean "$(result "$work_dir/no-query-claim.json")"
 draft "$work_dir/names-test.json" $'**suggestion**:\nThe test above sets the archived flag, so the total looks right by luck.' '{ran: "n/a: asks for no behaviour change", walked: "n/a: names an existing test"}'
 expect_eq "§PC5: naming an existing test is not asking for one" clean "$(result "$work_dir/names-test.json")"
 

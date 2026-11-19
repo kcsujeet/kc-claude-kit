@@ -51,6 +51,7 @@ A Rails app almost never needs a new shape. It already has dozens of controllers
 ## Specs
 
 - An N+1 fix is pinned with the app's N+1 detector (for example Prosopite or Bullet) over three records, not a hand-rolled query counter, and one spec covers a route that never asked for the fix.
+- An N+1 claim, in a fix or a review comment, is measured through a request (a request spec counting the queries that reach the database for one record and for several), never a console loop or a bare serializer call: a request's query cache and the associations its scope already loaded can make the per-record queries free, and a fix for a cost the request never pays is dead code.
 - A spec for a bug reproduces the data the way the app writes it (a nullable column left null), not the way a fixture makes convenient.
 - Every behaviour the change claims is mutation-checked: break it, and a specific spec fails.
 - `db/schema.rb` is never regenerated from a stale local database; its diff holds only the intended change.

@@ -197,6 +197,21 @@ expect_eq "a path no list names has no signed-out line" "0" "$(select_gates_outp
 mkdir -p "$work_dir/walk-declared/repo/.claude"
 printf '# shared links are open\n\n(^|/)other/\n(^|/)share/' > "$work_dir/walk-declared/repo/.claude/public-paths.txt"
 expect_eq "a path in .claude/public-paths.txt, after a comment and a blank line, on a last line with no newline: WALK=required" "WALK=required" "$(walk_line_for "$work_dir/walk-declared")"
+
+# A changed class that a class on a public path inherits from reaches signed-out visitors too.
+make_case "$work_dir/walk-inherited" 'class Api::V2::OrderSerializer < BaseSerializer' app/serializers/api/v2/order_serializer.rb
+mkdir -p "$work_dir/walk-inherited/repo/app/serializers/api/v2/public"
+printf 'class Api::V2::Public::OrderSerializer < Api::V2::OrderSerializer\nend\n' > "$work_dir/walk-inherited/repo/app/serializers/api/v2/public/order_serializer.rb"
+expect_contains "a class a public class inherits from: the signed-out reason, naming the inheritor" "signed out included (app/serializers/api/v2/order_serializer.rb is inherited by app/serializers/api/v2/public/order_serializer.rb)" "$(select_gates_output "$work_dir/walk-inherited")"
+
+make_case "$work_dir/walk-inherited-private" 'export class OrderCard extends Card {}' src/orders/OrderCard.ts
+printf 'export class AdminOrderCard extends OrderCard {}\n' > "$work_dir/walk-inherited-private/repo/src/orders/AdminOrderCard.ts"
+expect_eq "a class only a private class inherits from: no signed-out line" "0" "$(select_gates_output "$work_dir/walk-inherited-private" | grep -c 'signed out included' || true)"
+
+make_case "$work_dir/walk-inherited-prefix" 'class OrderSerializer < BaseSerializer' app/serializers/order_serializer.rb
+mkdir -p "$work_dir/walk-inherited-prefix/repo/app/public"
+printf 'class Public::OrderSerializerV2 < OrderSerializerV2\nend\n' > "$work_dir/walk-inherited-prefix/repo/app/public/order_serializer_v2.rb"
+expect_eq "a public class inheriting a longer name with the same start: no signed-out line" "0" "$(select_gates_output "$work_dir/walk-inherited-prefix" | grep -c 'signed out included' || true)"
 expect_contains "the declared path is the reason" "(src/share/view.ts)" "$(select_gates_output "$work_dir/walk-declared")"
 
 # Private source change: required, one walk-item per changed non-test source file.

@@ -61,3 +61,29 @@ kc_public_path_hit() {
   fi
   printf '%s\n' "$hit"
 }
+
+# kc_public_inheritor_hit <changed-files> [<repo-root>]: "<changed> is inherited by <public file>" for
+# the first changed source file defining a class that a class on a public path (kc_public_path_hit)
+# inherits from (Ruby `< Name`, JS/TS/Java-style `extends Name`), or nothing. A base class a guest
+# page renders through its subclass reaches signed-out visitors without its own path saying so.
+kc_public_inheritor_hit() {
+  local changed_files=$1 repo_root=${2:-.} changed_path class_name public_hit list_file
+  list_file=$(mktemp)
+  while IFS= read -r changed_path; do
+    [ -f "$repo_root/$changed_path" ] || continue
+    while IFS= read -r class_name; do
+      [ -n "$class_name" ] || continue
+      grep -rlE --exclude-dir=.git --exclude-dir=node_modules --exclude-dir=vendor --exclude-dir=tmp \
+        "(<|extends)[[:space:]]*(::)?${class_name}([^A-Za-z0-9_:]|$)" "$repo_root" 2>/dev/null \
+        | sed "s#^$repo_root/##" > "$list_file" || true
+      [ -s "$list_file" ] || continue
+      public_hit=$(kc_public_path_hit "$list_file" "$repo_root")
+      if [ -n "$public_hit" ]; then
+        rm -f "$list_file"
+        printf '%s is inherited by %s\n' "$changed_path" "$public_hit"
+        return 0
+      fi
+    done < <(sed -nE 's/^[[:space:]]*(export[[:space:]]+)?(default[[:space:]]+)?(abstract[[:space:]]+)?class[[:space:]]+([A-Z][A-Za-z0-9_:]*).*/\4/p' "$repo_root/$changed_path")
+  done < <(grep -vE "$KC_RISK_UNCOUNTED_PATHS" "$changed_files" | grep -E "\.${KC_PUBLIC_SOURCE_EXTENSIONS}$" || true)
+  rm -f "$list_file"
+}
