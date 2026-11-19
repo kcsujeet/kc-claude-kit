@@ -192,4 +192,21 @@ expect_eq "lessons with no look-back wording go out" out "$(run_hook "Two lesson
 { write_typed_message "start"; write_tool_call Bash command "bash feedback-ledger.sh check list.tsv ledger.tsv --rules checklist.md"; write_tool_result; write_typed_message "what did we learn?"; } > "$transcript"
 expect_eq "a ledger call that never ran list doesn't count" noted "$(run_hook "$lookback_reply")"
 
+# A cause and a fix proposed with no reproduction named.
+proposal='Cause: the read view lays out its own label column. Fix: render it through the shared row.'
+{ write_typed_message "address the QA rows"; } > "$transcript"
+expect_eq "a cause and fix with no reproduction line are noted" noted "$(run_hook "$proposal")"
+expect_reason "it asks for the evidence" "without reproducing the problem.*Reproduced: line"
+expect_eq "a Reproduced: line goes out" out "$(run_hook "$(printf '%s\nReproduced: screenshot of the card at 1440px.' "$proposal")")"
+expect_eq "a bold Reproduced label goes out" out "$(run_hook "$(printf '%s\n**Reproduced:** the 500 on POST /orders.' "$proposal")")"
+expect_eq "Not reproduced with a reason goes out" out "$(run_hook "$(printf '%s\nNot reproduced: no OpenAI key locally.' "$proposal")")"
+expect_eq "a fix with no cause goes out" out "$(run_hook "Fixed in abc123; the test passes.")"
+expect_eq "a cause with no fix goes out" out "$(run_hook "The cause is a stale cache entry.")"
+expect_eq "a cause with \"fixed it\" is a proposal too" noted "$(run_hook "Root cause: a stale cache. I fixed it in abc123.")"
+expect_eq "a cause with \"fixes\" is a proposal too" noted "$(run_hook "Root cause: a stale cache. This fixes it.")"
+{ write_typed_message "fix the QA rows"; write_tool_call Edit file_path "/repo/src/card.tsx"; write_tool_result; } > "$transcript"
+expect_eq "a cause and fix after edits is a report of a fix made, not a proposal" out "$(run_hook "$proposal")"
+{ write_typed_message "address the QA rows"; } > "$transcript"
+expect_eq "the word reproduced in prose is not the line" noted "$(run_hook "$(printf '%s I reproduced nothing yet.' "$proposal")")"
+
 finish

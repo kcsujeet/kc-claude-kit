@@ -38,6 +38,30 @@ asks_status() {
   printf '%s' "$text" | grep -Eq "(^|[^[:alnum:]])(are we (done|finished)|what.s (next|left|remaining)|what (is|else is) (next|left)|what now|where are we|(current|any|your|the latest) status|status (of|on|update|check)|is (it|that|this|the (pr|ticket)) (merged|deployed|tested|approved|released|live|done))([^[:alnum:]]|$)"
 }
 
+# True when the prompt asks to fix something reported: a fix or debug verb, or a word that reports a
+# problem ("the export is broken", "checkout crashes"); or a noun for one (an error, QA or review
+# feedback) with a verb that acts on it or reports it ("address the QA feedback", "it throws an
+# error"). The noun alone is a feature request ("add error handling", "add a QA checklist").
+asks_fix() {
+  local prompt_text
+  prompt_text=$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')
+  printf '%s' "$prompt_text" | grep -Eq "(^|[^[:alnum:]])(fix(es|ed|ing)?|debug(ging)?|bugs?|broken|regress(ed|ion)?|crash(es|ed)?|fail(s|ed|ing)|not working|doesn.t work)([^[:alnum:]]|$)" && return 0
+  printf '%s' "$prompt_text" | grep -Eq "(^|[^[:alnum:]])(errors?|failures?|qa|feedbacks?|findings?|review comments?)([^[:alnum:]]|$)" \
+    && printf '%s' "$prompt_text" | grep -Eq "(^|[^[:alnum:]])(address|handle|resolve|respond to|look at|go through|work through|act on|throws?|threw|returns?|returned|gets?|got|seeing|hits?)([^[:alnum:]]|$)"
+}
+
+# A cause word and a fix word anywhere in the reply, in any order.
+proposes_cause_and_fix() {
+  printf '%s' "$1" | grep -Eiq "(^|[^[:alnum:]])cause[sd]?([^[:alnum:]]|$)" \
+    && printf '%s' "$1" | grep -Eiq "(^|[^[:alnum:]])fix(es|ed)?([^[:alnum:]]|$)"
+}
+
+# True when a reply names how the problem was reproduced: a "Reproduced:" or "Not reproduced:"
+# line, any Markdown emphasis around the label allowed.
+names_reproduction() {
+  printf '%s\n' "$1" | grep -Eiq "(^|[^[:alnum:]])(not )?reproduced[*_]*:"
+}
+
 # True when the prompt is only a question: it ends with `?` and asks for no change (no imperative
 # such as fix, build, add or "do it" anywhere in it). "Can you fix this?" is a request, "why does
 # this fail?" is a question. A "do/does/did" before a subject is a question word, not an order.
