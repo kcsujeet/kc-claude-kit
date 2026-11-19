@@ -153,7 +153,7 @@ check_commit() {
   # An unborn branch has no old side to blame.
   git -C "$GIT_DIR" rev-parse -q --verify HEAD >/dev/null 2>&1 || return 0
   # Only the merge as staged: `-a` would add edits the merge didn't bring.
-  if is_default_branch_merge "$GIT_DIR" && ! commit_stages_all "${GIT_ARGS[@]:1}"; then
+  if is_default_branch_merge "$GIT_DIR" && ! is_commit_staging_all "${GIT_ARGS[@]:1}"; then
     return 0
   fi
   handed_off_fix=$(get_commit_diff "$GIT_DIR" -U0 "${GIT_ARGS[@]:1}" | drop_version_bump_hunks | find_handed_off_fix "$GIT_DIR" HEAD) || return 0

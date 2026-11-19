@@ -120,14 +120,14 @@ print_pretooluse_deny() {
     "$(printf '%s' "$1" | LC_ALL=C tr -d '\000-\037' | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g')"
 }
 
-# commit_stages_all <word>...: true when the words after `git commit` add every tracked change to the
-# commit (-a, --all, or -a inside a cluster such as -am).
-commit_stages_all() {
+# is_commit_staging_all <word>...: true when the words after `git commit` add every tracked change to the
+# commit (-a, --all, or -a inside a cluster such as -am; -u<mode> is the untracked-files option, not -a).
+is_commit_staging_all() {
   local word
   for word in "$@"; do
     case "$word" in
       --all) return 0 ;;
-      --*) ;;
+      --* | -u*) ;;
       -*a*) return 0 ;;
     esac
   done
@@ -138,12 +138,11 @@ commit_stages_all() {
 # `commit` would record: the staged diff, or with -a/--all the working tree against HEAD. A
 # repository with no commit yet is diffed against the empty tree.
 get_commit_diff() {
-  local dir=$1 options=$2 all=false base=HEAD
+  local dir=$1 options=$2 base=HEAD
   shift 2
-  commit_stages_all "$@" && all=true
   git -C "$dir" rev-parse -q --verify HEAD >/dev/null 2>&1 || base=4b825dc642cb6eb9a060e54bf8d69288fbee4904
   # shellcheck disable=SC2086 # $options is a list of diff options
-  if $all; then
+  if is_commit_staging_all "$@"; then
     git -C "$dir" diff $options --no-color --no-ext-diff --no-renames "$base"
   else
     git -C "$dir" diff --cached $options --no-color --no-ext-diff --no-renames "$base"

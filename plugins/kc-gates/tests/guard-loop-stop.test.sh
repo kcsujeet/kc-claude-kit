@@ -197,6 +197,7 @@ run_git_in "$merge_repo" merge -q --no-commit --no-ff origin/main >/dev/null
 edit_line "$merge_repo" f.txt 4
 check_verdict allow "allowed: a default-branch merge with an unstaged edit left out" "git commit --no-edit" "$merge_repo"
 check_verdict deny "blocked: git commit -a during a default-branch merge adds the edit" "git commit -a --no-edit" "$merge_repo"
+check_verdict allow "allowed: -uall is the untracked-files option, not -a" "git commit -uall --no-edit" "$merge_repo"
 run_git_in "$merge_repo" checkout -- f.txt
 run_git_in "$merge_repo" merge --abort
 
