@@ -143,4 +143,32 @@ edit_line "$old_repo" m.txt 2
 run_git_in "$old_repo" add m.txt
 check_verdict allow "allowed: the blamed commit is more than 7 days old" "git commit -m 'fix the fix'" "$old_repo"
 
+# A version bump: every release raises the version line a handed-off commit wrote.
+version_repo="$work_dir/version-repo"
+make_repo "$version_repo"
+printf '{\n  "name": "shop",\n  "version": "1.0.0"\n}\n' > "$version_repo/p.json"
+printf 'name = "shop"\nversion = "1.0.0"\n' > "$version_repo/p.toml"
+run_git_in "$version_repo" add p.json p.toml
+run_git_in "$version_repo" commit -q -m "release p"
+git -C "$version_repo" push -q origin main
+printf 'rounds=1\n' > "$KC_READY_DIR/$(git -C "$version_repo" rev-parse HEAD)"
+bump_version() { sed 's/1\.0\.0/1.0.1/' "$version_repo/$1" > "$work_dir/bump.tmp" && mv "$work_dir/bump.tmp" "$version_repo/$1"; }
+bump_version p.json
+bump_version p.toml
+run_git_in "$version_repo" add p.json p.toml
+check_verdict allow "allowed: a commit that only raises versions a receipted commit wrote" "git commit -m 'bump'" "$version_repo"
+reset_repo "$version_repo"
+sed 's/shop/store/' "$version_repo/p.json" > "$work_dir/p.tmp" && mv "$work_dir/p.tmp" "$version_repo/p.json"
+bump_version p.json
+run_git_in "$version_repo" add p.json
+check_verdict deny "blocked: a version bump beside another changed line of the same hunk" "git commit -m 'rename'" "$version_repo"
+reset_repo "$version_repo"
+git -C "$version_repo" checkout -q -b bump main
+bump_version p.json
+run_git_in "$version_repo" commit -q -am "bump p"
+check_verdict allow "allowed: gh pr create for a branch that only raises a version" "gh pr create --fill" "$version_repo"
+sed 's/name = "shop"/name = "store"/' "$version_repo/p.toml" > "$work_dir/p.tmp" && mv "$work_dir/p.tmp" "$version_repo/p.toml"
+run_git_in "$version_repo" commit -q -am "bump p and rename"
+check_verdict deny "blocked: gh pr create for a branch that also edits receipted lines" "gh pr create --fill" "$version_repo"
+
 finish

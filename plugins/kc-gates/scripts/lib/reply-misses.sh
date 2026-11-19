@@ -38,12 +38,16 @@ asks_status() {
   printf '%s' "$text" | grep -Eq "(^|[^[:alnum:]])(are we (done|finished)|what.s (next|left|remaining)|what (is|else is) (next|left)|what now|where are we|(current|any|your|the latest) status|status (of|on|update|check)|is (it|that|this|the (pr|ticket)) (merged|deployed|tested|approved|released|live|done))([^[:alnum:]]|$)"
 }
 
-# True when the prompt asks to fix or address something reported: a bug, an error, a failing check,
-# review or QA feedback ("address the QA feedback", "the export is broken", "fix the failing build").
+# True when the prompt asks to fix something reported: a fix or debug verb, or a word that reports a
+# problem ("the export is broken", "checkout crashes"); or a noun for one (an error, QA or review
+# feedback) with a verb that acts on it or reports it ("address the QA feedback", "it throws an
+# error"). The noun alone is a feature request ("add error handling", "add a QA checklist").
 asks_fix() {
   local text
   text=$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')
-  printf '%s' "$text" | grep -Eq "(^|[^[:alnum:]])(fix(es|ed|ing)?|debug(ging)?|bugs?|broken|regress(ed|ion)?|crash(es|ed)?|fail(s|ed|ing|ure)?|errors?|not working|doesn.t work|qa|feedbacks?|findings?|review comments?)([^[:alnum:]]|$)"
+  printf '%s' "$text" | grep -Eq "(^|[^[:alnum:]])(fix(es|ed|ing)?|debug(ging)?|bugs?|broken|regress(ed|ion)?|crash(es|ed)?|fail(s|ed|ing)|not working|doesn.t work)([^[:alnum:]]|$)" && return 0
+  printf '%s' "$text" | grep -Eq "(^|[^[:alnum:]])(errors?|failures?|qa|feedbacks?|findings?|review comments?)([^[:alnum:]]|$)" \
+    && printf '%s' "$text" | grep -Eq "(^|[^[:alnum:]])(address|handle|resolve|respond to|look at|go through|work through|act on|throws?|threw|returns?|returned|gets?|got|seeing|hits?)([^[:alnum:]]|$)"
 }
 
 # A cause word and a fix word anywhere in the reply, in any order, newlines folded to spaces.

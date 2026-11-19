@@ -13,7 +13,9 @@
 #     request for it that merged in the last 7 days (gh api commits/<sha>/pulls).
 # Everything the guard cannot read (no receipt folder, a failed lookup, no default branch) counts as
 # not handed off: it never blocks what it can't read. Lines the change only adds have no old side,
-# and neither do new files.
+# and neither do new files. A hunk whose changed lines only set a version (`"version": "1.2.0"`,
+# `version = "1.2.0"`, `VERSION = "1.2.0"`) is left out: every release raises it, so it is not a
+# fix being redone.
 #
 # A command containing the literal KC_REWORK_APPROVED=1 passes only when the user's own words approve
 # it: the latest message they typed in the session transcript (the payload's transcript_path)
@@ -36,6 +38,20 @@ readonly APPROVAL_TOKEN='KC_REWORK_APPROVED=1'
 readonly APPROVAL_PHRASE='approve rework'
 readonly HANDED_OFF_DAYS=7
 readonly HANDED_OFF_SECONDS=$((HANDED_OFF_DAYS * 24 * 60 * 60))
+# A changed line that only sets a version: a JSON or TOML key, or a constant, holding a quoted value.
+readonly VERSION_LINE='^[-+][[:space:]]*"?(version|VERSION)"?[[:space:]]*[:=][[:space:]]*"[^"]*",?[[:space:]]*$'
+
+# Copies a `git diff -U0` from stdin to stdout without the hunks whose changed lines all set a version.
+drop_version_bump_hunks() {
+  awk -v version_line="$VERSION_LINE" '
+    function flush_hunk() { if (hunk != "" && !only_version) printf "%s", hunk; hunk = ""; only_version = 1 }
+    /^diff --git / { flush_hunk(); in_hunk = 0; print; next }
+    /^@@ / { flush_hunk(); in_hunk = 1; hunk = $0 "\n"; next }
+    in_hunk { hunk = hunk $0 "\n"; if ($0 ~ /^[-+]/ && $0 !~ version_line) only_version = 0; next }
+    { print }
+    END { flush_hunk() }
+  '
+}
 
 # Prints "<sha> <path>:<line>" for each old-side line a `git diff -U0` (on stdin) changes, blamed at
 # the revision $1 in the repository $2. A `--- ` line is a file header only between a `diff --git`
@@ -115,7 +131,7 @@ check_commit() {
   [ "${GIT_ARGS[0]:-}" = commit ] || return 0
   # An unborn branch has no old side to blame.
   git -C "$GIT_DIR" rev-parse -q --verify HEAD >/dev/null 2>&1 || return 0
-  handed_off_fix=$(get_commit_diff "$GIT_DIR" -U0 "${GIT_ARGS[@]:1}" | find_handed_off_fix "$GIT_DIR" HEAD) || return 0
+  handed_off_fix=$(get_commit_diff "$GIT_DIR" -U0 "${GIT_ARGS[@]:1}" | drop_version_bump_hunks | find_handed_off_fix "$GIT_DIR" HEAD) || return 0
   deny_edit_of_handed_off_fix "$handed_off_fix"
   return 1
 }
@@ -139,7 +155,7 @@ check_pr_create() {
   # No base or merge-base to compare with: nothing to blame, so nothing to block.
   [ -n "$base_ref" ] || return 0
   merge_base=$(git -C "$dir" merge-base "$base_ref" HEAD 2>/dev/null) || return 0
-  handed_off_fix=$(git -C "$dir" diff -U0 --no-color --no-ext-diff --no-renames "$merge_base" HEAD | find_handed_off_fix "$dir" "$merge_base") || return 0
+  handed_off_fix=$(git -C "$dir" diff -U0 --no-color --no-ext-diff --no-renames "$merge_base" HEAD | drop_version_bump_hunks | find_handed_off_fix "$dir" "$merge_base") || return 0
   deny_edit_of_handed_off_fix "$handed_off_fix"
   return 1
 }

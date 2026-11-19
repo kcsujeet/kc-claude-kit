@@ -204,6 +204,9 @@ expect_eq "a fix with no cause goes out" out "$(run_hook "Fixed in abc123; the t
 expect_eq "a cause with no fix goes out" out "$(run_hook "The cause is a stale cache entry.")"
 expect_eq "a cause with \"fixed it\" is a proposal too" noted "$(run_hook "Root cause: a stale cache. I fixed it in abc123.")"
 expect_eq "a cause with \"fixes\" is a proposal too" noted "$(run_hook "Root cause: a stale cache. This fixes it.")"
+{ write_typed_message "fix the QA rows"; write_tool_call Edit file_path "/repo/src/card.tsx"; write_tool_result; } > "$transcript"
+expect_eq "a cause and fix after edits is a report of a fix made, not a proposal" out "$(run_hook "$proposal")"
+{ write_typed_message "address the QA rows"; } > "$transcript"
 expect_eq "the word reproduced in prose is not the line" noted "$(run_hook "$(printf '%s I reproduced nothing yet.' "$proposal")")"
 
 finish
