@@ -15,6 +15,9 @@
 # A reply that lists look-back lessons when the session never ran `feedback-ledger.sh list` is
 # noted: a look-back written from memory keeps the feedback that stood out and drops the rest.
 #
+# A reply that proposes a cause and a fix with no "Reproduced:" or "Not reproduced:" line is noted:
+# a cause read from code alone is a guess until the failing run shows it (kc-assess step 3).
+#
 # A turn whose latest message was only a question (is_only_question) and that made Edit or Write
 # calls is noted too: a question is not a change request.
 #
@@ -116,6 +119,10 @@ if printf '%s' "$reply_one_line" | grep -Eiq 'look[- ]?back' && printf '%s' "$re
 fi
 if [ "$lists_look_back_lessons" = true ] && [ "$ledger_listed" != true ]; then
   misses+=("It listed look-back lessons without running feedback-ledger.sh list over the session; run it, then give every item, the person's feedback included, a verdict.")
+fi
+
+if proposes_cause_and_fix "$reply" && ! names_reproduction "$reply"; then
+  misses+=("It proposed a cause and a fix without reproducing the problem. Reproduce it first (kc-conventions:kc-assess step 3) and name the evidence on a Reproduced: line, or say Not reproduced: <why>.")
 fi
 
 if printf '%s' "$reply" | tr '\n' ' ' | grep -Eiq "$UNCERTAIN_CLAIM"; then

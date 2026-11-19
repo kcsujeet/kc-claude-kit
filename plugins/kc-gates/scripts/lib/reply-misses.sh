@@ -38,6 +38,28 @@ asks_status() {
   printf '%s' "$text" | grep -Eq "(^|[^[:alnum:]])(are we (done|finished)|what.s (next|left|remaining)|what (is|else is) (next|left)|what now|where are we|(current|any|your|the latest) status|status (of|on|update|check)|is (it|that|this|the (pr|ticket)) (merged|deployed|tested|approved|released|live|done))([^[:alnum:]]|$)"
 }
 
+# True when the prompt asks to fix or address something reported: a bug, an error, a failing check,
+# review or QA feedback ("address the QA feedback", "the export is broken", "fix the failing build").
+asks_fix() {
+  local text
+  text=$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')
+  printf '%s' "$text" | grep -Eq "(^|[^[:alnum:]])(fix|debug|bugs?|broken|regress(ed|ion)?|crash(es|ed)?|fail(s|ed|ing|ure)?|errors?|not working|doesn.t work|qa|feedbacks?|findings?|review comments?)([^[:alnum:]]|$)"
+}
+
+# True when a reply proposes a cause and a fix: it names a cause and a fix for something.
+proposes_cause_and_fix() {
+  local text
+  text=$(printf '%s' "$1" | tr '\n' ' ')
+  printf '%s' "$text" | grep -Eiq "(^|[^[:alnum:]])(root cause|cause[sd]?|caused by)([^[:alnum:]]|$)" \
+    && printf '%s' "$text" | grep -Eiq "(^|[^[:alnum:]])(fix|fixes|fixed by)([^[:alnum:]]|$)"
+}
+
+# True when a reply names how the problem was reproduced: a "Reproduced:" or "Not reproduced:"
+# line, any Markdown emphasis around the label allowed.
+names_reproduction() {
+  printf '%s\n' "$1" | grep -Eiq "(^|[^[:alnum:]])(not )?reproduced[*_]*:"
+}
+
 # True when the prompt is only a question: it ends with `?` and asks for no change (no imperative
 # such as fix, build, add or "do it" anywhere in it). "Can you fix this?" is a request, "why does
 # this fail?" is a question. A "do/does/did" before a subject is a question word, not an order.

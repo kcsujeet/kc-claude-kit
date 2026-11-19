@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Changed (a cause and a fix are proposed only after the problem is reproduced)
+
+- `kc-gates` 3.15.1: on a prompt that asks to fix something reported (a bug, an error, a failing check, review or QA feedback), `remind-reply-rules.sh` adds a line: reproduce each problem in the running app, a test or the log before proposing a cause, and name the evidence on a `Reproduced:` line, or say `Not reproduced: <why>`. `check-reply-sources.sh` notes, for the next turn, a reply that proposes a cause and a fix with neither line. Other cases it catches: a failing test explained from its code when its output named the assertion, a slow page blamed on a query no profile showed, a layout complaint answered without opening the page. Held by `tests/remind-reply-rules.test.sh` and `tests/check-reply-sources.test.sh`; each new function was broken once and a test failed.
+- `kc-conventions` 2.6.3: `kc-assess` step 3 asks for the `Reproduced:` line.
+
 ### Changed (review rounds converge or stop, and a pull request merges only when the last round found nothing)
 
 - `kc-gates` 3.15.0 (a minor: a new hook).
