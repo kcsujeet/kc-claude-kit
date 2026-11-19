@@ -20,7 +20,7 @@ printf '{"login":"me"}\n' > "$work_dir/gh/user.json"
 # Routes `gh pr view [<ref>]` to a pull request whose head is $head_sha, authored by $1.
 route_pull_request() {
   printf '{"headRefOid":"%s","author":{"login":"%s"}}\n' "$head_sha" "$1" > "$work_dir/gh/pr.json"
-  printf 'pr view --json headRefOid,author\tpr.json\npr view 7 --json headRefOid,author\tpr.json\napi user\tuser.json\n' > "$work_dir/gh/routes.tsv"
+  printf 'pr view --json headRefOid,author\tpr.json\npr view 7 --json headRefOid,author\tpr.json\npr view 7 --repo o/r --json headRefOid,author\tpr.json\npr view --repo o/r --json headRefOid,author\tpr.json\npr view 9 --repo x/y --json headRefOid,author\tpr.json\napi user\tuser.json\n' > "$work_dir/gh/routes.tsv"
 }
 check_verdict() { expect_hook_verdict "$scripts/guard-merge.sh" "$@"; }
 
@@ -28,6 +28,11 @@ route_pull_request me
 check_verdict deny "blocked: merging your own pull request with no receipt" "gh pr merge 7 --squash" "$work_dir/repo"
 expect_contains "the message says why" "has no clean review receipt" "$last_hook_output"
 check_verdict deny "blocked: the current branch's pull request, no number" "gh pr merge --squash" "$work_dir/repo"
+check_verdict deny "blocked: a flag's value before the number is not the ref" "gh pr merge --subject x 7" "$work_dir/repo"
+check_verdict deny "blocked: -R names the repo, the number is still the ref" "gh pr merge -R o/r 7 --squash" "$work_dir/repo"
+check_verdict deny "blocked: --repo with no number is the current branch's pull request" "gh pr merge --repo o/r" "$work_dir/repo"
+check_verdict deny "blocked: a gh api PUT to the merge endpoint, its number and repo read from the path" "gh api -X PUT repos/x/y/pulls/9/merge" "$work_dir/repo"
+check_verdict allow "allowed: --disable-auto only cancels a queued merge" "gh pr merge 7 --disable-auto" "$work_dir/repo"
 
 printf 'sha=%s\nrounds=2\nopen=0\nclean=no\n' "$head_sha" > "$KC_READY_DIR/$head_sha"
 check_verdict deny "blocked: a receipt whose last round still found something" "gh pr merge 7 --squash" "$work_dir/repo"

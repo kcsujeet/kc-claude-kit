@@ -665,5 +665,44 @@ rm -rf "$pass_dir/round-3"
 save_fix_round round-3 "$fixed_head" "$smaller_head"
 expect_write written "a third round smaller than the second is written" "$smaller_head" --rounds 3 --open 0 --pass "$pass_dir"
 expect_contains "and is clean" "clean=yes" "$(bash "$scripts/ready-receipt.sh" check "$smaller_head")"
+rm -f "$KC_READY_DIR/$smaller_head"
+
+printf 'open\tshop/tax.sh:2 a naming question\tneeds a decision\n' >> "$pass_dir/fixes.txt"
+expect_write written "a clean last round with a finding left open is written" "$smaller_head" --rounds 3 --open 1 --pass "$pass_dir"
+expect_contains "but is not clean: something is still open" "clean=no" "$(bash "$scripts/ready-receipt.sh" check "$smaller_head")"
+rm -f "$KC_READY_DIR/$smaller_head"
+sed '$d' "$pass_dir/fixes.txt" > "$work_dir/fixes.tmp" && mv "$work_dir/fixes.tmp" "$pass_dir/fixes.txt"
+
+printf '  shop/report.sh:3: total\tbreaks\n' > "$pass_dir/round-3/uses-verdicts.txt"
+expect_write written "a last round with a use that breaks is written" "$smaller_head" --rounds 3 --open 0 --pass "$pass_dir"
+expect_contains "but is not clean: a broken use is a finding" "clean=no" "$(bash "$scripts/ready-receipt.sh" check "$smaller_head")"
+rm -f "$KC_READY_DIR/$smaller_head"
+
+printf 'name total (shop/total.sh): 1 uses\n  shop/report.sh:3: printf "a\\\\nb"\n' > "$pass_dir/round-3/uses.txt"
+printf '  shop/report.sh:3: printf "a\\\\nb"\tfine\n' > "$pass_dir/round-3/uses-verdicts.txt"
+expect_write written "a use line with a backslash matches its verdict as written" "$smaller_head" --rounds 3 --open 0 --pass "$pass_dir"
+rm -f "$KC_READY_DIR/$smaller_head"
+
+expect_write refused "a --rounds that is no count is refused" "$smaller_head" --rounds abc --open 0 --pass "$pass_dir"
+expect_said "it asks for a count" "--rounds is a count of gate rounds"
+expect_write refused "--rounds 0 is refused" "$smaller_head" --rounds 0 --open 0 --pass "$pass_dir"
+
+run_git reset -q --hard "$fixed_head"
+printf 'echo h1\n' >> "$repo/shop/total.sh"
+side_head=$(commit_all "a commit beside round 3")
+expect_write refused "a commit that does not descend from the last round's head is refused" "$side_head" --rounds 3 --open 0 --pass "$pass_dir"
+expect_said "it names the last round" "does not descend from round 3's head"
+
+run_git reset -q --hard "$round_one"
+printf 'echo other\n' >> "$repo/shop/tax.sh"
+other_head=$(commit_all "a round 2 off round 1's line")
+rm -rf "$pass_dir/round-3"
+save_fix_round round-3 "$fixed_head" "$other_head"
+expect_write refused "a round whose head does not descend from the round before is refused" "$other_head" --rounds 3 --open 0 --pass "$pass_dir"
+expect_said "it names the round" "round-3: its head does not descend from round 2's head"
+
+# The size count reads every changed line in a hunk, a markdown bullet or a --flag line too.
+printf 'diff --git a/x.md b/x.md\n--- a/x.md\n+++ b/x.md\n@@ -1,2 +1,2 @@\n-- old item\n--flag\n+- new item\n+plain\n' > "$work_dir/bullets.diff"
+expect_eq "count_changed_lines counts bullet and flag lines, not the headers" 4 "$(bash -c 'eval "$(sed -n "/^count_changed_lines()/,/^}/p" "$1")"; count_changed_lines "$2"' _ "$scripts/ready-receipt.sh" "$work_dir/bullets.diff" 2>&1)"
 
 finish

@@ -12,7 +12,7 @@
 
 set -u
 
-echo 'Before a branch'"'"'s first push and its PR, run /kc-gates:kc-ready-for-review once on the committed branch, without asking: rounds on fixes until one is clean (max 3). It also gates marking ready, a reviewer request and a move to review.'
+echo 'Before a branch'"'"'s first push and its PR, run /kc-gates:kc-ready-for-review once on the committed branch, without asking: rounds on fixes until one is clean. It also gates marking ready, a reviewer request and a move to review.'
 
 echo "Lessons are checks first: a lint rule, test, script or hook; prose only when no check can hold it (feedback-ledger.sh check enforces it)."
 

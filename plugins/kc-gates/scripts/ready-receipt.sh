@@ -13,7 +13,9 @@
 #       Refused unless the pass folder shows the pass ran (see below).
 #   ready-receipt.sh write <sha> --after <pass-sha>
 #       After commits that only hold fixes to that pass: the ones the user
-#       picked from its open list, or a reviewer asked for. Refused unless <pass-sha> has a pass or --after receipt and
+#       picked from its open list, or a reviewer asked for. It lets the PR
+#       stay in review but never makes the head clean: to merge, review those
+#       fixes as the pass's next round and write --rounds <k> for the new head. Refused unless <pass-sha> has a pass or --after receipt and
 #       <sha> descends from it. Run it from the repo root.
 #   ready-receipt.sh write <sha> --checklist [--ledger <dir>]
 #       After walking the repo's hand-off checklist alone, before opening a
@@ -299,39 +301,59 @@ check_review() {
 
 readonly MAX_ROUNDS=3
 
-# Prints the number of lines a unified diff adds or removes.
+# Prints the number of lines a unified diff adds or removes: every + or - line
+# inside a hunk, whatever it starts with (a markdown bullet, a --flag); the
+# ---/+++ file headers come before a file's first hunk and are not counted.
 count_changed_lines() {
-  grep -cE '^[+-]([^+-]|$)' "$1" || true
+  awk '
+    /^diff --git / { in_hunk = 0; next }
+    /^@@ / { in_hunk = 1; next }
+    { is_change = substr($0, 1, 1) == "+" || substr($0, 1, 1) == "-" }
+    in_hunk && is_change { changed++ }
+    END { print changed + 0 }' "$1"
 }
 
 # Prints the number of FAIL blocks among a review's verdicts.
 count_failing_blocks() {
-  print_verdicts "$1" | summarize_blocks | awk -F '\t' '$1 == "block" && $3 == "FAIL"' | grep -c . || true
+  print_verdicts "$1" | summarize_blocks | awk -F '\t' '{ is_block = $1 == "block"; is_failing = $3 == "FAIL" } is_block && is_failing { failing++ } END { print failing + 0 }'
 }
 
 # A later round's record of the uses of what its fixes changed: every use line
 # in uses.txt (indented, as trace-uses.sh prints them) has one verdict line.
+# A use marked breaks is a finding: count_broken_uses keeps such a round from
+# being clean.
 check_uses_record() {
-  local review=$1 dir=$pass_dir/$1 use_line use_count=0 missing=0
-  if [ ! -f "$dir/uses.txt" ] || [ ! -f "$dir/uses-verdicts.txt" ]; then
+  local review=$1 dir=$pass_dir/$1 use_line use_count=0 missing=0 has_uses_list=false has_uses_verdicts=false
+  [ -f "$dir/uses.txt" ] && has_uses_list=true
+  [ -f "$dir/uses-verdicts.txt" ] && has_uses_verdicts=true
+  if ! $has_uses_list || ! $has_uses_verdicts; then
     record_problem "$review: no uses.txt and uses-verdicts.txt (trace-uses.sh on the round's diff, and a verdict per use)"
     return
   fi
   while IFS= read -r use_line; do
     use_count=$((use_count + 1))
-    awk -F '\t' -v use="$use_line" '$1 == use && ($2 == "fine" || $2 == "breaks" || $2 == "changes") { found = 1 } END { exit !found }' "$dir/uses-verdicts.txt" \
+    # The use line goes through the environment, not -v, which would read its backslashes as escapes.
+    USE_LINE=$use_line awk -F '\t' '
+      { is_this_use = $1 == ENVIRON["USE_LINE"]; has_verdict = $2 == "fine" || $2 == "breaks" || $2 == "changes" }
+      is_this_use && has_verdict { found = 1 }
+      END { exit !found }' "$dir/uses-verdicts.txt" \
       || missing=$((missing + 1))
   done < <(grep -E '^  [^ ]' "$dir/uses.txt" || true)
   [ "$missing" -eq 0 ] || record_problem "$review: $missing of $use_count listed use(s) have no fine, breaks or changes line in uses-verdicts.txt"
 }
 
-# Checks rounds 2..<rounds>: each reviews only the fixes since the round before,
-# records a verdict per use, and is smaller than the round before. Sets
+# Prints the number of uses a round's uses-verdicts.txt marks breaks.
+count_broken_uses() {
+  awk -F '\t' '$2 == "breaks" { broken++ } END { print broken + 0 }' "$pass_dir/$1/uses-verdicts.txt" 2>/dev/null || echo 0
+}
+
+# Checks rounds 2..<rounds>, starting from round 1's head ($2): each reviews only
+# the fixes since the round before, records a verdict per use, and is smaller
+# than the round before. Sets
 # last_head to the last round's head. Not run in a subshell: its problems must
 # reach the caller's list.
 check_fix_rounds() {
-  local rounds=$1 round previous_head head base_commit size previous_size=""
-  previous_head=$(get_review_head round-1)
+  local rounds=$1 previous_head=$2 round head base_commit size previous_size="" has_previous_round did_not_shrink
   for ((round = 2; round <= rounds; round++)); do
     check_review "round-$round" no-scope
     [ "${#problems[@]}" -eq 0 ] || return 0
@@ -343,7 +365,10 @@ check_fix_rounds() {
       || record_problem "round-$round: its head does not descend from round $((round - 1))'s head"
     check_uses_record "round-$round"
     size=$(count_changed_lines "$regenerated_dir/round-$round.diff")
-    if [ -n "$previous_size" ] && [ "$size" -ge "$previous_size" ]; then
+    has_previous_round=false; did_not_shrink=false
+    [ -n "$previous_size" ] && has_previous_round=true
+    $has_previous_round && [ "$size" -ge "$previous_size" ] && did_not_shrink=true
+    if $did_not_shrink; then
       record_problem "round-$round: its fixes change $size lines, round $((round - 1))'s changed $previous_size: fixes that don't shrink are going in circles; stop and ask the user about the approach"
     fi
     previous_size=$size
@@ -443,7 +468,7 @@ write_pass_receipt() {
   if [ "${#problems[@]}" -eq 0 ]; then
     round_one_head=$(get_review_head round-1)
     last_head=$round_one_head
-    [ "$rounds" -eq 1 ] || check_fix_rounds "$rounds"
+    [ "$rounds" -eq 1 ] || check_fix_rounds "$rounds" "$round_one_head"
   fi
   if [ "${#problems[@]}" -eq 0 ]; then
     git -C "$repo_root" merge-base --is-ancestor "$last_head" "$sha" 2>/dev/null \
@@ -465,7 +490,11 @@ write_pass_receipt() {
     exit 1
   fi
   refuse_unanswered_comments
-  if [ "$sha" = "$last_head" ] && [ "$open" = 0 ] && [ "$(count_failing_blocks "round-$rounds")" -eq 0 ]; then
+  local is_last_round_head=false has_nothing_open=false last_round_found_nothing=false
+  [ "$sha" = "$last_head" ] && is_last_round_head=true
+  [ "$open" = 0 ] && has_nothing_open=true
+  [ "$(count_failing_blocks "round-$rounds")" -eq 0 ] && [ "$(count_broken_uses "round-$rounds")" -eq 0 ] && last_round_found_nothing=true
+  if $is_last_round_head && $has_nothing_open && $last_round_found_nothing; then
     clean=yes
   fi
   {
