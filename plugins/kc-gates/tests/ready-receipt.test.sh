@@ -149,11 +149,9 @@ expect_write refused "an --after write is refused while the PR has an unanswered
 expect_said "it names the unanswered comment" "src/total.ts:12 @review-bot[bot]"
 export KC_GH_ROUTES="$gh_fixtures/none/routes.tsv"
 
-# One gate round (§H1): a second is refused. The fixes are held by their record: a fix names a
-# test its commits changed (§H4), and what is left open says why and numbers --open (§H3).
+# The fixes are held by their record: a fix names a test its commits changed (§H4), and what is
+# left open says why and numbers --open (§H3). Rounds after the first are tested at the end.
 build_pass
-expect_write refused "a second round is refused" "$fixed_head" --rounds 2 --open 0 --pass "$pass_dir"
-expect_said "it says the fixes are held by the record" "a pass has one gate round"
 
 rm "$pass_dir/fixes.txt"
 expect_write refused "fix commits with no fixes.txt are refused" "$fixed_head" --rounds 1 --open 0 --pass "$pass_dir"
@@ -512,7 +510,7 @@ else
   record "check fails for a commit without a receipt" ok
 fi
 usage_text=$(bash "$scripts/ready-receipt.sh" 2>&1 || true)
-expect_contains "no arguments print the usage" "ready-receipt.sh write <sha> --rounds 1 --open <n> --pass <dir>" "$usage_text"
+expect_contains "no arguments print the usage" "ready-receipt.sh write <sha> --rounds <1-3> --open <n> --pass <dir>" "$usage_text"
 expect_eq "the usage has the header's lines without their comment marks" 0 "$(printf '%s\n' "$usage_text" | grep -c '^#' || true)"
 
 # Checklist verdicts (§H7): the hand-off checklist's boxes each get PASS, or N/A with a reason; a
@@ -600,5 +598,72 @@ expect_contains "the receipt records the walk" "checklist=walked" "$(bash "$scri
 verdict_check "$with_checklist"
 expect_eq "and the verdicts" 0 "$verdict_status"
 expect_write refused "a graded file that does not exist is refused" "$with_checklist" --verdicts "$work_dir/nope.md"
+
+# Rounds converge or stop (§H1). Round 1 reviews the whole change; each later round reviews only
+# the fixes since the round before, records a verdict per use of what they changed, and must be
+# smaller than the round before. Past round 3 the approach goes back to the user. The receipt is
+# clean only when the last round found nothing, the receipt's commit is its head and nothing is open.
+build_repo
+build_pass
+expect_write written "one round that found nothing, on its own head, is written" "$round_one" --rounds 1 --open 0 --pass "$pass_dir"
+expect_contains "and is clean" "clean=yes" "$(bash "$scripts/ready-receipt.sh" check "$round_one")"
+expect_write written "one round with fixes after it is written" "$fixed_head" --rounds 1 --open 0 --pass "$pass_dir"
+expect_contains "but is not clean: nothing reviewed the fixes" "clean=no" "$(bash "$scripts/ready-receipt.sh" check "$fixed_head")"
+expect_eq "check --clean refuses it" 1 "$(bash "$scripts/ready-receipt.sh" check "$fixed_head" --clean >/dev/null 2>&1; echo $?)"
+rm -f "$KC_READY_DIR/$fixed_head"
+expect_write refused "a fourth round is refused" "$fixed_head" --rounds 4 --open 0 --pass "$pass_dir"
+expect_said "it sends the approach back to the user" "stop and ask the user whether the approach is wrong"
+expect_write refused "a second round with no folder is refused" "$fixed_head" --rounds 2 --open 0 --pass "$pass_dir"
+expect_said "it names the missing round" "round-2: no round-2/ folder"
+
+# Saves a later round reviewing <from>..<to>: a block per listed gate and verification, the uses
+# trace-uses.sh listed and a verdict for each.
+save_fix_round() {
+  save_review "$1" "$2" "$3"
+  save_verdicts "$1" no-scope
+  build_gate_block verification > "$pass_dir/$1/verdicts/verification.txt"
+  printf 'name total (shop/total.sh): 1 uses\n  shop/report.sh:3: total\n' > "$pass_dir/$1/uses.txt"
+  printf '  shop/report.sh:3: total\tfine\n' > "$pass_dir/$1/uses-verdicts.txt"
+}
+save_fix_round round-2 "$round_one" "$fixed_head"
+expect_write written "a second round on round 1's fixes, a verdict per use, is written" "$fixed_head" --rounds 2 --open 0 --pass "$pass_dir"
+expect_contains "and is clean" "clean=yes" "$(bash "$scripts/ready-receipt.sh" check "$fixed_head")"
+expect_eq "check --clean accepts it" 0 "$(bash "$scripts/ready-receipt.sh" check "$fixed_head" --clean >/dev/null 2>&1; echo $?)"
+rm -f "$KC_READY_DIR/$fixed_head"
+
+: > "$pass_dir/round-2/uses-verdicts.txt"
+expect_write refused "a listed use with no verdict is refused" "$fixed_head" --rounds 2 --open 0 --pass "$pass_dir"
+expect_said "it counts the unjudged uses" "1 of 1 listed use(s) have no fine, breaks or changes line"
+rm "$pass_dir/round-2/uses.txt"
+expect_write refused "a later round with no uses record is refused" "$fixed_head" --rounds 2 --open 0 --pass "$pass_dir"
+expect_said "it asks for trace-uses.sh's list" "no uses.txt and uses-verdicts.txt"
+
+rm -rf "$pass_dir/round-2"
+save_fix_round round-2 "$base" "$fixed_head"
+expect_write refused "a later round that reads past the fixes is refused" "$fixed_head" --rounds 2 --open 0 --pass "$pass_dir"
+expect_said "it names the base it should have" "not round 1's head $round_one"
+
+rm -rf "$pass_dir/round-2"
+save_fix_round round-2 "$round_one" "$fixed_head"
+sed 's/^STATUS: PASS$/STATUS: FAIL/' "$pass_dir/round-2/verdicts/verification.txt" > "$work_dir/v.txt" && mv "$work_dir/v.txt" "$pass_dir/round-2/verdicts/verification.txt"
+expect_write written "a last round that still found something is written" "$fixed_head" --rounds 2 --open 0 --pass "$pass_dir"
+expect_contains "but is not clean" "clean=no" "$(bash "$scripts/ready-receipt.sh" check "$fixed_head")"
+rm -f "$KC_READY_DIR/$fixed_head"
+rm -rf "$pass_dir/round-2"
+save_fix_round round-2 "$round_one" "$fixed_head"
+
+# Round 2's fixes change 4 lines (round 1's head to its own); round 3's must change fewer.
+printf 'echo g1\necho g2\necho g3\necho g4\necho g5\n' >> "$repo/shop/tax.sh"
+bigger_head=$(commit_all "round 2 fixes, bigger")
+save_fix_round round-3 "$fixed_head" "$bigger_head"
+expect_write refused "a round whose fixes don't shrink is refused" "$bigger_head" --rounds 3 --open 0 --pass "$pass_dir"
+expect_said "it calls it going in circles" "fixes that don't shrink are going in circles"
+run_git reset -q --hard "$fixed_head"
+printf 'echo g1\n' >> "$repo/shop/tax.sh"
+smaller_head=$(commit_all "round 2 fixes, smaller")
+rm -rf "$pass_dir/round-3"
+save_fix_round round-3 "$fixed_head" "$smaller_head"
+expect_write written "a third round smaller than the second is written" "$smaller_head" --rounds 3 --open 0 --pass "$pass_dir"
+expect_contains "and is clean" "clean=yes" "$(bash "$scripts/ready-receipt.sh" check "$smaller_head")"
 
 finish
