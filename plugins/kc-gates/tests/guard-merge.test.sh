@@ -32,6 +32,7 @@ check_verdict deny "blocked: a flag's value before the number is not the ref" "g
 check_verdict deny "blocked: -R names the repo, the number is still the ref" "gh pr merge -R o/r 7 --squash" "$work_dir/repo"
 check_verdict deny "blocked: --repo with no number is the current branch's pull request" "gh pr merge --repo o/r" "$work_dir/repo"
 check_verdict deny "blocked: a gh api PUT to the merge endpoint, its number and repo read from the path" "gh api -X PUT repos/x/y/pulls/9/merge" "$work_dir/repo"
+check_verdict deny "blocked: a gh api merge written with {owner}/{repo} reads the directory's repo" "gh api -X PUT repos/{owner}/{repo}/pulls/7/merge" "$work_dir/repo"
 check_verdict allow "allowed: --disable-auto only cancels a queued merge" "gh pr merge 7 --disable-auto" "$work_dir/repo"
 
 printf 'sha=%s\nrounds=2\nopen=0\nclean=no\n' "$head_sha" > "$KC_READY_DIR/$head_sha"

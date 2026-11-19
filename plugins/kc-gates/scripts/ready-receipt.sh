@@ -15,7 +15,8 @@
 #       After commits that only hold fixes to that pass: the ones the user
 #       picked from its open list, or a reviewer asked for. It lets the PR
 #       stay in review but never makes the head clean: to merge, review those
-#       fixes as the pass's next round and write --rounds <k> for the new head. Refused unless <pass-sha> has a pass or --after receipt and
+#       fixes as the pass's next round and write --rounds <k> for the new
+#       head. Refused unless <pass-sha> has a pass or --after receipt and
 #       <sha> descends from it. Run it from the repo root.
 #   ready-receipt.sh write <sha> --checklist [--ledger <dir>]
 #       After walking the repo's hand-off checklist alone, before opening a
@@ -490,10 +491,14 @@ write_pass_receipt() {
     exit 1
   fi
   refuse_unanswered_comments
-  local is_last_round_head=false has_nothing_open=false last_round_found_nothing=false
+  local is_last_round_head=false has_nothing_open=false last_round_found_nothing=false failing_blocks broken_uses has_no_failing_blocks=false has_no_broken_uses=false
   [ "$sha" = "$last_head" ] && is_last_round_head=true
   [ "$open" = 0 ] && has_nothing_open=true
-  [ "$(count_failing_blocks "round-$rounds")" -eq 0 ] && [ "$(count_broken_uses "round-$rounds")" -eq 0 ] && last_round_found_nothing=true
+  failing_blocks=$(count_failing_blocks "round-$rounds")
+  broken_uses=$(count_broken_uses "round-$rounds")
+  [ "$failing_blocks" -eq 0 ] && has_no_failing_blocks=true
+  [ "$broken_uses" -eq 0 ] && has_no_broken_uses=true
+  $has_no_failing_blocks && $has_no_broken_uses && last_round_found_nothing=true
   if $is_last_round_head && $has_nothing_open && $last_round_found_nothing; then
     clean=yes
   fi
