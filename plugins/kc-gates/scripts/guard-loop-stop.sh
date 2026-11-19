@@ -15,7 +15,9 @@
 # not handed off: it never blocks what it can't read. Lines the change only adds have no old side,
 # and neither do new files. A hunk whose changed lines only set a version (`"version": "1.2.0"`,
 # `version = "1.2.0"`, `VERSION = "1.2.0"`) is left out: every release raises it, so it is not a
-# fix being redone.
+# fix being redone. A commit that concludes a merge of the default branch into a branch, taking the
+# index as staged, is left out too: its staged diff is the default branch's own work, already handed
+# off through its own PRs, plus any conflict resolutions, which are not checked. With -a it is checked.
 #
 # A command containing the literal KC_REWORK_APPROVED=1 passes only when the user's own words approve
 # it: the latest message they typed in the session transcript (the payload's transcript_path)
@@ -133,6 +135,16 @@ deny_edit_of_handed_off_fix() {
   print_pretooluse_deny "Blocked by the kc-gates plugin: this edits lines an earlier, already-handed-off fix wrote ($1): the loop-stop rule says stop and question the approach; ask the user. Ask the user: only their typed words approve it. When their latest message says \"approve rework\", prefix the command with KC_REWORK_APPROVED=1; the token without those words stays blocked."
 }
 
+# True when the repository in $1 is concluding a merge (MERGE_HEAD) of a commit the default branch
+# already has: its staged diff carries the default branch's own changes, not this branch's.
+is_default_branch_merge() {
+  local dir=$1 merge_head default_branch_ref
+  merge_head=$(git -C "$dir" rev-parse -q --verify MERGE_HEAD 2>/dev/null) || return 1
+  default_branch_ref=$(get_default_branch_ref "$dir")
+  # With no default branch the ref is empty and merge-base fails, so nothing is skipped.
+  git -C "$dir" merge-base --is-ancestor "$merge_head" "$default_branch_ref" 2>/dev/null
+}
+
 # Checks a `git commit`; $1 is the directory, the rest the words after `git`.
 check_commit() {
   local handed_off_fix
@@ -140,6 +152,10 @@ check_commit() {
   [ "${GIT_ARGS[0]:-}" = commit ] || return 0
   # An unborn branch has no old side to blame.
   git -C "$GIT_DIR" rev-parse -q --verify HEAD >/dev/null 2>&1 || return 0
+  # Only the merge as staged: `-a` would add edits the merge didn't bring.
+  if is_default_branch_merge "$GIT_DIR" && ! is_commit_staging_all "${GIT_ARGS[@]:1}"; then
+    return 0
+  fi
   handed_off_fix=$(get_commit_diff "$GIT_DIR" -U0 "${GIT_ARGS[@]:1}" | drop_version_bump_hunks | find_handed_off_fix "$GIT_DIR" HEAD) || return 0
   deny_edit_of_handed_off_fix "$handed_off_fix"
   return 1

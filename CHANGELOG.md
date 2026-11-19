@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Changed (merging the default branch in is not redoing a fix)
+
+- `kc-gates` 3.15.4: `guard-loop-stop.sh` lets a commit that concludes a merge of a commit the default branch already has (`MERGE_HEAD` an ancestor of it) through: its staged diff is the default branch's own work, already handed off through its own pull requests, so blaming it found those pull requests' fixes and blocked a routine "bring main in". A merge of any other branch, and a merge commit made with `-a` (which adds edits the merge didn't bring), is still checked; conflict resolutions in a default-branch merge are not. `is_commit_staging_all` in `lib/hook-input.sh` is the one reading of `-a`, shared with `get_commit_diff`; `-uall` (the untracked-files option) no longer reads as `-a` there. Other cases it catches: a release branch merged back after a hotfix, a long-lived branch kept current with main, a merge after a teammate's fix landed in the same file. Held by `tests/guard-loop-stop.test.sh`; each new branch was broken once and a test failed.
+
 ### Changed (a base class a public page renders is walked signed out; a query-count claim needs a request's counts)
 
 - `kc-gates` 3.15.3: `select-gates.sh` gives the signed-out walk reason, naming the inheritor, when a class on a public path inherits a changed class. `check-draft-format.sh` refuses a draft claiming an N+1 or extra queries unless its `"ran"` names a request and its counts. Held by `tests/select-gates.test.sh` and `tests/check-draft-format.test.sh`.
