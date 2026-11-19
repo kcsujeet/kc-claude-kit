@@ -41,13 +41,14 @@ readonly HANDED_OFF_SECONDS=$((HANDED_OFF_DAYS * 24 * 60 * 60))
 # A changed line that only sets a version: a JSON or TOML key, or a constant, holding a quoted value.
 readonly VERSION_LINE='^[-+][[:space:]]*"?(version|VERSION)"?[[:space:]]*[:=][[:space:]]*"[^"]*",?[[:space:]]*$'
 
-# Copies a `git diff -U0` from stdin to stdout without the hunks whose changed lines all set a version.
+# Copies a `git diff -U0`'s file headers and hunk headers from stdin to stdout, leaving out each hunk
+# whose changed lines all set a version. Hunk bodies are not copied: the blame reads only the headers.
 drop_version_bump_hunks() {
   awk -v version_line="$VERSION_LINE" '
-    function flush_hunk() { if (hunk != "" && !only_version) printf "%s", hunk; hunk = ""; only_version = 1 }
+    function flush_hunk() { if (hunk_header != "" && !only_version) print hunk_header; hunk_header = ""; only_version = 1 }
     /^diff --git / { flush_hunk(); in_hunk = 0; print; next }
-    /^@@ / { flush_hunk(); in_hunk = 1; hunk = $0 "\n"; next }
-    in_hunk { hunk = hunk $0 "\n"; if ($0 ~ /^[-+]/ && $0 !~ version_line) only_version = 0; next }
+    /^@@ / { flush_hunk(); in_hunk = 1; hunk_header = $0; next }
+    in_hunk { if ($0 ~ /^[-+]/ && $0 !~ version_line) only_version = 0; next }
     { print }
     END { flush_hunk() }
   '
