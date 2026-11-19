@@ -141,9 +141,11 @@ perl -MJSON::PP -CS -e '
     if ($rendered && $first !~ /^\*\*(question|note|thought|praise)\b/) {
       my $seen = $draft->{seen} // "";
       $seen = "" if ref $seen;
+      my $is_capture_name = $seen =~ /$ENV{KC_CAPTURE_PATH}/i;
+      my $capture_exists = -f $seen;
       if ($seen !~ /\S/) {
         push @found, "is on a screen with no \"seen\": open the running app, capture what the comment says, and give the file path";
-      } elsif ($seen !~ /$ENV{KC_CAPTURE_PATH}/i || !-f $seen) {
+      } elsif (!$is_capture_name || !$capture_exists) {
         push @found, "\"seen\" is not a screenshot or recording that exists: $seen";
       } elsif ($ENV{KC_HEAD_TIME} =~ /^\d+$/ && (stat $seen)[9] < $ENV{KC_HEAD_TIME}) {  # [9]: mtime
         push @found, "\"seen\" was captured before the head commit, so it shows older code: $seen";
