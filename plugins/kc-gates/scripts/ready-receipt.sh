@@ -113,6 +113,7 @@ is_full_sha() {
 }
 
 problems=()
+dismissals=()
 record_problem() { problems+=("$1"); }
 
 # Prints a review folder's verdict files, each ended by a newline: a file saved
@@ -343,6 +344,45 @@ check_uses_record() {
   [ "$missing" -eq 0 ] || record_problem "$review: $missing of $use_count listed use(s) have no fine, breaks or changes line in uses-verdicts.txt"
 }
 
+# Prints the number of findings a round's gate blocks list (bullets under FINDINGS:).
+count_round_findings() {
+  print_verdicts "$1" | awk '/^FINDINGS:/ { in_findings = 1; next } /^GATE:/ { in_findings = 0 } in_findings && /^- / && !/^- (none|None)/ { found++ } END { print found + 0 }'
+}
+
+# After the last allowed round still found something, the orchestrator settles
+# each finding in final.txt, one tab-separated line each:
+#   fixed<TAB><finding><TAB><test file>      a fix held by a test that fails without it
+#   dismissed<TAB><finding><TAB><reason>     not worth fixing, and why (shown to the user)
+#   asked<TAB><finding><TAB><user's words>   a product or design call the user made
+# The fixes (last round's head to <sha>) must change fewer lines than the last
+# round did. Prints each dismissal for the report. Records problems otherwise.
+check_final_settlement() {
+  local record=$pass_dir/final.txt finding_count=$1 last_round_size=$2 line_count=0 status finding detail fix_files fix_size
+  if [ ! -f "$record" ]; then
+    record_problem "round $MAX_ROUNDS still found $finding_count finding(s): settle each in final.txt (fixed, dismissed or asked), or ask the user about the approach"
+    return
+  fi
+  fix_files=$(git -C "$repo_root" -c core.quotePath=false diff --name-only "$last_head" "$sha")
+  while IFS=$'\t' read -r status finding detail || [ -n "$status" ]; do
+    [ -n "$status" ] || continue
+    line_count=$((line_count + 1))
+    if [ -z "$finding" ] || [ -z "$detail" ]; then
+      record_problem "final.txt line $line_count: needs a finding and its test, reason or the user's words"
+      continue
+    fi
+    case "$status" in
+      fixed) printf '%s\n' "$fix_files" | grep -qxF "$detail" || record_problem "final.txt line $line_count: the final fixes don't add or change $detail" ;;
+      dismissed) dismissals+=("$finding: $detail") ;;
+      asked) ;;
+      *) record_problem "final.txt line $line_count: '$status' is not fixed, dismissed or asked" ;;
+    esac
+  done < "$record"
+  [ "$line_count" -ge "$finding_count" ] || record_problem "final.txt settles $line_count finding(s); round $MAX_ROUNDS found $finding_count"
+  git -C "$repo_root" diff --no-color --no-ext-diff "$last_head" "$sha" > "$regenerated_dir/final.diff"
+  fix_size=$(count_changed_lines "$regenerated_dir/final.diff")
+  [ "$fix_size" -lt "$last_round_size" ] || record_problem "the final fixes change $fix_size lines, round $MAX_ROUNDS changed $last_round_size: too big to land without a gate round; ask the user about the approach"
+}
+
 # Prints the number of uses a round's uses-verdicts.txt marks breaks.
 count_broken_uses() {
   awk -F '\t' '$2 == "breaks" { broken++ } END { print broken + 0 }' "$pass_dir/$1/uses-verdicts.txt" 2>/dev/null || echo 0
@@ -491,7 +531,7 @@ write_pass_receipt() {
     exit 1
   fi
   refuse_unanswered_comments
-  local is_last_round_head=false has_nothing_open=false last_round_found_nothing=false failing_blocks broken_uses has_no_failing_blocks=false has_no_broken_uses=false
+  local is_last_round_head=false has_nothing_open=false last_round_found_nothing=false failing_blocks broken_uses has_no_failing_blocks=false has_no_broken_uses=false is_settled_after_last_round=false is_last_allowed_round=false has_final_record=false finding_count last_round_size
   [ "$sha" = "$last_head" ] && is_last_round_head=true
   [ "$open" = 0 ] && has_nothing_open=true
   failing_blocks=$(count_failing_blocks "round-$rounds")
@@ -499,12 +539,26 @@ write_pass_receipt() {
   [ "$failing_blocks" -eq 0 ] && has_no_failing_blocks=true
   [ "$broken_uses" -eq 0 ] && has_no_broken_uses=true
   $has_no_failing_blocks && $has_no_broken_uses && last_round_found_nothing=true
-  if $is_last_round_head && $has_nothing_open && $last_round_found_nothing; then
+  [ "$rounds" -eq "$MAX_ROUNDS" ] && is_last_allowed_round=true
+  [ -f "$pass_dir/final.txt" ] && has_final_record=true
+  if $is_last_allowed_round && ! $last_round_found_nothing && $has_final_record; then
+    finding_count=$(count_round_findings "round-$rounds")
+    last_round_size=$(count_changed_lines "$regenerated_dir/round-$rounds.diff")
+    check_final_settlement "$finding_count" "$last_round_size"
+    if [ "${#problems[@]}" -gt 0 ]; then
+      echo "ready-receipt: refused; the settlement after round $MAX_ROUNDS is not complete:" >&2
+      printf '  %s\n' "${problems[@]}" >&2
+      exit 1
+    fi
+    is_settled_after_last_round=true
+  fi
+  if $has_nothing_open && { { $is_last_round_head && $last_round_found_nothing; } || $is_settled_after_last_round; }; then
     clean=yes
   fi
   {
     printf 'sha=%s\ndate=%s\nrounds=%s\nopen=%s\nclean=%s\npass=%s\n' "$sha" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$rounds" "$open" "$clean" "$pass_dir"
     [ -z "$size" ] || printf 'size=%s\n' "$size"
+    ! $is_settled_after_last_round || printf 'settled=final.txt\n'
     [ -z "$widened" ] || printf 'scope_approved=%s\n' "$scope_approved"
   } > "$receipts_dir/$sha"
 }
@@ -759,6 +813,10 @@ write_receipt() {
   fi
   [ -z "$verdicts$task" ] || write_verdicts "$sha" "$verdicts" "$task" >&2
   echo "receipt written: $receipts_dir/$sha"
+  local dismissal
+  for dismissal in "${dismissals[@]+"${dismissals[@]}"}"; do
+    echo "dismissed: $dismissal"
+  done
 }
 
 [ "$#" -ge 2 ] || usage

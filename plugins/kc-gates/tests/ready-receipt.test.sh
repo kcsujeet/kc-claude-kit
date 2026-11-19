@@ -705,4 +705,46 @@ expect_said "it names the round" "round-3: its head does not descend from round 
 printf 'diff --git a/x.md b/x.md\n--- a/x.md\n+++ b/x.md\n@@ -1,2 +1,2 @@\n-- old item\n--flag\n+- new item\n+plain\n' > "$work_dir/bullets.diff"
 expect_eq "count_changed_lines counts bullet and flag lines, not the headers" 4 "$(bash -c 'eval "$(sed -n "/^count_changed_lines()/,/^}/p" "$1")"; count_changed_lines "$2"' _ "$scripts/ready-receipt.sh" "$work_dir/bullets.diff" 2>&1)"
 
+
+# After round 3 still found something, the orchestrator settles each finding in final.txt: fixed
+# with a test the final fixes changed, dismissed with a reason (printed for the user), or asked
+# with the user's words. The final fixes must be smaller than round 3's diff.
+build_repo
+build_pass
+save_fix_round round-2 "$round_one" "$fixed_head"
+printf 'echo g1\necho g2\necho g3\n' >> "$repo/shop/tax.sh"
+third_head=$(commit_all "round 2 fixes, three lines")
+save_fix_round round-3 "$fixed_head" "$third_head"
+printf 'GATE: naming\nSTATUS: FAIL\nBOXES:\n- [FAIL] §N1: shop/tax.sh:6 g3 is unclear\nFINDINGS:\n- 🟡 shop/tax.sh:6: g3 is unclear. Rename it.\n- 🟡 shop/tax.sh:5: g2 is unclear.\n' > "$pass_dir/round-3/verdicts/naming.txt"
+printf 'echo tax3\n' >> "$repo/shop/tax.sh"
+printf '# total\n' >> "$repo/shop/total.test.sh"
+final_head=$(commit_all "final fixes after round 3")
+expect_write written "round 3 with findings and no final.txt is written" "$final_head" --rounds 3 --open 0 --pass "$pass_dir"
+expect_contains "but is not clean" "clean=no" "$(bash "$scripts/ready-receipt.sh" check "$final_head")"
+rm -f "$KC_READY_DIR/$final_head"
+
+printf 'fixed\tshop/tax.sh:6 g3 is unclear\tshop/total.test.sh\ndismissed\tshop/tax.sh:5 g2 is unclear\tthe script prints it as asked\n' > "$pass_dir/final.txt"
+expect_write written "every round-3 finding settled, with small final fixes, is written" "$final_head" --rounds 3 --open 0 --pass "$pass_dir"
+expect_contains "and is clean" "clean=yes" "$(bash "$scripts/ready-receipt.sh" check "$final_head")"
+expect_said "each dismissal is printed for the user" "dismissed: shop/tax.sh:5 g2 is unclear: the script prints it as asked"
+rm -f "$KC_READY_DIR/$final_head"
+
+printf 'fixed\tshop/tax.sh:6 g3 is unclear\tshop/total.test.sh\n' > "$pass_dir/final.txt"
+expect_write refused "fewer settled lines than round 3's findings is refused" "$final_head" --rounds 3 --open 0 --pass "$pass_dir"
+expect_said "it counts them" "final.txt settles 1 finding(s); round 3 found 2"
+
+printf 'fixed\tshop/tax.sh:6 g3 is unclear\tshop/tax.test.sh\nasked\tshop/tax.sh:5 g2\tkeep it, it matches the report\n' > "$pass_dir/final.txt"
+expect_write refused "a fix naming a test the final fixes never touched is refused" "$final_head" --rounds 3 --open 0 --pass "$pass_dir"
+expect_said "it names the test" "the final fixes don't add or change shop/tax.test.sh"
+
+printf 'fixed\tshop/tax.sh:6 g3 is unclear\tshop/total.test.sh\nwaved\tshop/tax.sh:5 g2\tfine\n' > "$pass_dir/final.txt"
+expect_write refused "an unknown settlement is refused" "$final_head" --rounds 3 --open 0 --pass "$pass_dir"
+expect_said "it names the allowed ones" "is not fixed, dismissed or asked"
+
+printf 'fixed\tshop/tax.sh:6 g3 is unclear\tshop/total.test.sh\nasked\tshop/tax.sh:5 g2\tkeep it, it matches the report\n' > "$pass_dir/final.txt"
+printf 'echo t1\necho t2\necho t3\n' >> "$repo/shop/total.sh"
+big_final_head=$(commit_all "final fixes too big")
+expect_write refused "final fixes as big as round 3 are refused" "$big_final_head" --rounds 3 --open 0 --pass "$pass_dir"
+expect_said "it sends the approach to the user" "too big to land without a gate round"
+
 finish
