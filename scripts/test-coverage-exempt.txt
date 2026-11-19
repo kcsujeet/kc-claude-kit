@@ -4,3 +4,4 @@ plugins/kc-gates/scripts/lib/hook-input.sh sourced by the hook scripts; their te
 plugins/kc-conventions/scripts/build-rules.sh CI runs `build-rules.sh --check` against the real skills on every PR
 plugins/kc-conventions/scripts/lib/request-surface-pattern.sh sourced by request-surface.sh and select-gates.sh; their tests run it
 plugins/kc-gates/scripts/lib/capture-paths.sh sourced by check-walk-receipt.sh and check-draft-format.sh; their tests run it
+plugins/kc-gates/scripts/lib/review-dir.sh sourced by guard-github-post.sh and guard-review-walk.sh; their tests run it on saved review folders
