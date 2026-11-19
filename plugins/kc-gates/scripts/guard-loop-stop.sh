@@ -140,7 +140,7 @@ is_default_branch_merge() {
   local dir=$1 merge_head default_branch_ref
   merge_head=$(git -C "$dir" rev-parse -q --verify MERGE_HEAD 2>/dev/null) || return 1
   default_branch_ref=$(get_default_branch_ref "$dir")
-  [ -n "$default_branch_ref" ] || return 1
+  # With no default branch the ref is empty and merge-base fails, so nothing is skipped.
   git -C "$dir" merge-base --is-ancestor "$merge_head" "$default_branch_ref" 2>/dev/null
 }
 
