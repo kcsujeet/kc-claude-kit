@@ -171,4 +171,27 @@ edit_line "$version_repo" p.toml 1
 run_git_in "$version_repo" commit -q -am "bump p and rename"
 check_verdict deny "blocked: gh pr create for a branch that also edits receipted lines" "gh pr create --fill" "$version_repo"
 
+# Merging the default branch in: its staged diff is the default branch's own work.
+merge_repo="$work_dir/merge-repo"
+make_repo "$merge_repo"
+printf 'rounds=1\n' > "$KC_READY_DIR/$(git -C "$merge_repo" rev-parse HEAD~1)"
+run_git_in "$merge_repo" checkout -q -b feature
+echo feature > "$merge_repo/feature.txt"
+run_git_in "$merge_repo" add feature.txt
+run_git_in "$merge_repo" commit -q -m "feature work"
+run_git_in "$merge_repo" checkout -q main
+edit_line "$merge_repo" f.txt 2
+run_git_in "$merge_repo" commit -q -am "main edits the receipted fix"
+git -C "$merge_repo" push -q origin main
+run_git_in "$merge_repo" checkout -q -b other feature
+edit_line "$merge_repo" f.txt 3
+run_git_in "$merge_repo" commit -q -am "other edits the receipted fix"
+run_git_in "$merge_repo" checkout -q feature
+run_git_in "$merge_repo" merge -q --no-commit --no-ff origin/main >/dev/null
+check_verdict allow "allowed: concluding a merge of the default branch" "git commit --no-edit" "$merge_repo"
+run_git_in "$merge_repo" merge --abort
+run_git_in "$merge_repo" merge -q --no-commit --no-ff other >/dev/null
+check_verdict deny "blocked: concluding a merge of a branch that is not the default one" "git commit --no-edit" "$merge_repo"
+run_git_in "$merge_repo" merge --abort
+
 finish
