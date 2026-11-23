@@ -7,6 +7,7 @@ tests_dir=$(cd "$(dirname "$0")" && pwd)
 # shellcheck source=lib/harness.sh
 . "$tests_dir/lib/harness.sh"
 citations_script="$(dirname "$tests_dir")/scripts/check-gate-citations.sh"
+short_sha_chars=7
 
 repo=$work_dir/repo
 mkdir -p "$repo/src"
@@ -16,11 +17,11 @@ git -C "$repo" config user.name Test
 printf 'a\nb\nc\n' > "$repo/src/cart.ts"
 git -C "$repo" add -A && git -C "$repo" commit -q -m first
 old_sha=$(git -C "$repo" rev-parse HEAD)
-old_short=${old_sha:0:7}
+old_short=${old_sha:0:short_sha_chars}
 printf 'a\nb\nc\nd\n' > "$repo/src/cart.ts"
 git -C "$repo" add -A && git -C "$repo" commit -q -m second
 head_sha=$(git -C "$repo" rev-parse HEAD)
-short=${head_sha:0:7}
+short=${head_sha:0:short_sha_chars}
 
 # Runs the check on a gate output holding <text>; prints its output, or "clean".
 run_citation_check() {
@@ -56,7 +57,7 @@ expect_eq "missing arguments exit 2" 2 "$status"
 printf 'a\nb' > "$repo/src/tail.ts"
 git -C "$repo" add -A && git -C "$repo" commit -q -m third
 head_sha=$(git -C "$repo" rev-parse HEAD)
-short=${head_sha:0:7}
+short=${head_sha:0:short_sha_chars}
 expect_eq "a citation of the last line of a file with no final newline is clean" clean "$(run_citation_check "- src/tail.ts:2@$short: last line")"
 
 status=0
