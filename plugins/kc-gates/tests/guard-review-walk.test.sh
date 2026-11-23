@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Tests scripts/guard-review-walk.sh: while the saved review's walk receipt fails, the verification
 # gate's dispatch is denied and a reply giving a verdict is blocked; a full receipt, a diff with
-# nothing to walk, a reply with no verdict and any other tool call pass.
+# nothing to walk, a reply that offers the walk as a question is blocked, a reply with no verdict and any other tool call pass.
 set -euo pipefail
 
 tests_dir=$(cd "$(dirname "$0")" && pwd)
@@ -62,6 +62,16 @@ expect_eq "no receipt: the verification gate's dispatch is denied" deny "$(run_d
 expect_contains "the denial says to walk first" "walk-receipt.tsv" "$(cat "$work_dir/last-output")"
 expect_eq "no receipt: other gates still dispatch" allow "$(run_dispatch kc-gates:correctness-gate)"
 
+offer_reply="The gates are done. Do you want me to walk it in the running app before I give the verdict?"
+qa_offer_reply="Should I QA this change first?"
+try_offer_reply="Want me to try it locally?"
+expect_eq "no receipt: asking whether to walk it in the app is held" held "$(run_stop "$offer_reply")"
+expect_contains "the block says the walk is required, not a choice" "requires that walk" "$(cat "$work_dir/last-output")"
+expect_eq "no receipt: asking whether to QA it is held" held "$(run_stop "$qa_offer_reply")"
+expect_eq "no receipt: asking whether to try it locally is held" held "$(run_stop "$try_offer_reply")"
+expect_eq "no receipt: an unrelated question goes out" out "$(run_stop "Which gate do you want first?")"
+expect_eq "no receipt: saying it will walk, with no question, goes out" out "$(run_stop "I will walk it in the running app now.")"
+
 printf 'app/models/order.rb\tcreated an order with a free item\tno evidence\n' > "$review/walk-receipt.tsv"
 expect_eq "a receipt line with no evidence: verdict held" held "$(run_stop "$verdict_reply")"
 
@@ -72,6 +82,8 @@ expect_eq "full receipt: the verification gate dispatches" allow "$(run_dispatch
 write_review docs/notes.md
 rm -f "$review/walk-receipt.tsv"
 expect_eq "nothing to walk: the verdict goes out with no receipt" out "$(run_stop "$verdict_reply")"
+
+expect_eq "full receipt: a question about the app goes out" out "$(run_stop "$offer_reply")"
 
 rm -rf "$review"
 expect_eq "no saved review: the verdict goes out" out "$(run_stop "$verdict_reply")"

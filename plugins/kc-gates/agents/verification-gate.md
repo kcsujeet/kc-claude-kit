@@ -68,6 +68,7 @@ For §V2, list which trigger groups applied and cite each group's receipt, or it
 - [ ] §V9 On a re-review, each finding says where it came from: new code in this round's commits, a line an earlier round saw and let pass, or a change our own earlier comment asked for. Run `bash "${CLAUDE_PLUGIN_ROOT}/scripts/rename-only-lines.sh" "$DIFF_FILE"` yourself: a line it lists keeps the verdict the earlier round gave it, unless the rename itself is the problem (`<n> rename-only lines kept`); a finding on one, or a finding with no origin, FAILS. (N/A: first round)
 - [ ] §V10 A review whose `select-gates.sh` output gives the public-path walk reason (`walk: public or guest path`) has a `Walk:` receipt in its Checklist: each audience that can reach the change (signed out included) with what it saw in the running app, and the two replays (another record's id, the same id again) of each write a link, callback or return URL triggers; no receipt FAILS whatever the gates returned. (N/A: no public-path reason)
 - [ ] §V11 Each `walk-item:` line has a `Walk:` receipt of what was seen in the running app or at the API, also for a change made for another reviewer's or a bot's comment; a re-review walks the delta's items, not only its own findings; an item with no receipt FAILS. (N/A: no `walk-item` lines)
+- [ ] §V12 Every citation `path:line@sha` in the gate outputs passes `bash "${CLAUDE_PLUGIN_ROOT}/scripts/check-gate-citations.sh" <head-sha> <repo-root> <gate-output-file>...` (receipt: exit 0); a sha not the head's, or a line missing at the head, FAILS. (N/A: no citations)
 
 ---
 
@@ -197,13 +198,13 @@ The orchestrator walks §G1-§G5 in the kc-code-review skill's Step 1 itself, be
 
 ## §V8. Fixes and rewrites are re-checked
 
-Code you verify as a fix is new code. On a re-review, a replacement that resolves the original finding while adding a multi-line ternary, a dead wrapper or a misplaced export is a finding of its own, and quoting it approvingly without walking it is a documented miss. Likewise, a rewrite a gate proposes must pass every gate's checklist, not only the box that surfaced the problem. A proposed fix that changes behaviour is checked for bugs as well as style: it lists every state reaching the line with its result before and after (correctness §B15). A table is still the reviewer's guess at the states, so a behaviour change is also run: applied to a scratch copy with a test for the break it fixes, then the suite. Receipt: `<n> fixes re-checked` and `<n> rewrites checked`, each with the gates walked and, for behaviour changes, the states listed and the `ran:` result.
+Code you verify as a fix is new code. On a re-review, a replacement that resolves the original finding while adding a multi-line ternary, a dead wrapper or a misplaced export is a finding of its own. A rewrite a gate proposes must pass every gate's checklist too. A proposed fix that changes behaviour is checked for bugs as well as style: it lists every state reaching the line with its result before and after (correctness §B15). A behaviour change is also run, since a table is a guess: applied to a scratch copy with a test for the break it fixes, then the suite. Receipt: `<n> fixes re-checked` and `<n> rewrites checked`, each with the gates walked and, for behaviour changes, the states listed and the `ran:` result.
 
 ---
 
 ## §V9. A re-review says where each finding came from
 
-A rename puts every line it touches back in the delta, and an old line in the delta reads as new code. A re-review once flagged a variable name round one had passed, only because the rename round one asked for brought that line back. Each finding names its origin, so the author and the user can see which part of a round is new, which is a miss of ours, and which our own suggestions caused: new code, missed earlier, or from our suggestion. Run `bash "${CLAUDE_PLUGIN_ROOT}/scripts/rename-only-lines.sh" "$DIFF_FILE"` on the delta: each line it lists changed only by a rename, keeps its earlier verdict, and is judged only for the rename. Receipt: `<n> rename-only lines kept`, and an origin on every finding.
+A rename puts every line it touches back in the delta, and an old line in the delta reads as new code. Each finding names its origin, so the author and the user can see which part of a round is new, which is a miss of ours, and which our own suggestions caused: new code, missed earlier, or from our suggestion. Run `bash "${CLAUDE_PLUGIN_ROOT}/scripts/rename-only-lines.sh" "$DIFF_FILE"` on the delta: each line it lists changed only by a rename, keeps its earlier verdict, and is judged only for the rename. Receipt: `<n> rename-only lines kept`, and an origin on every finding.
 
 ## §V10. A public path is walked, not only read
 

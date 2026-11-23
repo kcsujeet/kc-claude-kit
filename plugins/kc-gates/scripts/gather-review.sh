@@ -19,6 +19,10 @@
 #                    head's history; otherwise (not fetched yet, or the author
 #                    rebased) it saves the whole diff and adds SINCE_SKIPPED=
 #                    with the reason. When used, meta.env has SINCE=<sha>.
+#                    When the delta holds merges of the base branch, it is cut
+#                    to the files the pull request itself changes
+#                    (merge-base(base, head)..head), and meta.env has
+#                    MERGES_EXCLUDED=<number of files dropped>.
 #   --branch [base]  Branch mode: `git diff <base>...HEAD` in the current repo.
 #                    The base is <base> when given, else origin/HEAD, else
 #                    main, else master.
@@ -73,12 +77,42 @@ describe_stale_base() {
   echo "$base is behind $upstream by $behind commit(s): gather again with --branch $upstream"
 }
 
+# A re-review's delta that holds a merge of the base branch also holds the base's own work. When it
+# does, narrows $files_tmp and $diff_tmp to the files the pull request itself changes
+# (merge-base(base, head)..head) and prints how many files it dropped; prints nothing when the delta
+# has no merge or the base can't be found in this clone.
+drop_base_merge_changes() {
+  local since=$1 head=$2 base=$3 base_ref own_base own_files kept_count total_count kept_file
+  local -a kept_files=()
+  [ -n "$(git rev-list --merges "$since..$head" 2>/dev/null | head -n 1)" ] || return 0
+  for base_ref in "origin/$base" "$base"; do
+    git rev-parse --verify --quiet "$base_ref^{commit}" >/dev/null && break
+    base_ref=""
+  done
+  [ -n "$base_ref" ] || return 0
+  own_base=$(git merge-base "$base_ref" "$head" 2>/dev/null) || return 0
+  own_files=$(mktemp "$tmp_root/kc-review-own.XXXXXX")
+  git diff --no-ext-diff --name-only "$own_base" "$head" > "$own_files"
+  total_count=$(grep -c . "$files_tmp" || true)
+  grep -Fxf "$own_files" "$files_tmp" > "$files_tmp.kept" || true
+  mv "$files_tmp.kept" "$files_tmp"
+  kept_count=$(grep -c . "$files_tmp" || true)
+  : > "$diff_tmp"
+  if [ "$kept_count" -gt 0 ]; then
+    while IFS= read -r kept_file; do kept_files+=("$kept_file"); done < "$files_tmp"
+    git diff --no-color --no-ext-diff --src-prefix=a/ --dst-prefix=b/ "$since" "$head" -- "${kept_files[@]}" > "$diff_tmp" 2>/dev/null || true
+  fi
+  rm -f "$own_files"
+  echo $((total_count - kept_count))
+}
+
 pr_number=""
 branch_mode=false
 base_arg=""
 out_dir=""
 since_sha=""
 since_skipped=""
+merges_excluded=""
 base_stale=""
 whole_diff=false
 while [ "$#" -gt 0 ]; do
@@ -185,6 +219,7 @@ else
       since_sha=$(git rev-parse "$since_sha^{commit}")
       git diff --no-color --no-ext-diff --src-prefix=a/ --dst-prefix=b/ "$since_sha" "$head_sha" > "$diff_tmp"
       git diff --no-ext-diff --name-only "$since_sha" "$head_sha" > "$files_tmp"
+      merges_excluded=$(drop_base_merge_changes "$since_sha" "$head_sha" "$review_base")
     fi
   fi
 fi
@@ -210,6 +245,7 @@ cp "$files_tmp" "$changed_files"
   print_env_line CHANGED_FILES "$changed_files"
   if [ -n "$fetch_command" ]; then print_env_line FETCH "$fetch_command"; fi
   if [ -n "$base_stale" ]; then print_env_line BASE_STALE "$base_stale"; fi
+  if [ -n "$merges_excluded" ]; then print_env_line MERGES_EXCLUDED "$merges_excluded"; fi
   if [ -n "$since_skipped" ]; then
     print_env_line SINCE_SKIPPED "$since_skipped"
   elif [ -n "$since_sha" ]; then

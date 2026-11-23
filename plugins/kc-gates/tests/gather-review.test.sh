@@ -240,4 +240,37 @@ check_status "usage: --since without a value exits 2" 2 12 --since
 check_status "usage: --since and --whole together exit 2" 2 12 --whole --since abc
 check_status "usage: --whole with --branch exits 2" 2 --branch --whole
 
+# --- a re-review whose delta holds a merge of the base: only the pull request's own files --------
+merge_repo="$work_dir/repo-merge"
+mkdir -p "$merge_repo"
+git -C "$merge_repo" init -q
+git -C "$merge_repo" symbolic-ref HEAD refs/heads/main
+git -C "$merge_repo" config user.email test@example.com
+git -C "$merge_repo" config user.name Test
+printf 'one\n' > "$merge_repo/a.txt"
+git -C "$merge_repo" add a.txt && git -C "$merge_repo" commit -q -m base
+git -C "$merge_repo" checkout -q -b feature
+printf 'mine\n' > "$merge_repo/b.txt"
+git -C "$merge_repo" add b.txt && git -C "$merge_repo" commit -q -m "pr work"
+reviewed_sha=$(git -C "$merge_repo" rev-parse HEAD)
+git -C "$merge_repo" checkout -q main
+printf 'someone else\n' > "$merge_repo/unrelated.txt"
+git -C "$merge_repo" add unrelated.txt && git -C "$merge_repo" commit -q -m "other work lands on main"
+git -C "$merge_repo" checkout -q feature
+git -C "$merge_repo" merge -q --no-edit main
+printf 'mine too\n' > "$merge_repo/c.txt"
+git -C "$merge_repo" add c.txt && git -C "$merge_repo" commit -q -m "more pr work"
+merge_head=$(git -C "$merge_repo" rev-parse HEAD)
+merge_fixtures="$work_dir/fixtures-merge"
+cp -R "$fixtures" "$merge_fixtures"
+jq --arg sha "$merge_head" '.headRefOid = $sha | .files = [{path: "b.txt"}, {path: "c.txt"}]' "$fixtures/pr-view.json" > "$merge_fixtures/pr-view.json"
+use_gh_fixtures "$merge_fixtures"
+merge_output=$(cd "$merge_repo" && bash "$gather" 12 --since "$reviewed_sha" --out-dir "$work_dir/out-merge")
+expect_eq "merge: the delta holds only the pull request's own files" "c.txt" "$(cat "$work_dir/out-merge/changed-files.txt")"
+expect_not_contains "merge: the base's file is not in the saved diff" "unrelated.txt" "$(cat "$work_dir/out-merge/review.diff")"
+expect_contains "merge: the pull request's own change is in the saved diff" "+mine too" "$(cat "$work_dir/out-merge/review.diff")"
+expect_contains "merge: meta.env says how many files were dropped" "MERGES_EXCLUDED=1" "$merge_output"
+no_merge_output=$(cd "$repo" && bash "$gather" 12 --since "$base_sha" --out-dir "$work_dir/out-no-merge")
+expect_not_contains "merge: a delta with no merge has no MERGES_EXCLUDED" "MERGES_EXCLUDED" "$no_merge_output"
+
 finish

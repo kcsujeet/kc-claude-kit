@@ -37,7 +37,16 @@
 # each `walk-item:` it prints needs a line in the receipt. No review folder, or no walk-item
 # (WALK=not-required), means no check.
 #
-# Output: the PreToolUse deny JSON on a blocked write, nothing otherwise.
+# With the token present, an approval (`gh pr review --approve`, or a reviews api write with event
+# APPROVE) is also compared with the head the review walked: the pull request's current head
+# (`gh pr view --json headRefOid`) against HEAD_SHA in the review folder's meta.env. When they
+# differ and any file the pull request changes differs between the two commits, the approval is
+# denied, naming the files: the new commits were not reviewed. When they differ only by commits
+# that touch none of the pull request's files (the default branch merged in), the approval goes
+# through with a one-line systemMessage saying so. A head, file list or commit it can't read means
+# no check.
+#
+# Output: the PreToolUse deny JSON on a blocked write, nothing otherwise (or the one-line note).
 # Always exits 0. Hook schema: https://code.claude.com/docs/en/hooks
 #
 # KC_GUARD_NO_JQ=1 forces the sed fallback (used by the tests).
@@ -325,21 +334,84 @@ read_remote_repo() {
 }
 
 
+# Prints the saved review folder this command's write is about: $KC_REVIEW_DIR, else the newest
+# folder for the repo and pull request the command names; nothing if none.
+find_command_review_dir() {
+  local target target_repo target_number
+  if [ -n "${KC_REVIEW_DIR:-}" ]; then
+    printf '%s' "$KC_REVIEW_DIR"
+    return 0
+  fi
+  target=$(read_review_target "$1")
+  target_repo=${target%%|*}
+  target_number=${target#*|}
+  [ -n "$target_repo" ] || target_repo=$(read_remote_repo)
+  find_review_dir "$target_repo" "$target_number"
+}
+
+# True when the command approves a pull request: `gh pr review --approve` (or -a), or a reviews
+# api write whose event is APPROVE, given as a field or in the --input file.
+is_approval_command() {
+  local segment payload_file
+  while IFS= read -r segment; do
+    is_review_write_segment "$segment" || continue
+    if printf '%s' "$segment" | grep -Eq "${GH_COMMAND_START}pr[[:space:]]+review([[:space:]]|$)"; then
+      printf '%s' "$segment" | grep -Eq '(^|[[:space:]])(--approve|-a)([[:space:]]|$)' && return 0
+      continue
+    fi
+    printf '%s' "$segment" | grep -Eq 'pulls/[0-9]+/reviews([^/0-9]|$)' || continue
+    printf '%s' "$segment" | grep -Eq "event[=:][[:space:]\"']*APPROVE" && return 0
+    payload_file=$(printf '%s' "$segment" | sed -nE "s/.*--input[[:space:]=]+[\"']?([^[:space:]\"']+).*/\\1/p")
+    [ -n "$payload_file" ] && [ -f "$payload_file" ] && command -v jq >/dev/null 2>&1 \
+      && [ "$(jq -r '.event // empty' "$payload_file" 2>/dev/null)" = APPROVE ] && return 0
+  done <<EOF
+$(split_segments "$1")
+EOF
+  return 1
+}
+
+# For an approval of a pull request whose head moved since the review walked it: prints the deny
+# JSON when a file the pull request changes differs between the two heads, or "note: <line>" when
+# only commits touching none of its files came in; nothing when the heads match or can't be read.
+get_moved_head_verdict() {
+  local command=$1 review_dir target repo number walked current files changed reason
+  local -a gh_target=() paths=()
+  local file
+  is_approval_command "$command" || return 0
+  review_dir=$(find_command_review_dir "$command")
+  has_review_files "$review_dir" || return 0
+  walked=$(sed -n 's/^HEAD_SHA=//p' "$review_dir/meta.env" 2>/dev/null | head -n 1)
+  [ -n "$walked" ] || return 0
+  target=$(read_review_target "$command")
+  repo=${target%%|*}
+  number=${target#*|}
+  [ -n "$number" ] && gh_target+=("$number")
+  [ -n "$repo" ] && gh_target+=(-R "$repo")
+  current=$(gh pr view ${gh_target[@]+"${gh_target[@]}"} --json headRefOid --jq .headRefOid 2>/dev/null) || return 0
+  [ -n "$current" ] && [ "$current" != "$walked" ] || return 0
+  files=$(gh pr view ${gh_target[@]+"${gh_target[@]}"} --json files --jq '.files[].path' 2>/dev/null) || return 0
+  [ -n "$files" ] || return 0
+  git cat-file -e "$walked^{commit}" 2>/dev/null && git cat-file -e "$current^{commit}" 2>/dev/null || return 0
+  while IFS= read -r file; do paths+=("$file"); done <<EOF
+$files
+EOF
+  changed=$(git diff --name-only "$walked" "$current" -- "${paths[@]}" 2>/dev/null) || return 0
+  if [ -z "$changed" ]; then
+    printf 'note: the pull request head moved from %s to %s since the review, by commits that touch none of its files (a merge of the default branch), so the approval stands.' "$(printf '%s' "$walked" | cut -c1-7)" "$(printf '%s' "$current" | cut -c1-7)"
+    return 0
+  fi
+  reason="Blocked by the kc-gates plugin: the pull request head is $(printf '%s' "$current" | cut -c1-7) but the review walked $(printf '%s' "$walked" | cut -c1-7), and these files of the pull request changed in between: $(printf '%s' "$changed" | tr '\n' ' ' | sed 's/["\\]//g' | cut -c1-400). Review the new commits first (gather the review again, then walk and grade them), then approve the head you reviewed."
+  printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"%s"}}' "$reason"
+}
+
 # Prints the deny JSON when the saved review has walk-items without a full receipt line; nothing
 # otherwise, and nothing when no review folder or no select-gates.sh can be found.
 get_unwalked_review_verdict() {
-  local scripts_dir review_dir selected problems reason problem_text target target_repo target_number
+  local scripts_dir review_dir selected problems reason problem_text
   # The reason is shown as a hook message, so the problem list is cut to a short length.
   local max_problem_chars=600
   scripts_dir=$(dirname "$0")
-  review_dir=${KC_REVIEW_DIR:-}
-  if [ -z "$review_dir" ]; then
-    target=$(read_review_target "$1")
-    target_repo=${target%%|*}
-    target_number=${target#*|}
-    [ -n "$target_repo" ] || target_repo=$(read_remote_repo)
-    review_dir=$(find_review_dir "$target_repo" "$target_number")
-  fi
+  review_dir=$(find_command_review_dir "$1")
   has_review_files "$review_dir" || return 0
   selected=$(mktemp)
   if ! bash "$scripts_dir/select-gates.sh" "$review_dir/review.diff" "$review_dir/changed-files.txt" . > "$selected" 2>/dev/null; then
@@ -360,7 +432,7 @@ EOF
 }
 
 main() {
-  local input command transcript verdict
+  local input command transcript verdict verdict_unshown
   input="$(cat)"
   command="$(extract_field "$input" command)"
   if [ -z "$command" ]; then
@@ -379,8 +451,20 @@ main() {
           printf '%s' "$verdict"
           exit 0
         fi
+        verdict=$(get_moved_head_verdict "$command")
+        case "$verdict" in
+          '{'*)
+            printf '%s' "$verdict"
+            exit 0
+            ;;
+        esac
         transcript="$(extract_field "$input" transcript_path)"
-        unshown_body_verdict "$command" "$transcript"
+        verdict_unshown=$(unshown_body_verdict "$command" "$transcript")
+        if [ -n "$verdict_unshown" ]; then
+          printf '%s' "$verdict_unshown"
+        elif [ -n "$verdict" ]; then
+          printf '{"systemMessage":"%s"}' "${verdict#note: }"
+        fi
       fi
       exit 0
       ;;
