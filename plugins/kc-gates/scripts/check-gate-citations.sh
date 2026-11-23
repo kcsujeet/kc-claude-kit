@@ -23,6 +23,7 @@ short_sha_chars=7
 for output_file in "$@"; do
   [ -r "$output_file" ] || { echo "$script_name: cannot read $output_file" >&2; exit 2; }
   while IFS= read -r citation; do
+    [ -n "$citation" ] || continue
     cited_path=${citation%:*}
     rest=${citation##*:}
     cited_line=${rest%%@*}

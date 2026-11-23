@@ -41,6 +41,9 @@ expect_contains "line 0 is not a line" "line 0 is not in" "$(run_citation_check 
 mixed=$(run_citation_check "- src/cart.ts:2@$short: ok
 - src/cart.ts:2@$old_short: stale")
 expect_contains "a bad citation among good ones is still reported" "is not the head" "$mixed"
+# No citation at all: the loop reads no empty one, so nothing is checked and nothing is printed.
+expect_eq "text with no citation prints nothing at all, on stderr too" "" "$(printf 'GATE: naming\n' > "$work_dir/none.txt"; bash "$citations_script" "$head_sha" "$repo" "$work_dir/none.txt" 2>&1)"
+
 status=0
 printf -- '- src/cart.ts:2@%s\n' "$old_short" > "$work_dir/gate.txt"
 bash "$citations_script" "$head_sha" "$repo" "$work_dir/gate.txt" > /dev/null 2>&1 || status=$?
