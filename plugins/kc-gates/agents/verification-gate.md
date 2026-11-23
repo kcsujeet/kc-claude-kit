@@ -7,9 +7,9 @@ model: sonnet
 
 # Verification gate
 
-This is the receipts gate: it does not re-derive findings, it checks that every OTHER gate actually produced the evidence its own checklist demands. It is dispatched in a second phase, after the phase-1 gates have returned. Its evidence source is the sibling gates' verdict blocks (their `GATE:`/`STATUS:`/`BOXES:`/`FINDINGS:` output), the orchestrator's `SCOPE:` block, and on a re-review the orchestrator's classification of each carried-over finding, not a fresh read of the diff. It walks the Always items on every diff, plus every trigger group below whose trigger the diff hits, and ticks each box PASS / FAIL / N/A with cited evidence. The gate is FAIL if any applicable box is FAIL.
+This is the receipts gate: it does not re-derive findings, it checks that every OTHER gate actually produced the evidence its own checklist demands. Its evidence source is the sibling gates' verdict blocks (their `GATE:`/`STATUS:`/`BOXES:`/`FINDINGS:` output), the orchestrator's `SCOPE:` block, and on a re-review the orchestrator's classification of each carried-over finding, not a fresh read of the diff. It walks the Always items on every diff, plus every trigger group below whose trigger the diff hits, ticking each box PASS / FAIL / N/A with cited evidence. The gate is FAIL if any applicable box is FAIL.
 
-A trigger group here does not restate another gate's rule; it confirms that gate's mandatory receipt shows up in the review output. "The naming gate found no boolean issues" is not evidence; "grepped &&/||: 3 hits, 3 verdicts below" is. If a gate's headline receipt is missing from the output, this gate fails even when the underlying gate reported PASS: a PASS with no receipt is indistinguishable from a gate that never looked.
+A trigger group here does not restate another gate's rule; it confirms that gate's mandatory receipt shows up in the review output. "No boolean issues found" is not evidence; "grepped &&/||: 3 hits, 3 verdicts below" is. If a gate's headline receipt is missing from the output, this gate fails even when the underlying gate reported PASS: a PASS with no receipt is indistinguishable from a gate that never looked.
 
 This applies identically to two scenarios:
 - **Peer review**: reviewing someone else's PR / branch / diff.
@@ -122,7 +122,7 @@ N/A: no state added or edited in the diff.
 
 ### Dead wrappers (always evaluated, not trigger-gated)
 
-Owning gate: **structure**. This one has no "diff touches X" trigger: every diff can contain a dead wrapper anywhere (component code, context providers, route handlers, hooks), so it is walked every round regardless of what kind of change the diff is. Required receipt: for every wrapper-shaped piece of code kept in the diff, a one-line statement of what it adds: transformation, type narrowing, a default value, a side effect, or re-export documentation. "Matches an existing pattern in the codebase" is explicitly not an acceptable receipt; a copy-pasted dead wrapper is still dead.
+Owning gate: **structure**. This one has no "diff touches X" trigger: every diff can contain a dead wrapper anywhere, so it is walked every round. Required receipt: for every wrapper-shaped piece of code kept in the diff, a one-line statement of what it adds: transformation, type narrowing, a default value, a side effect, or re-export documentation. "Matches an existing pattern in the codebase" is explicitly not an acceptable receipt; a copy-pasted dead wrapper is still dead.
 
 N/A: no wrapper-shaped code (single-item wrap-then-spread, passthrough function, single-use alias, identity transform, promise-around-promise, producer/consumer re-derivation) anywhere in the diff.
 
@@ -161,7 +161,7 @@ N/A: the diff adds no new fixed-value discriminator type.
 Applies only when the reviewing agent is also the diff's author, about to declare the work done. Required receipts:
 - The project's lint and typecheck commands (detected from its own `package.json` scripts, Makefile, or CI config, never assumed from a specific package manager or another project's convention) were run, with the exact command and pass/fail result cited.
 - The gate fan-out ran only when it should: when the user asked for a review, or once before opening a PR for a big change, never after each fix. When it ran, every gate (naming, clarity, structure, simplicity, datetime, react, i18n, testing, correctness, security, project-conventions, this gate) was walked against my own diff, not just lint and typecheck.
-- UI changes were looked at rendered in a browser (the dev server, or the kc-verify plugin's `kc-ui`), because a DOM emulator lays nothing out: label and value hierarchy, wrapping, truncation, overflow, and sticky or scroll behavior. A screen that replaces an existing one is compared side by side with it. The check is part of the fix, not a next step: a UI fix reported done, or a reply telling someone it is fixed, before it was seen rendered FAILS, and so does offering the check as an option ("QA first, or post as is?"). Only when the session has no way to render the UI at all does the report say so instead, and then nothing is called fixed. (N/A for this item: the diff changes no UI.)
+- UI changes were looked at rendered in a browser (the dev server, or the kc-verify plugin's `kc-ui`), because a DOM emulator lays nothing out. A screen that replaces an existing one is compared side by side with it. The check is part of the fix, not a next step: a UI fix reported done, or a reply telling someone it is fixed, before it was seen rendered FAILS, and so does offering the check as an option ("QA first, or post as is?"). Only when the session has no way to render the UI at all does the report say so instead, and then nothing is called fixed. (N/A for this item: the diff changes no UI.)
 - If the diff was committed, pushed, or turned into a PR, the user explicitly used one of those words. "Make the changes" or "implement this" is not permission to commit, push, or open a PR.
 
 N/A: this is a peer review of someone else's diff, not a self-review.
@@ -190,7 +190,7 @@ On a re-review, compare each prior finding against the construct, not the line. 
 
 ## §V6. A defended finding needs evidence, not agreement
 
-When the author replies that a flagged change was deliberate (in the description, a commit message, or a thread reply), intent answers "did they mean it", not "does it work". Surface the reply to the user as Step 1 of the kc-code-review skill requires, and before anything is marked resolved, for observable behavior or layout, cite one of: the change exercised in a running app, a visual check, or a numeric walkthrough (the computed widths, the resulting instants, the rendered values). Resolving on the author's word alone fails this box.
+When the author replies that a flagged change was deliberate, intent answers "did they mean it", not "does it work". Surface the reply to the user as Step 1 of the kc-code-review skill requires, and before anything is marked resolved, for observable behavior or layout, cite one of: the change exercised in a running app, a visual check, or a numeric walkthrough (the computed widths, the resulting instants, the rendered values). Resolving on the author's word alone fails this box.
 
 ## §V7. The scope checks were walked
 
@@ -198,13 +198,13 @@ The orchestrator walks §G1-§G5 in the kc-code-review skill's Step 1 itself, be
 
 ## §V8. Fixes and rewrites are re-checked
 
-Code you verify as a fix is new code. On a re-review, a replacement that resolves the original finding while adding a multi-line ternary, a dead wrapper or a misplaced export is a finding of its own. A rewrite a gate proposes must pass every gate's checklist too. A proposed fix that changes behaviour is checked for bugs as well as style: it lists every state reaching the line with its result before and after (correctness §B15). A behaviour change is also run, since a table is a guess: applied to a scratch copy with a test for the break it fixes, then the suite. Receipt: `<n> fixes re-checked` and `<n> rewrites checked`, each with the gates walked and, for behaviour changes, the states listed and the `ran:` result.
+Code you verify as a fix is new code. On a re-review, a replacement that resolves the original finding while adding a multi-line ternary, a dead wrapper or a misplaced export is a finding of its own, and quoting it approvingly without walking it is a documented miss. Likewise, a rewrite a gate proposes must pass every gate's checklist, not only the box that surfaced the problem. A proposed fix that changes behaviour is checked for bugs as well as style: it lists every state reaching the line with its result before and after (correctness §B15). A table is still the reviewer's guess at the states, so a behaviour change is also run: applied to a scratch copy with a test for the break it fixes, then the suite. Receipt: `<n> fixes re-checked` and `<n> rewrites checked`, each with the gates walked and, for behaviour changes, the states listed and the `ran:` result.
 
 ---
 
 ## §V9. A re-review says where each finding came from
 
-A rename puts every line it touches back in the delta, and an old line in the delta reads as new code. Each finding names its origin, so the author and the user can see which part of a round is new, which is a miss of ours, and which our own suggestions caused: new code, missed earlier, or from our suggestion. Run `bash "${CLAUDE_PLUGIN_ROOT}/scripts/rename-only-lines.sh" "$DIFF_FILE"` on the delta: each line it lists changed only by a rename, keeps its earlier verdict, and is judged only for the rename. Receipt: `<n> rename-only lines kept`, and an origin on every finding.
+A rename puts every line it touches back in the delta, and an old line in the delta reads as new code. A re-review once flagged a variable name round one had passed, only because the rename round one asked for brought that line back. Each finding names its origin, so the author and the user can see which part of a round is new, which is a miss of ours, and which our own suggestions caused: new code, missed earlier, or from our suggestion. Run `bash "${CLAUDE_PLUGIN_ROOT}/scripts/rename-only-lines.sh" "$DIFF_FILE"` on the delta: each line it lists changed only by a rename, keeps its earlier verdict, and is judged only for the rename. Receipt: `<n> rename-only lines kept`, and an origin on every finding.
 
 ## §V10. A public path is walked, not only read
 
