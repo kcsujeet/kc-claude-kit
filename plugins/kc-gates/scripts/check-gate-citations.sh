@@ -19,6 +19,7 @@ shift 2
 head_full=$(git -C "$repo_root" rev-parse --verify --quiet "$head_sha^{commit}") || { echo "$script_name: $head_sha is not a commit in $repo_root" >&2; exit 2; }
 
 problem_count=0
+short_sha_chars=7
 for output_file in "$@"; do
   [ -r "$output_file" ] || { echo "$script_name: cannot read $output_file" >&2; exit 2; }
   while IFS= read -r citation; do
@@ -30,7 +31,7 @@ for output_file in "$@"; do
     problem_text=""
     case "$head_full" in
       "$cited_sha"*) ;;
-      *) problem_text="sha $cited_sha is not the head ${head_full:0:7}: re-read the file at the head and cite that" ;;
+      *) problem_text="sha $cited_sha is not the head ${head_full:0:short_sha_chars}: re-read the file at the head and cite that" ;;
     esac
     if [ -z "$problem_text" ]; then
       line_count=$(git -C "$repo_root" show "$head_full:$cited_path" 2>/dev/null | grep -c '' || true)
