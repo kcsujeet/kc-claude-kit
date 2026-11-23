@@ -55,18 +55,13 @@ expect_eq "an instruction's first call is allowed" allowed "$(run_hook)"
 { write_typed_message "earlier question?"; write_text "ok"; write_typed_message "can you fix the build?"; } > "$transcript"
 expect_eq "text from an earlier turn doesn't count" denied "$(run_hook)"
 
-write_text_and_call() {
-  jq -cn --arg text "$1" --arg id "$2" '{type: "assistant", message: {role: "assistant", content: [{type: "text", text: $text}, {type: "tool_use", id: $id, name: "Bash", input: {command: "ls"}}]}}'
-}
-write_hook_note() { jq -cn '{type: "user", message: {role: "user", content: [{type: "text", text: "<system-reminder>note</system-reminder>"}]}}'; }
-
-{ write_typed_message "why did the build fail?"; write_text_and_call "A missing env var." t2; } > "$transcript"
+{ write_typed_message "why did the build fail?"; jq -cn '{type: "assistant", message: {role: "assistant", content: [{type: "text", text: "A missing env var."}, {type: "tool_use", id: "t2", name: "Bash", input: {command: "ls"}}]}}'; } > "$transcript"
 expect_eq "text in the same message as the call allows it" allowed "$(run_hook t2)"
 
 { write_typed_message "why did the build fail?"; write_text "A missing env var."; write_tool_call t1; write_tool_result; write_tool_call t2; } > "$transcript"
 expect_eq "text, then an earlier call and its result, then this call is allowed" allowed "$(run_hook t2)"
 
-{ write_typed_message "why did the build fail?"; write_text "A missing env var."; write_tool_call t1; write_tool_result; write_hook_note; write_tool_call t2; } > "$transcript"
+{ write_typed_message "why did the build fail?"; write_text "A missing env var."; write_tool_call t1; write_tool_result; jq -cn '{type: "user", message: {role: "user", content: [{type: "text", text: "<system-reminder>note</system-reminder>"}]}}'; write_tool_call t2; } > "$transcript"
 expect_eq "a hook note after the answer does not start a new turn" allowed "$(run_hook t2)"
 
 { write_typed_message "why did the build fail?"; write_text "A missing env var."; write_tool_call t1; write_tool_result; write_typed_message "and the deploy?"; write_tool_call t2; } > "$transcript"

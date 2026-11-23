@@ -18,7 +18,7 @@ repo_root=$2
 shift 2
 head_full=$(git -C "$repo_root" rev-parse --verify --quiet "$head_sha^{commit}") || { echo "$script_name: $head_sha is not a commit in $repo_root" >&2; exit 2; }
 
-problems=0
+problem_count=0
 for output_file in "$@"; do
   [ -r "$output_file" ] || { echo "$script_name: cannot read $output_file" >&2; exit 2; }
   while IFS= read -r citation; do
@@ -27,25 +27,25 @@ for output_file in "$@"; do
     cited_line=${rest%%@*}
     cited_line=${cited_line#L}
     cited_sha=${rest##*@}
-    problem=""
+    problem_text=""
     case "$head_full" in
       "$cited_sha"*) ;;
-      *) problem="sha $cited_sha is not the head ${head_full:0:7}: re-read the file at the head and cite that" ;;
+      *) problem_text="sha $cited_sha is not the head ${head_full:0:7}: re-read the file at the head and cite that" ;;
     esac
-    if [ -z "$problem" ]; then
-      line_count=$(git -C "$repo_root" show "$head_full:$cited_path" 2>/dev/null | wc -l | tr -d ' ') || line_count=0
+    if [ -z "$problem_text" ]; then
+      line_count=$(git -C "$repo_root" show "$head_full:$cited_path" 2>/dev/null | grep -c '' || true)
       if ! git -C "$repo_root" cat-file -e "$head_full:$cited_path" 2>/dev/null; then
-        problem="$cited_path does not exist at the head"
+        problem_text="$cited_path does not exist at the head"
       elif [ "$cited_line" -lt 1 ] || [ "$cited_line" -gt "$line_count" ]; then
-        problem="line $cited_line is not in $cited_path at the head (it has $line_count)"
+        problem_text="line $cited_line is not in $cited_path at the head (it has $line_count)"
       fi
     fi
-    if [ -n "$problem" ]; then
-      printf '%s: %s: %s\n' "$output_file" "$citation" "$problem"
-      problems=$((problems + 1))
+    if [ -n "$problem_text" ]; then
+      printf '%s: %s: %s\n' "$output_file" "$citation" "$problem_text"
+      problem_count=$((problem_count + 1))
     fi
   done <<EOF
 $(grep -Eo '[A-Za-z0-9_./-]+:L?[0-9]+@[0-9a-fA-F]{4,40}' "$output_file" | sort -u)
 EOF
 done
-[ "$problems" -eq 0 ]
+[ "$problem_count" -eq 0 ]

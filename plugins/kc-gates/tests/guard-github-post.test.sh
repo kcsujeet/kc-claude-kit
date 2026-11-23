@@ -380,11 +380,16 @@ check allow "head: a review that only comments is not an approval" "$walk_token 
 export KC_STUB_HEAD=$merged_sha
 
 note_output=$(build_payload "$walk_token gh pr review 12 --approve" | bash "$guard")
-expect_last_reason_of() { case "$2" in *"$3"*) echo "ok   $1"; passes=$((passes + 1)) ;; *) echo "FAIL $1"; echo "     missing: $3"; echo "     in:      $2"; failures=$((failures + 1)) ;; esac; }
-case "$note_output" in *permissionDecision*) record_deny=1 ;; *) record_deny=0 ;; esac
-expect_last_reason_of "head: the merge-only approval is not denied" "$record_deny" "0"
-expect_last_reason_of "head: the merge-only approval prints one line saying so" "$note_output" "touch none of its files"
+last_output=$note_output
+expect_last_reason "head: the merge-only approval prints one line saying so" "touch none of its files"
+case "$note_output" in
+  *permissionDecision*) echo "FAIL head: the merge-only approval is not denied"; failures=$((failures + 1)) ;;
+  *) echo "ok   head: the merge-only approval is not denied"; passes=$((passes + 1)) ;;
+esac
 
+export KC_STUB_HEAD=$moved_sha KC_STUB_FILES=
+check allow "head: a pull request file list gh gives empty means no check" "$walk_token gh pr review 12 --approve"
+export KC_STUB_FILES=$'app/models/order.rb\ndocs/notes.md'
 unset KC_STUB_HEAD
 check allow "head: a head gh can't give means no check" "$walk_token gh pr review 12 --approve"
 export KC_STUB_HEAD=0000000000000000000000000000000000000000

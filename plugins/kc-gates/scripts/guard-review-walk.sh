@@ -73,13 +73,13 @@ problems=$(get_walk_problems)
 [ -n "$problems" ] || exit 0
 walk_steps="Walk each changed behaviour in the running app or at the API, as every audience that can reach it (signed out too for a public path, replaying each write with another record's id and again with the same id), and write one line per walk-item to walk-receipt.tsv beside review.diff: path, what was seen, evidence (a screenshot or recording path, or a request line with its status)."
 if [ "$event" = PreToolUse ]; then
-  reason="Blocked by the kc-gates plugin: the review has items it has not walked, so the verification gate cannot run yet (it audits the walk receipt). $walk_steps Then dispatch it again. $problems"
-  printf '%s' "$reason" | jq -Rsc '{hookSpecificOutput: {hookEventName: "PreToolUse", permissionDecision: "deny", permissionDecisionReason: .}}'
+  block_reason="Blocked by the kc-gates plugin: the review has items it has not walked, so the verification gate cannot run yet (it audits the walk receipt). $walk_steps Then dispatch it again. $problems"
+  printf '%s' "$block_reason" | jq -Rsc '{hookSpecificOutput: {hookEventName: "PreToolUse", permissionDecision: "deny", permissionDecisionReason: .}}'
 elif [ "${stop_kind:-}" = offer ]; then
-  reason="Blocked by the kc-gates plugin: this reply asks whether to walk or try the change in the running app, but the review requires that walk, so it is not a choice to offer. Do it now. $walk_steps $problems"
-  printf '%s' "$reason" | jq -Rsc '{decision: "block", reason: .}'
+  block_reason="Blocked by the kc-gates plugin: this reply asks whether to walk or try the change in the running app, but the review requires that walk, so it is not a choice to offer. Do it now. $walk_steps $problems"
+  printf '%s' "$block_reason" | jq -Rsc '{decision: "block", reason: .}'
 else
-  reason="Blocked by the kc-gates plugin: this reply gives a review verdict, but the review has items it has not walked, so the review is not finished. $walk_steps Then give the verdict. If the walk cannot be run here, reply without a verdict: say the review is not finished, which items are unwalked and what the walk needs. $problems"
-  printf '%s' "$reason" | jq -Rsc '{decision: "block", reason: .}'
+  block_reason="Blocked by the kc-gates plugin: this reply gives a review verdict, but the review has items it has not walked, so the review is not finished. $walk_steps Then give the verdict. If the walk cannot be run here, reply without a verdict: say the review is not finished, which items are unwalked and what the walk needs. $problems"
+  printf '%s' "$block_reason" | jq -Rsc '{decision: "block", reason: .}'
 fi
 exit 0

@@ -352,7 +352,7 @@ find_command_review_dir() {
 # True when the command approves a pull request: `gh pr review --approve` (or -a), or a reviews
 # api write whose event is APPROVE, given as a field or in the --input file.
 is_approval_command() {
-  local segment payload_file
+  local segment payload_file payload_event
   while IFS= read -r segment; do
     is_review_write_segment "$segment" || continue
     if printf '%s' "$segment" | grep -Eq "${GH_COMMAND_START}pr[[:space:]]+review([[:space:]]|$)"; then
@@ -362,8 +362,10 @@ is_approval_command() {
     printf '%s' "$segment" | grep -Eq 'pulls/[0-9]+/reviews([^/0-9]|$)' || continue
     printf '%s' "$segment" | grep -Eq "event[=:][[:space:]\"']*APPROVE" && return 0
     payload_file=$(printf '%s' "$segment" | sed -nE "s/.*--input[[:space:]=]+[\"']?([^[:space:]\"']+).*/\\1/p")
-    [ -n "$payload_file" ] && [ -f "$payload_file" ] && command -v jq >/dev/null 2>&1 \
-      && [ "$(jq -r '.event // empty' "$payload_file" 2>/dev/null)" = APPROVE ] && return 0
+    [ -f "$payload_file" ] || continue
+    command -v jq >/dev/null 2>&1 || continue
+    payload_event=$(jq -r '.event // empty' "$payload_file" 2>/dev/null)
+    [ "$payload_event" = APPROVE ] && return 0
   done <<EOF
 $(split_segments "$1")
 EOF
@@ -371,12 +373,15 @@ EOF
 }
 
 # For an approval of a pull request whose head moved since the review walked it: prints the deny
-# JSON when a file the pull request changes differs between the two heads, or "note: <line>" when
-# only commits touching none of its files came in; nothing when the heads match or can't be read.
+# JSON when a file the pull request changes differs between the two heads, or the one-line note
+# when only commits touching none of its files came in; nothing when the heads match or can't be
+# read.
 get_moved_head_verdict() {
-  local command=$1 review_dir target repo number walked current files changed reason
+  local command=$1 review_dir target repo number walked current_head pr_files changed_files block_reason short_walked short_current changed_text
   local -a gh_target=() paths=()
   local file
+  # The message is shown as a hook message, so the file list is cut to a short length.
+  local short_sha_chars=7 max_changed_chars=400
   is_approval_command "$command" || return 0
   review_dir=$(find_command_review_dir "$command")
   has_review_files "$review_dir" || return 0
@@ -387,21 +392,24 @@ get_moved_head_verdict() {
   number=${target#*|}
   [ -n "$number" ] && gh_target+=("$number")
   [ -n "$repo" ] && gh_target+=(-R "$repo")
-  current=$(gh pr view ${gh_target[@]+"${gh_target[@]}"} --json headRefOid --jq .headRefOid 2>/dev/null) || return 0
-  [ -n "$current" ] && [ "$current" != "$walked" ] || return 0
-  files=$(gh pr view ${gh_target[@]+"${gh_target[@]}"} --json files --jq '.files[].path' 2>/dev/null) || return 0
-  [ -n "$files" ] || return 0
-  git cat-file -e "$walked^{commit}" 2>/dev/null && git cat-file -e "$current^{commit}" 2>/dev/null || return 0
+  current_head=$(gh pr view ${gh_target[@]+"${gh_target[@]}"} --json headRefOid --jq .headRefOid 2>/dev/null) || return 0
+  [ -n "$current_head" ] && [ "$current_head" != "$walked" ] || return 0
+  pr_files=$(gh pr view ${gh_target[@]+"${gh_target[@]}"} --json files --jq '.files[].path' 2>/dev/null) || return 0
+  [ -n "$pr_files" ] || return 0
+  git cat-file -e "$walked^{commit}" 2>/dev/null && git cat-file -e "$current_head^{commit}" 2>/dev/null || return 0
   while IFS= read -r file; do paths+=("$file"); done <<EOF
-$files
+$pr_files
 EOF
-  changed=$(git diff --name-only "$walked" "$current" -- "${paths[@]}" 2>/dev/null) || return 0
-  if [ -z "$changed" ]; then
-    printf 'note: the pull request head moved from %s to %s since the review, by commits that touch none of its files (a merge of the default branch), so the approval stands.' "$(printf '%s' "$walked" | cut -c1-7)" "$(printf '%s' "$current" | cut -c1-7)"
+  changed_files=$(git diff --name-only "$walked" "$current_head" -- "${paths[@]}" 2>/dev/null) || return 0
+  short_walked=$(printf '%s' "$walked" | cut -c1-"$short_sha_chars")
+  short_current=$(printf '%s' "$current_head" | cut -c1-"$short_sha_chars")
+  if [ -z "$changed_files" ]; then
+    printf 'the pull request head moved from %s to %s since the review, by commits that touch none of its files (a merge of the default branch), so the approval stands.' "$short_walked" "$short_current"
     return 0
   fi
-  reason="Blocked by the kc-gates plugin: the pull request head is $(printf '%s' "$current" | cut -c1-7) but the review walked $(printf '%s' "$walked" | cut -c1-7), and these files of the pull request changed in between: $(printf '%s' "$changed" | tr '\n' ' ' | sed 's/["\\]//g' | cut -c1-400). Review the new commits first (gather the review again, then walk and grade them), then approve the head you reviewed."
-  printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"%s"}}' "$reason"
+  changed_text=$(printf '%s' "$changed_files" | tr '\n' ' ' | sed 's/["\\]//g' | cut -c1-"$max_changed_chars")
+  block_reason="Blocked by the kc-gates plugin: the pull request head is $short_current but the review walked $short_walked, and these files of the pull request changed in between: $changed_text. Review the new commits first (gather the review again, then walk and grade them), then approve the head you reviewed."
+  printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"%s"}}' "$block_reason"
 }
 
 # Prints the deny JSON when the saved review has walk-items without a full receipt line; nothing
@@ -463,7 +471,7 @@ main() {
         if [ -n "$verdict_unshown" ]; then
           printf '%s' "$verdict_unshown"
         elif [ -n "$verdict" ]; then
-          printf '{"systemMessage":"%s"}' "${verdict#note: }"
+          printf '{"systemMessage":"%s"}' "$verdict"
         fi
       fi
       exit 0

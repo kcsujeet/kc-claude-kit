@@ -30,16 +30,6 @@ make_repo() {
   git -C "$repo_dir" commit -q -m feature
 }
 
-# Passes when <needle> is absent from <haystack>.
-expect_not_contains() {
-  local label=$1 needle=$2 haystack=$3
-  case "$haystack" in
-    *"$needle"*) record "$label" fail "unexpected: $needle
-in:         $haystack" ;;
-    *) record "$label" ok ;;
-  esac
-}
-
 # --- branch mode, falling back to main ---------------------------------------
 repo="$work_dir/repo-main"
 make_repo "$repo" main
@@ -270,6 +260,27 @@ expect_eq "merge: the delta holds only the pull request's own files" "c.txt" "$(
 expect_not_contains "merge: the base's file is not in the saved diff" "unrelated.txt" "$(cat "$work_dir/out-merge/review.diff")"
 expect_contains "merge: the pull request's own change is in the saved diff" "+mine too" "$(cat "$work_dir/out-merge/review.diff")"
 expect_contains "merge: meta.env says how many files were dropped" "MERGES_EXCLUDED=1" "$merge_output"
+# The base can't be found in the clone: the delta stays whole, with no count.
+nobase_fixtures="$work_dir/fixtures-nobase"
+cp -R "$merge_fixtures" "$nobase_fixtures"
+jq '.baseRefName = "no-such-base"' "$merge_fixtures/pr-view.json" > "$nobase_fixtures/pr-view.json"
+use_gh_fixtures "$nobase_fixtures"
+nobase_output=$(cd "$merge_repo" && bash "$gather" 12 --since "$reviewed_sha" --out-dir "$work_dir/out-nobase")
+expect_contains "merge: with no base in the clone the delta keeps the base's file" "unrelated.txt" "$(cat "$work_dir/out-nobase/changed-files.txt")"
+expect_not_contains "merge: with no base in the clone there is no MERGES_EXCLUDED" "MERGES_EXCLUDED" "$nobase_output"
+# A delta that is only the base's work: nothing of the pull request's own is left.
+git -C "$merge_repo" checkout -q -b only-merge "$reviewed_sha"
+git -C "$merge_repo" merge -q --no-edit main
+only_merge_head=$(git -C "$merge_repo" rev-parse HEAD)
+only_fixtures="$work_dir/fixtures-only-merge"
+cp -R "$merge_fixtures" "$only_fixtures"
+jq --arg sha "$only_merge_head" '.headRefOid = $sha | .files = [{path: "b.txt"}]' "$merge_fixtures/pr-view.json" > "$only_fixtures/pr-view.json"
+use_gh_fixtures "$only_fixtures"
+only_output=$(cd "$merge_repo" && bash "$gather" 12 --since "$reviewed_sha" --out-dir "$work_dir/out-only-merge")
+expect_eq "merge: a delta of only the base's work leaves no files" "" "$(cat "$work_dir/out-only-merge/changed-files.txt")"
+expect_eq "merge: a delta of only the base's work leaves an empty diff" "" "$(cat "$work_dir/out-only-merge/review.diff")"
+expect_contains "merge: a delta of only the base's work counts what it dropped" "MERGES_EXCLUDED=1" "$only_output"
+use_gh_fixtures "$merge_fixtures"
 no_merge_output=$(cd "$repo" && bash "$gather" 12 --since "$base_sha" --out-dir "$work_dir/out-no-merge")
 expect_not_contains "merge: a delta with no merge has no MERGES_EXCLUDED" "MERGES_EXCLUDED" "$no_merge_output"
 
