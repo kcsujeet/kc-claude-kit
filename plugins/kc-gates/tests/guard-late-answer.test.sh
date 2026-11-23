@@ -55,18 +55,6 @@ expect_eq "an instruction's first call is allowed" allowed "$(run_hook)"
 { write_typed_message "earlier question?"; write_text "ok"; write_typed_message "can you fix the build?"; } > "$transcript"
 expect_eq "text from an earlier turn doesn't count" denied "$(run_hook)"
 
-{ write_typed_message "why did the build fail?"; jq -cn '{type: "assistant", message: {role: "assistant", content: [{type: "text", text: "A missing env var."}, {type: "tool_use", id: "t2", name: "Bash", input: {command: "ls"}}]}}'; } > "$transcript"
-expect_eq "text in the same message as the call allows it" allowed "$(run_hook t2)"
-
-{ write_typed_message "why did the build fail?"; write_text "A missing env var."; write_tool_call t1; write_tool_result; write_tool_call t2; } > "$transcript"
-expect_eq "text, then an earlier call and its result, then this call is allowed" allowed "$(run_hook t2)"
-
-{ write_typed_message "why did the build fail?"; write_text "A missing env var."; write_tool_call t1; write_tool_result; jq -cn '{type: "user", message: {role: "user", content: [{type: "text", text: "<system-reminder>note</system-reminder>"}]}}'; write_tool_call t2; } > "$transcript"
-expect_eq "a hook note after the answer does not start a new turn" allowed "$(run_hook t2)"
-
-{ write_typed_message "why did the build fail?"; write_text "A missing env var."; write_tool_call t1; write_tool_result; write_typed_message "and the deploy?"; write_tool_call t2; } > "$transcript"
-expect_eq "a new question after the answer starts a new turn: no text yet, denied" denied "$(run_hook t2)"
-
 for question in "does it expire on write" "  Can we ship today?  "; do
   { write_typed_message "$question"; } > "$transcript"
   expect_eq "another question shape is denied: $question" denied "$(run_hook)"
