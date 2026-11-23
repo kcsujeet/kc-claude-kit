@@ -91,6 +91,10 @@ expect_eq "§PC4: a head the repo doesn't know skips the age check" clean "$unkn
 # --- a draft is read by a person, and every claim in it was run (kc-post-review §PC5) -----------
 draft "$work_dir/hard-word.json" $'**suggestion**:\nThe discount is ungated, so every caller sees it.'
 expect_contains "§PC5: a hard word is flagged" 'uses the hard word "ungated"' "$(result "$work_dir/hard-word.json")"
+for flow_word in "rerender" "re-render" "refetch" "fallbacks" "mid-edit" "early return" "short-circuits" "bails out"; do
+  draft "$work_dir/flow-word.json" $'**suggestion**:\nThe total can '"$flow_word"$' when the cart changes.'
+  expect_contains "§PC5: the code-flow word \"$flow_word\" is flagged" 'uses the hard word' "$(result "$work_dir/flow-word.json")"
+done
 draft "$work_dir/plain.json" $'**suggestion**:\nThe discount shows to everyone, guests included.'
 expect_eq "§PC5: the same point in everyday words is clean" clean "$(result "$work_dir/plain.json")"
 draft "$work_dir/test-ask.json" $'**todo**:\nA test that empties the cart would catch the old total.' '{}'

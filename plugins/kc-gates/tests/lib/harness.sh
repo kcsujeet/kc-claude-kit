@@ -39,6 +39,16 @@ expect_file() {
   fi
 }
 
+# Passes when <needle> is absent from <haystack>.
+expect_not_contains() {
+  local label=$1 needle=$2 haystack=$3
+  case "$haystack" in
+    *"$needle"*) record "$label" fail "unexpected: $needle
+in:         $haystack" ;;
+    *) record "$label" ok ;;
+  esac
+}
+
 expect_contains() {
   local label=$1 needle=$2 haystack=$3
   case "$haystack" in

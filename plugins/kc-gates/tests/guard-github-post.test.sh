@@ -220,6 +220,20 @@ git init -q "$walk_repo"
 git -C "$walk_repo" remote add origin https://github.com/acme/widgets.git
 export TMPDIR=$walk_tmp
 cd "$walk_repo"
+# A stub gh that answers nothing by default (the head check then has nothing to compare), and
+# gives the pull request's head and files from KC_STUB_HEAD and KC_STUB_FILES when they are set.
+stub_bin=$(mktemp -d)
+cat > "$stub_bin/gh" <<'STUB'
+#!/usr/bin/env bash
+[ -n "${KC_STUB_HEAD:-}" ] || exit 1
+case "$*" in
+  *headRefOid*) printf '%s\n' "$KC_STUB_HEAD" ;;
+  *files*) printf '%s\n' "$KC_STUB_FILES" ;;
+  *) exit 1 ;;
+esac
+STUB
+chmod +x "$stub_bin/gh"
+export PATH="$stub_bin:$PATH"
 walk_token=KC_REVIEW_POST_APPROVED=1
 review_folder=$walk_tmp/kc-review-abc123
 # Saves a review the way gather-review.sh does: write_review <changed path> [<folder> <pr> <repo>].
@@ -324,9 +338,67 @@ if [ "$(id -u)" -ne 0 ]; then
 fi
 rm -rf "$review_folder"
 check allow "walk: no saved review folder means no check" "$walk_token gh pr review 12 --approve"
+# --- an approval is of the head the review walked ------------------------------------------------
+# A head that moved only by commits touching none of the pull request's files (the default branch
+# merged in) still stands; a head that moved in a file of the pull request does not.
+git -C "$walk_repo" config user.email test@example.com
+git -C "$walk_repo" config user.name Test
+mkdir -p "$walk_repo/app/models"
+printf 'one\n' > "$walk_repo/app/models/order.rb"
+git -C "$walk_repo" add -A && git -C "$walk_repo" commit -q -m walked
+walked_sha=$(git -C "$walk_repo" rev-parse HEAD)
+printf 'unrelated\n' > "$walk_repo/README.md"
+git -C "$walk_repo" add -A && git -C "$walk_repo" commit -q -m "merge of the default branch"
+merged_sha=$(git -C "$walk_repo" rev-parse HEAD)
+printf 'two\n' > "$walk_repo/app/models/order.rb"
+git -C "$walk_repo" add -A && git -C "$walk_repo" commit -q -m "more work on the order"
+moved_sha=$(git -C "$walk_repo" rev-parse HEAD)
+rm -rf "$walk_tmp"/kc-review-*
+write_review docs/notes.md
+printf 'HEAD_SHA=%s\nPR=12\nURL=https://github.com/acme/widgets/pull/12\n' "$walked_sha" > "$review_folder/meta.env"
+export KC_STUB_FILES=$'app/models/order.rb\ndocs/notes.md'
+approve_forms=(
+  "gh pr review 12 --approve"
+  "gh pr review --approve 12"
+  "gh api repos/acme/widgets/pulls/12/reviews -X POST -f event=APPROVE"
+)
+
+export KC_STUB_HEAD=$walked_sha
+for form in "${approve_forms[@]}"; do
+  check allow "head: the head the review walked allows: $form" "$walk_token $form"
+done
+
+export KC_STUB_HEAD=$moved_sha
+for form in "${approve_forms[@]}"; do
+  check deny "head: a new commit in a file of the pull request denies: $form" "$walk_token $form"
+  expect_last_reason "head: the denial for '$form' names the file" "app/models/order.rb"
+  expect_last_reason "head: the denial for '$form' says to review the new commits first" "Review the new commits first"
+done
+check allow "head: a comment is not an approval, whatever the head" "$walk_token gh pr comment 12 --body hi"
+check allow "head: a review that only comments is not an approval" "$walk_token gh pr review 12 --comment --body hi"
+
+export KC_STUB_HEAD=$merged_sha
+
+note_output=$(build_payload "$walk_token gh pr review 12 --approve" | bash "$guard")
+last_output=$note_output
+expect_last_reason "head: the merge-only approval prints one line saying so" "touch none of its files"
+case "$note_output" in
+  *permissionDecision*) echo "FAIL head: the merge-only approval is not denied"; failures=$((failures + 1)) ;;
+  *) echo "ok   head: the merge-only approval is not denied"; passes=$((passes + 1)) ;;
+esac
+
+export KC_STUB_HEAD=$moved_sha KC_STUB_FILES=
+check allow "head: a pull request file list gh gives empty means no check" "$walk_token gh pr review 12 --approve"
+export KC_STUB_FILES=$'app/models/order.rb\ndocs/notes.md'
+unset KC_STUB_HEAD
+check allow "head: a head gh can't give means no check" "$walk_token gh pr review 12 --approve"
+export KC_STUB_HEAD=0000000000000000000000000000000000000000
+check allow "head: a head this clone doesn't have means no check" "$walk_token gh pr review 12 --approve"
+unset KC_STUB_HEAD KC_STUB_FILES
+
 cd "$tests_dir"
 TMPDIR=$base_tmp
-rm -rf "$walk_tmp" "$walk_repo"
+rm -rf "$walk_tmp" "$walk_repo" "$stub_bin"
 
 echo "$passes passed, $failures failed"
 [ "$failures" -eq 0 ]

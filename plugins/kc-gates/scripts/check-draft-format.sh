@@ -31,8 +31,8 @@
 #   - when it is an `issue` or a `suggestion`, carry a "ran" record: a change asked for in a
 #     review is code the author writes on the reviewer's word, so it is run before it is asked
 #     for, not only read (kc-post-review's "Verified before suggested"). An "n/a" needs a reason;
-#   - use none of a short list of hard words (gated, callers, derive, invariant, predicate and the
-#     like): a comment is read by a person, so it says the thing in everyday words;
+#   - use none of a short list of hard words (gated, callers, derive, invariant, predicate, and the
+#     code-flow words rerender, refetch, fallback, mid-edit, early return, short-circuit, bail out): a comment is read by a person, so it says the thing in everyday words;
 #   - when it asks for a test, carry a "ran" that says the test failed with the bug put back: a
 #     suggested test that still passes with the bug in place guards nothing;
 #   - when it says something about query counts (an N+1, extra or per-record queries), carry a
@@ -124,7 +124,7 @@ perl -MJSON::PP -CS -e '
     }
     my $ran_record = ref $draft->{ran} ? "" : ($draft->{ran} // "");
     # Words a reader has to stop and decode; each has an everyday way to say it.
-    my $hard_words = qr/\b(gated|ungated|callers?|derived?|derives|semantics|invariants?|predicates?|passthrough|upstream|downstream|idempotent|coerced?|coerces|hydrated?|truthy|falsy|mutates?|memoi[sz]ed?)\b/i;
+    my $hard_words = qr/\b(gated|ungated|callers?|derived?|derives|semantics|invariants?|predicates?|passthrough|upstream|downstream|idempotent|coerced?|coerces|hydrated?|truthy|falsy|mutates?|memoi[sz]ed?|re-?render(s|ed|ing)?|re-?fetch(es|ed|ing)?|fall-?backs?|mid-edit|early returns?|short-circuit(s|ed)?|bail(s|ed)? out)\b/i;
     if ($prose =~ $hard_words) {
       push @found, "uses the hard word \"$1\"; say it in everyday words (who sees what, what happens)";
     }
