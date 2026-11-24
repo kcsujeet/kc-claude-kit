@@ -256,6 +256,39 @@ printf -- '--- a/x\n+++ b/x\n@@ -0,0 +1 @@\n+  placed_at: Time.current\n' >> "$w
 expect_eq "mixed: react, rails and datetime all run, in table order" \
   "GATES=naming,clarity,structure,simplicity,datetime,react,rails,testing,correctness" "$(gates_for "$work_dir/mixed")"
 
+# --- --combined (opt-in) -----------------------------------------------------
+combined_output() {
+  bash "$select_gates" --combined "$1/review.diff" "$1/changed-files.txt" "$1/repo"
+}
+plain_ruby=$(select_gates_output "$work_dir/ruby")
+expect_not_contains "default output has no COMBINED line" "COMBINED" "$plain_ruby"
+combined_ruby=$(combined_output "$work_dir/ruby")
+expect_contains "combined: a small diff says yes" "COMBINED=yes" "$combined_ruby"
+expect_contains "combined: the verification gate still follows" "then kc-gates:verification-gate as usual" "$combined_ruby"
+expect_contains "combined: topics are the listed gates" \
+  "COMBINED_TOPICS=naming,clarity,structure,simplicity,rails,testing,correctness" "$combined_ruby"
+expect_eq "combined: the flag leaves every other line as it was" \
+  "$plain_ruby" "$(printf '%s\n' "$combined_ruby" | grep -vE '^(COMBINED|combined:)')"
+expect_eq "combined: the flag works after the positionals too" \
+  "$combined_ruby" "$(bash "$select_gates" "$work_dir/ruby/review.diff" "$work_dir/ruby/changed-files.txt" "$work_dir/ruby/repo" --combined)"
+
+# A diff over the file limit is not small: one agent per gate, as without the flag.
+big_paths=()
+for n in 1 2 3 4 5 6; do big_paths+=("src/big$n.ts"); done
+make_case "$work_dir/big" 'export const a = 1' "${big_paths[@]}"
+big_output=$(combined_output "$work_dir/big")
+expect_contains "combined: a diff over the size limit says no" "COMBINED=no" "$big_output"
+expect_not_contains "combined: no topics for a full-size diff" "COMBINED_TOPICS" "$big_output"
+
+# project-conventions keeps its own agent.
+mkdir -p "$work_dir/ruby/repo/.claude"
+printf '# rules\n' > "$work_dir/ruby/repo/.claude/review-conventions.md"
+conv_output=$(combined_output "$work_dir/ruby")
+expect_contains "combined: project-conventions is not folded in" \
+  "COMBINED_TOPICS=naming,clarity,structure,simplicity,rails,testing,correctness" "$conv_output"
+expect_contains "combined: project-conventions still in GATES" "project-conventions" "$(printf '%s\n' "$conv_output" | sed -n 1p)"
+rm -rf "$work_dir/ruby/repo/.claude"
+
 # --- usage errors -------------------------------------------------------------
 check_status() {
   local label=$1 expected=$2 status
@@ -269,5 +302,6 @@ check_status() {
 check_status "usage: no arguments exits 2" 2
 check_status "usage: a missing diff exits 2" 2 "$work_dir/none.diff" "$work_dir/ruby/changed-files.txt"
 check_status "usage: a missing file list exits 2" 2 "$work_dir/ruby/review.diff" "$work_dir/none.txt"
+check_status "usage: an unknown flag exits 2" 2 --nope "$work_dir/ruby/review.diff" "$work_dir/ruby/changed-files.txt"
 
 finish

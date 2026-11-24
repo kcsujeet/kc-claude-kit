@@ -3,7 +3,7 @@
 # changed files and added lines, so no gate runs on a diff it has nothing to
 # grade (a React gate on a Ruby-only change) and none is left out by judgment.
 #
-# Usage: select-gates.sh <diff-file> <changed-files> [<repo-root>]
+# Usage: select-gates.sh [--combined] <diff-file> <changed-files> [<repo-root>]
 #
 #   <diff-file>      The unified diff (gather-review.sh's review.diff).
 #   <changed-files>  One path per line (gather-review.sh's changed-files.txt).
@@ -25,6 +25,12 @@
 # `walk-item: <path>` line per changed non-test source file follows, so a receipt can be counted
 # against them.
 #
+# Opt-in, off by default: with `--combined` the output also ends with `COMBINED=yes` or
+# `COMBINED=no` and a `combined:` line. `yes` (pass-size.sh says SIZE=small) adds
+# `COMBINED_TOPICS=<topic>,...`, the listed gates one `kc-gates:combined-gate` agent walks in
+# place of one agent each (project-conventions keeps its own agent). `GATES=` and every other line
+# are the same with or without the flag.
+#
 # Exits 0 on success, 2 on a usage error or a missing input file.
 set -euo pipefail
 
@@ -33,10 +39,19 @@ usage() {
   echo "usage: $script_name <diff-file> <changed-files> [<repo-root>]" >&2
   exit 2
 }
-[ "$#" -ge 2 ] && [ "$#" -le 3 ] || usage
-diff_file=$1
-changed_files=$2
-repo_root=${3:-.}
+combined=false
+positional=()
+for arg in "$@"; do
+  case "$arg" in
+    --combined) combined=true ;;
+    -*) usage ;;
+    *) positional+=("$arg") ;;
+  esac
+done
+[ "${#positional[@]}" -ge 2 ] && [ "${#positional[@]}" -le 3 ] || usage
+diff_file=${positional[0]}
+changed_files=${positional[1]}
+repo_root=${positional[2]:-.}
 [ -f "$diff_file" ] || { echo "$script_name: no such diff: $diff_file" >&2; exit 2; }
 [ -f "$changed_files" ] || { echo "$script_name: no such file list: $changed_files" >&2; exit 2; }
 
@@ -203,4 +218,20 @@ else
 fi
 if [ -n "$walk_items" ]; then
   printf '%s\n' "$walk_items" | sed 's/^/walk-item: /'
+fi
+
+if $combined; then
+  size=$(bash "$plugin_root/scripts/pass-size.sh" "$diff_file" "$changed_files" "$repo_root" | sed -n 's/^SIZE=//p')
+  topics=()
+  for selected in "${selected_gates[@]}"; do
+    [ "$selected" = project-conventions ] || topics+=("$selected")
+  done
+  if [ "$size" = small ]; then
+    echo "COMBINED=yes"
+    echo "combined: SIZE=small, dispatch one kc-gates:combined-gate for these ${#topics[@]} topics (project-conventions, if listed, keeps its own agent), then kc-gates:verification-gate as usual"
+    printf 'COMBINED_TOPICS=%s\n' "$(IFS=,; printf '%s' "${topics[*]}")"
+  else
+    echo "COMBINED=no"
+    echo "combined: SIZE=${size:-unknown}, one agent per gate as usual"
+  fi
 fi

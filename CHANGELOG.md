@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added (an opt-in combined gate for small diffs, experiment)
+
+- `kc-gates` 3.17.0 (a minor: a new agent): `combined-gate` walks several topics' checklists in one agent, one block per topic in the per-gate shape, for a diff `pass-size.sh` calls small. Off by default: `select-gates.sh --combined` adds `COMBINED=yes|no` and `COMBINED_TOPICS=`, and `kc-code-review` uses it only when the user asks. `GATES=` and the default output are unchanged. New `combined-*` eval cases replay six small gate fixtures through it, and `scripts/compare-gate-arms.sh` and `scripts/gate-recall.sh` compare recall, boxes graded and tokens with the per-gate review. Held by `tests/select-gates.test.sh`, `scripts/tests/compare-gate-arms.test.sh`, `scripts/tests/gate-recall.test.sh` and the eval cases.
+
 ### Changed (approve only the reviewed head, never offer a required walk, and four review-tool fixes)
 
 - `kc-gates` 3.16.1: `guard-github-post.sh` denies an approval when the pull request's head moved since the review walked it and a file the pull request changes differs between the two heads (it names the files); a move by commits touching none of its files (the default branch merged in) is allowed with a one-line note. `guard-review-walk.sh` also blocks a reply that asks whether to walk, QA or try the change in the running app while the walk is owed. `check-draft-format.sh` adds code-flow hard words (rerender, refetch, fallback, mid-edit, early return, short-circuit, bail out). `gather-review.sh` cuts a re-review delta that holds merges of the base to the pull request's own files and writes `MERGES_EXCLUDED=<n>`. New `check-gate-citations.sh` (verification box §V12) checks every `path:line@sha` citation against the head. `guard-late-answer.sh` already allowed a call after a text answer in the same turn (held by `tests/guard-late-answer.test.sh`, "text before the call allows it"), so it is unchanged. Held by the matching tests.

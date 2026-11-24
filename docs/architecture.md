@@ -77,7 +77,7 @@ Convention topics, each a skill at `plugins/kc-conventions/skills/kc-<topic>/SKI
 | performance | no (rules only) | |
 | dependencies | no (rules only) | |
 
-Two gate agents own no topic skill: `kc-gates:project-conventions-gate` (reads the target repo's `.claude/review-conventions.md`) and `kc-gates:verification-gate` (audits the other gates' receipts, dispatched second).
+Two gate agents own no topic skill: `kc-gates:project-conventions-gate` (reads the target repo's `.claude/review-conventions.md`) and `kc-gates:verification-gate` (audits the other gates' receipts, dispatched second). A third, `kc-gates:combined-gate`, is an opt-in experiment for diffs `pass-size.sh` calls small: it loads each listed topic's skill itself and walks them in one agent, returning one block per topic; `scripts/compare-gate-arms.sh` compares its recall and cost with the per-gate review on the `combined-*` eval cases.
 
 Autopilot agents, at `plugins/kc-autopilot/agents/<role>.md`, dispatched by `workflows/deliver.js` as `agentType: 'kc-autopilot:<role>'`:
 

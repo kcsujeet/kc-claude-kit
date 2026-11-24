@@ -91,6 +91,12 @@ jobs:
       - name: Budget change check tests
         run: bash scripts/tests/check-budget-change.test.sh
 
+      - name: Gate-arm comparison tests
+        run: bash scripts/tests/compare-gate-arms.test.sh
+
+      - name: Gate recall script tests
+        run: bash scripts/tests/gate-recall.test.sh
+
       - name: Every plugin script has a test
         run: bash scripts/check-test-coverage.sh
 

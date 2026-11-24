@@ -1,0 +1,6 @@
+schema_version: "1.1"
+name: combined-clean-diff
+description: The clean-diff fixture (setup and graders linked from that case) reviewed with the opt-in combined gate instead of one agent per gate; it must still pass every grader the per-gate review passes. An experiment, compared with the per-gate arm by scripts/compare-gate-arms.sh.
+tags: [review, combined, negative]
+context:
+  scaffold_script: setup.sh
