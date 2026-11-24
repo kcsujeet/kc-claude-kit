@@ -14,7 +14,8 @@
 #       non-empty line of an --extra file (review comments, QA rows, one per line) is one item,
 #       its source the file's name. Listing only: nothing is judged here.
 #
-#   feedback-ledger.sh check <list> <ledger> [--diff <file>]... [--rules <dir>]... [--repo <dir> --base <ref>]
+#   feedback-ledger.sh check <list> <ledger> [--diff <file>]... [--public-diff <file>]... [--terms <file>]
+#                            [--rules <dir>]... [--repo <dir> --base <ref>]
 #       Fails unless the ledger gives every listed item one verdict, as a tab-separated line:
 #         <id> lesson <rule id>[,<rule id>]...       a --diff (the lesson PR) adds a line that
 #                                                     defines each id; a rule file with no ids (a
@@ -47,6 +48,24 @@
 #       HEAD, or one that still passes with the change reverted, holds nothing. The test is run
 #       as `bash <file> [<case>]` from the checkout's root; the case, when given, is its first
 #       argument. Without --repo a lesson is held when the diff changes any check file.
+#       Every lesson record (a `lesson` line, and a `covered` line whose catch is `lesson:...`)
+#       also states what it is a lesson of, as tab-separated tagged fields after the fields
+#       above, in any order (each missing or empty one is its own problem):
+#         class:<one sentence naming the class of mistake>
+#         examples:<a>; <b>[; <c>]       two or more unlike cases the rule catches, split on "; "
+#         mechanism:<check|guard|path-rule|skill|always-on>
+#                                        the layer the lesson sits at, as kc-look-back's "Placing
+#                                        a lesson by layer" ladder names them
+#         why-not-higher:<why no higher layer holds it>
+#                                        required unless the mechanism is check, the top layer
+#         proof:<test file, eval, script or box id>
+#                                        what fails without the lesson
+#       A --public-diff is a lesson diff like --diff (it counts for rule ids and check files)
+#       whose added lines must also name no client term: a word of --terms <file> (default
+#       ${KC_CLIENT_TERMS:-$HOME/.claude/kc-client-terms.txt}), one term per line, blank and #
+#       lines ignored, matched case-insensitively as whole words. Each hit is reported as
+#       "<diff file>: line N names client term". With no terms file the check is skipped. The
+#       terms are private: a --diff (a lesson diff for a private repo) is never checked for them.
 #       A rule id is written as the rules write it (`§B13`, `B13`, `WF14`). A line defines it when
 #       it starts with it, after any list marker, checkbox or heading marks (`- [ ] §B13 ...`,
 #       `### §B13. ...`, `- **B13.** ...`); a line that only cites it does not. --rules defaults
@@ -131,12 +150,14 @@ readonly RULE_FILE_PATH='(^|/)(rules|\.claude)/|(^|/)(CLAUDE|AGENTS|SKILL)\.md$'
 run_check() {
   # shellcheck source=lib/risk-paths.sh
   . "$(dirname "$0")/lib/risk-paths.sh"
-  local feedback_list=${1:-} ledger=${2:-} diffs=() rules_dirs=() repo_dir="" base_ref=""
+  local feedback_list=${1:-} ledger=${2:-} diffs=() public_diffs=() rules_dirs=() repo_dir="" base_ref="" terms_file=""
   [ -n "$feedback_list" ] && [ -n "$ledger" ] || usage
   shift 2
   while [ "$#" -gt 0 ]; do
     case "$1" in
       --diff) [ "$#" -ge 2 ] || usage; diffs+=("$2"); shift 2 ;;
+      --public-diff) [ "$#" -ge 2 ] || usage; diffs+=("$2"); public_diffs+=("$2"); shift 2 ;;
+      --terms) [ "$#" -ge 2 ] || usage; terms_file=$2; shift 2 ;;
       --rules) [ "$#" -ge 2 ] || usage; rules_dirs+=("$2"); shift 2 ;;
       --repo) [ "$#" -ge 2 ] || usage; repo_dir=$2; shift 2 ;;
       --base) [ "$#" -ge 2 ] || usage; base_ref=$2; shift 2 ;;
@@ -150,6 +171,7 @@ run_check() {
   if [ -n "$repo_dir" ] && [ -n "$base_ref" ]; then both_options_given=true; fi
   "$neither_option_given" || "$both_options_given" || usage
   local input_path
+  [ -z "$terms_file" ] || [ -r "$terms_file" ] || { echo "$script_name: cannot read $terms_file" >&2; exit 2; }
   for input_path in "$feedback_list" "$ledger" ${diffs[@]+"${diffs[@]}"}; do
     [ -r "$input_path" ] || { echo "$script_name: cannot read $input_path" >&2; exit 2; }
   done
@@ -178,6 +200,7 @@ run_check() {
     has_check_file=true
   fi
 
+  local lesson_line_tags_from=4 covered_line_tags_from=6
   local problems=0 ledger_line item_id verdict verdict_detail why_missed what_catches_it seen=" "
   record_problem() { echo "$1"; problems=$((problems + 1)); }
   # Each rule a lesson names is added by the lesson diff: an id it defines, or a file it changes.
@@ -223,6 +246,55 @@ run_check() {
       record_problem "$item: held-by $test_file passes at HEAD and still passes with the lesson's non-test changes reverted, so it does not block the mistake: make it fail without the change"
     fi
   }
+  # Each tagged field of a lesson line, from field number $2 on, as `name:value`.
+  get_lesson_field() {
+    local field_text
+    field_text=$(printf '%s' "$ledger_line" | awk -F'\t' -v from="$2" -v tag="$1:" \
+      'NR == 1 { for (i = from; i <= NF; i++) if (index($i, tag) == 1) found = substr($i, length(tag) + 1) } END { print found }')
+    field_text=${field_text#"${field_text%%[![:space:]]*}"}
+    printf '%s' "${field_text%"${field_text##*[![:space:]]}"}"
+  }
+  # A lesson record names its class, two unlike examples, the layer it sits at, why no higher
+  # layer holds it, and its proof. $1 is the item, $2 the number of the first tagged field.
+  check_lesson_record() {
+    local item=$1 from=$2 tag field_text rest example example_count=0 empty_example=false min_lesson_examples=2
+    local is_why_not_higher_tag mechanism_is_check is_optional_why_not_higher
+    for tag in class examples mechanism why-not-higher proof; do
+      field_text=$(get_lesson_field "$tag" "$from")
+      if [ -n "$field_text" ]; then continue; fi
+      is_why_not_higher_tag=false
+      mechanism_is_check=false
+      is_optional_why_not_higher=false
+      [ "$tag" = why-not-higher ] && is_why_not_higher_tag=true
+      [ "$(get_lesson_field mechanism "$from")" = check ] && mechanism_is_check=true
+      if "$is_why_not_higher_tag" && "$mechanism_is_check"; then is_optional_why_not_higher=true; fi
+      if printf '%s' "$ledger_line" | tr '\t' '\n' | tail -n +"$from" | grep -q "^$tag:"; then
+        record_problem "$item: lesson $tag: is empty"
+      elif ! "$is_optional_why_not_higher"; then
+        record_problem "$item: lesson is missing $tag:"
+      fi
+    done
+    field_text=$(get_lesson_field examples "$from")
+    if [ -n "$field_text" ]; then
+      rest=$field_text
+      while :; do
+        example=${rest%%; *}
+        example_count=$((example_count + 1))
+        [ -n "${example//[[:space:]]/}" ] || empty_example=true
+        case "$rest" in *"; "*) rest=${rest#*; } ;; *) break ;; esac
+      done
+      if [ "$empty_example" = true ]; then
+        record_problem "$item: lesson examples: has an empty example"
+      elif [ "$example_count" -lt "$min_lesson_examples" ]; then
+        record_problem "$item: lesson examples: has one example; a lesson needs $min_lesson_examples unlike cases, separated by \"; \""
+      fi
+    fi
+    field_text=$(get_lesson_field mechanism "$from")
+    case "$field_text" in
+      "" | check | guard | path-rule | skill | always-on) ;;
+      *) record_problem "$item: lesson mechanism:$field_text is not one of check, guard, path-rule, skill, always-on" ;;
+    esac
+  }
   # A lesson is held by a check in the diff; a ledger field cannot stand in for one.
   check_lesson_is_held() {
     if [ -n "$repo_dir" ]; then
@@ -238,6 +310,26 @@ run_check() {
     [ "$has_check_file" = true ] && return 0
     record_problem "$1: lesson is prose with no check: the lesson diff adds or changes no script, hook, test, eval, CI workflow or lint-rule file"
   }
+  # No client term in the added lines of a --public-diff (private terms, one per line; no file, no check).
+  check_client_terms() {
+    local public_diff term added_text added_numbers hit
+    [ "${#public_diffs[@]}" -gt 0 ] || return 0
+    [ -n "$terms_file" ] || terms_file=${KC_CLIENT_TERMS:-$HOME/.claude/kc-client-terms.txt}
+    [ -r "$terms_file" ] || return 0
+    for public_diff in "${public_diffs[@]}"; do
+      added_text=$scratch_dir/public-text
+      added_numbers=$scratch_dir/public-numbers
+      awk '/^\+\+\+ / { next } /^\+/ { print substr($0, 2) }' "$public_diff" > "$added_text"
+      awk '/^\+\+\+ / { next } /^\+/ { print NR }' "$public_diff" > "$added_numbers"
+      while IFS= read -r term || [ -n "$term" ]; do
+        term=${term%$'\r'}
+        case "$term" in "" | "#"*) continue ;; esac
+        while IFS=: read -r hit _; do
+          record_problem "$public_diff: line $(sed -n "${hit}p" "$added_numbers") names client term \"$term\""
+        done < <(grep -n -i -w -F -e "$term" "$added_text" || true)
+      done < "$terms_file"
+    done
+  }
   while IFS= read -r ledger_line || [ -n "$ledger_line" ]; do
     [ -n "$ledger_line" ] || continue
     # A separator that is not whitespace, so `read` keeps an empty field instead of skipping it.
@@ -249,6 +341,7 @@ run_check() {
       lesson)
         [ -n "$verdict_detail" ] || { record_problem "$item_id: lesson names no rule id"; continue; }
         check_lesson_rules "$item_id" "$verdict_detail"
+        check_lesson_record "$item_id" "$lesson_line_tags_from"
         check_lesson_is_held "$item_id" ;;
       covered)
         [ -n "$verdict_detail" ] || { record_problem "$item_id: covered names no rule id"; continue; }
@@ -262,6 +355,7 @@ run_check() {
         case "$what_catches_it" in
           lesson:?*)
             check_lesson_rules "$item_id" "${what_catches_it#lesson:}"
+            check_lesson_record "$item_id" "$covered_line_tags_from"
             check_lesson_is_held "$item_id" ;;
           no-change:?*) ;;
           *) record_problem "$item_id: covered by $verdict_detail says nothing on what catches the miss now (lesson:<rule id> or no-change:<why>)" ;;
@@ -272,6 +366,7 @@ run_check() {
     esac
   done < "$ledger"
 
+  check_client_terms
   local listed_id
   while IFS=$'\t' read -r listed_id _; do
     [ -n "$listed_id" ] || continue

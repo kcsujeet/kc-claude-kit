@@ -15,3 +15,6 @@ Slow is a bug, not a tuning opportunity for later.
 - A new query pattern ships with its index in the same change.
 - Do a deliberate pass at the end of any feature that reads data, and say what you measured rather than that you looked.
 - On the client: keep work off the main thread beyond rendering, virtualize long lists, and size images before they render.
+- Data that crosses a boundary (a job's arguments, a cache entry, a log line, an event, an outgoing request or a response) carries what the receiver reads: ids or named fields, never a whole record, a spread or deep copy of client state, or raw request input. Its size grows with the input, so a call that is quick on a small case stalls on a large one.
+
+Detection criteria live in the `## Review checklist` below, with the detail under `## Review detail`; the correctness gate grades a diff against it.

@@ -42,9 +42,10 @@ run_dispatch() {
   if printf '%s' "$output" | grep -q '"permissionDecision":"deny"'; then echo deny; else echo allow; fi
 }
 
-verdict_reply=$'### Review: Add free shipping\n**Head:** `abc1234` · **Verdict:** ❌ FAILED (2 gates failing)'
+works_section=$'**Does it work / what can it break**\n- Measured: checkout query before 420 ms -> after 38 ms.\n- Uses: 4 traced, 3 run, 1 read.\n'
+verdict_reply=$'### Review: Add free shipping\n**Head:** `abc1234` · **Verdict:** ❌ FAILED (2 gates failing)\n'"$works_section"$'\n**Gate status:**\n| Gate | Status |\n|------|--------|\n| naming | ❌ FAIL |\n\n**Naming:**\n- 🟡 `cart.ts:L4`: `tmp` is opaque. Rename `total`. (non-blocking)'
 passed_reply=$'**Verdict:** ✅ PASSED'
-clean_reply=$'### Review: Add free shipping\n`abc1234` `cart.ts`: follows existing conventions and naming. No changes.'
+clean_reply=$'### Review: Add free shipping\n'"$works_section"$'`abc1234` `cart.ts`: follows existing conventions and naming. No changes.'
 failed_line_reply=$'Round 2 · **Verdict:** ❌ FAILED (1 gate failing)'
 unfinished_reply="The review is not finished: app/models/order.rb is not walked yet; it needs the app running."
 
@@ -87,6 +88,17 @@ expect_eq "full receipt: a question about the app goes out" out "$(run_stop "$of
 
 rm -rf "$review"
 expect_eq "no saved review: the verdict goes out" out "$(run_stop "$verdict_reply")"
+
+# §G6: a verdict whose report does not lead with the does-it-work section, or leaves a style
+# finding unlabeled, is blocked even with nothing to walk; a reply with no verdict is untouched.
+bare_verdict=$'### Review: Add free shipping\n**Head:** `abc1234` · **Verdict:** ❌ FAILED (1 gate failing)\n\n**Naming:**\n- 🟡 `cart.ts:L4`: `tmp` is opaque. Rename `total`.'
+expect_eq "§G6 no saved review: a verdict with no does-it-work section is held" held "$(run_stop "$bare_verdict")"
+expect_contains "§G6 the block says what to add" "Does it work / what can it break" "$(cat "$work_dir/last-output")"
+expect_contains "§G6 the block names the unlabeled finding" "without (non-blocking)" "$(cat "$work_dir/last-output")"
+unlabeled_verdict=${verdict_reply%" (non-blocking)"}
+expect_eq "§G6 no saved review: an unlabeled style finding is held" held "$(run_stop "$unlabeled_verdict")"
+expect_eq "§G6 no saved review: a reply with no verdict is untouched" out "$(run_stop "$unfinished_reply")"
+expect_eq "§G6 no saved review: an ordinary reply is untouched" out "$(run_stop "Which gate do you want first?")"
 
 write_review app/models/order.rb
 other=$work_dir/other-review

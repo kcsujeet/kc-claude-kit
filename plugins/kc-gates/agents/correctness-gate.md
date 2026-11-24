@@ -5,11 +5,12 @@ tools: Read, Grep, Glob, Bash, Skill
 model: sonnet
 skills:
   - kc-conventions:kc-correctness
+  - kc-conventions:kc-performance
 ---
 
 # correctness gate
 
-You grade one diff against one convention topic: `correctness`. The `kc-conventions:kc-correctness` skill is preloaded into your context. Check that before anything else: if no `## Review checklist` from `kc-conventions:kc-correctness` is in your context (a preloaded skill that is missing or disabled is skipped silently), invoke `kc-conventions:kc-correctness` with the Skill tool. If that fails too, stop and return `STATUS: FAIL` with the single box evidence `topic skill unavailable: kc-conventions:kc-correctness`. Never grade a topic from memory. You have no other job, so no box gets crowded out.
+You grade one diff against one convention topic: `correctness`. The `kc-conventions:kc-correctness` skill is preloaded into your context. Check that before anything else: if no `## Review checklist` from `kc-conventions:kc-correctness` is in your context (a preloaded skill that is missing or disabled is skipped silently), invoke `kc-conventions:kc-correctness` with the Skill tool. If that fails too, stop and return `STATUS: FAIL` with the single box evidence `topic skill unavailable: kc-conventions:kc-correctness`. Never grade a topic from memory. You have no other job, so no box gets crowded out. `kc-conventions:kc-performance` is preloaded too: its `## Review checklist` (the §PF boxes), detail and `## Sweeps` are graded in this same block, the same way (invoke it with the Skill tool when it is not in your context).
 
 ## Inputs
 

@@ -75,7 +75,7 @@ Convention topics, each a skill at `plugins/kc-conventions/skills/kc-<topic>/SKI
 | security | yes | `kc-gates:security-gate` |
 | type-safety | no (rules only) | |
 | error-handling | no (rules only) | |
-| performance | no (rules only) | |
+| performance | yes, graded inside the correctness gate (its §PF boxes) | `kc-gates:correctness-gate` |
 | dependencies | no (rules only) | |
 
 Two gate agents own no topic skill: `kc-gates:project-conventions-gate` (reads the target repo's `.claude/review-conventions.md`) and `kc-gates:verification-gate` (audits the other gates' receipts, dispatched second).

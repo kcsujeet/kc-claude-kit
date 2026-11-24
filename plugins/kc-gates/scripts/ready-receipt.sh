@@ -29,6 +29,10 @@
 #       A `covered` verdict is checked against the rules as they were at the
 #       merge-base, plus each folder inside the ledger folder (another repo's
 #       rules as they were). --ledger without --checklist is a usage error.
+#       Each lesson also needs the record fields feedback-ledger.sh describes
+#       (class, examples, mechanism, why-not-higher, proof). Front matter
+#       with `public: true` (a public repo) makes this PR's own diff a
+#       --public-diff, so it must name no client term of the terms file.
 #   ready-receipt.sh write <sha> --verdicts <graded-checklist> [--task <KEY>]
 #       Records the checklist verdicts of the repo's hand-off checklist as it
 #       is at <sha> (.claude/hand-off-checklist.md), beside the receipt, in
@@ -695,16 +699,16 @@ check_receipt() {
 }
 
 # Succeeds when the repo's hand-off checklist opens with front matter holding
-# `ledger: true`.
-is_ledger_required() {
-  local checklist
+# `<key>: true` (ledger: true, public: true).
+is_checklist_flag_set() {
+  local key=$1 checklist
   checklist="$(git rev-parse --show-toplevel 2>/dev/null)/.claude/hand-off-checklist.md"
   [ -r "$checklist" ] || return 1
-  awk '{ is_first_line = (NR == 1); is_delimiter = ($0 == "---") }
+  awk -v key="$key" '{ is_first_line = (NR == 1); is_delimiter = ($0 == "---") }
        is_first_line && !is_delimiter { exit }
        is_first_line { next }
        is_delimiter { exit }
-       /^ledger:[[:space:]]*true[[:space:]]*$/ { found = 1; exit }
+       $0 ~ "^" key ":[[:space:]]*true[[:space:]]*$" { found = 1; exit }
        END { exit !found }' "$checklist"
 }
 
@@ -716,7 +720,7 @@ is_ledger_required() {
 check_ledger() {
   local dir=$1 root default_branch base diffs=() lesson_diff rules_dirs=() sibling_rules
   if [ -z "$dir" ]; then
-    is_ledger_required || return 0
+    is_checklist_flag_set ledger || return 0
     echo "ready-receipt: this repo's checklist has ledger: true; pass --ledger <dir> with feedback.tsv and ledger.tsv from feedback-ledger.sh" >&2
     exit 1
   fi
@@ -727,7 +731,12 @@ check_ledger() {
   ledger_work=$(mktemp -d)
   trap 'rm -rf "$ledger_work"' EXIT
   git -C "$root" diff --no-color --no-ext-diff "$base" "$sha" > "$ledger_work/pr.diff"
-  diffs=(--diff "$ledger_work/pr.diff")
+  # A public repo's own diff must also name no client term (feedback-ledger.sh --public-diff).
+  if is_checklist_flag_set public; then
+    diffs=(--public-diff "$ledger_work/pr.diff")
+  else
+    diffs=(--diff "$ledger_work/pr.diff")
+  fi
   for lesson_diff in "$dir"/*.diff; do
     [ -e "$lesson_diff" ] && diffs+=(--diff "$lesson_diff")
   done

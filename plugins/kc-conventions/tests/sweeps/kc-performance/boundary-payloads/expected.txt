@@ -1,0 +1,8 @@
+app/controllers/orders_controller.rb:5:     ImportOrderJob.perform_later(params.to_unsafe_h)
+app/controllers/orders_controller.rb:8:     Rails.logger.info("order received #{params.to_unsafe_h}")
+app/controllers/orders_controller.rb:9:     render json: order.as_json
+src/orders/api.ts:2:   fetch('/api/orders', { method: 'POST', body: JSON.stringify({ ...form }) })
+src/orders/api.ts:5: localStorage.setItem('draft', JSON.stringify(structuredClone(cart)))
+shop/storefronts/cache.py:1: cache.set(storefront_key(storefront.id), storefront.__dict__)
+shop/storefronts/cache.py:3: logger.info("storefront updated", extra=request.form)
+shop/storefronts/cache.py:4: events.publish("order.created", order.model_dump())

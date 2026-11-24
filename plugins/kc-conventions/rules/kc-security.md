@@ -16,6 +16,7 @@ A handler that passes every happy-path test can still let the wrong caller in, o
 - Secrets and personal data stay out of responses (serialize named fields, not a whole record), logs, error messages and URLs; a token in a query string ends up in logs and referrers.
 - A redirect, return or callback target taken from input is checked against an allowlist of hosts or paths (an exact match or a parsed host, never a prefix or substring test), or is not taken from input at all.
 - Input never becomes code: no SQL, shell command, HTML or template built by joining strings; use parameters, argument arrays and escaping the framework provides.
+- Raw request input never reaches a job's arguments, a log line, a cache or an event: pass the validated, allowlisted values or ids. Raw input carries personal data, files and fields nobody checked into stores that keep them and logs that print them.
 - A change that skips or removes an authentication, authorization or request-forgery check names who can now reach the action and what they can do, and a test shows the caller who must be refused refused.
 
 Detection criteria and per-box review failure modes live in the `## Review checklist` of the `kc-security` skill (`kc-conventions:kc-security`), with the detail under its `## Review detail`. These rules are the statement of the convention; that checklist is how a diff gets graded against it.

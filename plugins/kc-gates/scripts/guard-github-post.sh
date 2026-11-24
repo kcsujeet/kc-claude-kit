@@ -41,7 +41,12 @@
 # APPROVE) is also compared with the head the review walked: the pull request's current head
 # (`gh pr view --json headRefOid`) against HEAD_SHA in the review folder's meta.env. When they
 # differ and any file the pull request changes differs between the two commits, the approval is
-# denied, naming the files: the new commits were not reviewed. When they differ only by commits
+# denied, naming the files: the new commits were not reviewed, unless the move was a rebase:
+# `git range-diff` of the reviewed commits (merge-base with origin/<the pull request's base
+# branch> up to the walked head) against the current ones then shows every one unchanged (only "="
+# pairs), and the approval goes through with a one-line note. A commit changed, added or dropped
+# is named in the denial; a base branch or commit this clone lacks keeps the denial and says to
+# fetch. When they differ only by commits
 # that touch none of the pull request's files (the default branch merged in), the approval goes
 # through with a one-line systemMessage saying so. A head, file list or commit it can't read means
 # no check.
@@ -372,12 +377,41 @@ EOF
   return 1
 }
 
+# Compares the reviewed commits with the current ones by `git range-diff`, both ranges taken from
+# the merge-base with origin/<base> (the pull request's base branch). Prints "same" when every
+# pair is "=", "changed: <marker, short sha and subject of each commit that differs>" when a
+# commit changed, was added or dropped, and "unknown" when the base, a commit or range-diff is
+# unavailable here.
+# Usage: compare_reviewed_commits <base branch> <walked> <current>
+compare_reviewed_commits() {
+  local base_ref="origin/$1" walked=$2 current=$3 walked_base current_base pairs
+  local short_sha_chars=7
+  local has_base_name=false has_base_commit=false
+  [ -n "$1" ] && has_base_name=true
+  git rev-parse --verify -q "$base_ref^{commit}" >/dev/null 2>&1 && has_base_commit=true
+  if ! "$has_base_name" || ! "$has_base_commit"; then
+    echo unknown
+    return 0
+  fi
+  walked_base=$(git merge-base "$base_ref" "$walked" 2>/dev/null) || { echo unknown; return 0; }
+  current_base=$(git merge-base "$base_ref" "$current" 2>/dev/null) || { echo unknown; return 0; }
+  pairs=$(git range-diff --no-color "$walked_base..$walked" "$current_base..$current" 2>/dev/null) || { echo unknown; return 0; }
+  printf '%s\n' "$pairs" | awk -v n="$short_sha_chars" '
+    match($0, /^ *[0-9-]+: +[0-9a-f-]+ [=!<>] +[0-9-]+: +[0-9a-f-]+ /) {
+      split($0, f, " ")
+      if (f[3] == "=") { same++; next }
+      sha = (f[2] == "-") ? f[5] : f[2]
+      differ = differ f[3] " " substr(sha, 1, n) " " substr($0, RLENGTH + 1) "; "
+    }
+    END { if (differ != "") print "changed: " differ; else if (same) print "same"; else print "unknown" }'
+}
+
 # For an approval of a pull request whose head moved since the review walked it: prints the deny
 # JSON when a file the pull request changes differs between the two heads, or the one-line note
 # when only commits touching none of its files came in; nothing when the heads match or can't be
 # read.
 get_moved_head_verdict() {
-  local command=$1 review_dir target repo number walked current_head pr_files changed_files block_reason short_walked short_current changed_text
+  local command=$1 review_dir target repo number walked current_head pr_files changed_files block_reason short_walked short_current changed_text base_branch commits_state
   local -a gh_target=() paths=()
   local file
   # The message is shown as a hook message, so the file list is cut to a short length.
@@ -407,8 +441,18 @@ EOF
     printf 'the pull request head moved from %s to %s since the review, by commits that touch none of its files (a merge of the default branch), so the approval stands.' "$short_walked" "$short_current"
     return 0
   fi
+  base_branch=$(gh pr view ${gh_target[@]+"${gh_target[@]}"} --json baseRefName --jq .baseRefName 2>/dev/null) || base_branch=
+  commits_state=$(compare_reviewed_commits "$base_branch" "$walked" "$current_head")
+  if [ "$commits_state" = same ]; then
+    printf 'the pull request head moved from %s to %s since the review by a rebase: git range-diff shows every reviewed commit unchanged, so the approval stands.' "$short_walked" "$short_current"
+    return 0
+  fi
   changed_text=$(printf '%s' "$changed_files" | tr '\n' ' ' | sed 's/["\\]//g' | cut -c1-"$max_changed_chars")
   block_reason="Blocked by the kc-gates plugin: the pull request head is $short_current but the review walked $short_walked, and these files of the pull request changed in between: $changed_text. Review the new commits first (gather the review again, then walk and grade them), then approve the head you reviewed."
+  case "$commits_state" in
+    changed:*) block_reason="$block_reason Commits that differ from the reviewed ones (range-diff: < dropped, > added, ! changed): $(printf '%s' "${commits_state#changed: }" | sed 's/["\\]//g' | cut -c1-"$max_changed_chars")" ;;
+    *) block_reason="$block_reason If the head only moved by a rebase, fetch the pull request's base branch and head so git range-diff can compare the reviewed commits, then try again." ;;
+  esac
   printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"%s"}}' "$block_reason"
 }
 
