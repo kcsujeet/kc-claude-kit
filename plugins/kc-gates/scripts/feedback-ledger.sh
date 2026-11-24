@@ -257,7 +257,7 @@ run_check() {
   # A lesson record names its class, two unlike examples, the layer it sits at, why no higher
   # layer holds it, and its proof. $1 is the item, $2 the number of the first tagged field.
   check_lesson_record() {
-    local item=$1 from=$2 tag field_text rest example example_count=0 empty_example=false min_lesson_examples=2 min_lesson_examples_word=two
+    local item=$1 from=$2 tag field_text rest example example_count=0 empty_example=false min_lesson_examples=2
     local is_why_not_higher_tag mechanism_is_check is_optional_why_not_higher
     for tag in class examples mechanism why-not-higher proof; do
       field_text=$(get_lesson_field "$tag" "$from")
@@ -286,7 +286,7 @@ run_check() {
       if [ "$empty_example" = true ]; then
         record_problem "$item: lesson examples: has an empty example"
       elif [ "$example_count" -lt "$min_lesson_examples" ]; then
-        record_problem "$item: lesson examples: has one example; a lesson needs $min_lesson_examples_word unlike cases, separated by \"; \""
+        record_problem "$item: lesson examples: has one example; a lesson needs $min_lesson_examples unlike cases, separated by \"; \""
       fi
     fi
     field_text=$(get_lesson_field mechanism "$from")

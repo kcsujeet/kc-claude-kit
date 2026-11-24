@@ -281,7 +281,7 @@ for missing_field in class examples mechanism proof; do
 done
 build_ledger_with_f2_fields "$(get_record_without examples)"$'\texamples:only one case'
 expect_check failed "a lesson with one example fails"
-expect_contains "it says a lesson needs two unlike cases" "F2: lesson examples: has one example; a lesson needs two unlike cases" "$last_output"
+expect_contains "it says a lesson needs 2 unlike cases" "F2: lesson examples: has one example; a lesson needs 2 unlike cases" "$last_output"
 build_ledger_with_f2_fields "$(get_record_without examples)"$'\texamples:a case; ; another'
 expect_check failed "a lesson with an empty example fails"
 expect_contains "it names the empty example" "F2: lesson examples: has an empty example" "$last_output"

@@ -154,6 +154,7 @@ expect_eq "§PC7: an id inside a code block is clean" clean "$(result "$work_dir
 expect_eq "§PC7: standards names (UTF-8, ISO-8601, SHA-256) are not ids" clean "$(check_link 'The export is UTF-8 with ISO-8601 dates and a SHA-256 hash.')"
 expect_contains "§PC7: a CVE id is still flagged" "names CVE-2024-1234 without a link" "$(check_link 'The fix covers CVE-2024-1234.')"
 expect_eq "§PC7: a six-digit colour of digits only is not a reference" clean "$(check_link 'The badge text is #333333 on white.')"
+expect_eq "§PC7: an eight-digit colour with alpha is not a reference" clean "$(check_link 'The overlay is #33333333 over the photo.')"
 expect_contains "§PC7: a five-digit #12345 is still flagged" "names #12345 without a link" "$(check_link 'The same fix landed in #12345.')"
 expect_eq "§PC7: a heading line and a hex colour are not references" clean "$(check_link $'# Totals\nThe badge uses #fff and #123abc.')"
 

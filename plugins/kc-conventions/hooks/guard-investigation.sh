@@ -3,8 +3,8 @@
 # current branch has an investigation write-up at `$(git rev-parse --git-path kc-investigation)/<branch>.md`,
 # a command that opens a pull request or writes a comment or review from that checkout (`gh pr create`,
 # `gh pr comment`, `gh pr review`, `gh issue comment`, a `gh api` call to a comments endpoint
-# with a write method or fields, or an MCP tool that creates, adds, posts, saves or updates a
-# comment) is denied while `check-investigation.sh` fails on the write-up, with its problems in
+# with a write method or fields, or an MCP tool whose name starts with create, add, post, save,
+# update or reply and names a comment) is denied while `check-investigation.sh` fails on the write-up, with its problems in
 # the reason. Reading comments (a `gh api` GET, an MCP list or get tool) is never denied: those
 # are records the investigation reads. No write-up, another command, or a passing
 # write-up: nothing printed. The checkout is the payload's cwd, or the directory of a leading
@@ -30,9 +30,12 @@ is_sharing_command() {
   [ "$is_comments_api" = true ] && [ "$is_write_call" = true ]
 }
 
-# True when an MCP tool name writes a comment: create, add, post, save or update with "comment".
+# True when an MCP tool writes a comment: the tool part of mcp__<server>__<tool> starts with create,
+# add, post, save, update or reply and names a comment (save_comment, add_issue_comment,
+# comment_create). The server part is not read, so a server named like a verb changes nothing.
 is_comment_writing_tool() {
-  printf '%s' "$1" | grep -Eiq '(create|add|post|save|update|reply)[_-]?[a-z_-]*comment|comment[_-]?(create|add|post|save|update|reply)'
+  local tool_part=${1##*__}
+  printf '%s' "$tool_part" | grep -Eiq '^(create|add|post|save|update|reply)[_-]([a-z]+[_-])*comments?$|^comments?[_-](create|add|post|save|update|reply)$'
 }
 
 escape_json() {

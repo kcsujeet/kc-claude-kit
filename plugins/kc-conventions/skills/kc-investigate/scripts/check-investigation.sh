@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# investigate §INV1 to §INV9: checks an investigation write-up before its findings are shared or a
-# probe or fix is opened. Each box is ticked (`- [x] §INVn`) and carries evidence: a query or
-# command in backticks, a link, or a number (a count, a timing, a `path:line`). §INV3 to §INV8 may say `n/a: <why>`
-# instead, with the why in at least three words (min_reason_words below). §INV9 is followed by a Markdown table with a
-# `cause` column whose rows each end in a verdict cell: `in` or `out` citing at least one of
-# §INV1 to §INV8, or `open` naming the probe that would settle it.
+# investigate §INV1 to §INV9: checks an investigation write-up before its findings are shared or
+# a probe or fix is opened. Each box is ticked (`- [x] §INVn`) and carries evidence: a query or
+# command in backticks, a link, or a number (a count, a timing, a `path:line`). Any box but §INV1
+# and §INV9 may say `n/a: <why>` instead, the why at least min_reason_words long. §INV9 is
+# followed by a Markdown table with a `cause` column whose rows each end in a verdict cell: `in`
+# or `out` citing at least one of §INV1 to §INV8, or `open` naming the probe that would settle it.
 #
 # Usage: check-investigation.sh <write-up.md>
 # Prints one line per problem and exits 1 when there is any, 0 when the write-up passes, 2 on a
@@ -26,6 +26,7 @@ cause_table_box=9
 min_reason_words=3
 
 awk -v box_count="$box_count" -v hops_box="$hops_box" -v cause_table_box="$cause_table_box" -v min_reason_words="$min_reason_words" '
+  BEGIN { cause_label = "§INV" cause_table_box }
   function report_problem(text) { print text; problems++ }
   # A query or command in backticks, a link, or any number (a count, a time, a path:line).
   function has_evidence(text) {
@@ -65,7 +66,7 @@ awk -v box_count="$box_count" -v hops_box="$hops_box" -v cause_table_box="$cause
     cell_count = split(line, cells, /\|/)
     if (!header_seen) {
       header_seen = 1
-      if (tolower(line) !~ /cause/) report_problem("§INV9: the table has no cause column")
+      if (tolower(line) !~ /cause/) report_problem(cause_label ": the table has no cause column")
       next
     }
     if (line ~ /^[[:space:]:|-]*$/) next
@@ -77,11 +78,11 @@ awk -v box_count="$box_count" -v hops_box="$hops_box" -v cause_table_box="$cause
     if (verdict ~ /^(in|out)([^a-z]|$)/) {
       ruling = "out"
       if (verdict ~ /^in/) ruling = "in"
-      if (verdict !~ /§inv[1-8]([^0-9]|$)/) report_problem("§INV9: cause \"" cause "\" is ruled " ruling " without citing a box from §INV1 to §INV8")
+      if (verdict !~ /§inv[1-8]([^0-9]|$)/) report_problem(cause_label ": cause \"" cause "\" is ruled " ruling " without citing a box from §INV1 to §INV8")
     } else if (verdict ~ /^open([^a-z]|$)/) {
-      if (verdict !~ /probe/) report_problem("§INV9: cause \"" cause "\" is open without naming the probe that would settle it")
+      if (verdict !~ /probe/) report_problem(cause_label ": cause \"" cause "\" is open without naming the probe that would settle it")
     } else {
-      report_problem("§INV9: cause \"" cause "\" has no verdict (in, out or open) in its last cell")
+      report_problem(cause_label ": cause \"" cause "\" has no verdict (in, out or open) in its last cell")
     }
     next
   }
@@ -92,7 +93,7 @@ awk -v box_count="$box_count" -v hops_box="$hops_box" -v cause_table_box="$cause
     }
     has_cause_box = (cause_table_box in seen)
     has_no_rows = (rows == 0)
-    if (has_cause_box && has_no_rows) report_problem("§INV9: no cause table with at least one row after the box")
+    if (has_cause_box && has_no_rows) report_problem(cause_label ": no cause table with at least one row after the box")
     if (problems > 0) exit 1
   }
 ' "$1"

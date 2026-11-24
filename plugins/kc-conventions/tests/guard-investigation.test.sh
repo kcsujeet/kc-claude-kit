@@ -27,11 +27,6 @@ grep -v '§INV5' "$work_dir/passing.md" > "$work_dir/failing.md"
 build_bash_payload() { jq -n --arg command "$1" --arg cwd "$2" '{tool_name: "Bash", cwd: $cwd, tool_input: {command: $command}}'; }
 build_mcp_payload() { jq -n --arg tool "$1" --arg cwd "$2" '{tool_name: $tool, cwd: $cwd, tool_input: {body: "findings"}}'; }
 
-# A PATH with the tools the hook needs and no jq, for the no-jq case.
-no_jq_bin="$work_dir/no-jq-bin"
-mkdir -p "$no_jq_bin"
-for tool in bash cat dirname; do ln -s "$(command -v "$tool")" "$no_jq_bin/$tool"; done
-
 # expect_hook_verdict <allow|deny> <label> <payload> [nojq]
 expect_hook_verdict() {
   local expectation=$1 label=$2 payload=$3 mode=${4:-jq} output verdict
@@ -66,8 +61,12 @@ expect_hook_verdict deny "§INV5 missing: a leading cd names the checkout" "$(bu
 expect_hook_verdict allow "§INV5 missing: git status passes" "$(build_bash_payload 'git status' "$repo")"
 expect_hook_verdict allow "§INV5 missing: a comments api read passes" "$(build_bash_payload 'gh api repos/acme/shop/pulls/1/comments' "$repo")"
 expect_hook_verdict deny "§INV5 missing: a comments api POST is denied" "$(build_bash_payload 'gh api -X POST repos/acme/shop/issues/7/comments --input body.json' "$repo")"
+expect_hook_verdict deny "§INV5 missing: a comments api PATCH with no fields is denied" "$(build_bash_payload 'gh api -X PATCH repos/acme/shop/issues/comments/5' "$repo")"
 expect_hook_verdict allow "§INV5 missing: gh pr view passes" "$(build_bash_payload 'gh pr view 12' "$repo")"
 expect_hook_verdict allow "§INV5 missing: a command from another checkout passes" "$(build_bash_payload 'gh pr create --fill' "$work_dir")"
+no_jq_bin="$work_dir/no-jq-bin"
+mkdir -p "$no_jq_bin"
+for tool in bash cat dirname; do ln -s "$(command -v "$tool")" "$no_jq_bin/$tool"; done
 expect_hook_verdict allow "§INV5 missing: with no jq the hook reads nothing and allows" "$(build_bash_payload 'gh pr create --fill' "$repo")" nojq
 expect_hook_verdict deny "§INV5 missing: the denial names the problem" "$(build_bash_payload 'gh pr create --fill' "$repo")"
 if printf '%s' "$last_output" | jq -r '.hookSpecificOutput.permissionDecisionReason' | grep -qF '§INV5: missing'; then
@@ -77,6 +76,9 @@ else
 fi
 expect_hook_verdict deny "§INV5 missing: an MCP comment tool is denied" "$(build_mcp_payload mcp__tracker__save_comment "$repo")"
 expect_hook_verdict allow "§INV5 missing: an MCP tool that lists comments passes" "$(build_mcp_payload mcp__tracker__list_comments "$repo")"
+expect_hook_verdict allow "§INV5 missing: a list tool on a server named like a verb passes" "$(build_mcp_payload mcp__postgres__list_comments "$repo")"
+expect_hook_verdict allow "§INV5 missing: a get tool naming address comments passes" "$(build_mcp_payload mcp__shop__get_address_comments "$repo")"
+expect_hook_verdict deny "§INV5 missing: an add-issue-comment tool is denied" "$(build_mcp_payload mcp__tracker__add_issue_comment "$repo")"
 expect_hook_verdict allow "§INV5 missing: an MCP tool that does not comment passes" "$(build_mcp_payload mcp__tracker__get_issue "$repo")"
 
 git -C "$repo" checkout -q -b other
