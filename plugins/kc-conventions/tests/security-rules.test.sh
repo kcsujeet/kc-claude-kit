@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Checks that the security topic keeps its boxes, and that each box names the failure it grades:
-# kc-security §SEC1 to §SEC10 on its checklist, its sweep in its Sweeps section, and the generated
+# kc-security §SEC1 to §SEC9 on its checklist, its sweep in its Sweeps section, and the generated
 # rule file in step with the skill. Fixtures for the sweep itself are under tests/sweeps/kc-security.
 set -euo pipefail
 
@@ -32,9 +32,11 @@ require_box_text §SEC8 'N/A: no query, command, markup or template built from i
 require_box_text §SEC9 'request-surface.sh'
 require_box_text §SEC9 'grepped request surface: 0 hits'
 
+# §SEC10 (raw request input in jobs, logs, caches and events) has its box and its detail section.
 require_box_text §SEC10 'validated, allowlisted output or ids'
+grep -qE "^### §SEC10\. " "$skill" || fail "§SEC10 has a checklist box but no detail section"
 
-for section in §SEC1 §SEC2 §SEC3 §SEC4 §SEC5 §SEC6 §SEC7 §SEC8 §SEC9 §SEC10; do
+for section in §SEC1 §SEC2 §SEC3 §SEC4 §SEC5 §SEC6 §SEC7 §SEC8 §SEC9; do
   grep -qE "^### $section\. " "$skill" || fail "$section has a checklist box but no detail section"
 done
 ! sed -n '/^### §SEC7\. /,/^### §SEC8\. /p' "$skill" | grep -qE ' \? .+ : ' || fail "§SEC7's Prefer example must not be a ternary (clarity §C15): gates copy it into fixes"
