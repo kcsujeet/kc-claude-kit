@@ -449,27 +449,45 @@ run_git symbolic-ref refs/remotes/origin/HEAD refs/remotes/origin/main
 expect_write refused "a checklist asking for the ledger refuses a receipt without one" "$lesson_head" --checklist
 expect_said "it asks for the ledger" "pass --ledger <dir>"
 ledger_dir=$work_dir/ledger-$RANDOM
+record_fields=$'\tclass:a total that drops cents\texamples:an order total; a refund amount\tmechanism:check\tproof:shop/total.test.sh'
 mkdir -p "$ledger_dir"
 printf 'F1\ttyped\tprint cents\nF2\ttyped\tgo ahead\n' > "$ledger_dir/feedback.tsv"
-printf 'F1\tlesson\t§X2\n' > "$ledger_dir/ledger.tsv"
+printf 'F1\tlesson\t§X2%s\n' "$record_fields" > "$ledger_dir/ledger.tsv"
 expect_write refused "a ledger with an item left out is refused" "$lesson_head" --checklist --ledger "$ledger_dir"
 expect_said "it names the item" "F2: no verdict in the ledger"
-printf 'F1\tlesson\t§X3\nF2\tnot-feedback\tthe go-ahead\n' > "$ledger_dir/ledger.tsv"
+printf 'F1\tlesson\t§X3%s\nF2\tnot-feedback\tthe go-ahead\n' "$record_fields" > "$ledger_dir/ledger.tsv"
 expect_write refused "a lesson the PR doesn't add is refused" "$lesson_head" --checklist --ledger "$ledger_dir"
 printf -- '+- **X3.** From the sibling repo\n' > "$ledger_dir/sibling.diff"
 expect_write written "a lesson added by a sibling repo's diff beside the ledger counts" "$lesson_head" --checklist --ledger "$ledger_dir"
 rm "$ledger_dir/sibling.diff"
-printf 'F1\tlesson\t§X2\nF2\tnot-feedback\tthe go-ahead\n' > "$ledger_dir/ledger.tsv"
+printf 'F1\tlesson\t§X2%s\nF2\tnot-feedback\tthe go-ahead\n' "$record_fields" > "$ledger_dir/ledger.tsv"
 expect_write written "a complete ledger whose lessons the PR adds is written" "$lesson_head" --checklist --ledger "$ledger_dir"
+printf 'F1\tlesson\t§X2\nF2\tnot-feedback\tthe go-ahead\n' > "$ledger_dir/ledger.tsv"
+expect_write refused "a lesson with no class, examples, mechanism or proof is refused" "$lesson_head" --checklist --ledger "$ledger_dir"
+expect_said "it names the missing field" "F1: lesson is missing class:"
+printf 'F1\tlesson\t§X2%s\nF2\tnot-feedback\tthe go-ahead\n' "$record_fields" > "$ledger_dir/ledger.tsv"
+# `public: true` makes the PR's own diff a --public-diff: it must name no client term.
+terms_file=$work_dir/terms.txt
+printf 'cents\n' > "$terms_file"
+printf -- '---\nledger: true\npublic: true\n---\n# Hand-off checklist\n' > "$repo/.claude/hand-off-checklist.md"
+public_head=$(commit_all "public checklist")
+expect_write written "public: true with no terms file asks for no client-term check" "$public_head" --checklist --ledger "$ledger_dir"
+last_output=$(cd "$repo" && KC_CLIENT_TERMS=$terms_file bash "$scripts/ready-receipt.sh" write "$public_head" --checklist --ledger "$ledger_dir" 2>&1) && actual=written || actual=refused
+expect_eq "public: true refuses a PR diff that names a client term" refused "$actual"
+expect_said "it names the term" "names client term \"cents\""
+printf -- '---\nledger: true\n---\n# Hand-off checklist\n' > "$repo/.claude/hand-off-checklist.md"
+private_head=$(commit_all "private checklist")
+last_output=$(cd "$repo" && KC_CLIENT_TERMS=$terms_file bash "$scripts/ready-receipt.sh" write "$private_head" --checklist --ledger "$ledger_dir" 2>&1) && actual=written || actual=refused
+expect_eq "without public: true the same diff is not checked for client terms" written "$actual"
 # A covered rule must have existed before this PR: the base's rules, or a sibling repo's folder.
-printf 'F1\tcovered\t§X2\tadded here, not missed\tlesson:§X2\nF2\tnot-feedback\tthe go-ahead\n' > "$ledger_dir/ledger.tsv"
+printf 'F1\tcovered\t§X2\tadded here, not missed\tlesson:§X2%s\nF2\tnot-feedback\tthe go-ahead\n' "$record_fields" > "$ledger_dir/ledger.tsv"
 expect_write refused "a rule this PR adds is not covered" "$lesson_head" --checklist --ledger "$ledger_dir"
 expect_said "it says the rule wasn't there" "F1: covered by §X2, which no rule file had"
 mkdir -p "$ledger_dir/sibling-rules"
 printf -- '- **X2.** In the sibling repo\n' > "$ledger_dir/sibling-rules/rules.md"
 expect_write written "a rule from a sibling repo's rules folder counts as covered" "$lesson_head" --checklist --ledger "$ledger_dir"
 rm -r "$ledger_dir/sibling-rules"
-printf 'F1\tlesson\t§X2\nF2\tnot-feedback\tthe go-ahead\n' > "$ledger_dir/ledger.tsv"
+printf 'F1\tlesson\t§X2%s\nF2\tnot-feedback\tthe go-ahead\n' "$record_fields" > "$ledger_dir/ledger.tsv"
 expect_write refused "--ledger without --checklist is a usage error" "$lesson_head" --after "$lesson_head" --ledger "$ledger_dir"
 expect_said "it says where --ledger goes" "--ledger goes with --checklist"
 expect_write refused "--ledger with no folder is a usage error" "$lesson_head" --checklist --ledger
@@ -483,7 +501,7 @@ expect_write written "with no origin/HEAD, the default branch is main" "$lesson_
 rm -f "$ledger_dir/ledger.tsv"
 expect_write refused "a ledger folder without the ledger is refused" "$lesson_head" --checklist --ledger "$ledger_dir"
 expect_said "it names both files" "$ledger_dir needs feedback.tsv and ledger.tsv"
-printf 'F1\tlesson\t§X2\n' > "$ledger_dir/ledger.tsv"
+printf 'F1\tlesson\t§X2%s\n' "$record_fields" > "$ledger_dir/ledger.tsv"
 rm -f "$ledger_dir/feedback.tsv"
 expect_write refused "a ledger folder without the feedback list is refused" "$lesson_head" --checklist --ledger "$ledger_dir"
 expect_said "it names both files" "$ledger_dir needs feedback.tsv and ledger.tsv"

@@ -16,6 +16,10 @@
 #   - Stop: a reply that asks the person whether to walk, QA or try the change in the running app is
 #     blocked too: the walk is required by the review, so it is done and never offered as a choice.
 #     Saying the review is not finished, without asking, passes.
+#   - Stop: a reply that gives a verdict is also run through check-review-report.sh (§G6) and
+#     blocked when its report does not lead with the does-it-work section or leaves a style
+#     finding unlabeled, so the reader sees effectiveness and blast radius first. A reply with no
+#     verdict is never checked.
 # Everything the guard can't read (no jq, no review folder, select-gates.sh failing) lets the
 # action through: it never blocks what it can't read. Always exits 0.
 # Hook schema: https://code.claude.com/docs/en/hooks
@@ -70,7 +74,17 @@ case "$event" in
 esac
 
 problems=$(get_walk_problems)
-[ -n "$problems" ] || exit 0
+if [ -z "$problems" ]; then
+  report_problems=
+  if [ "$event" = Stop ] && [ "${stop_kind:-}" = verdict ]; then
+    report_problems=$(printf '%s' "$reply" | bash "$(dirname "$0")/check-review-report.sh" - 2>&1 | tr '\n' ' ' | cut -c1-600)
+  fi
+  if [ -n "$report_problems" ]; then
+    block_reason="Blocked by the kc-gates plugin: this reply gives a review verdict, but its report does not lead with whether the change works and what it can break. Add a \"**Does it work / what can it break**\" section right under the \`### Review:\` title, above the gate table: what was measured with before and after numbers (or \"not measured: <why>\"), and a \"Uses:\" line with the trace-uses.sh count and which uses were run or checked. End each naming and clarity finding with \"(non-blocking)\". $report_problems"
+    printf '%s' "$block_reason" | jq -Rsc '{decision: "block", reason: .}'
+  fi
+  exit 0
+fi
 walk_steps="Walk each changed behaviour in the running app or at the API, as every audience that can reach it (signed out too for a public path, replaying each write with another record's id and again with the same id), and write one line per walk-item to walk-receipt.tsv beside review.diff: path, what was seen, evidence (a screenshot or recording path, or a request line with its status)."
 if [ "$event" = PreToolUse ]; then
   block_reason="Blocked by the kc-gates plugin: the review has items it has not walked, so the verification gate cannot run yet (it audits the walk receipt). $walk_steps Then dispatch it again. $problems"

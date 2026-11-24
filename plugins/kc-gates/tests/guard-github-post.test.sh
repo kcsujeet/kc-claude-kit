@@ -221,7 +221,8 @@ git -C "$walk_repo" remote add origin https://github.com/acme/widgets.git
 export TMPDIR=$walk_tmp
 cd "$walk_repo"
 # A stub gh that answers nothing by default (the head check then has nothing to compare), and
-# gives the pull request's head and files from KC_STUB_HEAD and KC_STUB_FILES when they are set.
+# gives the pull request's head, files and base branch from KC_STUB_HEAD, KC_STUB_FILES and
+# KC_STUB_BASE when they are set.
 stub_bin=$(mktemp -d)
 cat > "$stub_bin/gh" <<'STUB'
 #!/usr/bin/env bash
@@ -229,6 +230,7 @@ cat > "$stub_bin/gh" <<'STUB'
 case "$*" in
   *headRefOid*) printf '%s\n' "$KC_STUB_HEAD" ;;
   *files*) printf '%s\n' "$KC_STUB_FILES" ;;
+  *baseRefName*) printf '%s\n' "${KC_STUB_BASE:-}" ;;
   *) exit 1 ;;
 esac
 STUB
@@ -396,7 +398,84 @@ export KC_STUB_HEAD=0000000000000000000000000000000000000000
 check allow "head: a head this clone doesn't have means no check" "$walk_token gh pr review 12 --approve"
 unset KC_STUB_HEAD KC_STUB_FILES
 
+# --- a rebase that left the reviewed commits unchanged still stands --------------------------------
+# A pull request of two commits, reviewed at one head, then rebased onto a base that moved in a file
+# the pull request also changes: the files differ, but git range-diff pairs every commit with "=".
+rb_repo=$(mktemp -d)
+git init -q -b main "$rb_repo"
+git -C "$rb_repo" remote add origin https://github.com/acme/widgets.git
+git -C "$rb_repo" config user.email test@example.com
+git -C "$rb_repo" config user.name Test
+cd "$rb_repo"
+mkdir -p app/models docs
+printf '%s\n' a b c d e f g h i j > app/models/order.rb
+git add -A && git commit -q -m "initial shop"
+git checkout -q -b feature
+sed -i.bak 's/^a$/A/' app/models/order.rb && rm app/models/order.rb.bak
+git commit -q -am "add order total"
+printf 'notes\n' > docs/notes.md
+git add -A && git commit -q -m "document orders"
+rb_walked=$(git rev-parse HEAD)
+git checkout -q main
+sed -i.bak 's/^j$/J/' app/models/order.rb && rm app/models/order.rb.bak
+git commit -q -am "base moves in the order file"
+git update-ref refs/remotes/origin/main main
+git checkout -q -b rebased "$rb_walked"
+git rebase -q main
+rb_rebased=$(git rev-parse HEAD)
+git checkout -q -b rebased-edit main
+git cherry-pick "$rb_walked~1" >/dev/null
+printf 'extra\n' >> app/models/order.rb
+git commit -q -a --amend --no-edit
+git cherry-pick "$rb_walked" >/dev/null
+rb_edited=$(git rev-parse HEAD)
+git checkout -q -b rebased-added "$rb_rebased"
+printf 'more\n' >> docs/notes.md
+git commit -q -am "add a late commit"
+rb_added=$(git rev-parse HEAD)
+git checkout -q -b rebased-dropped main
+git cherry-pick "$rb_walked~1" >/dev/null
+rb_dropped=$(git rev-parse HEAD)
+
+rm -rf "$walk_tmp"/kc-review-*
+write_review docs/notes.md
+printf 'HEAD_SHA=%s\nPR=12\nURL=https://github.com/acme/widgets/pull/12\n' "$rb_walked" > "$review_folder/meta.env"
+export KC_STUB_FILES=$'app/models/order.rb\ndocs/notes.md' KC_STUB_BASE=main
+
+export KC_STUB_HEAD=$rb_rebased
+note_output=$(build_payload "$walk_token gh pr review 12 --approve" | bash "$guard")
+last_output=$note_output
+expect_last_reason "head: a rebase with the reviewed commits unchanged prints one line saying so" "range-diff shows every reviewed commit unchanged"
+case "$note_output" in
+  *permissionDecision*) echo "FAIL head: the unchanged-commits rebase is not denied"; failures=$((failures + 1)) ;;
+  *) echo "ok   head: the unchanged-commits rebase is not denied"; passes=$((passes + 1)) ;;
+esac
+
+export KC_STUB_HEAD=$rb_edited
+check deny "head: a rebase that also edits a reviewed commit denies" "$walk_token gh pr review 12 --approve"
+expect_last_reason "head: the denial for an edited commit names it" "add order total"
+export KC_STUB_HEAD=$rb_added
+check deny "head: a commit added after the rebase denies" "$walk_token gh pr review 12 --approve"
+expect_last_reason "head: the denial for an added commit names it" "add a late commit"
+export KC_STUB_HEAD=$rb_dropped
+check deny "head: a commit dropped by the rebase denies" "$walk_token gh pr review 12 --approve"
+expect_last_reason "head: the denial for a dropped commit names it" "document orders"
+
+export KC_STUB_HEAD=$rb_rebased KC_STUB_BASE=release
+check deny "head: a base branch this clone doesn't have keeps the denial" "$walk_token gh pr review 12 --approve"
+expect_last_reason "head: the unresolved-base denial says to fetch" "fetch the pull request's base branch"
+export KC_STUB_BASE=
+check deny "head: a base branch gh can't give keeps the denial" "$walk_token gh pr review 12 --approve"
+# Both ranges empty (the reviewed head is already in the base): nothing to compare, so the denial stays.
+printf '%s\n' "HEAD_SHA=$(git rev-parse main~1)" 'PR=12' 'URL=https://github.com/acme/widgets/pull/12' > "$review_folder/meta.env"
+KC_STUB_HEAD=$(git rev-parse main)
+export KC_STUB_HEAD KC_STUB_BASE=main
+check deny "head: no reviewed commits to compare keeps the denial" "$walk_token gh pr review 12 --approve"
+expect_last_reason "head: the no-commits denial says to fetch" "fetch the pull request's base branch"
+unset KC_STUB_HEAD KC_STUB_FILES KC_STUB_BASE
+
 cd "$tests_dir"
+rm -rf "$rb_repo"
 TMPDIR=$base_tmp
 rm -rf "$walk_tmp" "$walk_repo" "$stub_bin"
 

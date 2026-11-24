@@ -75,11 +75,18 @@ complete_ledger() {
   printf 'F11\tone-off\twhen to round is this order page only\n'
 }
 ledger=$work_dir/ledger.tsv
+# The tagged fields every lesson record carries (class, examples, mechanism, proof).
+record_fields=$'class:a name that hides what a value is\texamples:an order total; a storefront slug\tmechanism:check\tproof:plugin/tests/rules.test.sh'
+# Appends them to each lesson line that names a rule, and to each covered line with a lesson: catch.
+add_record_fields() {
+  awk -F'\t' -v OFS='\t' -v fields="$record_fields" \
+    '($2 == "lesson" && NF >= 3) || ($2 == "covered" && $5 ~ /^lesson:./) { print $0 OFS fields; next } { print }'
+}
 # The complete ledger with F4's covered verdict replaced by the given fields, tab-joined.
 ledger_with_covered_f4() {
   local fields
   fields=$(printf '\t%s' "$@")
-  complete_ledger | awk -v line="F4\tcovered$fields" -F'\t' '$1 == "F4" { print line; next } { print }' > "$ledger"
+  complete_ledger | awk -v line="F4\tcovered$fields" -F'\t' '$1 == "F4" { print line; next } { print }' | add_record_fields > "$ledger"
 }
 run_check() { bash "$script" check "$list" "$ledger" --diff "$diff_file" --rules "$rules_dir" 2>&1; }
 expect_check() {
@@ -89,42 +96,42 @@ expect_check() {
   last_output=$output
 }
 
-complete_ledger > "$ledger"
+complete_ledger | add_record_fields > "$ledger"
 expect_check passed "a ledger with a verdict for every item passes"
 expect_contains "it counts the items" "11 item(s), each with a verdict" "$last_output"
 
-complete_ledger | sed '/^F5/d' > "$ledger"
+complete_ledger | sed '/^F5/d' | add_record_fields > "$ledger"
 expect_check failed "an item with no verdict fails"
 expect_contains "it names the item" "F5: no verdict in the ledger" "$last_output"
 
-{ complete_ledger; printf 'F2\tone-off\tagain\n'; } > "$ledger"
+{ complete_ledger; printf 'F2\tone-off\tagain\n'; } | add_record_fields > "$ledger"
 expect_check failed "an item given two verdicts fails"
 expect_contains "it names the item" "F2: listed twice in the ledger" "$last_output"
 
-{ complete_ledger; printf 'F12\tone-off\tno such item\n'; } > "$ledger"
+{ complete_ledger; printf 'F12\tone-off\tno such item\n'; } | add_record_fields > "$ledger"
 expect_check failed "a verdict for an item not on the list fails"
 expect_contains "it names the item" "F12: not on the feedback list" "$last_output"
 
-complete_ledger | sed 's/^F2\tlesson\t§B13$/F2\tlesson\t§B9/' > "$ledger"
+complete_ledger | sed 's/^F2\tlesson\t§B13$/F2\tlesson\t§B9/' | add_record_fields > "$ledger"
 expect_check failed "a lesson whose rule the diff only removes fails"
 expect_contains "it names the rule" "F2: lesson §B9 is not added by the lesson diff" "$last_output"
 
-complete_ledger | sed 's/^F2\tlesson\t§B13$/F2\tlesson\t§B1/' > "$ledger"
+complete_ledger | sed 's/^F2\tlesson\t§B13$/F2\tlesson\t§B1/' | add_record_fields > "$ledger"
 expect_check failed "a lesson id that is only the start of an added id fails"
 
-complete_ledger | sed 's/^F3\tlesson\tB13,WF14$/F3\tlesson\tB13,WF15/' > "$ledger"
+complete_ledger | sed 's/^F3\tlesson\tB13,WF14$/F3\tlesson\tB13,WF15/' | add_record_fields > "$ledger"
 expect_check failed "every id of a lesson must be added, not only the first"
 expect_contains "it names the missing one" "F3: lesson WF15 is not added by the lesson diff" "$last_output"
 
-complete_ledger | sed 's/^F9\tlesson\tWF14$/F9\tlesson\trules.md/' > "$ledger"
+complete_ledger | sed 's/^F9\tlesson\tWF14$/F9\tlesson\trules.md/' | add_record_fields > "$ledger"
 expect_check passed "a lesson may name the rule file its diff changes, for a file with no ids"
-complete_ledger | sed 's/^F9\tlesson\tWF14$/F9\tlesson\tagreement.md/' > "$ledger"
+complete_ledger | sed 's/^F9\tlesson\tWF14$/F9\tlesson\tagreement.md/' | add_record_fields > "$ledger"
 expect_check failed "a lesson naming a file the diff doesn't change fails"
 expect_contains "it names the file" "F9: lesson agreement.md is not a file the lesson diff changes" "$last_output"
-complete_ledger | sed 's/^F9\tlesson\tWF14$/F9\tlesson\tr.les.md/' > "$ledger"
+complete_ledger | sed 's/^F9\tlesson\tWF14$/F9\tlesson\tr.les.md/' | add_record_fields > "$ledger"
 expect_check failed "a file name is matched literally, not as a pattern"
 
-complete_ledger | sed 's/^F2\tlesson\t§B13$/F2\tlesson/' > "$ledger"
+complete_ledger | sed 's/^F2\tlesson\t§B13$/F2\tlesson/' | add_record_fields > "$ledger"
 expect_check failed "a lesson with no rule id fails"
 expect_contains "it says so" "F2: lesson names no rule id" "$last_output"
 
@@ -194,24 +201,24 @@ ledger_with_covered_f4
 expect_check failed "covered with no rule id fails"
 expect_contains "it says so" "F4: covered names no rule id" "$last_output"
 
-complete_ledger | sed 's/^F5\tone-off\t.*/F5\tone-off/' > "$ledger"
+complete_ledger | sed 's/^F5\tone-off\t.*/F5\tone-off/' | add_record_fields > "$ledger"
 expect_check failed "a one-off with no reason fails"
 expect_contains "it asks for the reason" "F5: one-off gives no reason" "$last_output"
 
-complete_ledger | sed 's/^F1\tnot-feedback\t.*/F1\tnot-feedback/' > "$ledger"
+complete_ledger | sed 's/^F1\tnot-feedback\t.*/F1\tnot-feedback/' | add_record_fields > "$ledger"
 expect_check failed "not-feedback with no reason fails"
 
-complete_ledger | sed 's/^F5\tone-off\t/F5\tskipped\t/' > "$ledger"
+complete_ledger | sed 's/^F5\tone-off\t/F5\tskipped\t/' | add_record_fields > "$ledger"
 expect_check failed "an unknown verdict fails"
 expect_contains "it lists the verdicts" "'skipped' is not lesson, covered, one-off or not-feedback" "$last_output"
 
-complete_ledger > "$ledger"
+complete_ledger | add_record_fields > "$ledger"
 output=$(bash "$script" check "$list" "$ledger" --rules "$rules_dir" 2>&1) && actual=passed || actual=failed
 expect_eq "with no lesson diff given, no lesson can be shown" failed "$actual"
 
 # A lesson must be defined by the diff, not only cited by it; a covered rule must be defined.
 printf -- '--- a/rules.md\n+++ b/rules.md\n+see §B13 for context\n+- **WF14.** The look-back lists\n' > "$work_dir/citing.diff"
-complete_ledger > "$ledger"
+complete_ledger | add_record_fields > "$ledger"
 output=$(bash "$script" check "$list" "$ledger" --diff "$work_dir/citing.diff" --rules "$rules_dir" 2>&1) && actual=passed || actual=failed
 expect_eq "a diff that only cites a rule does not add it" failed "$actual"
 expect_contains "it names the rule" "F2: lesson §B13 is not added by the lesson diff" "$output"
@@ -221,12 +228,12 @@ ledger_with_covered_f4 '§R12' 'not in Markdown' 'no-change:x'
 expect_check failed "only Markdown rule files count"
 
 # An empty field stays empty: the reason doesn't slide into the rule id.
-complete_ledger | sed 's/^F2\tlesson\t§B13$/F2\tlesson\t\tsee F3/' > "$ledger"
+complete_ledger | sed 's/^F2\tlesson\t§B13$/F2\tlesson\t\tsee F3/' | add_record_fields > "$ledger"
 expect_check failed "a lesson with an empty rule field fails"
 expect_contains "it reads the field as empty" "F2: lesson names no rule id" "$last_output"
 
 # Blank lines and a last line with no newline are read.
-printf '%s' "$(complete_ledger | sed '3a\
+printf '%s' "$(complete_ledger | add_record_fields | sed '3a\
 ')" > "$ledger"
 { cat "$list"; printf '\n'; } > "$work_dir/list-blank.tsv"
 output=$(bash "$script" check "$work_dir/list-blank.tsv" "$ledger" --diff "$diff_file" --rules "$rules_dir" 2>&1) && actual=passed || actual=failed
@@ -235,7 +242,7 @@ expect_eq "a blank line in the list or ledger and no final newline still pass" p
 # A diff with no added lines, and rules with no ids, report problems instead of stopping.
 printf -- '--- a/rules.md\n+++ b/rules.md\n- removed §B9 line\n' > "$work_dir/removal.diff"
 mkdir -p "$work_dir/no-rules" && printf 'nothing here\n' > "$work_dir/no-rules/readme.md"
-complete_ledger > "$ledger"
+complete_ledger | add_record_fields > "$ledger"
 output=$(bash "$script" check "$list" "$ledger" --diff "$work_dir/removal.diff" --rules "$work_dir/no-rules" 2>&1) && actual=passed || actual=failed
 expect_eq "a removal-only diff and rules with no ids fail the ledger" failed "$actual"
 expect_contains "it says the lesson isn't added" "F2: lesson §B13 is not added by the lesson diff" "$output"
@@ -246,9 +253,71 @@ output=$(bash "$script" check "$list" "$ledger" --diff "$diff_file" --rules "$wo
 expect_eq "a rules folder that does not exist fails the covered verdict" failed "$actual"
 expect_contains "it still reports the item" "F4: covered by §R11, which no rule file had" "$output"
 
+# Lesson records: class, examples, mechanism, why-not-higher and proof, each checked on its own.
+record_without() { printf '%s' "$record_fields" | tr '\t' '\n' | grep -v "^$1:" | paste -sd '\t' -; }
+ledger_with_f2_fields() {
+  complete_ledger | awk -F'\t' -v OFS='\t' -v fields="$1" '$1 == "F2" { print $0 OFS fields; next } { print }' | add_record_fields_except_f2 > "$ledger"
+}
+add_record_fields_except_f2() { awk -F'\t' -v OFS='\t' -v fields="$record_fields" '$1 != "F2" && (($2 == "lesson" && NF >= 3) || ($2 == "covered" && $5 ~ /^lesson:./)) { print $0 OFS fields; next } { print }'; }
+for missing_field in class examples mechanism proof; do
+  ledger_with_f2_fields "$(record_without "$missing_field")"
+  expect_check failed "a lesson with no $missing_field: field fails"
+  expect_contains "it names the item and the field" "F2: lesson is missing $missing_field:" "$last_output"
+  ledger_with_f2_fields "$(record_without "$missing_field")"$'\t'"$missing_field:"
+  expect_check failed "a lesson with an empty $missing_field: field fails"
+  expect_contains "it names the item and the empty field" "F2: lesson $missing_field: is empty" "$last_output"
+done
+ledger_with_f2_fields "$(record_without examples)"$'\texamples:only one case'
+expect_check failed "a lesson with one example fails"
+expect_contains "it says a lesson needs two unlike cases" "F2: lesson examples: has one example; a lesson needs two unlike cases" "$last_output"
+ledger_with_f2_fields "$(record_without examples)"$'\texamples:a case; ; another'
+expect_check failed "a lesson with an empty example fails"
+expect_contains "it names the empty example" "F2: lesson examples: has an empty example" "$last_output"
+ledger_with_f2_fields "$(record_without examples)"$'\texamples:a case; another case; a third'
+expect_check passed "a lesson with three examples passes"
+ledger_with_f2_fields "$(record_without mechanism)"$'\tmechanism:memo'
+expect_check failed "a mechanism that is not on the layer ladder fails"
+expect_contains "it names the mechanism" "F2: lesson mechanism:memo is not one of check, guard, path-rule, skill, always-on" "$last_output"
+ledger_with_f2_fields "$(record_without mechanism)"$'\tmechanism:guard'
+expect_check failed "a guard with no why-not-higher fails"
+expect_contains "it asks for why-not-higher" "F2: lesson is missing why-not-higher:" "$last_output"
+ledger_with_f2_fields "$(record_without mechanism)"$'\tmechanism:guard\twhy-not-higher:the mistake happens at commit time, outside any test'
+expect_check passed "a guard with why-not-higher passes"
+ledger_with_f2_fields "$(record_without mechanism)"$'\tmechanism:check'
+expect_check passed "a check needs no why-not-higher"
+complete_ledger | add_record_fields | awk -F'\t' '$1 == "F4" { print "F4\tcovered\t§R11\tno box for it\tlesson:B13\tclass:a missed box"; next } { print }' > "$ledger"
+expect_check failed "a covered line whose catch is a lesson: needs the record fields too"
+expect_contains "it names what is missing" "F4: lesson is missing examples:" "$last_output"
+ledger_with_covered_f4 '§R11' 'no box for it' 'no-change:the box covers it'
+expect_check passed "a covered line with a no-change: catch needs no record fields"
+
+# Client terms: a --public-diff's added lines name none of the terms; a plain --diff is not checked.
+terms_file=$work_dir/terms.txt
+printf '# private list\n\nAcmeCorp\r\nwidget shop\n' > "$terms_file"
+public_diff=$work_dir/public.diff
+printf -- '--- a/rules.md\n+++ b/rules.md\n+- [ ] §B13 A new kind of actor\n+- **WF14.** Seen at the acmecorp checkout\n+Reading acmecorps is fine, not a whole word\n+# private list\n- removed AcmeCorp line\n--- a/plugin/tests/rules.test.sh\n+++ b/plugin/tests/rules.test.sh\n+echo held widget shop\n' > "$public_diff"
+complete_ledger | add_record_fields > "$ledger"
+output=$(bash "$script" check "$list" "$ledger" --public-diff "$public_diff" --terms "$terms_file" --rules "$rules_dir" 2>&1) && actual=passed || actual=failed
+expect_eq "a client term in a --public-diff fails" failed "$actual"
+expect_contains "it names the diff, the line and the term" "$public_diff: line 4 names client term \"AcmeCorp\"" "$output"
+expect_contains "a multi-word term is matched" "$public_diff: line 10 names client term \"widget shop\"" "$output"
+expect_eq "a term inside a longer word and a removed line are not hits" 2 "$(printf '%s\n' "$output" | grep -c 'names client term')"
+output=$(bash "$script" check "$list" "$ledger" --diff "$public_diff" --terms "$terms_file" --rules "$rules_dir" 2>&1) && actual=passed || actual=failed
+expect_eq "the same terms in a plain --diff pass" passed "$actual"
+output=$(KC_CLIENT_TERMS=$work_dir/no-such-terms.txt bash "$script" check "$list" "$ledger" --public-diff "$public_diff" --rules "$rules_dir" 2>&1) && actual=passed || actual=failed
+expect_eq "with no terms file the client-term check is skipped" passed "$actual"
+output=$(KC_CLIENT_TERMS=$terms_file bash "$script" check "$list" "$ledger" --public-diff "$public_diff" --rules "$rules_dir" 2>&1) && actual=passed || actual=failed
+expect_eq "KC_CLIENT_TERMS names the default terms file" failed "$actual"
+expect_eq "an unreadable --terms file is a usage error" 2 "$(bash "$script" check "$list" "$ledger" --public-diff "$public_diff" --terms "$work_dir/none.txt" --rules "$rules_dir" >/dev/null 2>&1; echo $?)"
+printf -- '--- a/rules.md\n+++ b/rules.md\n+- [ ] §B13 A new kind of actor\n+- **WF14.** The look-back lists\n--- a/plugin/tests/rules.test.sh\n+++ b/plugin/tests/rules.test.sh\n+echo held\n' > "$work_dir/clean-public.diff"
+output=$(bash "$script" check "$list" "$ledger" --public-diff "$work_dir/clean-public.diff" --terms "$terms_file" --rules "$rules_dir" 2>&1) && actual=passed || actual=failed
+expect_eq "a --public-diff with no term counts for rule ids and check files, and passes" passed "$actual"
+
 # Usage and unreadable inputs.
 output=$(bash "$script" 2>&1 || true)
 expect_contains "usage shows every verdict form" "<id> not-feedback <reason>" "$output"
+expect_contains "usage shows the lesson record fields" "why-not-higher:<why no higher layer holds it>" "$output"
+expect_contains "usage shows --public-diff" "[--public-diff <file>]..." "$output"
 expect_eq "check with no ledger is a usage error" 2 "$(bash "$script" check "$list" >/dev/null 2>&1; echo $?)"
 expect_contains "a missing transcript says so" "cannot read $work_dir/none.jsonl" "$(bash "$script" list "$work_dir/none.jsonl" 2>&1 || true)"
 expect_contains "a missing extra file says so" "cannot read $work_dir/none.txt" "$(bash "$script" list "$transcript" --extra "$work_dir/none.txt" 2>&1 || true)"
@@ -264,18 +333,18 @@ expect_eq "an unknown command is a usage error" 2 "$(bash "$script" tally >/dev/
 prose_diff=$work_dir/prose.diff
 printf -- '--- a/rules.md\n+++ b/rules.md\n+- [ ] §B13 A new kind of actor\n+- **WF14.** The look-back lists\n' > "$prose_diff"
 run_prose_check() { output=$(bash "$script" check "$list" "$ledger" --diff "$prose_diff" --rules "$rules_dir" 2>&1) && actual=passed || actual=failed; }
-complete_ledger > "$ledger"
+complete_ledger | add_record_fields > "$ledger"
 run_prose_check
 expect_eq "a lesson whose diff adds only rule text fails" failed "$actual"
 expect_contains "it says the lesson is prose with no check" "F2: lesson is prose with no check" "$output"
-complete_ledger | sed -E 's/^(F2\tlesson\t§B13)$/\1\tprose-only: no script can tell whether a name is honest/; s/^(F3\tlesson\tB13,WF14)$/\1\tprose-only: judgment/; s/^(F9\tlesson\tWF14)$/\1\tprose-only: judgment/; s/^(F4\tcovered\t§R11\t[^\t]*\tlesson:§B13)$/\1\tprose-only: judgment/' > "$ledger"
+complete_ledger | sed -E 's/^(F2\tlesson\t§B13)$/\1\tprose-only: no script can tell whether a name is honest/; s/^(F3\tlesson\tB13,WF14)$/\1\tprose-only: judgment/; s/^(F9\tlesson\tWF14)$/\1\tprose-only: judgment/; s/^(F4\tcovered\t§R11\t[^\t]*\tlesson:§B13)$/\1\tprose-only: judgment/' | add_record_fields > "$ledger"
 run_prose_check
 expect_eq "a prose-only field with a reason no longer passes a prose diff" failed "$actual"
 expect_contains "it still says the lesson is prose with no check" "F2: lesson is prose with no check" "$output"
 expect_contains "a covered line's lesson: catch needs a check too" "F4: lesson is prose with no check" "$output"
 for held_path in plugin/scripts/check.sh plugin/hooks/hooks.json plugin/evals/case/setup.sh src/total.test.ts biome.json .github/workflows/ci.yml; do
   printf -- '--- a/rules.md\n+++ b/rules.md\n+- [ ] §B13 A new kind of actor\n+- **WF14.** The look-back lists\n--- a/%s\n+++ b/%s\n+x\n' "$held_path" "$held_path" > "$prose_diff"
-  complete_ledger > "$ledger"
+  complete_ledger | add_record_fields > "$ledger"
   run_prose_check
   expect_eq "a diff that changes $held_path holds the lessons" passed "$actual"
 done
@@ -313,7 +382,7 @@ printf -- '--- /dev/null\n+++ b/tests/lib/helper.sh\n+true\n--- /dev/null\n+++ b
 printf 'F1\ttyped\tdon'"'"'t do that\n' > "$work_dir/held-list.tsv"
 held_rules=$work_dir/held-rules; mkdir -p "$held_rules"
 run_held() {
-  printf 'F1\tlesson\t§B13\t%s\n' "$1" > "$work_dir/held-ledger.tsv"
+  printf 'F1\tlesson\t§B13\t%s\t%s\n' "$1" "$record_fields" > "$work_dir/held-ledger.tsv"
   held_output=$(bash "$script" check "$work_dir/held-list.tsv" "$work_dir/held-ledger.tsv" --diff "$held_diff" --rules "$held_rules" --repo "$held_repo" --base base 2>&1) && held_actual=passed || held_actual=failed
 }
 run_held 'held-by:tests/good.test.sh'

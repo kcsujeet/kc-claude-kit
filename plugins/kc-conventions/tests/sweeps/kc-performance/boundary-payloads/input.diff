@@ -1,0 +1,47 @@
+diff --git a/app/controllers/orders_controller.rb b/app/controllers/orders_controller.rb
+index 1111111..2222222 100644
+--- a/app/controllers/orders_controller.rb
++++ b/app/controllers/orders_controller.rb
+@@ -4,2 +4,7 @@ class OrdersController < ApplicationController
+   def create_async
++    ImportOrderJob.perform_later(params.to_unsafe_h)
++    ImportOrderJob.perform_later(order_contract.call(order_params).to_h)
++    ImportOrderJob.perform_later(order.id)
++    Rails.logger.info("order received #{params.to_unsafe_h}")
++    render json: order.as_json
+   end
+diff --git a/src/orders/api.ts b/src/orders/api.ts
+new file mode 100644
+index 0000000..1111111
+--- /dev/null
++++ b/src/orders/api.ts
+@@ -0,0 +1,5 @@
++export const saveOrder = (form: OrderForm) =>
++  fetch('/api/orders', { method: 'POST', body: JSON.stringify({ ...form }) })
++export const saveNote = (orderId: string, note: string) =>
++  fetch(`/api/orders/${orderId}/notes`, { method: 'POST', body: JSON.stringify({ note }) })
++localStorage.setItem('draft', JSON.stringify(structuredClone(cart)))
+diff --git a/shop/storefronts/cache.py b/shop/storefronts/cache.py
+new file mode 100644
+index 0000000..1111111
+--- /dev/null
++++ b/shop/storefronts/cache.py
+@@ -0,0 +1,4 @@
++cache.set(storefront_key(storefront.id), storefront.__dict__)
++cache.set(storefront_key(storefront.id), {"name": storefront.name})
++logger.info("storefront updated", extra=request.form)
++events.publish("order.created", order.model_dump())
+diff --git a/spec/jobs/import_order_job_spec.rb b/spec/jobs/import_order_job_spec.rb
+new file mode 100644
+index 0000000..1111111
+--- /dev/null
++++ b/spec/jobs/import_order_job_spec.rb
+@@ -0,0 +1,1 @@
++ImportOrderJob.perform_later(params)
+diff --git a/README.md b/README.md
+new file mode 100644
+index 0000000..1111111
+--- /dev/null
++++ b/README.md
+@@ -0,0 +1,1 @@
++Never call `perform_later(params)` with raw input.

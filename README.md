@@ -118,10 +118,11 @@ Most skills start on their own when the topic comes up. You can also type any of
 | `kc-rails` | Rails models, queries, migrations and specs. |
 | `kc-type-safety` | Types that tell the truth. |
 | `kc-error-handling` | Errors that are caught, reported and explained. |
-| `kc-performance` | Queries and renders that stay fast. |
+| `kc-performance` | Queries and renders that stay fast, and data sized for whatever receives it. |
 | `kc-dependencies` | Adding a library only when it earns its place. |
 | `kc-delegation` | Handing work to subagents or a workflow without the cost running away. |
 | `kc-assess` | Assessing a task before building: claims check, reproduce first, every reader of the broken value. |
+| `kc-investigate` | Investigating a production problem from the records that already exist, hop by hop, before building a probe or a fix. |
 | `kc-look-back` | The look-back at hand-off: list the feedback, a verdict each, lessons as one batch, where a lesson belongs. |
 | `kc-claims` | Checking a claim against its source before stating it. |
 | `kc-init` | Copies the rules into a project, to commit them there. The home copy installs itself. |

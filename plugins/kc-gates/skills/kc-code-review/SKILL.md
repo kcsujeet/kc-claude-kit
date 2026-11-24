@@ -76,6 +76,7 @@ If a script fails, relay its message; fall back to the equivalent `gh`/`git` com
 - [ ] §G3 Every linked issue was read in full (the `issue-<n>.md` files `scope-facts.sh` saved, and its `pr-body.md`), and every design, prototype or mockup it links was opened and walked through each state the diff changes (on and off, empty and filled, each role or plan) before any finding about what a person sees. Each constraint the issue states ("no public API change", "must work offline") is checked against the diff, and a violated one is a finding that cites the issue. Each finding about copy, layout, or what shows in which state is checked against the design as well: one the design contradicts is dropped, and one where the issue's text and the design disagree is a question for whoever owns the spec, citing both. For example, faulting a settings page's wording that the linked mockup has word for word, or calling a card's placement wrong when the mockup puts it there. (N/A: no linked issue)
 - [ ] §G4 A diff too large to read in one pass (roughly 35KB or more) was read from the saved file in offset/limit chunks, every chunk; no hunk was skimmed. The gate agents get the saved path, not a truncated paste. (N/A: the diff was read whole)
 - [ ] §G5 The approach was questioned before the lines. The orchestrator wrote down the result the change is after, then at least one other way to get it, and compared them: fewer mechanisms, fewer places that know the same thing, less code. When another way is materially simpler, it is one design finding that leads the report and any drafted comment, and the line findings it would delete are folded under it instead of listed as separate asks. Evidence: the goal in one line, the alternative considered, and why it is or is not simpler. On a re-review it is walked again, and when this round finds a new case of a defect an earlier round fixed in the same code, the recurrence is the evidence: the approach comes back as a finding (a question citing the rounds), even when the author declined it before. (N/A: never; even a one-line change has a goal another shape could meet)
+- [ ] §G6 Under the title, `**Does it work / what can it break**` gives before and after numbers (or `not measured: <why>`) and the `Uses:` line; naming and clarity findings end `(non-blocking)` and still fail their gate. Held by `check-review-report.sh`. (N/A: never)
 
 ### Step 2: dispatch the gate agents in two phases (mandatory: every gate the diff needs, EVERY round)
 
@@ -184,20 +185,23 @@ A verdict that does not have this shape, or that has a box with no evidence, is 
 Report directly in chat. No file output. **Be terse.** The reader is the user, not the PR author; they want to scan, not read prose.
 
 **Rules:**
-- One finding = one line. Two short lines max if a fix snippet is genuinely needed. This is a budget, not a target to fill; most findings fit in one line and should stay there.
+- One finding = one line. Two short lines max if a fix snippet is genuinely needed.
 - **No explanation paragraphs anywhere in the report**: not under a finding, not under the verdict, not as a preamble to a section. The gate table, the finding line and the fix carry the whole message.
 - Prefix every finding with a severity color so the user can scan weight at a glance: 🔴 must-fix (real bug, regression, security, drift from a stated convention), 🟠 should-address (correctness gap, validation hole, behavior question that needs an answer), 🟡 low (style, naming, nit, cleanup). These emojis are chat-only: never put them in posted PR comment bodies, where the Conventional Comments label (`issue` / `suggestion` / `nitpick`) carries the weight instead.
 - Lead with the file:line. Then the issue. Then the fix (as inline code or short phrase, not a code block, when it fits).
 - No code blocks unless the suggested fix is multi-line and cannot be expressed inline.
-- No "explanation" paragraphs. The fix implies the reasoning. If the reader needs the *why*, they will ask.
 - Do not repeat the same finding under two gates. Pick the closer fit.
-- Skip a section header entirely when the section is empty.
+- Skip an empty section's header.
 
 **Format:**
 
 ```
 ### Review: <PR title>
 **Head:** `<short-sha>` (re-review: `since <short-sha>`, or `whole diff: rebased`) · **Verdict:** ✅ PASSED | ❌ FAILED (<n> gate(s) failing)
+
+**Does it work / what can it break**
+- Measured: <before 420 ms -> after 38 ms>, or `not measured: <why>`.
+- Uses: <n> names, <n> uses, <n> break, <n> change; <n> tests run, <n> failed (or why they couldn't run).
 
 **Approach:** <one line: the simpler design and the line findings it replaces, or "no simpler shape found: <the alternative weighed>">.
 
@@ -219,11 +223,11 @@ Report directly in chat. No file output. **Be terse.** The reader is the user, n
 | verification | ... |
 
 **Naming:**
-- 🔴 `<file>:L<n>`: <issue>. <fix as inline code or short phrase>.
-- 🟡 `<file>:L<n>`: <issue>. <fix>. (fails safe)
+- 🔴 `<file>:L<n>`: <issue>. <fix as inline code or short phrase>. (non-blocking)
+- 🟡 `<file>:L<n>`: <issue>. <fix>. (non-blocking) (fails safe)
 
 **Clarity:**
-- 🟠 `<file>:L<n>`: <issue>. <fix>.
+- 🟠 `<file>:L<n>`: <issue>. <fix>. (non-blocking)
 
 **i18n:** (paste the per-key audit table from the i18n gate when locale files changed)
 
@@ -234,7 +238,6 @@ Report directly in chat. No file output. **Be terse.** The reader is the user, n
 - Always: <files read at sha, findings cite file:line + sha, nothing posted to GitHub>.
 - Scope: <§G1-§G5 results, e.g. "not stacked (author has no other open PR); title matches; no linked issue; diff read whole; approach: weighed one grouping step for both cases, the diff's two are needed because <reason>">.
 - <trigger group>: <receipt, or "n/a, diff does not touch X">.
-- Uses: <n> names, <n> uses, <n> break, <n> change; <n> tests run, <n> failed (or why they couldn't run).
 - Walk: <`WALK=not-required`, or one line per `walk-item` (the same lines as `walk-receipt.tsv`) with what was seen in the running app or at the API; with the public-path reason, also the audiences walked (signed out included) and each replayed write's result>.
 - Integrity: <n> fixes re-checked; <n> rewrites checked; <n> findings, <n> verified, <n> dropped, <n> fail safe.
 
@@ -247,7 +250,7 @@ Report directly in chat. No file output. **Be terse.** The reader is the user, n
 
 The verification gate's "How to use this in the output" section, with a full worked Checklist example, is in `${CLAUDE_PLUGIN_ROOT}/agents/verification-gate.md`.
 
-The **Gate status table is mandatory and leads the report**: it is the receipt that every gate was checked by its agent this round. A review without the full table (all gates listed, each with PASS / FAIL / N/A) is incomplete. The top-line **Verdict is FAILED if any gate is FAIL**, full stop; do not report PASSED with a failing gate, and do not omit a gate to make the table look clean.
+The **Gate status table is mandatory and follows the §G6 section**: it is the receipt that every gate was checked by its agent this round. A review without the full table (all gates listed, each with PASS / FAIL / N/A) is incomplete. The top-line **Verdict is FAILED if any gate is FAIL**, full stop; do not report PASSED with a failing gate, and do not omit a gate to make the table look clean.
 
 **Each gate's verdict reflects every box in its checklist, not just the headline rule.** A gate agent reports `PASS` only after walking every box in its topic's `## Review checklist` and citing evidence for each. A vague "naming looks fine" from an agent is a rejected verdict; send it back for the per-box `BOXES:` breakdown.
 
@@ -271,6 +274,8 @@ If the whole PR looks clean, one line:
 
 ```
 ### Review: <PR title>
+**Does it work / what can it break**
+- not measured: <why>. Uses: <n> traced, <n> checked.
 `<short-sha>` `<file>`: follows existing conventions and naming. No changes.
 ```
 

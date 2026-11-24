@@ -1,6 +1,7 @@
 ---
 drafts: true
 ledger: true
+public: true
 ---
 
 # Hand-off checklist

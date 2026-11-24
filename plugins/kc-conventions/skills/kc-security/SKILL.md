@@ -22,6 +22,7 @@ paths:
   - §SEC7. Redirects go only to allowed hosts
   - §SEC8. Input never becomes code
   - §SEC9. Every request-surface hit has a verdict
+  - §SEC10. Raw request input never reaches jobs, logs, caches or events
 - Sweeps
 
 ## Rules
@@ -36,6 +37,7 @@ A handler that passes every happy-path test can still let the wrong caller in, o
 - Secrets and personal data stay out of responses (serialize named fields, not a whole record), logs, error messages and URLs; a token in a query string ends up in logs and referrers.
 - A redirect, return or callback target taken from input is checked against an allowlist of hosts or paths (an exact match or a parsed host, never a prefix or substring test), or is not taken from input at all.
 - Input never becomes code: no SQL, shell command, HTML or template built by joining strings; use parameters, argument arrays and escaping the framework provides.
+- Raw request input never reaches a job's arguments, a log line, a cache or an event: pass the validated, allowlisted values or ids. Raw input carries personal data, files and fields nobody checked into stores that keep them and logs that print them.
 - A change that skips or removes an authentication, authorization or request-forgery check names who can now reach the action and what they can do, and a test shows the caller who must be refused refused.
 
 Detection criteria and per-box review failure modes live in the `## Review checklist` of the `kc-security` skill (`kc-conventions:kc-security`), with the detail under its `## Review detail`. These rules are the statement of the convention; that checklist is how a diff gets graded against it.
@@ -53,6 +55,7 @@ The security gate agent ticks every box against the diff. A box is FAIL if any m
 - [ ] §SEC7 Redirects go only to allowed hosts: a redirect, return or callback target from input is matched against an allowlist by exact value or parsed host, never by prefix or substring. Example: `redirect_to params[:return_to]`. (N/A: the diff adds or changes no redirect and takes no target from input)
 - [ ] §SEC8 Input never becomes code: no SQL, shell command, HTML or template is built by joining strings with request input; each uses parameters, argument arrays or the framework's escaping. Example: `where("name = '#{params[:name]}'")`. (N/A: no query, command, markup or template built from input)
 - [ ] §SEC9 Every hit of the `request-surface.sh` sweep has its own verdict on §SEC1 to §SEC8, and the hit count equals the verdict count; a hit nobody judged FAILS. **Enumerate with the `request-surface.sh` sweep** (see Sweeps). (N/A: only when it returns 0 hits, stated as `grepped request surface: 0 hits`)
+- [ ] §SEC10 Raw request input never reaches a job, log, cache or event: each hit of kc-performance's `boundary-payloads.sh` sweep whose payload is request input (the whole params, body, query or form) FAILS unless what is passed is the validated, allowlisted output or ids, and the evidence names that validation. Example: a handler that queues `params.to_unsafe_h`, so customers' personal data and uploaded files sit in the queue store and print in the job log. **Enumerate with the `boundary-payloads.sh` sweep** (see Sweeps). (N/A: no hit's payload is request input, stated with the sweep's count)
 
 ## Review detail
 
@@ -144,6 +147,17 @@ A string built from input and handed to an interpreter (a SQL engine, a shell, a
 
 The sweep lists every added line that reads request input, declares a route or handler, or skips an authentication filter. Walk each hit and say which of §SEC1 to §SEC8 it touches and why it passes, or fail the box that it breaks. A hit that is only a declaration (a route line, a `class ...Controller`) is judged with the handler it points to. State `grepped request surface: N hits` and give N verdicts; the sweep misses input read through a variable it was assigned to earlier, so read the handlers whole, not just their hits.
 
+### §SEC10. Raw request input never reaches jobs, logs, caches or events
+
+A validated value has had its fields named and its types checked; raw input holds whatever the caller sent, personal data, base64 files and fields the code never reads included. Handed to a queue, cache, event or log line it is stored and printed where no response filter applies, and every consumer has to trust it again. Pass the contract's or allowlist's output, or ids the receiver loads within the caller's scope (§SEC4).
+
+```ruby
+# Flag: the raw parameters are stored in the queue and printed in the job log
+ImportOrderJob.perform_later(params.to_unsafe_h)
+# Prefer: the validated output
+ImportOrderJob.perform_later(order_contract.call(order_params).to_h)
+```
+
 ## Sweeps
 
 Save the diff under review to a file and run the scripts over it; `-` reads the diff from stdin. Each prints one `path:line: text` hit per line, where `line` is the new-side line number, and nothing else. Give every hit its own verdict, and state each receipt with its count, `0 hits` included.
@@ -158,4 +172,10 @@ Save the diff under review to a file and run the scripts over it; `-` reads the 
 
   ```bash
   bash "${CLAUDE_PLUGIN_ROOT}/skills/kc-security/scripts/request-surface.sh" <diff-file>
+  ```
+
+- `boundary-payloads.sh` (§SEC10), from kc-performance: added lines that hand a whole object or raw request input to a job, cache, log, event, outgoing request or response. Judge each hit whose payload is request input. Receipt: `grepped boundary payloads: N hits`.
+
+  ```bash
+  bash "${CLAUDE_PLUGIN_ROOT}/skills/kc-performance/scripts/boundary-payloads.sh" <diff-file>
   ```

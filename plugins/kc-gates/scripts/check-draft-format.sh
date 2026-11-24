@@ -31,6 +31,10 @@
 #   - when it is an `issue` or a `suggestion`, carry a "ran" record: a change asked for in a
 #     review is code the author writes on the reviewer's word, so it is run before it is asked
 #     for, not only read (kc-post-review's "Verified before suggested"). An "n/a" needs a reason;
+#   - outside code, name a ticket or pull request only as a link: a tracker id (ABC-123, two or more
+#     capitals) or a #123 / PR 123 / pull request 123 reference that is not the text of a
+#     [..](http..) link and not part of a URL is a problem, so the reader can open it; standards
+#     names (UTF-8, ISO-8601, SHA-256, RFC, HTTP, TLS, SSL) are not ids (kc-post-review's "Linked, not bare");
 #   - use none of a short list of hard words (gated, callers, derive, invariant, predicate, and the
 #     code-flow words rerender, refetch, fallback, mid-edit, early return, short-circuit, bail out): a comment is read by a person, so it says the thing in everyday words;
 #   - when it asks for a test, carry a "ran" that says the test failed with the bug put back: a
@@ -124,6 +128,18 @@ perl -MJSON::PP -CS -e '
     }
     my $ran_record = ref $draft->{ran} ? "" : ($draft->{ran} // "");
     # Words a reader has to stop and decode; each has an everyday way to say it.
+    (my $linkable = $rest) =~ s/```.*?```//gs;
+    $linkable =~ s/`[^`\n]*`//g;
+    $linkable =~ s{\[[^\]\n]*\]\(https?:[^)\s]*\)}{}g;
+    $linkable =~ s{https?://\S+}{}g;
+    my %bare;
+    $bare{$1} = 1 while $linkable =~ /(?<![\w\/#&-])((?:PR|[Pp]ull [Rr]equest) #?\d+)\b/g;
+    $linkable =~ s/(?:PR|[Pp]ull [Rr]equest) #?\d+\b//g;
+    $bare{$1} = 1 while $linkable =~ /(?<![\w\/&-])((?!(?:UTF|ISO|SHA|RFC|HTTP|TLS|SSL)-)[A-Z]{2,}-\d+(?:-\d+)?)\b/g;
+    $bare{$1} = 1 while $linkable =~ /(?<![\w\/&#])(#\d+)\b/g;
+    for my $ref (sort keys %bare) {
+      push @found, "names ${ref} without a link; write it as [${ref}](<url>)";
+    }
     my $hard_words = qr/\b(gated|ungated|callers?|derived?|derives|semantics|invariants?|predicates?|passthrough|upstream|downstream|idempotent|coerced?|coerces|hydrated?|truthy|falsy|mutates?|memoi[sz]ed?|re-?render(s|ed|ing)?|re-?fetch(es|ed|ing)?|fall-?backs?|mid-edit|early returns?|short-circuit(s|ed)?|bail(s|ed)? out)\b/i;
     if ($prose =~ $hard_words) {
       push @found, "uses the hard word \"$1\"; say it in everyday words (who sees what, what happens)";

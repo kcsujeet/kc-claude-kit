@@ -40,6 +40,17 @@
             "timeout": 10
           }
         ]
+      },
+      {
+        "matcher": "Bash|mcp__.*[Cc]omment.*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/guard-investigation.sh\"",
+            "shell": "bash",
+            "timeout": 10
+          }
+        ]
       }
     ]
   }
