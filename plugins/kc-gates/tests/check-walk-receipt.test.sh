@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Tests scripts/check-walk-receipt.sh: every walk-item needs a receipt line with something seen and
-# evidence that is an existing capture or a request with its status.
+# Tests scripts/check-walk-receipt.sh: every walk-item needs a receipt line with something seen,
+# evidence that is an existing capture or a request with its status, and the states walked (at
+# least two, or "only state:" with a reason): kc-ready-for-review §H8.
 set -euo pipefail
 
 tests_dir=$(cd "$(dirname "$0")" && pwd)
@@ -20,10 +21,10 @@ run_walk_receipt_check() {
   if [ "$status" -eq 0 ]; then echo clean; else printf '%s\n' "$output"; fi
 }
 
-printf 'env\tbin/review-env up\tGET /health 200\napp/models/order.rb\tcreated an order with a free item, total 0\tPOST /orders 201\nsrc/cart/total.ts\tcart page shows 2 items\t%s\n' "$work_dir/total.png" > "$receipt"
+printf 'env\tbin/review-env up\tGET /health 200\napp/models/order.rb\tcreated an order with a free item, total 0\tPOST /orders 201\tstates: empty cart; two items\nsrc/cart/total.ts\tcart page shows 2 items\t%s\tstates: one item; many items\n' "$work_dir/total.png" > "$receipt"
 expect_eq "§V11: a full receipt passes" clean "$(run_walk_receipt_check)"
 
-printf 'app/models/order.rb\tcreated an order\tPOST /orders 201\n' > "$receipt"
+printf 'app/models/order.rb\tcreated an order\tPOST /orders 201\tstates: empty cart; two items\n' > "$receipt"
 missing=$(run_walk_receipt_check)
 expect_contains "§V11: an item with no receipt line fails" "walk-item src/cart/total.ts: no receipt line" "$missing"
 expect_eq "only the missing item is listed" 1 "$(printf '%s\n' "$missing" | grep -c '^walk-item')"
@@ -31,23 +32,23 @@ expect_eq "only the missing item is listed" 1 "$(printf '%s\n' "$missing" | grep
 rm -f "$receipt"
 expect_contains "§V11: no receipt file fails every item" "walk-item app/models/order.rb: no receipt line" "$(run_walk_receipt_check)"
 
-printf 'env\tbin/review-env up\tGET /health 200\napp/models/order.rb\t\tPOST /orders 201\nsrc/cart/total.ts\t  \t%s\n' "$work_dir/total.png" > "$receipt"
+printf 'env\tbin/review-env up\tGET /health 200\napp/models/order.rb\t\tPOST /orders 201\tstates: empty cart; two items\nsrc/cart/total.ts\t  \t%s\tstates: one item; many items\n' "$work_dir/total.png" > "$receipt"
 empty_seen=$(run_walk_receipt_check)
 expect_contains "an empty seen fails" "walk-item app/models/order.rb: nothing seen" "$empty_seen"
 expect_contains "a blank seen fails" "walk-item src/cart/total.ts: nothing seen" "$empty_seen"
 
-printf 'env\tbin/review-env up\tGET /health 200\napp/models/order.rb\tcreated an order\tlooked fine\nsrc/cart/total.ts\tcart page\t%s\n' "$work_dir/gone.png" > "$receipt"
+printf 'env\tbin/review-env up\tGET /health 200\napp/models/order.rb\tcreated an order\tlooked fine\tstates: empty cart; two items\nsrc/cart/total.ts\tcart page\t%s\tstates: one item; many items\n' "$work_dir/gone.png" > "$receipt"
 bad_evidence=$(run_walk_receipt_check)
 expect_contains "evidence that is prose fails" "walk-item app/models/order.rb: evidence is neither" "$bad_evidence"
 expect_contains "a capture that does not exist fails" "walk-item src/cart/total.ts: evidence file does not exist" "$bad_evidence"
 
-printf 'env\tbin/review-env up\tGET /health 200\napp/models/order.rb\tcreated an order\tPOST /orders\nsrc/cart/total.ts\tcart page\t%s\n' "$work_dir/total.png" > "$receipt"
+printf 'env\tbin/review-env up\tGET /health 200\napp/models/order.rb\tcreated an order\tPOST /orders\tstates: empty cart; two items\nsrc/cart/total.ts\tcart page\t%s\tstates: one item; many items\n' "$work_dir/total.png" > "$receipt"
 expect_contains "a request line with no status fails" "walk-item app/models/order.rb: evidence is neither" "$(run_walk_receipt_check)"
 
-printf 'env\tbin/review-env up\tGET /health 200\napp/models/order.rb\tcreated an order\tPOST /orders 201\nsrc/cart/total.ts\tcart page\ttotal.png\n' > "$receipt"
+printf 'env\tbin/review-env up\tGET /health 200\napp/models/order.rb\tcreated an order\tPOST /orders 201\tstates: empty cart; two items\nsrc/cart/total.ts\tcart page\ttotal.png\tstates: one item; many items\n' > "$receipt"
 expect_eq "a relative capture path is read from the receipt's folder" clean "$(run_walk_receipt_check)"
 
-printf 'env\tbin/review-env up\tGET /health 200\napp/models/order.rb\tcreated an order\tPOST /orders 201\nsrc/cart/total.ts\tcart page\t%s\n' "$work_dir/total.webm" > "$receipt"
+printf 'env\tbin/review-env up\tGET /health 200\napp/models/order.rb\tcreated an order\tPOST /orders 201\tstates: empty cart; two items\nsrc/cart/total.ts\tcart page\t%s\tstates: one item; many items\n' "$work_dir/total.webm" > "$receipt"
 printf 'webm' > "$work_dir/total.webm"
 expect_eq "a recording in the shared capture formats (webm) is evidence" clean "$(run_walk_receipt_check)"
 
@@ -73,7 +74,7 @@ expect_eq "a blank walk-item line is not an item" clean "$(run_walk_receipt_chec
 printf 'GATES=naming\nWALK=required\nwalk: x\nwalk-item: app/models/order.rb\nwalk-item: src/cart/total.ts\n' > "$select_output"
 printf 'png' > "$work_dir/total.png"
 write_with_env() { printf 'env\t%s\t%s\n' "$1" "$2" > "$receipt"; printf '%b' "$items_only" >> "$receipt"; }
-items_only='app/models/order.rb\tcreated an order\tPOST /orders 201\nsrc/cart/total.ts\tcart page\tPOST /orders 201\n'
+items_only='app/models/order.rb\tcreated an order\tPOST /orders 201\tstates: empty cart; two items\nsrc/cart/total.ts\tcart page\tPOST /orders 201\tstates: empty cart; two items\n'
 printf '%b' "$items_only" > "$receipt"
 expect_contains "env: no env line fails" "env: no env line" "$(run_walk_receipt_check)"
 write_with_env 'bin/review-env up && bin/seed' 'GET /health 200'
@@ -84,7 +85,7 @@ write_with_env '' 'GET /health 200'
 expect_contains "env: a blank command fails" "env: no command" "$(run_walk_receipt_check)"
 write_with_env 'bin/review-env up' 'it came up'
 expect_contains "env: evidence that is prose fails" "env: evidence is neither" "$(run_walk_receipt_check)"
-printf 'env\tbin/review-env up\t%s\n' "$work_dir/gone.png" > "$receipt"
+printf 'env\tbin/review-env up\t%s\tstates: one item; many items\n' "$work_dir/gone.png" > "$receipt"
 printf '%b' "$items_only" >> "$receipt"
 expect_contains "env: a capture that does not exist fails" "env: evidence file does not exist" "$(run_walk_receipt_check)"
 write_with_env 'bin/review-env up' 'total.png'
@@ -92,5 +93,27 @@ expect_eq "env: a capture beside the receipt is evidence" clean "$(run_walk_rece
 printf 'GATES=naming\nWALK=not-required\nwalk: none\n' > "$select_output"
 rm -f "$receipt"
 expect_eq "env: nothing to walk needs no env line" clean "$(run_walk_receipt_check)"
+
+# The states walked: one walk of one state is not QA.
+printf 'GATES=naming\nWALK=required\nwalk: x\nwalk-item: app/models/order.rb\n' > "$select_output"
+write_states() { printf 'env\tbin/review-env up\tGET /health 200\napp/models/order.rb\tcreated an order\tPOST /orders 201\t%s\n' "$1" > "$receipt"; }
+printf 'env\tbin/review-env up\tGET /health 200\napp/models/order.rb\tcreated an order\tPOST /orders 201\n' > "$receipt"
+missing_states=$(run_walk_receipt_check)
+expect_contains "§H8: an item with no states field fails" "walk-item app/models/order.rb: fewer than two states walked" "$missing_states"
+expect_contains "§H8: the message says to list every shape and walk each" "list every shape the change's output can take" "$missing_states"
+write_states 'states: empty cart'
+expect_contains "§H8: one state fails" "fewer than two states walked" "$(run_walk_receipt_check)"
+write_states 'states: empty cart;  ; '
+expect_contains "§H8: blank entries are not states" "fewer than two states walked" "$(run_walk_receipt_check)"
+write_states 'states: empty cart; one long row; many short rows; landscape'
+expect_eq "§H8: four states pass" clean "$(run_walk_receipt_check)"
+write_states 'states: empty cart; two items'
+expect_eq "§H8: two states pass" clean "$(run_walk_receipt_check)"
+write_states 'only state: the page has no variants'
+expect_eq "§H8: only state with a reason passes" clean "$(run_walk_receipt_check)"
+write_states 'only state: none'
+expect_contains "§H8: only state with a one-word reason fails" "fewer than two states walked" "$(run_walk_receipt_check)"
+write_states 'only state:'
+expect_contains "§H8: only state with no reason fails" "fewer than two states walked" "$(run_walk_receipt_check)"
 
 finish

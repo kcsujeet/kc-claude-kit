@@ -209,4 +209,30 @@ expect_eq "a cause and fix after edits is a report of a fix made, not a proposal
 { write_typed_message "address the QA rows"; } > "$transcript"
 expect_eq "the word reproduced in prose is not the line" noted "$(run_hook "$(printf '%s I reproduced nothing yet.' "$proposal")")"
 
+# Capability claims: a tool, CLI or API said not to do something needs a lookup in the turn.
+cannot_reply='The shopctl CLI cannot export orders as CSV.'
+{ write_typed_message "can we export orders?"; } > "$transcript"
+expect_eq "a CLI said not to do something with no lookup is noted" noted "$(run_hook "$cannot_reply")"
+expect_reason "it says to look the capability up" "can't do something with no lookup"
+{ write_typed_message "can we export orders?"; write_tool_call Read file_path "/repo/src/cart.rb"; write_tool_result; } > "$transcript"
+expect_eq "a read of an unrelated file is not a lookup" noted "$(run_hook "$cannot_reply")"
+{ write_typed_message "can we export orders?"; write_tool_call Edit file_path "/repo/docs/shopctl.md"; write_tool_result; } > "$transcript"
+expect_eq "an edit naming the tool is not a lookup" noted "$(run_hook "$cannot_reply")"
+{ write_typed_message "can we export orders?"; write_tool_call Bash command "shopctl export --help"; write_tool_result; } > "$transcript"
+expect_eq "the tool's own --help is a lookup" out "$(run_hook "$cannot_reply")"
+{ write_typed_message "can we export orders?"; write_tool_call WebFetch url "https://example.com/docs/export"; write_tool_result; } > "$transcript"
+expect_eq "a web fetch is a lookup" out "$(run_hook "$cannot_reply")"
+{ write_typed_message "can we export orders?"; write_tool_call WebSearch query "shopctl export csv"; write_tool_result; } > "$transcript"
+expect_eq "a web search is a lookup" out "$(run_hook "$cannot_reply")"
+{ write_typed_message "can we export orders?"; write_tool_call Grep pattern "export"; write_tool_result; } > "$transcript"
+expect_eq "a search naming a word of the claim is a lookup" out "$(run_hook "The export API has no way to filter by date.")"
+{ write_typed_message "can we export orders?"; } > "$transcript"
+expect_eq "'doesn't support' about an API is noted" noted "$(run_hook "The orders API doesn't support filtering by date.")"
+expect_eq "'no API for' is noted" noted "$(run_hook "There is no API for bulk refunds in the service.")"
+expect_eq "a cannot with no tool in the sentence goes out" out "$(run_hook "I cannot remember what we decided.")"
+expect_eq "a reply with no such claim goes out" out "$(run_hook "The CLI exports orders as JSON.")"
+expect_eq "'can't confirm' is the uncertainty note, not a capability claim" noted "$(run_hook "I can't confirm whether the API returns the total.")"
+expect_reason "the uncertainty note is the one made" "couldn't confirm or didn't know"
+if tr '\n' ' ' < "$misses_file" | grep -q "can't do something with no lookup"; then record "'can't confirm' is not also a capability note" fail "$(cat "$misses_file")"; else record "'can't confirm' is not also a capability note" ok; fi
+
 finish
