@@ -1,15 +1,16 @@
 #!/usr/bin/env bash
 # PreToolUse guard for sharing an investigation's findings (kc-investigate). When the checkout's
 # current branch has an investigation write-up at `$(git rev-parse --git-path kc-investigation)/<branch>.md`,
-# a command that opens a pull request or writes a comment or review from that checkout (`gh pr create`,
-# `gh pr comment`, `gh pr review`, `gh issue comment`, a `gh api` call to a comments endpoint
-# with a write method or fields, or an MCP tool whose name starts with create, add, post, save,
-# update or reply and names a comment) is denied while `check-investigation.sh` fails on the write-up, with its problems in
-# the reason. Reading comments (a `gh api` GET, an MCP list or get tool) is never denied: those
-# are records the investigation reads. No write-up, another command, or a passing
-# write-up: nothing printed. The checkout is the payload's cwd, or the directory of a leading
-# `cd <dir> &&`. Without jq it reads nothing and lets every call through (it never blocks what it
-# can't read). Output: the deny JSON or nothing; always exits 0.
+# a command that opens a pull request or writes a comment or review from that checkout
+# (`gh pr create`, `gh pr comment`, `gh pr review`, `gh issue comment`, a `gh api` call to a
+# comments endpoint with a write method or fields, or an MCP tool whose name pairs create, add,
+# post, save, update or reply with comment, as in save_comment or comment_create) is denied while
+# `check-investigation.sh` fails on the write-up, with its problems in the reason. Reading
+# comments (a `gh api` GET, an MCP list or get tool) is never denied: those are records the
+# investigation reads. No write-up, another command, or a passing write-up: nothing printed. The
+# checkout is the payload's cwd, or the directory of a leading `cd <dir> &&`. Without jq it reads
+# nothing and lets every call through (it never blocks what it can't read). Output: the deny JSON
+# or nothing; always exits 0.
 set -u
 
 hook_dir=$(cd "$(dirname "$0")" && pwd)
@@ -30,12 +31,13 @@ is_sharing_command() {
   [ "$is_comments_api" = true ] && [ "$is_write_call" = true ]
 }
 
-# True when an MCP tool writes a comment: the tool part of mcp__<server>__<tool> starts with create,
-# add, post, save, update or reply and names a comment (save_comment, add_issue_comment,
-# comment_create). The server part is not read, so a server named like a verb changes nothing.
+# True when an MCP tool writes a comment: its name (the part after the last __) starts with create,
+# add, post, save, update or reply and says comment somewhere after it (save_comment,
+# add_comment_to_issue, addCommentToIssue), or starts with comment and a verb (comment_create).
+# The server part is not read, so a server named like a verb (postgres) changes nothing.
 is_comment_writing_tool() {
   local tool_part=${1##*__}
-  printf '%s' "$tool_part" | grep -Eiq '^(create|add|post|save|update|reply)[_-]([a-z]+[_-])*comments?$|^comments?[_-](create|add|post|save|update|reply)$'
+  printf '%s' "$tool_part" | grep -Eiq '^(create|add|post|save|update|reply)[_-]?([a-z0-9]*[_-]?)*comment|^comments?[_-]?(create|add|post|save|update|reply)'
 }
 
 escape_json() {

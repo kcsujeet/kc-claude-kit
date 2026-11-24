@@ -79,6 +79,10 @@ expect_hook_verdict allow "§INV5 missing: an MCP tool that lists comments passe
 expect_hook_verdict allow "§INV5 missing: a list tool on a server named like a verb passes" "$(build_mcp_payload mcp__postgres__list_comments "$repo")"
 expect_hook_verdict allow "§INV5 missing: a get tool naming address comments passes" "$(build_mcp_payload mcp__shop__get_address_comments "$repo")"
 expect_hook_verdict deny "§INV5 missing: an add-issue-comment tool is denied" "$(build_mcp_payload mcp__tracker__add_issue_comment "$repo")"
+expect_hook_verdict deny "§INV5 missing: a tool with words after comment is denied" "$(build_mcp_payload mcp__tracker__add_comment_to_issue "$repo")"
+expect_hook_verdict deny "§INV5 missing: a camelCase comment tool is denied" "$(build_mcp_payload mcp__tracker__addCommentToIssue "$repo")"
+expect_hook_verdict deny "§INV5 missing: a comment-first tool name is denied" "$(build_mcp_payload mcp__tracker__comment_create "$repo")"
+expect_hook_verdict deny "§INV5 missing: a reply tool is denied" "$(build_mcp_payload mcp__tracker__reply_to_comment "$repo")"
 expect_hook_verdict allow "§INV5 missing: an MCP tool that does not comment passes" "$(build_mcp_payload mcp__tracker__get_issue "$repo")"
 
 git -C "$repo" checkout -q -b other
