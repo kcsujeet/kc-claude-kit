@@ -9,6 +9,7 @@
 # right before handing work to a reviewer.
 #
 # Usage: task-claims.sh <task-key> [--repo <owner/name>]... [--path <file-or-dir>]... [--since <commit>]
+#                       [--deleting <file-or-dir>]...
 #   <task-key>  the task's id as titles and descriptions carry it (`ABC-1`, `#42`)
 #   --repo      a repository to search; repeat for each repository the task may touch
 #               (default: the current directory's repository)
@@ -18,6 +19,12 @@
 #   --since     with --path, run inside a local checkout: after fetching, lists the commits on the
 #               default branch after <commit> that touch the paths, so a change the default branch
 #               already made or fixed shows up
+#   --deleting  a file (or a directory, expanded to its tracked files) a cleanup is about to delete;
+#               repeat for each. Run inside a local checkout. Adds a last section, `## files to delete,
+#               by who added them`, one line per file, tab-separated: `<path> <adder email> <mine|NOT YOURS>`. The
+#               adder is the author of the commit that added the file; `mine` means it equals
+#               `git config user.email`, ignoring case. A cleanup deletes only `mine` files, unless the requester
+#               says otherwise, and lists the rest
 #
 # Output, per repository: `## <owner/name>`, then one line per pull request whose title or
 # description names the key, newest first (at most `max_rows`, 50):
@@ -40,7 +47,7 @@ set -euo pipefail
 
 script_name=$(basename "$0")
 usage() {
-  echo "usage: $script_name <task-key> [--repo <owner/name>]... [--path <file-or-dir>]... [--since <commit>]" >&2
+  echo "usage: $script_name <task-key> [--repo <owner/name>]... [--path <file-or-dir>]... [--since <commit>] [--deleting <file-or-dir>]..." >&2
   exit 2
 }
 fail() {
@@ -55,6 +62,7 @@ shift
 repos=()
 paths=()
 since=""
+deleting_paths=()
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --repo)
@@ -68,6 +76,14 @@ while [ "$#" -gt 0 ]; do
       path=${path#./}
       [ -n "$path" ] || usage
       paths+=("$path")
+      shift 2
+      ;;
+    --deleting)
+      [ "$#" -ge 2 ] && [ -n "$2" ] || usage
+      deleting_path=${2%/}
+      deleting_path=${deleting_path#./}
+      [ -n "$deleting_path" ] || usage
+      deleting_paths+=("$deleting_path")
       shift 2
       ;;
     --since)
@@ -141,4 +157,25 @@ if [ -n "$since" ]; then
   else
     echo "(none)"
   fi
+fi
+
+if [ "${#deleting_paths[@]}" -gt 0 ]; then
+  my_email=$(git config user.email) || fail "git config user.email is not set; the files' adders cannot be compared with you"
+  my_email=$(printf '%s' "$my_email" | tr '[:upper:]' '[:lower:]')
+  echo "## files to delete, by who added them"
+  for deleting_path in "${deleting_paths[@]}"; do
+    tracked_files=$(git -c core.quotePath=false --literal-pathspecs ls-files -- "$deleting_path") || fail "git ls-files $deleting_path failed; run inside a checkout of the repository"
+    if [ -z "$tracked_files" ]; then
+      printf '%s\t(no tracked files)\tNOT YOURS\n' "$deleting_path"
+      continue
+    fi
+    while IFS= read -r file; do
+      adder=$(git --literal-pathspecs log --diff-filter=A --follow --format=%ae -1 -- "$file")
+      if [ -n "$adder" ] && [ "$(printf '%s' "$adder" | tr '[:upper:]' '[:lower:]')" = "$my_email" ]; then
+        printf '%s\t%s\tmine\n' "$file" "$adder"
+      else
+        printf '%s\t%s\tNOT YOURS\n' "$file" "${adder:-unknown}"
+      fi
+    done <<< "$tracked_files"
+  done
 fi
