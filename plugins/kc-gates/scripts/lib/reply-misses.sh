@@ -7,6 +7,10 @@
 # shellcheck disable=SC2034  # read by the scripts that source this file
 readonly REPLY_MAX_WORDS=180
 
+# A tool call line (get_tool_call_lines) of a tool that changes files.
+# shellcheck disable=SC2034  # read by the scripts that source this file
+readonly EDIT_CALLS=$'^(Edit|Write|MultiEdit|NotebookEdit)\t'
+
 # Prints session <id>'s misses file; fails, printing nothing, without a data folder or an id.
 reply_misses_file() {
   [ -n "${CLAUDE_PLUGIN_DATA:-}" ] && [ -n "${1:-}" ] || return 1
@@ -71,4 +75,34 @@ is_only_question() {
   case "$text" in *'?') ;; *) return 1 ;; esac
   text=$(printf '%s' "$text" | sed -E 's/(^|[^[:alnum:]])(do|does|did)[[:space:]]+(you|we|i|they|it|he|she)([^[:alnum:]]|$)/ /g')
   ! printf '%s' "$text" | grep -Eq "(^|[^[:alnum:]])(fix|build|change|add|remove|make|update|write|implement|create|delete|run|try|edit|rename|revert|apply|commit|push|do (it|this|that))([^[:alnum:]]|$)"
+}
+
+# Each command in each line on stdin, one per line: split on && || ; |, then past a `$ ` prompt,
+# `await`, VAR=value assignments and runners (sudo, env, time, bunx, npx, bundle exec, pnpm exec and
+# the like) with their flags, and past the directory of the command's own path, so `bin/rspec spec/a.rb`
+# and `./node_modules/.bin/jest a.test.ts` read as `rspec spec/a.rb` and `jest a.test.ts`.
+# Read by guard-unreproduced-cause.sh, and by check-reply-sources.sh through list_command_starts.
+list_stripped_commands() {
+  awk '{
+    count = split($0, commands, /&&|\|\||;|\|/)
+    for (i = 1; i <= count; i++) {
+      command = commands[i]
+      sub(/^[ \t]*((\$|await)[ \t]+)?/, "", command)
+      while (1) {
+        if (sub(/^[A-Za-z_][A-Za-z0-9_]*=[^ \t]*[ \t]+/, "", command)) continue
+        if (sub(/^(sudo|env|time|bunx|npx|pnpx|bun x|pnpm dlx|yarn dlx|bundle exec|pnpm exec)[ \t]+/, "", command)) {
+          while (sub(/^-[^ \t]*[ \t]+/, "", command)) {}
+          continue
+        }
+        break
+      }
+      sub(/^[^ \t]*\//, "", command)
+      if (command != "") print command
+    }
+  }'
+}
+
+# The first word of each command on stdin (see list_stripped_commands).
+list_command_starts() {
+  list_stripped_commands | awk '{ print $1 }'
 }

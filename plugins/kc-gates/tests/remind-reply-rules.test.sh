@@ -65,7 +65,7 @@ expect_eq "a payload with no prompt gets no status line" "" "$(printf '{}' | bas
 # --- a prompt to fix something reported gets the reproduce-first line ------------------------------
 for mode in jq sed; do
   for fix_prompt in "address the QA feedback on ABC-1" "the export is broken" "fix the failing build" "checkout crashes on submit" "look at the review comments" "fixing the login redirect" "debugging the checkout redirect" "it fixes the login redirect" "I fixed the login redirect" "the checkout throws an error" "address the review comments" "the export failed overnight"; do
-    expect_contains "[$mode] a fix prompt gets the reproduce-first line: $fix_prompt" "reproduce each one (the running app, a test or the log) before proposing a cause" "$(run_prompt "$mode" "$fix_prompt")"
+    expect_contains "[$mode] a fix prompt gets the reproduce-first line: $fix_prompt" "reproduce each one the way the reporter met it (their entry point, runtime and version, environment, real-shaped data) before proposing a cause" "$(run_prompt "$mode" "$fix_prompt")"
   done
   for other_prompt in "next" "add a price column" "what's left?" "prefix the ids with shop" "add error handling to the form" "show a failure toast" "add a QA checklist" "list the review comments"; do
     expect_eq "[$mode] no reproduce-first line for: $other_prompt" "" "$(run_prompt "$mode" "$other_prompt" | grep 'Reproduced: line' || true)"

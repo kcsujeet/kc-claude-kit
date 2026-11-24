@@ -39,7 +39,7 @@ if is_question "$(extract_field "$input" prompt)"; then
 fi
 
 if asks_fix "$(extract_field "$input" prompt)"; then
-  echo "This prompt asks to fix reported problems: reproduce each one (the running app, a test or the log) before proposing a cause, and name the evidence on a Reproduced: line per item, or say Not reproduced: <why> (kc-conventions:kc-assess step 3)."
+  echo "This prompt asks to fix reported problems: reproduce each one the way the reporter met it (their entry point, runtime and version, environment, real-shaped data) before proposing a cause, and name the evidence on a Reproduced: line per item, or say Not reproduced: <why> (kc-conventions:kc-assess step 3)."
 fi
 
 if asks_status "$(extract_field "$input" prompt)"; then

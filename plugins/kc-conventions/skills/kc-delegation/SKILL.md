@@ -30,3 +30,7 @@ Before handing work off, walk these habits:
 - **Re-check only what changes.** After a fix, rerun the script and the agents on the files that changed, not everything again.
 - **Never switch a running session's model.** The prompt cache is per model, so the switch makes the session write its whole context again.
 - **Measure.** Run `bash "${CLAUDE_PLUGIN_ROOT}/scripts/subagent-cost.sh" <transcript.jsonl or folder>...` on the session's transcripts (a session's `subagents/` folder works) to see calls and cached tokens per agent, before and after the change.
+
+## Gate checklist
+
+- [ ] §D1 Each independent result is waited on by its own short poll, acted on as it lands: no one call waits on several (two deploys, three test runs, two CI watches in a `Promise.all` or a chain), since it returns only when the slowest ends and a hung one hides, and no wait has a timeout over 10 minutes on a check that takes seconds. Held by kc-gates `guard-batched-wait.sh`, which denies a call with two CI watches or one with a timeout over 10 minutes. (N/A: the work waits on nothing)

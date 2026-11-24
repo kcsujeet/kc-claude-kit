@@ -274,10 +274,10 @@ for form in "${write_forms[@]}"; do
   check deny "walk: no receipt denies: $form" "$walk_token $form"
   expect_last_reason "walk: the denial for '$form' names the item with no receipt line" "walk-item app/models/order.rb: $no_receipt_reason"
 done
-printf 'app/models/order.rb\tcreated an order with a free item\tno evidence\n' > "$review_folder/walk-receipt.tsv"
+printf 'app/models/order.rb\tcreated an order with a free item\tno evidence\tstates: empty cart; two items\n' > "$review_folder/walk-receipt.tsv"
 check deny  "walk: a receipt line with bad evidence is denied" "$walk_token gh pr review 12 --approve"
 expect_last_reason "walk: the denial for bad evidence says what the evidence must be" "evidence is neither an existing screenshot or recording nor a request line"
-printf 'env\tbin/review-env up\tGET /health 200\napp/models/order.rb\tcreated an order with a free item\tPOST /orders 201\n' > "$review_folder/walk-receipt.tsv"
+printf 'env\tbin/review-env up\tGET /health 200\napp/models/order.rb\tcreated an order with a free item\tPOST /orders 201\tstates: empty cart; two items\n' > "$review_folder/walk-receipt.tsv"
 for form in "${write_forms[@]}"; do
   check allow "walk: a full receipt allows: $form" "$walk_token $form"
 done

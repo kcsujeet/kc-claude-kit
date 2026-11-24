@@ -12,6 +12,11 @@
 #                          Evidence is an existing screenshot or recording (png, jpg, jpeg, gif,
 #                          webp, mp4, mov, webm; a relative path is read from the receipt's
 #                          folder), or a request line with its status (`GET /orders/7 200`).
+#                          A fourth field names the states walked, `states: <a>; <b>; ...`: at least
+#                          two of the shapes the changed output can take (the data and the options:
+#                          `empty list; one long row; many short rows; landscape`), or
+#                          `only state: <why>` (three or more words) when it has one. One walk of one
+#                          state is not QA: list every shape the output can take and walk each.
 #
 # The environment the walk ran in is one line too, `env<TAB><command><TAB><evidence>`: the one command
 # that brought the app up (never a chain of steps done by hand: no `&&`, `;`, `||` or `then`), and
@@ -20,8 +25,8 @@
 # evidence; that it was run as written and is a tested one is for the reviewer.
 #
 # Prints one line per problem (`walk-item <path>: <problem>`, or `env: <problem>`): no receipt line,
-# nothing seen, or evidence that is neither. Exits 0 when every item has a full line, 1 when any does not, 2 on a
-# usage error or an unreadable <select-gates-output>. A missing or unreadable receipt is not an
+# nothing seen, evidence that is neither, or fewer than two states walked with no reason. Exits 0
+# when every item has a full line, 1 when any does not, 2 on a usage error or an unreadable <select-gates-output>. A missing or unreadable receipt is not an
 # error: every item then has no receipt line, which exits 1.
 set -euo pipefail
 
@@ -38,6 +43,18 @@ receipt_dir=$(dirname "$receipt")
 items=$(sed -n 's/^walk-item: //p' "$select_output")
 
 request_pattern='^(GET|HEAD|POST|PUT|PATCH|DELETE)[[:space:]]+[^[:space:]]+.*[[:space:]][1-5][0-9][0-9]([^0-9]|$)'
+readonly MIN_STATES=2
+
+# True when a receipt line's fourth field names two or more states ("states: a; b"), or says
+# "only state:" with a reason of three or more words.
+has_walked_states() {
+  local text
+  text=$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')
+  if printf '%s' "$text" | grep -Eq '^[[:space:]]*only state:[[:space:]]*[^[:space:]]+([[:space:]]+[^[:space:]]+){2,}'; then return 0; fi
+  text=$(printf '%s' "$text" | sed -E 's/^[[:space:]]*states:[[:space:]]*//')
+  [ "$(printf '%s' "$text" | tr ';' '\n' | grep -c '[^[:space:]]')" -ge "$MIN_STATES" ]
+}
+
 problems=0
 record_walk_problem() { echo "walk-item $1: $2"; problems=$((problems + 1)); }
 
@@ -65,6 +82,10 @@ while IFS= read -r item; do
     fi
   elif ! printf '%s' "$evidence" | grep -Eq "$request_pattern"; then
     record_walk_problem "$item" "evidence is neither an existing screenshot or recording nor a request line with its status (GET /path 200): $evidence"
+  fi
+  states=$(printf '%s' "$line" | awk -F'\t' '{ print $4 }')
+  if ! has_walked_states "$states"; then
+    record_walk_problem "$item" "fewer than two states walked: list every shape the change's output can take (empty, one long row, many short rows, each option) and walk each; write states: <a>; <b> as the fourth field, or only state: <why, three or more words> when it has one"
   fi
 done <<EOF
 $items
