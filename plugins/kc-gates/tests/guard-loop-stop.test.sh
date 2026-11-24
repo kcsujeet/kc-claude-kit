@@ -201,4 +201,49 @@ check_verdict allow "allowed: -uall is the untracked-files option, not -a" "git 
 run_git_in "$merge_repo" checkout -- f.txt
 run_git_in "$merge_repo" merge --abort
 
+# Small changes (change-class.sh). A rule file a handed-off commit (receipted, on main) wrote.
+small_repo="$work_dir/small-repo"
+make_repo "$small_repo"
+printf 'Orders ship in one box.\nRefunds go to the card.\nStorefronts share one cart.\n' > "$small_repo/rules.md"
+run_git_in "$small_repo" add rules.md
+run_git_in "$small_repo" commit -q -m "shop rules (#5)"
+git -C "$small_repo" push -q origin main
+printf 'rounds=1\n' > "$KC_READY_DIR/$(git -C "$small_repo" rev-parse HEAD)"
+run_git_in "$small_repo" checkout -q -b wording
+edit_line "$small_repo" rules.md 2
+run_git_in "$small_repo" add rules.md
+check_verdict allow "allowed: a small prose commit editing a handed-off rule, no phrase" "git commit -m 'reword'" "$small_repo"
+run_git_in "$small_repo" commit -q -m "reword"
+check_verdict allow "allowed: gh pr create for a small prose branch editing a handed-off rule, no phrase" "gh pr create --fill" "$small_repo"
+run_git_in "$small_repo" checkout -q -b wording-and-tool main
+edit_line "$small_repo" rules.md 2
+echo 'echo hi' > "$small_repo/tool.sh"
+run_git_in "$small_repo" add rules.md tool.sh
+check_verdict deny "blocked: the same commit plus one script" "git commit -m 'reword and tool'" "$small_repo"
+run_git_in "$small_repo" commit -q -m "reword and tool"
+check_verdict deny "blocked: the same pull request plus one script" "gh pr create --fill" "$small_repo"
+expect_contains "the block lists every phrase the remaining steps need" 'types one message: \"approve rework\".' "$last_hook_output"
+printf 'sha=%s\nrounds=1\nopen=1\nclean=no\n' "$(git -C "$small_repo" rev-parse HEAD)" > "$KC_READY_DIR/$(git -C "$small_repo" rev-parse HEAD)"
+check_verdict deny "blocked: still, with a receipt that left findings open" "gh pr create --fill" "$small_repo"
+expect_contains "the block also lists the merge phrase the open findings will need" 'types one message: \"approve rework\", \"approve merge\".' "$last_hook_output"
+
+# A small code change (code_small) fixing lines its own branch's receipted commit wrote is not
+# rework of a handed-off fix; the same change on a risk path (full) still is.
+for own_file in label.sh auth-label.sh; do
+  run_git_in "$small_repo" checkout -q -b "own-$own_file" main
+  write_lines "$small_repo/$own_file" l
+  run_git_in "$small_repo" add "$own_file"
+  run_git_in "$small_repo" commit -q -m "round 1"
+  printf 'rounds=1\n' > "$KC_READY_DIR/$(git -C "$small_repo" rev-parse HEAD)"
+done
+edit_line "$small_repo" auth-label.sh 2
+run_git_in "$small_repo" add auth-label.sh
+check_verdict deny "blocked: a small change with a risk line (full) editing its own receipted lines" "git commit -m 'round 2'" "$small_repo"
+reset_repo "$small_repo"
+run_git_in "$small_repo" checkout -q own-label.sh
+edit_line "$small_repo" label.sh 2
+run_git_in "$small_repo" add label.sh
+check_verdict allow "allowed: a small code change editing lines its own receipted commit wrote" "git commit -m 'round 2'" "$small_repo"
+reset_repo "$small_repo"
+
 finish

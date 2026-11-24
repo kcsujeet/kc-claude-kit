@@ -163,6 +163,26 @@ user_approved() {
     | grep -qiF -- "$phrase"
 }
 
+# read_change_class <dir> <change-class.sh option>...: prints prose_small, code_small or full for the
+# change (change-class.sh); full when it cannot be read.
+read_change_class() {
+  local dir=$1 class
+  shift
+  class=$(bash "$(dirname "${BASH_SOURCE[0]}")/../change-class.sh" --dir "$dir" "$@" 2>/dev/null | sed -n 's/^CLASS=//p')
+  printf '%s' "${class:-full}"
+}
+
+# needed_phrases_sentence <dir> <this guard's phrase>: the sentence a block that needs the user's typed
+# words ends with: every phrase the remaining steps need (approvals-needed.sh, this guard's first),
+# so the user types one message. Prints nothing in check-only mode (KC_CHECK_ONLY=1), where
+# approvals-needed.sh runs the guards.
+needed_phrases_sentence() {
+  local dir=$1 own=$2 phrases
+  [ "${KC_CHECK_ONLY:-0}" != 1 ] || return 0
+  phrases=$({ printf '%s\n' "$own"; bash "$(dirname "${BASH_SOURCE[0]}")/../approvals-needed.sh" --dir "$dir" 2>/dev/null; } | awk 'NF && !seen[$0]++ { printf "%s\"%s\"", (n++ ? ", " : ""), $0 }')
+  printf ' Every phrase the remaining steps (commit, pull request, merge) need, so the user types one message: %s.' "$phrases"
+}
+
 # One shell segment per line: split on newlines, ;, &&, || and |.
 split_segments() {
   printf '%s\n' "$1" | sed -e 's/&&/\

@@ -10,6 +10,11 @@
 # contains "approve merge" (user_approved in lib/hook-input.sh). The token without those words, no
 # transcript, or a session with no typed message (a subagent) stays blocked.
 #
+# A pull request whose change from its base is prose_small (change-class.sh: a few prose lines and
+# nothing else, its head and base read in this clone) needs no receipt: it merges once every check
+# GitHub lists for it has passed (or with --auto, which waits for them). A head this clone doesn't
+# have is classed full.
+#
 # Everything the guard cannot read (no gh, no pull request, a failed lookup) is not blocked.
 # Output: the PreToolUse deny JSON on a blocked command, nothing otherwise. Always exits 0.
 # Hook schema: https://code.claude.com/docs/en/hooks
@@ -25,6 +30,21 @@ readonly APPROVAL_TOKEN='KC_MERGE_APPROVED=1'
 readonly APPROVAL_PHRASE='approve merge'
 readonly SHORT_SHA_LENGTH=9
 readonly MERGE_SUBCOMMAND_WORDS=2 # "pr merge"
+# The checks of the pull request that have not passed: failed, cancelled or still running.
+readonly UNPASSED_CHECKS='[.statusCheckRollup[]? | (.conclusion // .state // "") | ascii_upcase | select(. != "SUCCESS" and . != "NEUTRAL" and . != "SKIPPED")] | length | tostring'
+
+# Prints the class (change-class.sh) of the pull request's change in directory $1: head $2, base
+# branch $3. full when this clone lacks either.
+read_pull_request_class() {
+  local dir=$1 head=$2 base_branch=$3 base_ref merge_base
+  git -C "$dir" rev-parse -q --verify "$head^{commit}" >/dev/null 2>&1 || { printf full; return; }
+  for base_ref in "origin/$base_branch" "$base_branch"; do
+    merge_base=$(git -C "$dir" merge-base "$base_ref" "$head" 2>/dev/null) && break
+    merge_base=""
+  done
+  [ -n "$merge_base" ] || { printf full; return; }
+  read_change_class "$dir" --base "$merge_base" --head "$head"
+}
 
 # Prints "<pr ref>|<repo>" for a merge segment's words (after `gh`): the pull request's number or
 # branch (empty: the current branch's) and the -R/--repo value (empty: the directory's repo).
@@ -61,7 +81,7 @@ get_merge_target() {
 
 # Checks one shell segment, run in directory $2.
 check_segment() {
-  local segment=$1 dir=$2 gh_words_list=() merge_target pr_ref repo pr_fields head author me has_head=false is_by_me=false is_own_pull_request=false
+  local segment=$1 dir=$2 gh_words_list=() merge_target pr_ref repo pr_fields head author base_branch unpassed_checks me has_head=false is_by_me=false is_own_pull_request=false change_class
   is_merge_segment "$segment" || return 0
   read -ra gh_words_list <<< "$(gh_words "$segment")"
   # Split on the separator by hand: an empty ref before a --repo value stays empty.
@@ -69,15 +89,22 @@ check_segment() {
   pr_ref=${merge_target%%|*}
   repo=${merge_target#*|}
   # shellcheck disable=SC2086 # an empty $pr_ref means the current branch's pull request
-  pr_fields=$(cd "$dir" && gh pr view $pr_ref ${repo:+--repo "$repo"} --json headRefOid,author --jq '.headRefOid + " " + .author.login' 2>/dev/null) || return 0
-  read -r head author <<< "$pr_fields"
+  pr_fields=$(cd "$dir" && gh pr view $pr_ref ${repo:+--repo "$repo"} --json headRefOid,author,baseRefName,statusCheckRollup --jq ".headRefOid + \" \" + .author.login + \" \" + .baseRefName + \" \" + ($UNPASSED_CHECKS)" 2>/dev/null) || return 0
+  read -r head author base_branch unpassed_checks <<< "$pr_fields"
   me=$(gh api user --jq .login 2>/dev/null) || return 0
   [ -n "$head" ] && has_head=true
   [ "$author" = "$me" ] && is_by_me=true
   $has_head && $is_by_me && is_own_pull_request=true
   $is_own_pull_request || return 0
+  change_class=$(read_pull_request_class "$dir" "$head" "${base_branch:-}")
+  if [ "$change_class" = prose_small ]; then
+    [ "${unpassed_checks:-0}" = 0 ] && return 0
+    printf '%s\n' "${gh_words_list[@]}" | grep -qx -- '--auto' && return 0
+    print_pretooluse_deny "Blocked by the kc-gates plugin: this pull request changes only a few prose lines (change-class.sh: prose_small), so it merges with no review receipt, but only once its checks pass: $unpassed_checks of them have not passed yet. Wait for them (gh pr checks), fix a failure, then merge; or merge with --auto, which waits for them. No user approval is needed."
+    return 1
+  fi
   bash "$scripts_dir/ready-receipt.sh" check "$head" --clean >/dev/null 2>&1 && return 0
-  print_pretooluse_deny "Blocked by the kc-gates plugin: this pull request's head (${head:0:$SHORT_SHA_LENGTH}) has no clean review receipt: a pull request merges only when its last gate round found nothing and nothing is left open. Fix what is open and review the fixes as the next round (kc-ready-for-review), or, when the rounds are used up, ask the user about the approach. Ask the user: only their typed words approve a merge with problems left. When their latest message says \"approve merge\", prefix the command with KC_MERGE_APPROVED=1; the token without those words stays blocked."
+  print_pretooluse_deny "Blocked by the kc-gates plugin: this pull request's head (${head:0:$SHORT_SHA_LENGTH}) has no clean review receipt: a pull request merges only when its last gate round found nothing and nothing is left open. Fix what is open and review the fixes as the next round (kc-ready-for-review), or, when the rounds are used up, ask the user about the approach. Ask the user: only their typed words approve a merge with problems left. When their latest message says \"approve merge\", prefix the command with KC_MERGE_APPROVED=1; the token without those words stays blocked.$(needed_phrases_sentence "$dir" "$APPROVAL_PHRASE")"
   return 1
 }
 
