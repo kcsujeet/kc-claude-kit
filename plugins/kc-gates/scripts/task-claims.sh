@@ -22,9 +22,9 @@
 #   --deleting  a file (or a directory, expanded to its tracked files) a cleanup is about to delete;
 #               repeat for each. Run inside a local checkout. Adds a last section, `## files to delete,
 #               by who added them`, one line per file: `<path> <adder email> <mine|NOT YOURS>`. The
-#               adder is the author of the commit that added the file (the first commit touching it
-#               when no add is found); `mine` means it equals `git config user.email`. A cleanup
-#               deletes only `mine` files, unless the requester says otherwise, and lists the rest
+#               adder is the author of the commit that added the file; `mine` means it equals
+#               `git config user.email`. A cleanup deletes only `mine` files, unless the requester
+#               says otherwise, and lists the rest
 #
 # Output, per repository: `## <owner/name>`, then one line per pull request whose title or
 # description names the key, newest first (at most `max_rows`, 50):
@@ -62,7 +62,7 @@ shift
 repos=()
 paths=()
 since=""
-deleting=()
+deleting_paths=()
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --repo)
@@ -80,10 +80,10 @@ while [ "$#" -gt 0 ]; do
       ;;
     --deleting)
       [ "$#" -ge 2 ] && [ -n "$2" ] || usage
-      target=${2%/}
-      target=${target#./}
-      [ -n "$target" ] || usage
-      deleting+=("$target")
+      deleting_path=${2%/}
+      deleting_path=${deleting_path#./}
+      [ -n "$deleting_path" ] || usage
+      deleting_paths+=("$deleting_path")
       shift 2
       ;;
     --since)
@@ -159,23 +159,22 @@ if [ -n "$since" ]; then
   fi
 fi
 
-if [ "${#deleting[@]}" -gt 0 ]; then
-  me=$(git config user.email) || fail "git config user.email is not set; the files' adders cannot be compared with you"
+if [ "${#deleting_paths[@]}" -gt 0 ]; then
+  my_email=$(git config user.email) || fail "git config user.email is not set; the files' adders cannot be compared with you"
   echo "## files to delete, by who added them"
-  for target in "${deleting[@]}"; do
-    files=$(git --literal-pathspecs ls-files -- "$target") || fail "git ls-files $target failed; run inside a checkout of the repository"
-    if [ -z "$files" ]; then
-      echo "$target (no tracked files) NOT YOURS"
+  for deleting_path in "${deleting_paths[@]}"; do
+    tracked_files=$(git --literal-pathspecs ls-files -- "$deleting_path") || fail "git ls-files $deleting_path failed; run inside a checkout of the repository"
+    if [ -z "$tracked_files" ]; then
+      echo "$deleting_path (no tracked files) NOT YOURS"
       continue
     fi
     while IFS= read -r file; do
       adder=$(git --literal-pathspecs log --diff-filter=A --follow --format=%ae -1 -- "$file")
-      [ -n "$adder" ] || adder=$(git --literal-pathspecs log --follow --format=%ae -- "$file" | tail -n 1)
-      if [ "$adder" = "$me" ]; then
+      if [ "$adder" = "$my_email" ]; then
         echo "$file $adder mine"
       else
         echo "$file ${adder:-unknown} NOT YOURS"
       fi
-    done <<< "$files"
+    done <<< "$tracked_files"
   done
 fi

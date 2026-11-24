@@ -119,6 +119,12 @@ tasks/theirs.rb other@example.com NOT YOURS" "$deleting_dir"
 expect_eq "--deleting: without it the output has no deletion section" "$two_repos" "$(cd "$cleanup_repo" && bash "$task_claims" ABC-1 --repo acme/shop --repo acme/shop-api)"
 expect_contains "--deleting: a path with no tracked files is listed as NOT YOURS" "tasks/gone.rb (no tracked files) NOT YOURS" "$(cd "$cleanup_repo" && bash "$task_claims" ABC-1 --repo acme/shop --deleting tasks/gone.rb)"
 
+echo c > "$cleanup_repo/tasks/staged.rb"
+git -C "$cleanup_repo" add tasks/staged.rb
+expect_contains "--deleting: a staged file with no commit has no adder and is NOT YOURS" "tasks/staged.rb unknown NOT YOURS" "$(cd "$cleanup_repo" && bash "$task_claims" ABC-1 --repo acme/shop --deleting tasks/staged.rb)"
+git -C "$cleanup_repo" reset --quiet tasks/staged.rb
+rm "$cleanup_repo/tasks/staged.rb"
+
 if grep -Eqv '^(pr list|repo view) ' "$KC_GH_LOG"; then
   record "only read calls reached gh" fail "$(cat "$KC_GH_LOG")"
 else
