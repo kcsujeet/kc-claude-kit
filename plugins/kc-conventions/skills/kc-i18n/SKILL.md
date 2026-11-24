@@ -21,9 +21,10 @@ paths:
   - §I3. No duplicates: search before adding, including pre-existing entries
   - §I4. Key name matches the value (or an established short form)
   - §I5. Generic nouns and labels belong in the shared namespace
-  - §I6. Every countable noun is an ICU plural
+  - §I6. Labels are plain keys; an ICU plural is for a real count
   - §I7. Never concatenate translations
   - §I8. Text shown to people is never also an identifier
+  - §I9. No grammar attached to a placeholder
 
 ## Rules
 
@@ -34,7 +35,8 @@ A key is added once and read by every translator afterwards. Two keys for one st
 - A grep miss is not proof: think about semantic equivalents too, since "Save changes" and "Save" and "Update" evade each other's greps while meaning the same thing on the same button.
 - The key name says what the value says. `fooSection: "Foo"` bakes in a `Section` the value does not have.
 - Generic nouns, labels and headings live in the shared namespace, not inside a feature file. `Total`, `Notes`, `Header` are not feature-specific just because you needed one there first.
-- Every countable noun is an ICU plural, including a label that only ever shows one today. No `item`/`items` key pairs, no plural baked into the key name.
+- A fixed label, heading, column or nav item is a plain string key, one per form the screen shows (`"addOn": "Add-on"`, `"addOns": "Add-ons"`). An ICU plural message is only for a real count: it uses `#` and is read with the actual number variable. Never pass a literal count (`count: 0`, `1`, `2`) to get a word form.
+- No grammar attached to a placeholder: `"{name}'s plan"` and `"{count}th"` can't be inflected by a translator. Write the sentence so the placeholder stands alone (`"The plan for {name}"`).
 - Never concatenate translations. `t('delete') + ' ' + t('booking')` has an order that is wrong in half the languages we ship. A verb plus a noun decomposes into an action template with the noun interpolated.
 - A label next to a runtime value **is** interpolation, and that is correct. Do not invent a composite key to avoid it.
 - Text shown to people is never also used as an identifier. A value kept in state, a link, a filter or a stored field holds a key (`other`), and the screen shows its translation; the moment the label is translated, a label used as a value either stays untranslated or breaks.
@@ -50,13 +52,14 @@ The i18n gate agent ticks every box against the diff. A box is FAIL if any key o
 - [ ] §I3 No duplicates: for EVERY new key, and every pre-existing key in a file the diff touches, both the value grep and the unscoped leaf-key grep were run across the whole source-locale tree, plus semantic-equivalent reasoning. Any hit outside the file being added to is a FAIL, no exemptions. (N/A: no new or touched keys)
 - [ ] §I4 Key name matches its value in camelCase, or an established short-form suffix (grepped, not assumed); no generic leaf under a nested object. (N/A: no new or touched keys)
 - [ ] §I5 Generic nouns/labels/headings live in the project's shared namespace, not a feature file — judged independently of the §I3 grep result. (N/A: no new keys in the diff)
-- [ ] §I6 Every countable noun is an ICU plural, including singular-only labels/headings/columns; no separate x/xs key pairs, no baked-plural compound keys. (N/A: project has no ICU-capable i18n library, or no countable-noun keys in diff — state which)
+- [ ] §I6 A fixed label, heading, column or nav item is a plain string key (`addOn`, `addOns`); an ICU plural message is only for a real count, uses `#`, and is read with the actual count variable. A literal count (`count: 0`, `1`, `2`) passed to get a word form FAILS, as does a message that shows a count with no plural and an `x`/`xs` key pair picked by `count === 1`. A finding on this carries its short why (§I6 detail). **Enumerate with the `literal-plural-count.sh` sweep** (see Sweeps). (N/A: no label, count message or translation call added in the diff — state which; the receipt `grepped literal plural counts: N hits` is stated either way)
 - [ ] §I7 No translation concatenation: no `t(a) + t(b)` or template-joined translatable fragments; verb+noun values decompose into an action template plus a noun key; label+data is interpolation and is not flagged, and no redundant composite key was invented in its place. (N/A: no new key values or call sites in diff)
 - [ ] §I8 Text shown to people is never an identifier: every string the diff adds that a user sees and that is also stored, compared, put in a link or used as a key FAILS; the stored side holds a key and the screen renders its translation. **Enumerate** constants and literals that reach both a screen and a value. (N/A: none added)
+- [ ] §I9 No grammar attached to a placeholder: a message with `{name}'s`, `{count}th` or another suffix, article or agreement written against a placeholder FAILS; the placeholder stands alone (`The plan for {name}`), or an ordinal is a `selectordinal` message. **Enumerate with the `placeholder-grammar.sh` sweep** (see Sweeps). (N/A: no message value added in the diff, stated as `grepped placeholder grammar: 0 hits`)
 
 ## Review detail
 
-Translation/locale-key rules for the diff under review. Covers eight independent failure modes: mandatory per-key audit evidence, source-locale-only edits, duplicate keys (exact and semantic), key names that don't match their values, generic nouns misplaced outside the shared namespace, missing ICU plurals, translation concatenation, and display text used as an identifier.
+Translation/locale-key rules for the diff under review. Covers nine independent failure modes: mandatory per-key audit evidence, source-locale-only edits, duplicate keys (exact and semantic), key names that don't match their values, generic nouns misplaced outside the shared namespace, labels read through a made-up count, translation concatenation, display text used as an identifier, and grammar attached to a placeholder.
 
 ### §I1. The per-key audit table is the mandatory first output
 
@@ -65,17 +68,17 @@ Before evaluating any rule below, the gate agent produces one row per NEW key in
 Required row shape:
 
 ```
-<file>:L<n>: <key> = "<value>" | namespace: <ok / move to shared>, plural: <icu / bare-noun → flag>, dupe: <none / clash with X>, naming: <matches value / mismatch>
+<file>:L<n>: <key> = "<value>" | namespace: <ok / move to shared>, plural: <icu for a real count / plain label / literal count → flag>, dupe: <none / clash with X>, naming: <matches value / mismatch>
 ```
 
 Example:
 
 ```
-feature.json:L12: sprocket = "sprocket" | namespace: move to shared (generic noun), plural: bare-noun → flag (should be ICU), dupe: none, naming: matches value
+feature.json:L12: sprocket = "sprocket" | namespace: move to shared (generic noun), plural: n/a (plain label), dupe: none, naming: matches value
 feature.json:L44: deleteWidgetMessage = "Are you sure you want to delete this widget?" | namespace: ok (feature-specific), plural: n/a (sentence), dupe: none, naming: matches value (short-form Message suffix)
 ```
 
-Do not batch rows from memory. For every new key, walk §I2 through §I7 below and fill in the corresponding cell — a row filled in without actually running the grep and the ICU/naming checks is the exact glaze-over that ships violations. Output the table first, then let the individual boxes' findings expand on any row marked FLAG.
+Do not batch rows from memory. For every new key, walk §I2 through §I9 below and fill in the corresponding cell — a row filled in without actually running the grep and the plural/naming checks is the exact glaze-over that ships violations. Output the table first, then let the individual boxes' findings expand on any row marked FLAG.
 
 ### §I2. Only the source locale is edited
 
@@ -130,51 +133,44 @@ A generic noun, status word, short label, or section/card heading that any sibli
 
 This box is judged **independently of the §I3 duplicate grep**. A "no match" result from the value grep is not a pass here: a generic noun like "Header," "Notes," or "Total" belongs in the shared file whether or not a matching key exists there today — the question is placement, not present duplication.
 
-Watch for a bare noun added to a feature file sitting next to other feature keys — neighboring precedent is not a pass. Check the key against its real peers: if the other section titles in the same component are read from the shared namespace as ICU-plural common nouns, a new bare-noun heading dropped into the feature file beside them is a placement finding, not conformance with its neighbors.
+Watch for a bare noun added to a feature file sitting next to other feature keys — neighboring precedent is not a pass. Check the key against its real peers: if the other section titles in the same component are read from the shared namespace as plain common-noun labels, a new bare-noun heading dropped into the feature file beside them is a placement finding, not conformance with its neighbors.
 
 Any single common word — noun or verb — that a sibling feature could plausibly want with the same meaning qualifies as "generic": not just `title`/`description`/`text`/`label`, but domain-neutral words like `person`, `member`, `date`, `time`, `image`, `total`. If you can imagine another feature wanting the same word with the same meaning, it belongs in the shared file at the top level, not nested under the feature's namespace.
 
 A key that, after this check, is genuinely feature-specific is a PASS with the reasoning cited — never record it as N/A. This box is N/A only when the diff adds no new keys at all.
 
-### §I6. Every countable noun is an ICU plural
+### §I6. Labels are plain keys; an ICU plural is for a real count
 
-**Applicability guard:** this box applies when the project uses an ICU-capable i18n library (e.g. next-intl, i18next configured with ICU message format, or FormatJS). Check the repo's i18n setup before flagging — grep for an existing `{count, plural, ...}` value to confirm ICU is in use. If the project has no ICU support, flag only the separate-`x`/`xs`-key-pair shape below; the "even as a singular label" requirement does not apply without ICU.
-
-When ICU is available, one key handles every count:
+A fixed label, heading, column title, tab or nav item is a plain string key, one key per form the screen shows:
 
 ```json
-"widget": "{count, plural, =0 {Widgets} =1 {Widget} other {# Widgets}}"
+"addOn": "Add-on",
+"addOns": "Add-ons"
 ```
 
-Called as `t('widget', { count: 1 })` or `t('widget', { count: 2 })`. If a diff adds both `widget` and `widgets` (or any singular/plural pair) as separate keys, flag it — point at an existing ICU-plural key as precedent and tell the author to use the `{ count }` form on one key instead.
-
-**Prefer the full three-branch shape, with `#` in `other`:**
+A message that shows a number is an ICU plural. It uses `#` for the formatted count and is read with the real count variable:
 
 ```json
-"gadget": "{count, plural, =0 {Gadgets} =1 {Gadget} other {# Gadgets}}"
+"orderCount": "{count, plural, one {# order} other {# orders}}"
 ```
 
-This is the default for any new countable noun: `count: 0` gives the bare plural, `count: 1` gives the singular, any other count gives a numbered plural (`3 Gadgets`). Recommend this shape even when today's only call site is a singular label (`{ count: 1 }`) — the unused branches cost nothing, and the key becomes reusable in a numbered context without a follow-up edit later. A minimal `{=1 {X} other {Xs}}` form is not wrong on its own, but when a diff adds several new plural keys, they should all use the same shape rather than mixing minimal and full.
-
-**Compound domain nouns are covered too, not just single words.** A feature whose name reads as plural in English (e.g. "Widget Credits") is still a countable noun and should be a singular-root ICU key, not a baked-plural one:
-
-```json
-"widgetCredit": "{count, plural, =0 {Widget Credits} =1 {Widget Credit} other {Widget Credits}}"
+```ts
+t('orderCount', { count: orders.length })   // never { count: 2 } to get the word "Orders"
 ```
 
-Call sites that always want the plural feature name pass `count: 0`. Treat any new key whose value ends in "s" as a near-certain flag — the near-universal fix is "this is a noun that should be ICU'd," not a genuine permanent plural.
+Never pass a literal count (`count: 0`, `1`, `2`) to get a word form out of a plural message. `literal-plural-count.sh` lists every translation call in the diff that does, including calls written across several lines; each hit gets a verdict, and the usual fix is a plain label key.
 
-**Every countable noun is an ICU plural, always, even when only ever used as a singular label.** Section headings, card titles, radio-option labels, and column labels never show a count, so the temptation is a plain string (`"widget": "Widget"`). Flag it every time the library supports ICU — the call site simply renders the singular with `{ count: 1 }`.
+**Why, in a line a finding can carry:** ICU, FormatJS and next-intl define `#` as the formatted count and describe plural messages as choosing on a number, and none describes them as a way to pick a label; Mastodon's react-intl locale file keeps labels plain (`"account.posts": "Posts"`) and gives its counts their own plural key (`"account.statuses_counter"`); and a made-up count makes the label depend on how each translator fills every CLDR plural form (Arabic has zero, one, two, few, many and other), branches nobody sees on screen. A review finding on this box says the same short why, not only the rule.
 
-**A plain-string sibling is a pre-existing violation, never precedent.** Some older keys may be stored as plain strings; these predate the rule and are misses, not the standard to match. "It matches the sibling key `amount`/`payment`" is the trap — match the rule, not the nearest non-conforming neighbor. Grepping a plain-string sibling is never evidence that a new noun may stay plain.
+**Flag the opposite too:** a message that shows a real count as two keys chosen at the call site (`count === 1 ? t('widget') : t('widgets')`), or as one string with no plural (`"{count} widgets"`). That is one ICU plural read with the real count. Two label keys (`addOn`, `addOns`) used where each screen position always shows the same form are not this.
 
-No separate `x`/`xs` key pairs, and no baked-plural compound keys, under any circumstance — these two shapes are flagged regardless of ICU availability, since they are wrong independent of pluralization support.
+**A neighbouring key stored as a plural message and read with a literal count is a pre-existing miss, not precedent.** A new label stays a plain key.
 
 ### §I7. Never concatenate translations
 
 Do not join two translatable fragments at the call site: `t('edit') + ' ' + t('widget')` or the template-literal equivalent `${t('edit')} ${t('widget')}`. Word order varies across languages, so concatenation produces grammatically broken output the moment a language reorders verb and noun.
 
-**The same rule applies to a new key whose English value is `[verb] [noun]`.** A key like `enableWidgetCredits: "Enable Widget Credits"` bakes the concatenation into the key itself — it bypasses word-order handling exactly the way runtime string-joining would. Decompose it into an action template plus the noun key: `t('actions.enableSomething', { something: t('widgetCredit', { count: 0 }) })`, using an existing or newly-added parameterized action key (the file holding these varies by project — call it the action-template file, and grep the repo to find it).
+**The same rule applies to a new key whose English value is `[verb] [noun]`.** A key like `enableWidgetCredits: "Enable Widget Credits"` bakes the concatenation into the key itself — it bypasses word-order handling exactly the way runtime string-joining would. Decompose it into an action template plus the noun key: `t('actions.enableSomething', { something: t('widgetCredits') })`, using an existing or newly-added parameterized action key (the file holding these varies by project — call it the action-template file, and grep the repo to find it).
 
 **Mandatory decomposition check, for every new key whose value is `[transitive verb] [domain noun]`:**
 1. Is there already a key for the noun (`widget`, `gadget`, `sprocket`)? Usually yes.
@@ -183,8 +179,8 @@ Do not join two translatable fragments at the call site: `t('edit') + ' ' + t('w
 
 ```ts
 // Good
-t('actions.editSomething', { something: t('widget', { count: 1 }) })
-t('actions.addSomething', { something: t('gadgetCount') })
+t('actions.editSomething', { something: t('widget') })
+t('actions.addSomething', { something: t('gadget') })
 
 // Bad: flag this
 `${t('edit')} ${t('widget')}`
@@ -201,14 +197,30 @@ t('edit') + ' ' + t('widget')
 
 A filter offers "Other" for records with no category and uses the same string as the option's value: the link reads `?category=Other` and the code compares against `"Other"`. It works until the screen is translated. Then the label either stays in the source language, or it changes and every saved link and comparison stops matching. Keep a key for the value (`other`) and translate it only where it is shown.
 
+### §I9. No grammar attached to a placeholder
+
+A placeholder reaches the translator as `{name}`, a value they can't see or inflect. `"{name}'s plan"` assumes the English possessive, `"{count}th"` the English ordinal, `"a {thing}"` the English article: each is wrong in a language that marks the same idea another way (a case ending, a preposition, a different ordinal). Write the sentence so the placeholder stands alone: `"The plan for {name}"`, `"Position: {count}"`. An ordinal that has to be an ordinal is a `selectordinal` message, which carries the suffix in the message where the translator can change it. `placeholder-grammar.sh` lists added possessive and ordinal-suffix shapes in locale files; articles and agreement are judged by reading.
+
 ## Sweeps
 
-Save the diff under review to a file and run `added-lines.sh` over it; `-` reads the diff from stdin. The topic bundles no diff sweep of its own, only the §I3 lookup.
+Save the diff under review to a file and run `added-lines.sh` over it; `-` reads the diff from stdin. Two diff sweeps and the §I3 lookup. The diff sweeps print one `path:line: text` hit per line; give every hit its own verdict and state each receipt with its count, `0 hits` included.
 
 - `locale-duplicates.sh` (§I3, a lookup rather than a diff sweep): takes a locale directory, a value and a leaf key, and runs the two §I3 greps. Run it once per new or touched key.
 
   ```bash
   bash "${CLAUDE_PLUGIN_ROOT}/skills/kc-i18n/scripts/locale-duplicates.sh" <locale-dir> <value> <leaf-key>
+  ```
+
+- `literal-plural-count.sh` (§I6): added lines in code files that pass a numeric literal as `count` to a translation call (`t('addOn', { count: 1 })`, `formatMessage(message, { count: 0 })`), across a call's lines. The fix is a plain label key. Receipt: `grepped literal plural counts: N hits`.
+
+  ```bash
+  bash "${CLAUDE_PLUGIN_ROOT}/skills/kc-i18n/scripts/literal-plural-count.sh" <diff-file>
+  ```
+
+- `placeholder-grammar.sh` (§I9): added lines in locale JSON files with a possessive or ordinal suffix on a placeholder (`{name}'s`, `{count}th`). Receipt: `grepped placeholder grammar: N hits`.
+
+  ```bash
+  bash "${CLAUDE_PLUGIN_ROOT}/skills/kc-i18n/scripts/placeholder-grammar.sh" <diff-file>
   ```
 
 - `added-lines.sh` (citation map): every added line as `path:line: text`, with the source line number at the head SHA. Cite every finding's line from this output or from a sweep hit, never from a position in the diff file.

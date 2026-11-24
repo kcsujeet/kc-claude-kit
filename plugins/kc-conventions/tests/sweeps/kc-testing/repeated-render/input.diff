@@ -1,0 +1,13 @@
+diff --git a/src/widget-card.test.tsx b/src/widget-card.test.tsx
+new file mode 100644
+index 0000000..1111111
+--- /dev/null
++++ b/src/widget-card.test.tsx
+@@ -0,0 +1,7 @@
++it('shows the title', () => {
++  render(<WidgetCard title="A" />)
++})
++it('shows the badge', () => {
++  render(<WidgetCard title="B" badge />)
++  render(<Toolbar />)
++})

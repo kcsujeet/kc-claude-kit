@@ -1,0 +1,17 @@
+diff --git a/src/widget-card.test.tsx b/src/widget-card.test.tsx
+new file mode 100644
+index 0000000..1111111
+--- /dev/null
++++ b/src/widget-card.test.tsx
+@@ -0,0 +1,11 @@
++const renderCard = (overrides = {}) => render(<WidgetCard title="A" {...overrides} />)
++it('shows the title', () => {
++  renderCard()
++})
++it('shows the badge', () => {
++  renderCard({ badge: true })
++  rerender(<WidgetCard title="C" />)
++})
++it('renders with no props', () => {
++  render(<WidgetCard />)
++})

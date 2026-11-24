@@ -1,0 +1,20 @@
+diff --git a/locales/en/plans.json b/locales/en/plans.json
+new file mode 100644
+index 0000000..1111111
+--- /dev/null
++++ b/locales/en/plans.json
+@@ -0,0 +1,7 @@
++  "planOf": "{name}'s plan",
++  "planOfCurly": "{name}’s plan",
++  "rank": "You are {count}th in line",
++  "planFor": "The plan for {name}",
++  "greeting": "Hello {name}",
++  "quoted": "Search for '{query}'",
++  "ordinalWord": "{name}stone",
+diff --git a/src/plans.json b/src/plans.json
+new file mode 100644
+index 0000000..1111111
+--- /dev/null
++++ b/src/plans.json
+@@ -0,0 +1,1 @@
++  "planOf": "{name}'s plan",

@@ -148,7 +148,7 @@ In rough order of frequency for review findings:
 - **Default to short replies. Long is fine when the situation calls for it.** When accepting feedback and the fix is straightforward, the ideal reply is one sentence: `Addressed in <sha>.` or `Done in <sha>.` Skip restating the suggestion or itemising what changed when the linked commit makes both obvious. Go long only when the reply needs to (a) explain a subtle tradeoff, (b) push back on the suggestion with technical reasoning, (c) clarify a non-obvious decision that lives in the commit. Brevity is the default; verbosity has to earn its place.
 - **Grounded and humble, always, at any length.** Write the way you'd talk to a teammate you respect: humble, plain, never rude. "Addressed in <sha>" is fine; "Yep, fixed" is curt. No phrasing that sounds like a ruling ("Declining", "Rejecting", "Not doing this", "I'd rather", "Keeping it as is"), even when the code stays the same. Sound human, not polite by formula: no stock closes or emoji ("if that's okay", "happy to change it if you'd prefer", 🙂). A soft first-person line like "I think we need this lock here." is how a person says it; use it where it fits, not on every reply.
 - No attribution footers ("Generated with Claude Code", thumbs reactions, etc.).
-- **Translation/locale findings must show a concrete before/after example, not just describe the rule.** A comment that says "this should be an ICU plural in the shared strings file" leaves the author guessing at the exact shape. Include the corrected key (with the full ICU plural value) and the updated call site, in fenced blocks. Mirror an existing key the codebase already has so the shape is unambiguous. See the worked example below.
+- **Translation/locale findings must show a concrete before/after example, not just describe the rule.** A comment that says "this should be a plain label key in the shared strings file" leaves the author guessing at the exact shape. Include the corrected key (with its full value) and the updated call site, in fenced blocks. Mirror an existing key the codebase already has so the shape is unambiguous. See the worked example below.
 - **The user's voice, for questions and decisions posted under their name** (issue tracker comments, chat). Open with "Hey @Name, a question on <topic>." Give the situation in a few plain sentences, with the number that matters ("at least 50 accounts"). Lead into choices with "So I think we have 3 options:" and a numbered list, each option one or two plain sentences saying what the reader would see. Close with the ask, such as "Let me know which one you think works best." No bold labels, no option headings, no "(my recommendation)" tag, and no sign-off beyond the ask.
 - **Never cite internal rule numbers or checklist references in PR comments.** Internal markers like `§4.5`, `§clarity 9`, `§10.4`, `(§ Pricing math)`, "the prop-drilling rule from the skill", etc. mean nothing to the PR author and read as ceremony. State the technical issue plainly: "Box with display:'grid' is a hand-rolled Grid" beats "this is the §4.5 anti-pattern"; "the child takes 2 props derived entirely from a hook the parent had to call" beats "§clarity 9 / prop drilling". These refs are useful in chat findings (as a self-audit trail) but should be stripped before drafting comments.
 
@@ -188,19 +188,19 @@ A one-line comment saying `update` has to run before `remove` would help, since 
 Is the `String() === String()` here because one side can come in as a string from the form? If yes, a short comment saying so would help.
 ```
 
-Translation finding: always include the concrete key shape and call site (countable nouns are ICU plurals, even singular-only labels):
+Translation finding: always include the concrete key shape and call site, and for a label read through a made-up count, the short why (a fixed label is a plain key; `#` is the real count; a literal count depends on how each translator fills each plural form):
 
 ```
 **suggestion:**
-`widget` is a common word, so it belongs in the shared strings file as a plural, like the `gadget` entry there.
+`widget` is a common word, so it belongs in the shared strings file as a plain label, like the `gadget` entry there. A plural message is for a real count; `{ count: 1 }` to get a label depends on how each translator fills each plural form.
 ```
 ```jsonc
 // shared.json
-"widget": "{count, plural, =0 {Widgets} =1 {Widget} other {Widgets}}",
+"widget": "Widget",
 ```
 ```ts
 // SomeComponent.tsx, call site
-label: tShared('widget', { count: 1 }),   // instead of t('widget')
+label: tShared('widget'),   // instead of tShared('widget', { count: 1 })
 ```
 
 Short reply when accepting a straightforward suggestion (one-sentence default):

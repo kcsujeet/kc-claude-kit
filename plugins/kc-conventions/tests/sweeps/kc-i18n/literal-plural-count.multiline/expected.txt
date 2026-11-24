@@ -1,0 +1,1 @@
+src/shop/columns.ts:4:     count: 2,

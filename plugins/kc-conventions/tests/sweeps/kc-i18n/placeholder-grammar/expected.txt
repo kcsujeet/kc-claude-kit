@@ -1,0 +1,3 @@
+locales/en/plans.json:1:   "planOf": "{name}'s plan",
+locales/en/plans.json:2:   "planOfCurly": "{name}’s plan",
+locales/en/plans.json:3:   "rank": "You are {count}th in line",
