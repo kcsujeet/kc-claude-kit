@@ -97,13 +97,13 @@ is_run_command() {
 }
 
 did_run_product() {
-  local name command stripped_command
-  while IFS=$'\t' read -r name command; do
-    case "$name" in
-      mcp__*) printf '%s' "$name" | grep -Eiq "$BROWSER_TOOL" && return 0 ;;
+  local tool_name command stripped_command
+  while IFS=$'\t' read -r tool_name command; do
+    case "$tool_name" in
+      mcp__*) printf '%s' "$tool_name" | grep -Eiq "$BROWSER_TOOL" && return 0 ;;
       Bash | REPL)
         # A REPL script runs shell commands inside backtick templates: split on the backticks too.
-        [ "$name" = REPL ] && command=$(printf '%s' "$command" | tr '`' ';')
+        [ "$tool_name" = REPL ] && command=$(printf '%s' "$command" | tr '`' ';')
         while IFS= read -r stripped_command; do
           is_run_command "$stripped_command" && return 0
         done < <(printf '%s\n' "$command" | list_stripped_commands)
