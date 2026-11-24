@@ -94,6 +94,31 @@ no_head_output=$(cd "$checkout" && bash "$task_claims" ABC-1 --repo acme/shop --
 expect_eq "--since: without origin/HEAD the default branch is origin/main" "## commits on origin/main after $base_sha changing the paths
 $(git_in_checkout log -1 --format='%h dev %s' --grep='Rewrite the header' origin/main)" "$no_head_output"
 
+# --deleting, on a throwaway repo where the configured user added one file and another author added one.
+cleanup_repo="$work_dir/cleanup"
+git init --quiet --initial-branch=main "$cleanup_repo"
+git -C "$cleanup_repo" config user.email dev@example.com
+git -C "$cleanup_repo" config user.name dev
+mkdir -p "$cleanup_repo/tasks"
+echo a > "$cleanup_repo/tasks/mine.rb"
+git -C "$cleanup_repo" add -A
+git -C "$cleanup_repo" commit --quiet -m "Add mine"
+echo b > "$cleanup_repo/tasks/theirs.rb"
+git -C "$cleanup_repo" add -A
+git -C "$cleanup_repo" -c user.email=other@example.com -c user.name=other commit --quiet -m "Add theirs"
+echo changed >> "$cleanup_repo/tasks/mine.rb"
+git -C "$cleanup_repo" -c user.email=other@example.com commit --quiet -am "Another author edits mine"
+deleting_two_files=$(cd "$cleanup_repo" && bash "$task_claims" ABC-1 --repo acme/shop --deleting tasks/mine.rb --deleting tasks/theirs.rb | sed -n '/^## files to delete/,$p')
+expect_eq "--deleting: a file the configured user added is mine, one another author added is NOT YOURS" "## files to delete, by who added them
+tasks/mine.rb dev@example.com mine
+tasks/theirs.rb other@example.com NOT YOURS" "$deleting_two_files"
+deleting_dir=$(cd "$cleanup_repo" && bash "$task_claims" ABC-1 --repo acme/shop --deleting tasks/ | sed -n '/^## files to delete/,$p')
+expect_eq "--deleting: a directory expands to its files, and a later edit by another author does not change who added a file" "## files to delete, by who added them
+tasks/mine.rb dev@example.com mine
+tasks/theirs.rb other@example.com NOT YOURS" "$deleting_dir"
+expect_eq "--deleting: without it the output has no deletion section" "$two_repos" "$(cd "$cleanup_repo" && bash "$task_claims" ABC-1 --repo acme/shop --repo acme/shop-api)"
+expect_contains "--deleting: a path with no tracked files is listed as NOT YOURS" "tasks/gone.rb (no tracked files) NOT YOURS" "$(cd "$cleanup_repo" && bash "$task_claims" ABC-1 --repo acme/shop --deleting tasks/gone.rb)"
+
 if grep -Eqv '^(pr list|repo view) ' "$KC_GH_LOG"; then
   record "only read calls reached gh" fail "$(cat "$KC_GH_LOG")"
 else
@@ -113,10 +138,13 @@ bash "$task_claims" ABC-1 --path > /dev/null 2>&1
 bare_path_status=$?
 bash "$task_claims" ABC-1 --repo acme/shop --path src/Header.tsx --since "" > /dev/null 2>&1
 empty_since_status=$?
+bash "$task_claims" ABC-1 --deleting > /dev/null 2>&1
+bare_deleting_status=$?
 set -e
 expect_eq "usage: --since without --path exits 2" 2 "$since_alone_status"
 expect_eq "usage: --path without a value exits 2" 2 "$bare_path_status"
 expect_eq "usage: --since with an empty value exits 2, so the commit check is never skipped silently" 2 "$empty_since_status"
+expect_eq "usage: --deleting without a value exits 2" 2 "$bare_deleting_status"
 expect_eq "usage: no key exits 2" 2 "$no_key_status"
 expect_eq "usage: --repo without a value exits 2" 2 "$bare_repo_status"
 expect_eq "a failing gh call exits 1" 1 "$gh_fail_status"

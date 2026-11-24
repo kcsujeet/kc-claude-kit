@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Changed (a cleanup deletes only the files its requester added)
+
+- `kc-gates` 3.16.4 and `kc-conventions` 2.6.5: `task-claims.sh --deleting <file-or-dir>` (repeatable, run in a checkout) lists each file a cleanup is about to delete with the email of the commit author who added it and `mine` or `NOT YOURS` against `git config user.email`. `kc-assess` step 1 (the working agreement's Assess step points to it, and has no spare bytes in the always-on budget) says a cleanup that deletes files runs it and deletes only the requester's own, listing the rest for their authors. Held by `tests/task-claims.test.sh` (the `--deleting` cases).
 ### Changed (cheaper later review rounds, and a receipt that lists everything at once)
 
 - `kc-gates` 3.16.3: `guard-tracker-transition.sh` also holds a hand-off status move made through a tracker's general save or update call on an issue (`save_issue`, `updateIssue`: its state or status field, or a nested name, matching `KC_REVIEW_STATUS_REGEX`); a title or description that only mentions the review status is not a move, and `hooks.json` registers the hook for those tool names. `check-walk-receipt.sh` requires one `env<TAB><command><TAB><evidence>` line whenever there is a walk-item: the one command that brought the review environment up (a chain of steps is refused) and a request line or capture showing the app answered. `gather-review.sh` warns when `--out-dir` is inside a git checkout or its `.git` (Claude Code loads a folder's CLAUDE.md and path-scoped rules on the first Read of a file under it, so the saved review would load a second copy of the repo's rules); its default stays `${TMPDIR:-/tmp}/kc-review-<sha>`, and `kc-ready-for-review` tells the pass folder to live outside any checkout. Held by `tests/guard-tracker-transition.test.sh`, `tests/check-walk-receipt.test.sh` and `tests/gather-review.test.sh`.
