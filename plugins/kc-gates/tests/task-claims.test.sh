@@ -110,18 +110,27 @@ echo changed >> "$cleanup_repo/tasks/mine.rb"
 git -C "$cleanup_repo" -c user.email=other@example.com commit --quiet -am "Another author edits mine"
 deleting_two_files=$(cd "$cleanup_repo" && bash "$task_claims" ABC-1 --repo acme/shop --deleting tasks/mine.rb --deleting tasks/theirs.rb | sed -n '/^## files to delete/,$p')
 expect_eq "--deleting: a file the configured user added is mine, one another author added is NOT YOURS" "## files to delete, by who added them
-tasks/mine.rb dev@example.com mine
-tasks/theirs.rb other@example.com NOT YOURS" "$deleting_two_files"
+tasks/mine.rb	dev@example.com	mine
+tasks/theirs.rb	other@example.com	NOT YOURS" "$deleting_two_files"
 deleting_dir=$(cd "$cleanup_repo" && bash "$task_claims" ABC-1 --repo acme/shop --deleting tasks/ | sed -n '/^## files to delete/,$p')
 expect_eq "--deleting: a directory expands to its files, and a later edit by another author does not change who added a file" "## files to delete, by who added them
-tasks/mine.rb dev@example.com mine
-tasks/theirs.rb other@example.com NOT YOURS" "$deleting_dir"
+tasks/mine.rb	dev@example.com	mine
+tasks/theirs.rb	other@example.com	NOT YOURS" "$deleting_dir"
 expect_eq "--deleting: without it the output has no deletion section" "$two_repos" "$(cd "$cleanup_repo" && bash "$task_claims" ABC-1 --repo acme/shop --repo acme/shop-api)"
-expect_contains "--deleting: a path with no tracked files is listed as NOT YOURS" "tasks/gone.rb (no tracked files) NOT YOURS" "$(cd "$cleanup_repo" && bash "$task_claims" ABC-1 --repo acme/shop --deleting tasks/gone.rb)"
+expect_contains "--deleting: a path with no tracked files is listed as NOT YOURS" "tasks/gone.rb	(no tracked files)	NOT YOURS" "$(cd "$cleanup_repo" && bash "$task_claims" ABC-1 --repo acme/shop --deleting tasks/gone.rb)"
 
+mkdir -p "$cleanup_repo/extra"
+echo d > "$cleanup_repo/extra/é.rb"
+echo e > "$cleanup_repo/extra/a b.rb"
+git -C "$cleanup_repo" add extra
+git -C "$cleanup_repo" -c user.email=Dev@Example.com commit --quiet -m "Add extra files"
+extra_listing=$(cd "$cleanup_repo" && bash "$task_claims" ABC-1 --repo acme/shop --deleting extra | sed -n '/^## files to delete/,$p')
+expect_eq "--deleting: a non-ASCII name, a name with a space and an email differing only in case are listed as the requester's own, one tab-separated line each" "## files to delete, by who added them
+extra/a b.rb	Dev@Example.com	mine
+extra/é.rb	Dev@Example.com	mine" "$extra_listing"
 echo c > "$cleanup_repo/tasks/staged.rb"
 git -C "$cleanup_repo" add tasks/staged.rb
-expect_contains "--deleting: a staged file with no commit has no adder and is NOT YOURS" "tasks/staged.rb unknown NOT YOURS" "$(cd "$cleanup_repo" && bash "$task_claims" ABC-1 --repo acme/shop --deleting tasks/staged.rb)"
+expect_contains "--deleting: a staged file with no commit has no adder and is NOT YOURS" "tasks/staged.rb	unknown	NOT YOURS" "$(cd "$cleanup_repo" && bash "$task_claims" ABC-1 --repo acme/shop --deleting tasks/staged.rb)"
 git -C "$cleanup_repo" reset --quiet tasks/staged.rb
 rm "$cleanup_repo/tasks/staged.rb"
 

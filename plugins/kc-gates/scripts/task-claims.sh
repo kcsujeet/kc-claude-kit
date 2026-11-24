@@ -21,9 +21,9 @@
 #               already made or fixed shows up
 #   --deleting  a file (or a directory, expanded to its tracked files) a cleanup is about to delete;
 #               repeat for each. Run inside a local checkout. Adds a last section, `## files to delete,
-#               by who added them`, one line per file: `<path> <adder email> <mine|NOT YOURS>`. The
+#               by who added them`, one line per file, tab-separated: `<path> <adder email> <mine|NOT YOURS>`. The
 #               adder is the author of the commit that added the file; `mine` means it equals
-#               `git config user.email`. A cleanup deletes only `mine` files, unless the requester
+#               `git config user.email`, ignoring case. A cleanup deletes only `mine` files, unless the requester
 #               says otherwise, and lists the rest
 #
 # Output, per repository: `## <owner/name>`, then one line per pull request whose title or
@@ -161,19 +161,20 @@ fi
 
 if [ "${#deleting_paths[@]}" -gt 0 ]; then
   my_email=$(git config user.email) || fail "git config user.email is not set; the files' adders cannot be compared with you"
+  my_email=$(printf '%s' "$my_email" | tr '[:upper:]' '[:lower:]')
   echo "## files to delete, by who added them"
   for deleting_path in "${deleting_paths[@]}"; do
-    tracked_files=$(git --literal-pathspecs ls-files -- "$deleting_path") || fail "git ls-files $deleting_path failed; run inside a checkout of the repository"
+    tracked_files=$(git -c core.quotePath=false --literal-pathspecs ls-files -- "$deleting_path") || fail "git ls-files $deleting_path failed; run inside a checkout of the repository"
     if [ -z "$tracked_files" ]; then
-      echo "$deleting_path (no tracked files) NOT YOURS"
+      printf '%s\t(no tracked files)\tNOT YOURS\n' "$deleting_path"
       continue
     fi
     while IFS= read -r file; do
       adder=$(git --literal-pathspecs log --diff-filter=A --follow --format=%ae -1 -- "$file")
-      if [ "$adder" = "$my_email" ]; then
-        echo "$file $adder mine"
+      if [ "$(printf '%s' "$adder" | tr '[:upper:]' '[:lower:]')" = "$my_email" ]; then
+        printf '%s\t%s\tmine\n' "$file" "$adder"
       else
-        echo "$file ${adder:-unknown} NOT YOURS"
+        printf '%s\t%s\tNOT YOURS\n' "$file" "${adder:-unknown}"
       fi
     done <<< "$tracked_files"
   done
