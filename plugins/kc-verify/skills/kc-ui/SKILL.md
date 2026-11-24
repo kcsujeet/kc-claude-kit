@@ -51,6 +51,8 @@ A design is not a pixel spec for things the app already has a pattern for. Title
 
 ### Step 2 — get real data in front of it
 
+Bring the app (a review or QA environment) up with one command that was tested: a script or target in the repo (`bin/dev`, `make up`, a compose file) run as written, never started by hand step by step. If none exists, write it first and run it from a clean state; the next person, and the reviewer, then get the same environment. The report and the walk receipt name that command.
+
 Use the project's seed or fixture path if it has one. Otherwise construct data that is deliberately awkward: a long name, an empty collection, a large collection, a zero amount, a negative amount, a missing optional field, a non-Latin string.
 
 The point is not coverage for its own sake. Every one of those is a shape that has broken a layout before.
@@ -139,6 +141,7 @@ If nothing is available and you genuinely cannot see the UI, say that plainly an
 Do not report a UI change verified until every box is ticked:
 
 - [ ] Every surface the diff reaches is listed, including other consumers of shared components.
+- [ ] The app was brought up with one tested command run as written, not by hand step by step; the command is named in the report and in the walk receipt's `env` line (`env<TAB><command><TAB><evidence the app answered>`, which `check-walk-receipt.sh` requires), or a script was written for it first.
 - [ ] The app was signed in through the project's dev-only credential, not someone's password; where it has none, the guarded path was proposed, and the user signed in only until it exists.
 - [ ] A session cookie scoped to a parent domain was set in a separate headless browser on a mapped throwaway subdomain, never in the browser the developer uses.
 - [ ] When the work spans several branches or pull requests, the list covers every screen any of them changes, not only the one being worked on now.

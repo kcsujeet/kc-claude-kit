@@ -1,0 +1,201 @@
+#!/usr/bin/env bash
+# Tests scripts/verify-gate-blocks.sh: the mechanical half of the verification gate. Each case saves
+# a round folder (review.diff, changed-files.txt, meta.env, verdicts/) for a real commit in a scratch
+# repo and expects the problem lines, one per fault, or the passing verification block.
+set -euo pipefail
+
+tests_dir=$(cd "$(dirname "$0")" && pwd)
+# shellcheck source=lib/harness.sh
+. "$tests_dir/lib/harness.sh"
+scripts="$(dirname "$tests_dir")/scripts"
+verify="$scripts/verify-gate-blocks.sh"
+
+repo="$work_dir/repo"
+run_git() { git -C "$repo" -c user.name=t -c user.email=t@example.test "$@"; }
+git init -q -b main "$repo"
+mkdir -p "$repo/shop"
+printf 'a\nb\nc\nd\ne\n' > "$repo/shop/total.sh"
+run_git add -A && run_git commit -q -m base
+base=$(run_git rev-parse HEAD)
+printf 'f\ng\nh\n' >> "$repo/shop/total.sh"
+run_git add -A && run_git commit -q -m change
+head=$(run_git rev-parse HEAD)
+short=${head:0:7}
+
+# A round folder for base..head with a passing block for each gate select-gates.sh lists, a
+# verification block and a SCOPE: block: the good case every other case edits.
+build_round() {
+  round="$work_dir/round-$RANDOM$RANDOM"
+  mkdir -p "$round/verdicts"
+  run_git diff --src-prefix=a/ --dst-prefix=b/ "$base" "$head" > "$round/review.diff"
+  run_git diff --name-only "$base" "$head" > "$round/changed-files.txt"
+  printf 'HEAD_SHA=%s\nBASE=%s\n' "$head" "$base" > "$round/meta.env"
+  local gate
+  for gate in $(bash "$scripts/select-gates.sh" "$round/review.diff" "$round/changed-files.txt" "$repo" | sed -n 's/^GATES=//p' | tr ',' ' '); do
+    printf 'GATE: %s\nSTATUS: PASS\nBOXES:\n- [PASS] §X1: read shop/total.sh:7@%s\nFINDINGS:\n- none\n' "$gate" "$short" > "$round/verdicts/$gate.txt"
+  done
+  # shellcheck disable=SC2016 # the fence is part of a pasted block.
+  printf 'SCOPE:\nBOXES:\n- [N/A] §G1: local diff\n- [PASS] §G2: matches the title\n- [N/A] §G3: no linked issue\n- [N/A] §G4: read whole\n- [PASS] §G5: weighed one script\n' > "$round/verdicts/scope.txt"
+}
+
+last_output=""
+last_status=0
+run_verify() {
+  last_status=0
+  last_output=$(bash "$verify" "$@" 2>&1) || last_status=$?
+}
+expect_clean() {
+  run_verify "$round" "$repo"
+  expect_eq "$1" 0 "$last_status"
+}
+expect_problem() {
+  local label=$1 needle=$2
+  shift 2
+  run_verify "$@" "$round" "$repo"
+  expect_eq "$label: exits 1" 1 "$last_status"
+  expect_contains "$label: says" "$needle" "$last_output"
+}
+# Overwrites a gate's verdict file with the given text (\n escapes expanded).
+set_gate() { printf '%b' "$2" > "$round/verdicts/$1.txt"; }
+
+build_round
+expect_clean "a complete round passes"
+expect_contains "it prints a verification block" "GATE: verification" "$last_output"
+expect_contains "its status is PASS" "STATUS: PASS" "$last_output"
+expect_contains "it counts the resolved citations" "1 citation(s) path:line@sha, every one resolves at head $short" "$last_output"
+expect_contains "it says what it did not judge" "SOURCE: verify-gate-blocks.sh" "$last_output"
+
+# The passing block is the verification record: it is not read back as a gate block, and the
+# receipt's shape check (GATE:, STATUS:, a box with evidence) accepts it.
+printf '%s\n' "$last_output" > "$round/verdicts/verification.txt"
+expect_clean "its own earlier output in verdicts/ is not read back"
+
+# --- citations ---------------------------------------------------------------
+build_round
+set_gate naming "GATE: naming\nSTATUS: PASS\nBOXES:\n- [PASS] §N1: read shop/total.sh:7@1234567\nFINDINGS:\n- none\n"
+expect_problem "§V12: a citation with another sha" "sha 1234567 is not the head $short" 
+build_round
+set_gate naming "GATE: naming\nSTATUS: PASS\nBOXES:\n- [PASS] §N1: read total.sh:7@$short\nFINDINGS:\n- none\n"
+run_verify "$round" "$repo"
+expect_eq "§V12: a bare file name: exits 1" 1 "$last_status"
+expect_problem "a bare file name is told where the file is" "total.sh does not exist at the head" 
+expect_contains "the hint names the repo path" "(cite the repo path: shop/total.sh)" "$last_output"
+build_round
+set_gate naming "GATE: naming\nSTATUS: PASS\nBOXES:\n- [PASS] §N1: read shop/total.sh:99@$short\nFINDINGS:\n- none\n"
+expect_problem "§V12: a line past the end of the file" "line 99 is not in shop/total.sh at the head (it has 8)"
+
+# --- sweeps ------------------------------------------------------------------
+build_round
+set_gate clarity "GATE: clarity\nSTATUS: PASS\nBOXES:\n- [PASS] §C1: grepped ternaries: 3 hits: shop/total.sh:6 ok, shop/total.sh:7 ok\nFINDINGS:\n- none\n"
+expect_problem "3 hits with 2 verdicts" "§C1: \"grepped ternaries: 3 hits\" has 2 per-hit verdict(s)"
+set_gate clarity "GATE: clarity\nSTATUS: PASS\nBOXES:\n- [PASS] §C1: grepped ternaries: 3 hits: shop/total.sh:6 ok, shop/total.sh:7 ok, shop/total.sh:8 ok\nFINDINGS:\n- none\n"
+expect_clean "3 hits with 3 verdicts passes"
+set_gate clarity "GATE: clarity\nSTATUS: PASS\nBOXES:\n- [PASS] §C1: grepped ternaries: 3 hits\n    shop/total.sh:6 ok\n    shop/total.sh:7 ok\n    shop/total.sh:8 ok\nFINDINGS:\n- none\n"
+expect_clean "per-hit verdicts on indented lines under the box count"
+set_gate clarity "GATE: clarity\nSTATUS: PASS\nBOXES:\n- [PASS] §C1: grepped ternaries: 0 hits\nFINDINGS:\n- none\n"
+expect_clean "0 hits needs no verdicts"
+set_gate clarity "GATE: clarity\nSTATUS: PASS\nBOXES:\n- [PASS] §C1: grepped ternaries: 1 hit: shop/total.sh:6 ok; grepped as-casts: 2 hits: shop/total.sh:7 ok\nFINDINGS:\n- none\n"
+expect_problem "each sweep in a box is counted on its own" "\"grepped as-casts: 2 hits\" has 1 per-hit verdict(s)"
+set_gate clarity "GATE: clarity\nSTATUS: PASS\nBOXES:\n- [PASS] §C1: grepped ternaries: 2 hits: shop/total.sh:6 ok, shop/total.sh:6 ok\nFINDINGS:\n- none\n"
+expect_problem "one location twice is one verdict" "has 1 per-hit verdict(s)"
+
+# --- boxes that contradict themselves ----------------------------------------
+build_round
+set_gate naming "GATE: naming\nSTATUS: FAIL\nBOXES:\n- [FAIL] §N1: PASS, every name reads as its role\nFINDINGS:\n- none\n"
+expect_problem "a FAIL box whose text says PASS" "§N1 is marked FAIL but its text says PASS"
+set_gate naming "GATE: naming\nSTATUS: FAIL\nBOXES:\n- [FAIL] §N1: N/A, no new names\nFINDINGS:\n- none\n"
+expect_problem "a FAIL box whose text says N/A" "§N1 is marked FAIL but its text says N/A"
+set_gate naming "GATE: naming\nSTATUS: PASS\nBOXES:\n- [PASS] §N1: FAIL, a name hides its role\nFINDINGS:\n- none\n"
+expect_problem "a PASS box whose text says FAIL" "§N1 is marked PASS but its text says FAIL"
+set_gate naming "GATE: naming\nSTATUS: FAIL\nBOXES:\n- [FAIL] §N1: shop/total.sh:7 a name is unclear, but PASS elsewhere\nFINDINGS:\n- none\n"
+expect_clean "PASS in the middle of a FAIL box's text is not a contradiction"
+
+# --- STATUS against boxes ----------------------------------------------------
+build_round
+set_gate naming "GATE: naming\nSTATUS: PASS\nBOXES:\n- [FAIL] §N1: shop/total.sh:7 unclear\n- [PASS] §N2: fine\nFINDINGS:\n- x\n"
+expect_problem "STATUS: PASS with a FAIL box" "GATE: naming says STATUS: PASS but 1 box(es) are FAIL (§N1)"
+set_gate naming "GATE: naming\nSTATUS: FAIL\nBOXES:\n- [PASS] §N1: fine\nFINDINGS:\n- none\n"
+expect_problem "STATUS: FAIL with no FAIL box" "GATE: naming says STATUS: FAIL but no box is FAIL"
+set_gate naming "GATE: naming\nSTATUS: PASS (N/A)\nBOXES:\n- [PASS] §N1: fine\nFINDINGS:\n- none\n"
+expect_problem "STATUS: PASS (N/A) with a PASS box" "GATE: naming says STATUS: PASS (N/A) but a box is not N/A"
+set_gate naming "GATE: naming\nSTATUS: PASS (N/A)\nBOXES:\n- [N/A] §N1: no names added\nFINDINGS:\n- none\n"
+expect_clean "STATUS: PASS (N/A) with only N/A boxes passes"
+set_gate naming "GATE: naming\nBOXES:\n- [PASS] §N1: fine\nFINDINGS:\n- none\n"
+expect_problem "no STATUS line" "GATE: naming has no STATUS: line"
+
+# --- gate blocks and SCOPE ---------------------------------------------------
+build_round
+rm "$round/verdicts/testing.txt"
+expect_problem "a listed gate with no block" "verdicts/: no GATE: testing block"
+build_round
+rm "$round/verdicts/scope.txt"
+expect_problem "no SCOPE block" "verdicts/: no SCOPE: block"
+build_round
+sed '/§G3/d' "$round/verdicts/scope.txt" > "$work_dir/scope.tmp" && mv "$work_dir/scope.tmp" "$round/verdicts/scope.txt"
+expect_problem "a SCOPE block without §G3" "SCOPE: marks §G3 0 time(s)"
+build_round
+printf -- '- [PASS] §G2: again\n' >> "$round/verdicts/scope.txt"
+expect_problem "§G2 marked twice" "SCOPE: marks §G2 2 time(s)"
+build_round
+# shellcheck disable=SC2016 # the fence is part of a pasted block.
+printf '```\nGATE: naming\nSTATUS: PASS\nBOXES:\n- [PASS] §N1: fine\nFINDINGS:\n- none\n```\n' > "$round/verdicts/naming.txt"
+expect_clean "a block pasted inside a code fence is read"
+
+# One run lists every problem, not the first.
+build_round
+rm "$round/verdicts/testing.txt" "$round/verdicts/scope.txt"
+set_gate naming "GATE: naming\nSTATUS: PASS\nBOXES:\n- [FAIL] §N1: PASS\nFINDINGS:\n- none\n"
+set_gate clarity "GATE: clarity\nSTATUS: PASS\nBOXES:\n- [PASS] §C1: grepped ternaries: 4 hits: shop/total.sh:6@abcdef0\nFINDINGS:\n- none\n"
+run_verify "$round" "$repo"
+expect_eq "several problems: one line each" 6 "$(printf '%s\n' "$last_output" | grep -c .)"
+expect_contains "several problems: the missing gate" "no GATE: testing block" "$last_output"
+expect_contains "several problems: the missing scope" "no SCOPE: block" "$last_output"
+expect_contains "several problems: the contradiction and the status" "says STATUS: PASS but 1 box(es) are FAIL" "$last_output"
+expect_contains "several problems: the sweep" "has 1 per-hit verdict(s)" "$last_output"
+expect_contains "several problems: the citation" "sha abcdef0 is not the head" "$last_output"
+
+# An agent's verification block is read like any gate's.
+build_round
+set_gate verification "GATE: verification\nSTATUS: PASS\nBOXES:\n- [FAIL] §V3: PASS\nFINDINGS:\n- none\n"
+expect_problem "an agent's verification block with a contradiction" "§V3 is marked FAIL but its text says PASS"
+
+# --- a later round -----------------------------------------------------------
+# The delta renames one line, so only naming is listed; the receipt lines and walk-items are needed.
+printf 'f\ng\nh2\n' > "$repo/shop/total.sh"
+run_git add -A && run_git commit -q -m rename
+later_head=$(run_git rev-parse HEAD)
+build_later() {
+  round="$work_dir/later-$RANDOM$RANDOM"
+  mkdir -p "$round/verdicts"
+  printf 'diff --git a/shop/total.sh b/shop/total.sh\n--- a/shop/total.sh\n+++ b/shop/total.sh\n@@ -6,3 +6,3 @@\n f\n g\n-h\n+h2\n' > "$round/review.diff"
+  printf 'shop/total.sh\n' > "$round/changed-files.txt"
+  printf 'HEAD_SHA=%s\nBASE=%s\n' "$later_head" "$head" > "$round/meta.env"
+  printf 'GATE: naming\nSTATUS: PASS\nBOXES:\n- [PASS] §N1: read shop/total.sh:3@%s\nFINDINGS:\n- none\n' "${later_head:0:7}" > "$round/verdicts/naming.txt"
+  printf '2 fixes re-checked\n0 rewrites checked\n1 rename-only lines kept\nWalk: shop/total.sh printed the same total\n' > "$round/verdicts/checklist.txt"
+}
+build_later
+run_verify --later-round "$round" "$repo"
+expect_eq "a later round with its lines passes (only naming is listed)" 0 "$last_status"
+expect_contains "it records the rename-only count" "1 rename-only lines kept" "$last_output"
+expect_not_contains "it asks for no SCOPE block" "SCOPE" "$(printf '%s\n' "$last_output" | sed -n '1,/^FINDINGS/p')"
+rm "$round/verdicts/checklist.txt"
+expect_problem "a later round with no receipt lines" "no \"<n> fixes re-checked\" line" --later-round
+expect_contains "it also asks for rewrites" "no \"<n> rewrites checked\" line" "$last_output"
+expect_contains "and rename-only lines" "no \"<n> rename-only lines kept\" line" "$last_output"
+expect_contains "and the walk" "walk-item shop/total.sh has no \"Walk:\" line" "$last_output"
+build_later
+printf '2 fixes re-checked\n0 rewrites checked\n3 rename-only lines kept\nWalk: shop/total.sh printed the same total\n' > "$round/verdicts/checklist.txt"
+expect_problem "a rename-only count that is not the script's" "\"3 rename-only lines kept\" but rename-only-lines.sh lists 1" --later-round
+build_later
+printf '2 fixes re-checked\n0 rewrites checked\n1 rename-only lines kept\n' > "$round/verdicts/checklist.txt"
+expect_problem "a walk-item with no Walk: line" "walk-item shop/total.sh has no \"Walk:\" line" --later-round
+build_later
+expect_problem "round 1's rules on a later round's folder (no flag) ask for a SCOPE block" "no SCOPE: block"
+
+# --- usage -------------------------------------------------------------------
+run_verify
+expect_eq "usage: no arguments exits 2" 2 "$last_status"
+run_verify "$work_dir/none" "$repo"
+expect_eq "usage: a missing round folder exits 2" 2 "$last_status"
+
+finish

@@ -256,6 +256,67 @@ printf -- '--- a/x\n+++ b/x\n@@ -0,0 +1 @@\n+  placed_at: Time.current\n' >> "$w
 expect_eq "mixed: react, rails and datetime all run, in table order" \
   "GATES=naming,clarity,structure,simplicity,datetime,react,rails,testing,correctness" "$(gates_for "$work_dir/mixed")"
 
+# --- later rounds: the always-run gates follow the delta -----------------------
+later_gates_for() {
+  bash "$select_gates" --later-round "$1/review.diff" "$1/changed-files.txt" "$1/repo" | sed -n 1p
+}
+later_output_for() {
+  bash "$select_gates" --later-round "$1/review.diff" "$1/changed-files.txt" "$1/repo"
+}
+
+# One changed line in a test file: only the testing gate.
+mkdir -p "$work_dir/later-test/repo"
+printf 'src/cart.test.ts\n' > "$work_dir/later-test/changed-files.txt"
+printf -- '--- a/src/cart.test.ts\n+++ b/src/cart.test.ts\n@@ -3 +3 @@\n-  expect(total).toBeGreaterThan(0)\n+  expect(total).toBe(3)\n' > "$work_dir/later-test/review.diff"
+later_test_output=$(later_output_for "$work_dir/later-test")
+expect_eq "later round, tests only: just testing runs" "GATES=testing" "$(printf '%s\n' "$later_test_output" | sed -n 1p)"
+expect_contains "later round, tests only: the skipped gates say why" "correctness: N/A (later round: every changed file is a test, nothing for correctness to grade)" "$later_test_output"
+expect_contains "later round, tests only: the round line names the case" "round: later, tests only" "$later_test_output"
+expect_eq "round 1 on the same delta still runs every always gate" \
+  "GATES=naming,clarity,structure,simplicity,testing,correctness" "$(gates_for "$work_dir/later-test")"
+expect_not_contains "round 1 prints no round line" "round:" "$(select_gates_output "$work_dir/later-test")"
+
+# A test file that adds date code still gets the datetime gate: topic gates keep their triggers.
+mkdir -p "$work_dir/later-test-date/repo"
+printf 'src/cart.test.ts\n' > "$work_dir/later-test-date/changed-files.txt"
+printf -- '--- a/src/cart.test.ts\n+++ b/src/cart.test.ts\n@@ -3 +3 @@\n-  const at = 1\n+  const at = new Date(0)\n' > "$work_dir/later-test-date/review.diff"
+expect_eq "later round, tests only: a topic gate still runs on its trigger" "GATES=datetime,testing" "$(later_gates_for "$work_dir/later-test-date")"
+
+# A test and a source file together: the full set.
+make_case "$work_dir/later-mixed" '  def total = items.sum(&:price)' app/models/order.rb spec/models/order_spec.rb
+expect_eq "later round, source and test: every always gate runs" \
+  "GATES=naming,clarity,structure,simplicity,rails,testing,correctness" "$(later_gates_for "$work_dir/later-mixed")"
+expect_not_contains "later round, full delta: no round line" "round:" "$(later_output_for "$work_dir/later-mixed")"
+
+# Renames only: just naming.
+mkdir -p "$work_dir/later-rename/repo"
+printf 'src/cart.ts\n' > "$work_dir/later-rename/changed-files.txt"
+printf -- '--- a/src/cart.ts\n+++ b/src/cart.ts\n@@ -1,2 +1,2 @@\n-const cartTotal = sum(items)\n-export default cartTotal\n+const orderTotal = sum(items)\n+export default orderTotal\n' > "$work_dir/later-rename/review.diff"
+later_rename_output=$(later_output_for "$work_dir/later-rename")
+expect_eq "later round, renames only: just naming runs" "GATES=naming" "$(printf '%s\n' "$later_rename_output" | sed -n 1p)"
+expect_contains "later round, renames only: the round line names the case" "round: later, renames only" "$later_rename_output"
+
+# A rename beside a changed line is not renames only.
+printf -- '--- a/src/cart.ts\n+++ b/src/cart.ts\n@@ -1,2 +1,3 @@\n-const cartTotal = sum(items)\n-export default cartTotal\n+const orderTotal = sum(items)\n+export default orderTotal\n+log(orderTotal)\n' > "$work_dir/later-rename/review.diff"
+expect_eq "later round, a rename plus a new line: the full set" \
+  "GATES=naming,clarity,structure,simplicity,testing,correctness" "$(later_gates_for "$work_dir/later-rename")"
+printf -- '--- a/src/cart.ts\n+++ b/src/cart.ts\n@@ -1,3 +1,2 @@\n-const cartTotal = sum(items)\n-export default cartTotal\n-log(cartTotal)\n+const orderTotal = sum(items)\n+export default orderTotal\n' > "$work_dir/later-rename/review.diff"
+expect_eq "later round, a rename plus a removed line: the full set" \
+  "GATES=naming,clarity,structure,simplicity,testing,correctness" "$(later_gates_for "$work_dir/later-rename")"
+printf -- '--- a/src/cart.ts\n+++ b/src/cart.ts\n@@ -1 +1 @@\n-const cartTotal = sum(items)\n+const cartTotal = sum(items, 2)\n' > "$work_dir/later-rename/review.diff"
+expect_eq "later round, a changed argument is not a rename: the full set" \
+  "GATES=naming,clarity,structure,simplicity,testing,correctness" "$(later_gates_for "$work_dir/later-rename")"
+
+# A rename in one hunk and a removed line in another is not renames only.
+printf -- '--- a/src/cart.ts\n+++ b/src/cart.ts\n@@ -1 +1 @@\n-const cartTotal = sum(items)\n+const orderTotal = sum(items)\n@@ -9,2 +9 @@\n-log(cartTotal)\n keep()\n' > "$work_dir/later-rename/review.diff"
+expect_eq "later round, a rename hunk plus a removal hunk: the full set" \
+  "GATES=naming,clarity,structure,simplicity,testing,correctness" "$(later_gates_for "$work_dir/later-rename")"
+
+# An empty delta has nothing to narrow by: the full set.
+: > "$work_dir/later-empty.diff"; : > "$work_dir/later-empty.txt"
+expect_eq "later round, an empty delta: the full set" \
+  "GATES=naming,clarity,structure,simplicity,testing,correctness" "$(bash "$select_gates" --later-round "$work_dir/later-empty.diff" "$work_dir/later-empty.txt" "$work_dir/ruby/repo" | sed -n 1p)"
+
 # --- usage errors -------------------------------------------------------------
 check_status() {
   local label=$1 expected=$2 status

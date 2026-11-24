@@ -30,6 +30,25 @@ make_repo() {
   git -C "$repo_dir" commit -q -m feature
 }
 
+# --- the output folder stays outside any checkout ------------------------------
+# A folder under the repo, or under its .git, is warned about: reading a file there loads the
+# repo's CLAUDE.md and path-scoped rules a second time.
+repo="$work_dir/repo-outdir"
+make_repo "$repo" main
+inside_warning=$(cd "$repo" && bash "$gather" --branch --out-dir "$repo/review-out" 2>&1 >/dev/null)
+expect_contains "out-dir inside the checkout: warns" "is inside a git checkout (or its .git)" "$inside_warning"
+expect_contains "the warning says why" "loads a second copy of the repo's rules" "$inside_warning"
+expect_contains "the warning names the folder" "$repo/review-out" "$inside_warning"
+git_dir_warning=$(cd "$repo" && bash "$gather" --branch --out-dir "$repo/.git/kc-review" 2>&1 >/dev/null)
+expect_contains "out-dir inside .git: warns" "is inside a git checkout (or its .git)" "$git_dir_warning"
+expect_eq "it still writes the review there" yes "$([ -f "$repo/.git/kc-review/review.diff" ] && echo yes || echo no)"
+outside_warning=$(cd "$repo" && bash "$gather" --branch --out-dir "$work_dir/out-outside-repo" 2>&1 >/dev/null)
+expect_eq "out-dir outside any checkout: no warning" "" "$outside_warning"
+default_output=$(cd "$repo" && TMPDIR="$work_dir/tmp-default" && mkdir -p "$TMPDIR" && TMPDIR=$TMPDIR bash "$gather" --branch 2>"$work_dir/default.err")
+default_sha=$(git -C "$repo" rev-parse HEAD)
+expect_contains "no --out-dir: the folder is under TMPDIR, outside the checkout" "DIFF_FILE=$work_dir/tmp-default/kc-review-$default_sha/review.diff" "$default_output"
+expect_eq "no --out-dir: no warning" "" "$(cat "$work_dir/default.err")"
+
 # --- branch mode, falling back to main ---------------------------------------
 repo="$work_dir/repo-main"
 make_repo "$repo" main

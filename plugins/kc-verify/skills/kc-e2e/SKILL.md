@@ -31,6 +31,8 @@ Write down the layers the change touches, in order, from the interaction to the 
 
 ### Step 2 — get a system running
 
+Bring it up with one tested command (a script or target in the repo) run as written, never by hand step by step, and name the command in the report (`kc-verify:kc-ui` Step 2 has the rule and its walk-receipt line).
+
 Bring up the system users actually run (the app, its demo or a staging build, with its default configuration), not only the test harness, and with seed data that resembles production. Note which parts are real and which are stubbed, because a flow verified against a stubbed payment provider is verified against a stub, and the report should say so.
 
 ### Step 2b — list the states

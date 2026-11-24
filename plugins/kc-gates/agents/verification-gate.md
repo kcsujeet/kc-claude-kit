@@ -25,7 +25,7 @@ The dispatch prompt gives you:
 - on a re-review, the orchestrator's classification of each carried-over finding (fixed, declined-with-reason, still open);
 - the head SHA, the path to the saved unified diff file, and the changed-file list, so you can tell which trigger groups the diff hits.
 
-Read the diff file only to decide which trigger groups apply. Do not re-grade the diff against another gate's rules; judge whether that gate's receipt is present and enumerated.
+When the dispatch gives `verify-gate-blocks.sh`'s passing output, its §V3 counts, §V7 and §V12 results are already checked: cite them and walk the rest. Read the diff file only to decide which trigger groups apply. Do not re-grade the diff against another gate's rules; judge whether that gate's receipt is present and enumerated.
 
 ## Output
 
@@ -68,7 +68,7 @@ For §V2, list which trigger groups applied and cite each group's receipt, or it
 - [ ] §V9 On a re-review, each finding says where it came from: new code in this round's commits, a line an earlier round saw and let pass, or a change our own earlier comment asked for. Run `bash "${CLAUDE_PLUGIN_ROOT}/scripts/rename-only-lines.sh" "$DIFF_FILE"` yourself: a line it lists keeps the verdict the earlier round gave it, unless the rename itself is the problem (`<n> rename-only lines kept`); a finding on one, or a finding with no origin, FAILS. (N/A: first round)
 - [ ] §V10 A review whose `select-gates.sh` output gives the public-path walk reason (`walk: public or guest path`) has a `Walk:` receipt in its Checklist: each audience that can reach the change (signed out included) with what it saw in the running app, and the two replays (another record's id, the same id again) of each write a link, callback or return URL triggers; no receipt FAILS whatever the gates returned. (N/A: no public-path reason)
 - [ ] §V11 Each `walk-item:` line has a `Walk:` receipt of what was seen in the running app or at the API, also for a change made for another reviewer's or a bot's comment; a re-review walks the delta's items, not only its own findings; an item with no receipt FAILS. (N/A: no `walk-item` lines)
-- [ ] §V12 Every citation `path:line@sha` in the gate outputs passes `bash "${CLAUDE_PLUGIN_ROOT}/scripts/check-gate-citations.sh" <head-sha> <repo-root> <gate-output-file>...` (receipt: exit 0); a sha not the head's, or a line missing at the head, FAILS. (N/A: no citations)
+- [ ] §V12 Every citation `path:line@sha` passes `check-gate-citations.sh <head-sha> <repo-root> <gate-output-file>...` (receipt: exit 0, or verify-gate-blocks.sh's §V12 line). (N/A: no citations)
 
 ---
 

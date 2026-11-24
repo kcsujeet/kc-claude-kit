@@ -77,6 +77,28 @@ check allow "allowed: a generic execute tool moving to another status" PreToolUs
 
 check allow "allowed: a generic execute tool running another operation that mentions a review status" PreToolUse mcp__tracker__executeWrite '{"name":"updateJiraIssue","inputs":{"issueIdOrKey":"ABC-1","fields":{"status":"In Review"}}}' "$list"
 
+# A tracker that moves status through its general save or update call is held the same way: the
+# state or status field carries the move, a title or description that mentions it does not.
+check deny  "blocked: save_issue with a state of In Review" PreToolUse mcp__tracker__save_issue '{"id":"ABC-1","state":"In Review"}' "$list"
+check deny  "blocked: updateIssue with a nested status name" PreToolUse mcp__tracker__updateIssue '{"issueIdOrKey":"ABC-1","status":{"name":"In Review"}}' "$list"
+check deny  "blocked: update_issue with a statusName" PreToolUse mcp__tracker__update_issue '{"id":"ABC-1","title":"Totals","statusName":"Code Review"}' "$list"
+check allow "allowed: save_issue moving to another state" PreToolUse mcp__tracker__save_issue '{"id":"ABC-1","state":"Done"}' "$list"
+check allow "allowed: save_issue editing only a description that mentions In Review" PreToolUse mcp__tracker__save_issue '{"id":"ABC-1","description":"Move this to In Review once QA passes"}' "$list"
+check allow "allowed: save_issue whose title mentions review" PreToolUse mcp__tracker__save_issue '{"id":"ABC-1","title":"Review the totals","state":"Todo"}' "$list"
+check allow "allowed: a save_issue call in a repo with no checklist" PreToolUse mcp__tracker__save_issue '{"id":"ABC-1","state":"In Review"}' "$plain"
+check allow "allowed: a save call on something that is not an issue" PreToolUse mcp__tracker__save_comment '{"issueId":"ABC-1","state":"In Review"}' "$list"
+check allow "allowed: save_issue moving to review with the skip token" PreToolUse mcp__tracker__save_issue '{"id":"ABC-1","state":"In Review","description":"KC_READY_SKIP=1"}' "$list"
+save_verdicts '- [PASS] The walkthrough video is in the How to test section.\n- [PASS] The assignee is the named reviewer.\n'
+check allow "allowed: save_issue to review once every box is met" PreToolUse mcp__tracker__save_issue '{"id":"ABC-1","state":"In Review"}' "$list"
+rm "$KC_READY_DIR/$head_sha.checklist"
+
+# The hook is registered for those tools: its matcher covers each name above (jq reads hooks.json).
+matcher=$(jq -r '.hooks.PreToolUse[] | select(any(.hooks[]; .command | test("guard-tracker-transition"))) | .matcher' "$(dirname "$tests_dir")/hooks/hooks.json")
+for registered in mcp__tracker__transitionIssue mcp__tracker__executeWrite mcp__tracker__save_issue mcp__tracker__updateIssue mcp__tracker__update_issue mcp__tracker__issue_update; do
+  expect_eq "hooks.json matcher covers $registered" match "$(printf '%s' "$registered" | grep -Eq "^($matcher)$" && echo match || echo no-match)"
+done
+expect_eq "hooks.json matcher leaves a comment tool alone" no-match "$(printf '%s' mcp__tracker__addComment | grep -Eq "^($matcher)$" && echo match || echo no-match)"
+
 # The status pattern can be set.
 expect_eq "a status pattern from the environment: matching" deny "$(verdict_of "$(payload PreToolUse $TOOL '{"issueIdOrKey":"ABC-1","transitionName":"Ready for QA"}' "$list" | KC_REVIEW_STATUS_REGEX='review|qa' bash "$scripts/guard-tracker-transition.sh" 2>/dev/null)")"
 expect_eq "a status pattern from the environment: review no longer matches" allow "$(verdict_of "$(payload PreToolUse $TOOL "$REVIEW" "$list" | KC_REVIEW_STATUS_REGEX='qa' bash "$scripts/guard-tracker-transition.sh" 2>/dev/null)")"

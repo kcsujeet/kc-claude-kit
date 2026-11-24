@@ -26,7 +26,11 @@
 #   --branch [base]  Branch mode: `git diff <base>...HEAD` in the current repo.
 #                    The base is <base> when given, else origin/HEAD, else
 #                    main, else master.
-#   --out-dir <dir>  Where to write (default: ${TMPDIR:-/tmp}/kc-review-<sha>).
+#   --out-dir <dir>  Where to write (default: ${TMPDIR:-/tmp}/kc-review-<sha>, outside any
+#                    checkout). A folder inside a git checkout or its .git gets a warning on
+#                    stderr: Claude Code loads a folder's CLAUDE.md and path-scoped rules the
+#                    first time the Read tool opens a file under it, so reading the saved review
+#                    there loads a second copy of the repo's rules into context.
 #
 # Writes <out-dir>/review.diff, <out-dir>/changed-files.txt (one path per line)
 # and <out-dir>/meta.env, then prints meta.env. meta.env holds HEAD_SHA, BASE,
@@ -227,6 +231,9 @@ fi
 [ -n "$out_dir" ] || out_dir="$tmp_root/kc-review-$head_sha"
 mkdir -p "$out_dir"
 out_dir=$(cd "$out_dir" && pwd)
+if [ "$(git -C "$out_dir" rev-parse --is-inside-work-tree 2>/dev/null)" = true ] || [ "$(git -C "$out_dir" rev-parse --is-inside-git-dir 2>/dev/null)" = true ]; then
+  echo "$script_name: warning: --out-dir $out_dir is inside a git checkout (or its .git). Claude Code loads a folder's CLAUDE.md and path-scoped rules the first time the Read tool opens a file under it, so reading the saved review there loads a second copy of the repo's rules into context for the rest of the session. Use a folder outside any checkout (default: ${TMPDIR:-/tmp}/kc-review-<sha>)." >&2
+fi
 diff_file="$out_dir/review.diff"
 changed_files="$out_dir/changed-files.txt"
 meta_file="$out_dir/meta.env"

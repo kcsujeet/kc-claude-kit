@@ -51,6 +51,15 @@
 #       --pass, a receipt for the checklist alone doesn't count: handing a PR
 #       to review needs the pass. With --clean, only a pass whose last round
 #       found nothing counts (clean=yes): what guard-merge.sh needs.
+#   ready-receipt.sh write <sha> --preflight --rounds <1-3> --open <n> --pass <dir>
+#       The same checks of the pass folder's records, shape only and fast: it
+#       reads the saved review.diff and changed-files.txt of each round instead
+#       of making them again from git, asks the PR host nothing and skips the
+#       risk check of the fixes. It writes no receipt and prints every missing
+#       or malformed item; run it after saving the records, before the real
+#       write. A real write also lists every problem at once, not the first.
+#   ready-receipt.sh help
+#       Prints this text and the exact line formats of the pass folder's files.
 #
 # The pass folder holds round-1/, gather-review.sh's --out-dir for the one
 # gate round (review.diff, changed-files.txt, meta.env) plus a verdicts/
@@ -100,11 +109,46 @@
 # the repo root; the commits must be in the local clone.
 set -euo pipefail
 
+preflight=false
 receipts_dir=${KC_READY_DIR:-$HOME/.claude/kc-ready-for-review}
 scripts_dir=$(cd "$(dirname "$0")" && pwd)
 
+# The exact line formats of the pass folder's files; a TAB is a literal tab character.
+print_formats() {
+  cat <<'FORMATS'
+
+Pass folder, and the exact lines each file must hold:
+  round-<k>/verdicts/<name>.txt   one gate's block, as it returned:
+                                    GATE: <name>
+                                    STATUS: PASS | PASS (N/A) | FAIL
+                                    BOXES:
+                                    - [PASS|FAIL|N/A] <box id>: <evidence>
+                                    FINDINGS:
+                                  and, in round 1, one block  SCOPE:  BOXES:  with
+                                  - [PASS|FAIL|N/A] §G1: <evidence>  through §G5, each once.
+                                  Verification: an agent's block, or the output of
+                                  verify-gate-blocks.sh (it carries SOURCE: verify-gate-blocks.sh
+                                  and is run again here, so it must still pass).
+  fixes.txt                       one line per round-1 finding, fields split by TAB:
+                                    fixed<TAB><finding><TAB><test file the fix commits changed>
+                                    mechanical<TAB><finding>
+                                    open<TAB><finding><TAB><reason>
+                                  <reason> is exactly one of: fails safe | needs a decision |
+                                  pre-existing  (those words and nothing after them).
+  round-<k>/uses.txt              trace-uses.sh's output; each use is a line starting with two
+                                  spaces:  "  <path>:<line>: <text>"
+  round-<k>/uses-verdicts.txt     one line per use line:  <the use line copied exactly, its two
+                                  leading spaces included><TAB>fine|breaks|changes
+  final.txt                       after round 3 found something, one line per finding:
+                                    fixed<TAB><finding><TAB><test file the final fixes changed>
+                                    dismissed<TAB><finding><TAB><reason>
+                                    asked<TAB><finding><TAB><the user's words>
+FORMATS
+}
+
 usage() {
   awk '/^#   ready-receipt.sh/ { show = 1 } show && /^#$/ { exit } show { sub(/^# ?/, ""); print }' "$0" >&2
+  print_formats >&2
   exit 2
 }
 
@@ -264,7 +308,8 @@ get_review_base_commit() {
 # The round needs every gate its diff lists, verification and a SCOPE: block. The project-conventions gate is needed only when the repo had
 # .claude/review-conventions.md at the review's head.
 check_review() {
-  local review=$1 with_scope=${2:-scope} dir=$pass_dir/$1 summary gate_report gates gate required head base_commit
+  local review=$1 with_scope=${2:-scope} dir=$pass_dir/$1 summary gate_report gates gate required head base_commit select_args=() verification_file
+  review_usable=false
   if [ ! -d "$dir" ]; then
     record_problem "$review: no $review/ folder in the pass folder"
     return
@@ -286,10 +331,18 @@ check_review() {
     record_problem "$review: meta.env names no BASE this clone has"
     return
   fi
-  git -C "$repo_root" diff --no-color --no-ext-diff --src-prefix=a/ --dst-prefix=b/ "$base_commit...$head" > "$regenerated_dir/$review.diff"
-  git -C "$repo_root" diff --no-ext-diff --name-only "$base_commit...$head" > "$regenerated_dir/$review.files"
+  if $preflight; then
+    cp "$dir/review.diff" "$regenerated_dir/$review.diff"
+    cp "$dir/changed-files.txt" "$regenerated_dir/$review.files"
+  else
+    git -C "$repo_root" diff --no-color --no-ext-diff --src-prefix=a/ --dst-prefix=b/ "$base_commit...$head" > "$regenerated_dir/$review.diff"
+    git -C "$repo_root" diff --no-ext-diff --name-only "$base_commit...$head" > "$regenerated_dir/$review.files"
+  fi
+  review_usable=true
   summary=$(print_verdicts "$review" | summarize_blocks)
-  gate_report=$(bash "$scripts_dir/select-gates.sh" "$regenerated_dir/$review.diff" "$regenerated_dir/$review.files" "$repo_root")
+  # A later round reviews only the fixes, so its always-run gates follow what the delta touches.
+  [ "$with_scope" = scope ] || select_args=(--later-round)
+  gate_report=$(bash "$scripts_dir/select-gates.sh" "${select_args[@]+"${select_args[@]}"}" "$regenerated_dir/$review.diff" "$regenerated_dir/$review.files" "$repo_root")
   gates=$(printf '%s\n' "$gate_report" | sed -n 's/^GATES=//p')
   if ! git -C "$repo_root" cat-file -e "$head:.claude/review-conventions.md" 2>/dev/null; then
     gates=${gates/,project-conventions/}
@@ -299,6 +352,16 @@ check_review() {
   done
   check_gate_block "$review" "$summary" verification
   [ "$with_scope" != scope ] || check_scope_block "$review" "$summary"
+  # A verification block made by verify-gate-blocks.sh is only as good as its last run: run it again.
+  verification_file=$(grep -l '^SOURCE: verify-gate-blocks.sh' "$dir"/verdicts/* 2>/dev/null | head -n 1 || true)
+  if [ -n "$verification_file" ]; then
+    local rerun_args=() rerun_output
+    [ "$with_scope" = scope ] || rerun_args=(--later-round)
+    if ! rerun_output=$(bash "$scripts_dir/verify-gate-blocks.sh" "${rerun_args[@]+"${rerun_args[@]}"}" "$dir" "$repo_root" 2>&1); then
+      record_problem "$review: the verification block is verify-gate-blocks.sh's, and the script now finds:"
+      while IFS= read -r line; do record_problem "  $line"; done <<< "$rerun_output"
+    fi
+  fi
 }
 
 readonly MAX_ROUNDS=3
@@ -325,23 +388,36 @@ count_failing_blocks() {
 # A use marked breaks is a finding: count_broken_uses keeps such a round from
 # being clean.
 check_uses_record() {
-  local review=$1 dir=$pass_dir/$1 use_line use_count=0 missing=0 has_uses_list=false has_uses_verdicts=false
+  local review=$1 dir=$pass_dir/$1 has_uses_list=false has_uses_verdicts=false summary use_count missing bad sample_line
   [ -f "$dir/uses.txt" ] && has_uses_list=true
   [ -f "$dir/uses-verdicts.txt" ] && has_uses_verdicts=true
   if ! $has_uses_list || ! $has_uses_verdicts; then
     record_problem "$review: no uses.txt and uses-verdicts.txt (trace-uses.sh on the round's diff, and a verdict per use)"
     return
   fi
-  while IFS= read -r use_line; do
-    use_count=$((use_count + 1))
-    # The use line goes through the environment, not -v, which would read its backslashes as escapes.
-    USE_LINE=$use_line awk -F '\t' '
-      { is_this_use = $1 == ENVIRON["USE_LINE"]; has_verdict = $2 == "fine" || $2 == "breaks" || $2 == "changes" }
-      is_this_use && has_verdict { found = 1 }
-      END { exit !found }' "$dir/uses-verdicts.txt" \
-      || missing=$((missing + 1))
-  done < <(grep -E '^  [^ ]' "$dir/uses.txt" || true)
-  [ "$missing" -eq 0 ] || record_problem "$review: $missing of $use_count listed use(s) have no fine, breaks or changes line in uses-verdicts.txt"
+  # One pass over both files: the verdicts become a set keyed by the use line (read from the file,
+  # so a backslash stays one), then each listed use is looked up in it.
+  summary=$({ grep -E '^  [^ ]' "$dir/uses.txt" || true; } | awk -F '\t' '
+    FILENAME == ARGV[1] {
+      if ($2 == "fine" || $2 == "breaks" || $2 == "changes") judged[$1] = 1
+      else if (length($0) > 0) { bad++; if (bad <= 2) bad_sample[bad] = $0 }
+      next
+    }
+    { uses++; if (!($0 in judged)) { missing++; if (missing <= 2) missing_sample[missing] = $0 } }
+    END {
+      printf "count\t%d\t%d\t%d\n", uses, missing, bad
+      for (i = 1; i <= 2; i++) if (i in missing_sample) printf "missing\t%s\n", missing_sample[i]
+      for (i = 1; i <= 2; i++) if (i in bad_sample) printf "bad\t%s\n", bad_sample[i]
+    }' "$dir/uses-verdicts.txt" -)
+  IFS=$'\t' read -r _ use_count missing bad <<< "$(printf '%s\n' "$summary" | sed -n 1p)"
+  if [ "$missing" -gt 0 ]; then
+    record_problem "$review: $missing of $use_count listed use(s) have no fine, breaks or changes line in uses-verdicts.txt (a line is the use line copied exactly from uses.txt, its two leading spaces included, a TAB, then fine, breaks or changes)"
+    while IFS=$'\t' read -r _ sample_line; do record_problem "  no verdict for: $sample_line"; done < <(printf '%s\n' "$summary" | grep $'^missing\t' || true)
+  fi
+  if [ "$bad" -gt 0 ]; then
+    record_problem "$review: $bad line(s) of uses-verdicts.txt do not end in a TAB and exactly fine, breaks or changes"
+    while IFS=$'\t' read -r _ sample_line; do record_problem "  malformed: $sample_line"; done < <(printf '%s\n' "$summary" | grep $'^bad\t' || true)
+  fi
 }
 
 # Prints the number of findings a round's gate blocks list (bullets under FINDINGS:).
@@ -397,13 +473,21 @@ check_fix_rounds() {
   local rounds=$1 previous_head=$2 round head base_commit size previous_size="" has_previous_round did_not_shrink
   for ((round = 2; round <= rounds; round++)); do
     check_review "round-$round" no-scope
-    [ "${#problems[@]}" -eq 0 ] || return 0
+    # A round whose folder can't be read has no head to chain the next round from: it and the
+    # checks that need the chain are skipped, and its own problems are already listed.
+    if ! $review_usable; then
+      previous_head=""
+      previous_size=""
+      continue
+    fi
     head=$(get_review_head "round-$round")
     base_commit=$(get_review_base_commit "round-$round")
-    [ "$base_commit" = "$previous_head" ] \
-      || record_problem "round-$round: reviews from $base_commit, not round $((round - 1))'s head $previous_head: gather it with --branch $previous_head"
-    git -C "$repo_root" merge-base --is-ancestor "$previous_head" "$head" 2>/dev/null \
-      || record_problem "round-$round: its head does not descend from round $((round - 1))'s head"
+    if [ -n "$previous_head" ]; then
+      [ "$base_commit" = "$previous_head" ] \
+        || record_problem "round-$round: reviews from $base_commit, not round $((round - 1))'s head $previous_head: gather it with --branch $previous_head"
+      git -C "$repo_root" merge-base --is-ancestor "$previous_head" "$head" 2>/dev/null \
+        || record_problem "round-$round: its head does not descend from round $((round - 1))'s head"
+    fi
     check_uses_record "round-$round"
     size=$(count_changed_lines "$regenerated_dir/round-$round.diff")
     has_previous_round=false; did_not_shrink=false
@@ -451,7 +535,7 @@ check_fixes_record() {
         open_lines=$((open_lines + 1))
         case "$detail" in
           'fails safe' | 'needs a decision' | 'pre-existing') ;;
-          *) record_problem "fixes.txt line $line_number: an open finding says why: fails safe, needs a decision or pre-existing" ;;
+          *) record_problem "fixes.txt line $line_number: an open finding's reason is exactly one of: fails safe | needs a decision | pre-existing (the third field, nothing after those words); got '$detail'" ;;
         esac ;;
       *) record_problem "fixes.txt line $line_number: '$status' is not fixed, mechanical or open" ;;
     esac
@@ -492,8 +576,8 @@ get_widened_footprint() {
 }
 
 write_pass_receipt() {
-  local rounds=$1 open=$2 size=$3 scope_approved=$4 line round_one_head
-  local widened="" last_head clean=no
+  local rounds=$1 open=$2 size=$3 scope_approved=$4 line round_one_head=""
+  local widened="" last_head="" clean=no is_sha_in_clone=true round_one_usable=false last_round_usable=false
   printf '%s' "$rounds" | grep -Eqx '[1-9][0-9]*' || { echo "ready-receipt: --rounds is a count of gate rounds" >&2; exit 2; }
   [ "$rounds" -le "$MAX_ROUNDS" ] || { echo "ready-receipt: --rounds is at most $MAX_ROUNDS: past round $MAX_ROUNDS the fixes keep making findings, so stop and ask the user whether the approach is wrong" >&2; exit 2; }
   printf '%s' "$open" | grep -Eqx '[0-9]+' || { echo "ready-receipt: --open is a count" >&2; exit 2; }
@@ -504,53 +588,62 @@ write_pass_receipt() {
   regenerated_dir=$(mktemp -d)
   trap 'rm -rf "$regenerated_dir"' EXIT
 
+  # Every check whose input exists runs, so one refusal lists all that is missing; a check
+  # needing a head or a folder that is not usable is skipped, its cause being listed already.
   check_review round-1
-  git -C "$repo_root" cat-file -e "$sha^{commit}" 2>/dev/null || record_problem "commit $sha is not in this clone"
-  if [ "${#problems[@]}" -eq 0 ]; then
+  round_one_usable=$review_usable
+  last_round_usable=$review_usable
+  git -C "$repo_root" cat-file -e "$sha^{commit}" 2>/dev/null || { record_problem "commit $sha is not in this clone"; is_sha_in_clone=false; }
+  if $round_one_usable; then
     round_one_head=$(get_review_head round-1)
     last_head=$round_one_head
-    [ "$rounds" -eq 1 ] || check_fix_rounds "$rounds" "$round_one_head"
   fi
-  if [ "${#problems[@]}" -eq 0 ]; then
+  if [ "$rounds" -gt 1 ]; then
+    check_fix_rounds "$rounds" "$round_one_head"
+    last_round_usable=$review_usable
+  fi
+  if $is_sha_in_clone && [ -n "$last_head" ]; then
     git -C "$repo_root" merge-base --is-ancestor "$last_head" "$sha" 2>/dev/null \
       || record_problem "$sha does not descend from round $rounds's head (a rebase or reset since): that round reviewed another diff; run the pass again"
   fi
-  if [ "${#problems[@]}" -eq 0 ] && { [ "$round_one_head" != "$sha" ] || [ "$open" != 0 ]; }; then
+  if $is_sha_in_clone && [ -n "$round_one_head" ] && { [ "$round_one_head" != "$sha" ] || [ "$open" != 0 ]; }; then
     check_fixes_record "$round_one_head" "$open"
   fi
-  if [ "${#problems[@]}" -eq 0 ]; then
+  if $is_sha_in_clone && $round_one_usable && ! $preflight; then
     widened=$(get_widened_footprint "$round_one_head")
     if [ -n "$widened" ] && [ -z "$scope_approved" ]; then
       record_problem "the fixes reach past round 1's diff; show the user these and pass their words as --scope-approved \"<their words>\":"
       while IFS= read -r line; do record_problem "  $line"; done <<< "$widened"
     fi
   fi
+  local is_last_round_head=false has_nothing_open=false last_round_found_nothing=false failing_blocks broken_uses has_no_failing_blocks=false has_no_broken_uses=false is_settled_after_last_round=false is_last_allowed_round=false has_final_record=false finding_count last_round_size problems_before_settlement
+  [ "$sha" = "$last_head" ] && is_last_round_head=true
+  [ "$open" = 0 ] && has_nothing_open=true
+  if $last_round_usable; then
+    failing_blocks=$(count_failing_blocks "round-$rounds")
+    broken_uses=$(count_broken_uses "round-$rounds")
+    [ "$failing_blocks" -eq 0 ] && has_no_failing_blocks=true
+    [ "$broken_uses" -eq 0 ] && has_no_broken_uses=true
+    $has_no_failing_blocks && $has_no_broken_uses && last_round_found_nothing=true
+    [ "$rounds" -eq "$MAX_ROUNDS" ] && is_last_allowed_round=true
+    [ -f "$pass_dir/final.txt" ] && has_final_record=true
+    if $is_last_allowed_round && ! $last_round_found_nothing && $has_final_record && $is_sha_in_clone; then
+      finding_count=$(count_round_findings "round-$rounds")
+      last_round_size=$(count_changed_lines "$regenerated_dir/round-$rounds.diff")
+      problems_before_settlement=${#problems[@]}
+      check_final_settlement "$finding_count" "$last_round_size"
+      [ "${#problems[@]}" -gt "$problems_before_settlement" ] || is_settled_after_last_round=true
+    fi
+  fi
+  $preflight || check_unanswered_comments
   if [ "${#problems[@]}" -gt 0 ]; then
-    echo "ready-receipt: refused; the pass folder does not show the pass ran in full:" >&2
+    echo "ready-receipt: refused; the pass folder does not show the pass ran in full (every problem found is listed):" >&2
     printf '  %s\n' "${problems[@]}" >&2
     exit 1
   fi
-  refuse_unanswered_comments
-  local is_last_round_head=false has_nothing_open=false last_round_found_nothing=false failing_blocks broken_uses has_no_failing_blocks=false has_no_broken_uses=false is_settled_after_last_round=false is_last_allowed_round=false has_final_record=false finding_count last_round_size
-  [ "$sha" = "$last_head" ] && is_last_round_head=true
-  [ "$open" = 0 ] && has_nothing_open=true
-  failing_blocks=$(count_failing_blocks "round-$rounds")
-  broken_uses=$(count_broken_uses "round-$rounds")
-  [ "$failing_blocks" -eq 0 ] && has_no_failing_blocks=true
-  [ "$broken_uses" -eq 0 ] && has_no_broken_uses=true
-  $has_no_failing_blocks && $has_no_broken_uses && last_round_found_nothing=true
-  [ "$rounds" -eq "$MAX_ROUNDS" ] && is_last_allowed_round=true
-  [ -f "$pass_dir/final.txt" ] && has_final_record=true
-  if $is_last_allowed_round && ! $last_round_found_nothing && $has_final_record; then
-    finding_count=$(count_round_findings "round-$rounds")
-    last_round_size=$(count_changed_lines "$regenerated_dir/round-$rounds.diff")
-    check_final_settlement "$finding_count" "$last_round_size"
-    if [ "${#problems[@]}" -gt 0 ]; then
-      echo "ready-receipt: refused; the settlement after round $MAX_ROUNDS is not complete:" >&2
-      printf '  %s\n' "${problems[@]}" >&2
-      exit 1
-    fi
-    is_settled_after_last_round=true
+  if $preflight; then
+    echo "ready-receipt: preflight ok: the pass folder's records are well formed (shape only; the real write also asks the PR host about unanswered comments and checks the fixes' risk)"
+    exit 0
   fi
   if $has_nothing_open && { { $is_last_round_head && $last_round_found_nothing; } || $is_settled_after_last_round; }; then
     clean=yes
@@ -561,6 +654,15 @@ write_pass_receipt() {
     ! $is_settled_after_last_round || printf 'settled=final.txt\n'
     [ -z "$widened" ] || printf 'scope_approved=%s\n' "$scope_approved"
   } > "$receipts_dir/$sha"
+}
+
+# Records a problem per PR comment its author has not answered (nothing when there is no PR or no
+# network: the script prints a note and passes).
+check_unanswered_comments() {
+  local unanswered comment_line
+  unanswered=$("$scripts_dir/unanswered-pr-comments.sh") && return 0
+  record_problem "the PR has comments its author has not answered (read each, fix or reply, then write the receipt):"
+  while IFS= read -r comment_line; do record_problem "  $comment_line"; done <<< "$unanswered"
 }
 
 # Refuses (exit 1) while the branch's PR has review comments no reply from its author follows.
@@ -768,6 +870,7 @@ write_receipt() {
   local rounds="" open="" after="" size="" scope_approved="" checklist=false ledger_dir="" verdicts="" task=""
   shift
   pass_dir=""
+  preflight=false
   while [ "$#" -gt 0 ]; do
     case "$1" in
       --checklist) checklist=true; shift ;;
@@ -779,6 +882,7 @@ write_receipt() {
       --pass) pass_dir=$2; shift 2 ;;
       --scope-approved) scope_approved=$2; shift 2 ;;
       --verdicts) [ "$#" -ge 2 ] || usage; verdicts=$2; shift 2 ;;
+      --preflight) preflight=true; shift ;;
       --task) [ "$#" -ge 2 ] || usage; task=$2; shift 2 ;;
       *) usage ;;
     esac
@@ -787,7 +891,11 @@ write_receipt() {
     echo "ready-receipt: --ledger goes with --checklist" >&2
     exit 2
   fi
-  mkdir -p "$receipts_dir"
+  if $preflight && { $checklist || [ -n "$after$verdicts$task" ] || [ -z "$pass_dir" ]; }; then
+    echo "ready-receipt: --preflight checks a pass: --rounds, --open and --pass, with no --checklist, --after, --verdicts or --task" >&2
+    exit 2
+  fi
+  $preflight || mkdir -p "$receipts_dir"
   if [ -n "$verdicts$task" ] && ! $checklist && [ -z "$after$rounds$open$pass_dir$size" ]; then
     write_verdicts "$sha" "$verdicts" "$task"
     return
@@ -819,6 +927,10 @@ write_receipt() {
   done
 }
 
+if [ "${1:-}" = help ] || [ "${1:-}" = --help ] || [ "${1:-}" = -h ]; then
+  { awk '/^#   ready-receipt.sh/ { show = 1 } show && /^#$/ { exit } show { sub(/^# ?/, ""); print }' "$0"; print_formats; }
+  exit 0
+fi
 [ "$#" -ge 2 ] || usage
 action=$1
 if [ "$action" = check-task ]; then

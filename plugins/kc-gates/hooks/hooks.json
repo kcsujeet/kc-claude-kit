@@ -70,7 +70,7 @@
         ]
       },
       {
-        "matcher": "mcp__.*([Tt]ransition|[Ee]xecute).*",
+        "matcher": "mcp__.*([Tt]ransition|[Ee]xecute|([Ss]ave|[Uu]pdate|[Ee]dit|[Ss]et)[_-]?[Ii]ssue|[Ii]ssue[_-]?([Ss]ave|[Uu]pdate|[Ee]dit)).*",
         "hooks": [
           {
             "type": "command",

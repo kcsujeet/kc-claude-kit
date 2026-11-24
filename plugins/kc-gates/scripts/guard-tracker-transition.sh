@@ -6,8 +6,13 @@
 #
 # A call is a transition when its tool name matches /transition.*issue/i, or it
 # is a generic execute tool (name contains "execute") whose input names such an
-# operation. It is a move to review when a status field of the input
-# (transitionName, targetStatus, transition, status, to, name) matches
+# operation, or it is a save or update call on an issue (a name like save_issue,
+# updateIssue, issue_update: trackers that move status through their general
+# edit call) whose input has a state or status field (state, status, stateName,
+# statusName, workflowState; a value or its nested name). It is a move to review
+# when a status field of the input (transitionName, targetStatus, transition,
+# status, to, name; for a save or update call only its state and status fields,
+# so a title or description that mentions the review status is not a move) matches
 # $KC_REVIEW_STATUS_REGEX (default `review`, case-insensitive; set it in the
 # repo's or the user's settings `env`). A call that names only a transition id
 # can't be read and is not blocked.
@@ -30,6 +35,10 @@ scripts_dir=$(dirname "$0")
 
 readonly SKIP_TOKEN='KC_READY_SKIP=1'
 readonly STATUS_KEYS='(transitionName|targetStatus|transition|status|statusName|toStatus|to|name)'
+# A save or update call moves status only through its state or status field, whose value is the
+# status or an object holding its name.
+readonly SAVE_STATE_KEYS='(state|status|stateName|statusName|workflowState|workflow_state)'
+readonly SAVE_TOOL_PATTERN='(save|update|edit|set)[-_]?issue|issue[-_]?(save|update|edit)'
 
 print_deny() {
   printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Blocked by the kc-gates plugin: %s Only when the user has said in their latest message to skip it for this move, add KC_READY_SKIP=1 to the call (a comment field) or the environment; never on your own."}}\n' "$1"
@@ -40,18 +49,24 @@ escape_json() {
 }
 
 main() {
-  local input tool dir status_regex key root unmet lines
+  local input tool dir status_regex key root unmet lines status_key_pattern value_prefix=""
   input=$(cat)
   input=${input%%'"tool_response"'*}
   case "$input" in *"$SKIP_TOKEN"*) exit 0 ;; esac
   [ "${KC_READY_SKIP:-}" != 1 ] || exit 0
   tool=$(printf '%s' "$input" | tr '\n' ' ' | sed -nE 's/.*"tool_name"[[:space:]]*:[[:space:]]*"([^"]*)".*/\1/p')
-  if ! printf '%s' "$tool" | grep -Eiq 'transition.*issue'; then
+  status_key_pattern=$STATUS_KEYS
+  if printf '%s' "$tool" | grep -Eiq 'transition.*issue'; then
+    :
+  elif printf '%s' "$tool" | grep -Eiq "$SAVE_TOOL_PATTERN"; then
+    status_key_pattern=$SAVE_STATE_KEYS
+    value_prefix='(\{[^{}]*"name"[[:space:]]*:[[:space:]]*)?'
+  else
     printf '%s' "$tool" | grep -Eiq 'execute' || exit 0
     printf '%s' "$input" | grep -Eiq '"(name|operation|operationId|tool)"[[:space:]]*:[[:space:]]*"[^"]*transition[^"]*issue' || exit 0
   fi
   status_regex=${KC_REVIEW_STATUS_REGEX:-review}
-  printf '%s' "$input" | tr '\n' ' ' | grep -Eiq "\"$STATUS_KEYS\"[[:space:]]*:[[:space:]]*\"[^\"]*($status_regex)" || exit 0
+  printf '%s' "$input" | tr '\n' ' ' | grep -Eiq "\"$status_key_pattern\"[[:space:]]*:[[:space:]]*$value_prefix\"[^\"]*($status_regex)" || exit 0
   dir=$(printf '%s' "$input" | tr '\n' ' ' | sed -nE 's/.*"cwd"[[:space:]]*:[[:space:]]*"([^"]*)".*/\1/p')
   dir=${dir:-$PWD}
   root=$(git -C "$dir" rev-parse --show-toplevel 2>/dev/null) || root=""
