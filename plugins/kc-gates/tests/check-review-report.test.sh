@@ -7,13 +7,13 @@ set -euo pipefail
 tests_dir=$(cd "$(dirname "$0")" && pwd)
 # shellcheck source=lib/harness.sh
 . "$tests_dir/lib/harness.sh"
-check="$(dirname "$tests_dir")/scripts/check-review-report.sh"
+check_review_report="$(dirname "$tests_dir")/scripts/check-review-report.sh"
 
 # Runs the check on <report>, passing it as a file; prints the exit code, output in last-output.
 run_check() {
   printf '%s\n' "$1" > "$work_dir/report.md"
   local code=0
-  bash "$check" "$work_dir/report.md" > "$work_dir/last-output" 2>&1 || code=$?
+  bash "$check_review_report" "$work_dir/report.md" > "$work_dir/last-output" 2>&1 || code=$?
   echo "$code"
 }
 
@@ -55,18 +55,21 @@ expect_not_contains "a labeled finding is not reported" "L7" "$(cat "$work_dir/l
 
 expect_eq "§G6 a clarity-only unlabeled finding is reported" 1 "$(run_check "$head_lines$works$table"$'\n**Clarity:**\n- 🟡 `a.ts:L1`: dense. Split.\n')"
 
+bold_label=$'**Does it work / what can it break**\n**Checkout**\n- Measured: checkout query before 420 ms -> after 38 ms (1,000 orders).\n- Uses: 4 traced, 3 run in the orders spec, 1 read.\n'
+expect_eq "§G6 a plain bold label inside the section does not end it" 0 "$(run_check "$head_lines$bold_label$table$labeled")"
+
 stdin_code=0
-printf '%s\n' "$good" | bash "$check" - > "$work_dir/last-output" 2>&1 || stdin_code=$?
+printf '%s\n' "$good" | bash "$check_review_report" - > "$work_dir/last-output" 2>&1 || stdin_code=$?
 expect_eq "§G6 stdin is read with -" 0 "$stdin_code"
 stdin_code=0
-printf '%s\n' "$no_section" | bash "$check" - > "$work_dir/last-output" 2>&1 || stdin_code=$?
+printf '%s\n' "$no_section" | bash "$check_review_report" - > "$work_dir/last-output" 2>&1 || stdin_code=$?
 expect_eq "§G6 stdin problems exit 1" 1 "$stdin_code"
 
 usage_code=0
-bash "$check" > /dev/null 2>&1 || usage_code=$?
+bash "$check_review_report" > /dev/null 2>&1 || usage_code=$?
 expect_eq "no argument is a usage error" 2 "$usage_code"
 usage_code=0
-bash "$check" "$work_dir/missing.md" > /dev/null 2>&1 || usage_code=$?
+bash "$check_review_report" "$work_dir/missing.md" > /dev/null 2>&1 || usage_code=$?
 expect_eq "an unreadable file is a usage error" 2 "$usage_code"
 
 finish

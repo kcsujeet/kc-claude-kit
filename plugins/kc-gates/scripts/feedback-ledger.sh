@@ -200,6 +200,7 @@ run_check() {
     has_check_file=true
   fi
 
+  local lesson_line_tags_from=4 covered_line_tags_from=6
   local problems=0 ledger_line item_id verdict verdict_detail why_missed what_catches_it seen=" "
   record_problem() { echo "$1"; problems=$((problems + 1)); }
   # Each rule a lesson names is added by the lesson diff: an id it defines, or a file it changes.
@@ -246,29 +247,36 @@ run_check() {
     fi
   }
   # Each tagged field of a lesson line, from field number $2 on, as `name:value`.
-  lesson_field() {
-    local value
-    value=$(printf '%s' "$ledger_line" | awk -F'\t' -v from="$2" -v tag="$1:" \
+  get_lesson_field() {
+    local field_text
+    field_text=$(printf '%s' "$ledger_line" | awk -F'\t' -v from="$2" -v tag="$1:" \
       'NR == 1 { for (i = from; i <= NF; i++) if (index($i, tag) == 1) found = substr($i, length(tag) + 1) } END { print found }')
-    value=${value#"${value%%[![:space:]]*}"}
-    printf '%s' "${value%"${value##*[![:space:]]}"}"
+    field_text=${field_text#"${field_text%%[![:space:]]*}"}
+    printf '%s' "${field_text%"${field_text##*[![:space:]]}"}"
   }
   # A lesson record names its class, two unlike examples, the layer it sits at, why no higher
   # layer holds it, and its proof. $1 is the item, $2 the number of the first tagged field.
   check_lesson_record() {
-    local item=$1 from=$2 tag value rest example example_count=0 empty_example=false
+    local item=$1 from=$2 tag field_text rest example example_count=0 empty_example=false min_lesson_examples=2 min_lesson_examples_word=two
+    local is_why_not_higher_tag mechanism_is_check is_optional_why_not_higher
     for tag in class examples mechanism why-not-higher proof; do
-      value=$(lesson_field "$tag" "$from")
-      if [ -n "$value" ]; then continue; fi
+      field_text=$(get_lesson_field "$tag" "$from")
+      if [ -n "$field_text" ]; then continue; fi
+      is_why_not_higher_tag=false
+      mechanism_is_check=false
+      is_optional_why_not_higher=false
+      [ "$tag" = why-not-higher ] && is_why_not_higher_tag=true
+      [ "$(get_lesson_field mechanism "$from")" = check ] && mechanism_is_check=true
+      if "$is_why_not_higher_tag" && "$mechanism_is_check"; then is_optional_why_not_higher=true; fi
       if printf '%s' "$ledger_line" | tr '\t' '\n' | tail -n +"$from" | grep -q "^$tag:"; then
         record_problem "$item: lesson $tag: is empty"
-      elif [ "$tag" != why-not-higher ] || [ "$(lesson_field mechanism "$from")" != check ]; then
+      elif ! "$is_optional_why_not_higher"; then
         record_problem "$item: lesson is missing $tag:"
       fi
     done
-    value=$(lesson_field examples "$from")
-    if [ -n "$value" ]; then
-      rest=$value
+    field_text=$(get_lesson_field examples "$from")
+    if [ -n "$field_text" ]; then
+      rest=$field_text
       while :; do
         example=${rest%%; *}
         example_count=$((example_count + 1))
@@ -277,14 +285,14 @@ run_check() {
       done
       if [ "$empty_example" = true ]; then
         record_problem "$item: lesson examples: has an empty example"
-      elif [ "$example_count" -lt 2 ]; then
-        record_problem "$item: lesson examples: has one example; a lesson needs two unlike cases, separated by \"; \""
+      elif [ "$example_count" -lt "$min_lesson_examples" ]; then
+        record_problem "$item: lesson examples: has one example; a lesson needs $min_lesson_examples_word unlike cases, separated by \"; \""
       fi
     fi
-    value=$(lesson_field mechanism "$from")
-    case "$value" in
+    field_text=$(get_lesson_field mechanism "$from")
+    case "$field_text" in
       "" | check | guard | path-rule | skill | always-on) ;;
-      *) record_problem "$item: lesson mechanism:$value is not one of check, guard, path-rule, skill, always-on" ;;
+      *) record_problem "$item: lesson mechanism:$field_text is not one of check, guard, path-rule, skill, always-on" ;;
     esac
   }
   # A lesson is held by a check in the diff; a ledger field cannot stand in for one.
@@ -333,7 +341,7 @@ run_check() {
       lesson)
         [ -n "$verdict_detail" ] || { record_problem "$item_id: lesson names no rule id"; continue; }
         check_lesson_rules "$item_id" "$verdict_detail"
-        check_lesson_record "$item_id" 4
+        check_lesson_record "$item_id" "$lesson_line_tags_from"
         check_lesson_is_held "$item_id" ;;
       covered)
         [ -n "$verdict_detail" ] || { record_problem "$item_id: covered names no rule id"; continue; }
@@ -347,7 +355,7 @@ run_check() {
         case "$what_catches_it" in
           lesson:?*)
             check_lesson_rules "$item_id" "${what_catches_it#lesson:}"
-            check_lesson_record "$item_id" 6
+            check_lesson_record "$item_id" "$covered_line_tags_from"
             check_lesson_is_held "$item_id" ;;
           no-change:?*) ;;
           *) record_problem "$item_id: covered by $verdict_detail says nothing on what catches the miss now (lesson:<rule id> or no-change:<why>)" ;;

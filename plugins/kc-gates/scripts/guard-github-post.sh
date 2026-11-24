@@ -386,7 +386,10 @@ EOF
 compare_reviewed_commits() {
   local base_ref="origin/$1" walked=$2 current=$3 walked_base current_base pairs
   local short_sha_chars=7
-  if [ -z "$1" ] || ! git rev-parse --verify -q "$base_ref^{commit}" >/dev/null 2>&1; then
+  local has_base_name=false has_base_commit=false
+  [ -n "$1" ] && has_base_name=true
+  git rev-parse --verify -q "$base_ref^{commit}" >/dev/null 2>&1 && has_base_commit=true
+  if ! "$has_base_name" || ! "$has_base_commit"; then
     echo unknown
     return 0
   fi

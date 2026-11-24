@@ -76,8 +76,13 @@ esac
 problems=$(get_walk_problems)
 if [ -z "$problems" ]; then
   report_problems=
-  if [ "$event" = Stop ] && [ "${stop_kind:-}" = verdict ]; then
-    report_problems=$(printf '%s' "$reply" | bash "$(dirname "$0")/check-review-report.sh" - 2>&1 | tr '\n' ' ' | cut -c1-600)
+  report_problems_max_chars=600
+  is_stop_event=false
+  is_verdict_reply=false
+  [ "$event" = Stop ] && is_stop_event=true
+  [ "${stop_kind:-}" = verdict ] && is_verdict_reply=true
+  if "$is_stop_event" && "$is_verdict_reply"; then
+    report_problems=$(printf '%s' "$reply" | bash "$(dirname "$0")/check-review-report.sh" - 2>&1 | tr '\n' ' ' | cut -c1-"$report_problems_max_chars")
   fi
   if [ -n "$report_problems" ]; then
     block_reason="Blocked by the kc-gates plugin: this reply gives a review verdict, but its report does not lead with whether the change works and what it can break. Add a \"**Does it work / what can it break**\" section right under the \`### Review:\` title, above the gate table: what was measured with before and after numbers (or \"not measured: <why>\"), and a \"Uses:\" line with the trace-uses.sh count and which uses were run or checked. End each naming and clarity finding with \"(non-blocking)\". $report_problems"

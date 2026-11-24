@@ -134,26 +134,28 @@ draft "$work_dir/walked-question.json" $'**question:**\nIs the total meant to sk
 expect_eq "§PC6: a question needs no \"walked\"" clean "$(result "$work_dir/walked-question.json")"
 
 # --- a ticket or pull request is a link the reader can open (kc-post-review §PC7) -------------
-link_check() {
+check_link() {
   draft "$work_dir/link.json" $'**note**:\n'"$1" '{}'
   result "$work_dir/link.json"
 }
-expect_contains "§PC7: a bare tracker id is flagged" "names ABC-1 without a link; write it as [ABC-1](<url>)" "$(link_check 'This repeats ABC-1 on the order list.')"
-expect_eq "§PC7: a tracker id written as a link is clean" clean "$(link_check 'This repeats [ABC-1](https://tracker.example/ABC-1) on the order list.')"
-expect_eq "§PC7: a tracker id inside a URL is clean" clean "$(link_check 'See https://tracker.example/browse/ABC-1 for the order list.')"
-expect_contains "§PC7: a bare #42 is flagged" "names #42 without a link" "$(link_check 'The same fix landed in #42.')"
-expect_contains "§PC7: a bare PR 42 is flagged" "names PR 42 without a link" "$(link_check 'The same fix landed in PR 42.')"
-expect_contains "§PC7: a bare pull request #42 is flagged" "names pull request #42 without a link" "$(link_check 'The same fix landed in pull request #42.')"
-expect_eq "§PC7: a pull request written as a link is clean" clean "$(link_check 'The same fix landed in [#42](https://github.com/acme/shop/pull/42).')"
-expect_eq "§PC7: a pull request URL ending in a number is clean" clean "$(link_check 'See https://github.com/acme/shop/pull/42 for it.')"
+expect_contains "§PC7: a bare tracker id is flagged" "names ABC-1 without a link; write it as [ABC-1](<url>)" "$(check_link 'This repeats ABC-1 on the order list.')"
+expect_eq "§PC7: a tracker id written as a link is clean" clean "$(check_link 'This repeats [ABC-1](https://tracker.example/ABC-1) on the order list.')"
+expect_eq "§PC7: a tracker id inside a URL is clean" clean "$(check_link 'See https://tracker.example/browse/ABC-1 for the order list.')"
+expect_contains "§PC7: a bare #42 is flagged" "names #42 without a link" "$(check_link 'The same fix landed in #42.')"
+expect_contains "§PC7: a bare PR 42 is flagged" "names PR 42 without a link" "$(check_link 'The same fix landed in PR 42.')"
+expect_contains "§PC7: a bare pull request #42 is flagged" "names pull request #42 without a link" "$(check_link 'The same fix landed in pull request #42.')"
+expect_eq "§PC7: a pull request written as a link is clean" clean "$(check_link 'The same fix landed in [#42](https://github.com/acme/shop/pull/42).')"
+expect_eq "§PC7: a pull request URL ending in a number is clean" clean "$(check_link 'See https://github.com/acme/shop/pull/42 for it.')"
 tick='`'
-expect_eq "§PC7: an id inside inline code is clean" clean "$(link_check "The key is ${tick}ABC-1${tick} in the fixture.")"
-expect_eq "§PC7: an id in a URL query is clean" clean "$(link_check 'See https://tracker.example/search?q=ABC-1 for it.')"
+expect_eq "§PC7: an id inside inline code is clean" clean "$(check_link "The key is ${tick}ABC-1${tick} in the fixture.")"
+expect_eq "§PC7: an id in a URL query is clean" clean "$(check_link 'See https://tracker.example/search?q=ABC-1 for it.')"
 draft "$work_dir/link-block.json" $'**note**:\nThe fixture holds this row.\n```\nticket: ABC-1 #42\n```'
 expect_eq "§PC7: an id inside a code block is clean" clean "$(result "$work_dir/link-block.json")"
-expect_eq "§PC7: standards names (UTF-8, ISO-8601, SHA-256) are not ids" clean "$(link_check 'The export is UTF-8 with ISO-8601 dates and a SHA-256 hash.')"
-expect_contains "§PC7: a CVE id is still flagged" "names CVE-2024-1234 without a link" "$(link_check 'The fix covers CVE-2024-1234.')"
-expect_eq "§PC7: a heading line and a hex colour are not references" clean "$(link_check $'# Totals\nThe badge uses #fff and #123abc.')"
+expect_eq "§PC7: standards names (UTF-8, ISO-8601, SHA-256) are not ids" clean "$(check_link 'The export is UTF-8 with ISO-8601 dates and a SHA-256 hash.')"
+expect_contains "§PC7: a CVE id is still flagged" "names CVE-2024-1234 without a link" "$(check_link 'The fix covers CVE-2024-1234.')"
+expect_eq "§PC7: a six-digit colour of digits only is not a reference" clean "$(check_link 'The badge text is #333333 on white.')"
+expect_contains "§PC7: a five-digit #12345 is still flagged" "names #12345 without a link" "$(check_link 'The same fix landed in #12345.')"
+expect_eq "§PC7: a heading line and a hex colour are not references" clean "$(check_link $'# Totals\nThe badge uses #fff and #123abc.')"
 
 # --- slips the checklist exists for ---------------------------------------------------------
 draft "$work_dir/no-label.json" 'Good catch on the rounding. Could this use the shared formatter?'

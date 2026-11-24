@@ -79,8 +79,12 @@ ledger=$work_dir/ledger.tsv
 record_fields=$'class:a name that hides what a value is\texamples:an order total; a storefront slug\tmechanism:check\tproof:plugin/tests/rules.test.sh'
 # Appends them to each lesson line that names a rule, and to each covered line with a lesson: catch.
 add_record_fields() {
-  awk -F'\t' -v OFS='\t' -v fields="$record_fields" \
-    '($2 == "lesson" && NF >= 3) || ($2 == "covered" && $5 ~ /^lesson:./) { print $0 OFS fields; next } { print }'
+  awk -F'\t' -v OFS='\t' -v fields="$record_fields" '
+    {
+      is_lesson_line = ($2 == "lesson" && NF >= 3)
+      is_lesson_catch_line = ($2 == "covered" && $5 ~ /^lesson:./)
+    }
+    is_lesson_line || is_lesson_catch_line { print $0 OFS fields; next } { print }'
 }
 # The complete ledger with F4's covered verdict replaced by the given fields, tab-joined.
 ledger_with_covered_f4() {
@@ -254,36 +258,44 @@ expect_eq "a rules folder that does not exist fails the covered verdict" failed 
 expect_contains "it still reports the item" "F4: covered by §R11, which no rule file had" "$output"
 
 # Lesson records: class, examples, mechanism, why-not-higher and proof, each checked on its own.
-record_without() { printf '%s' "$record_fields" | tr '\t' '\n' | grep -v "^$1:" | paste -sd '\t' -; }
-ledger_with_f2_fields() {
+get_record_without() { printf '%s' "$record_fields" | tr '\t' '\n' | grep -v "^$1:" | paste -sd '\t' -; }
+build_ledger_with_f2_fields() {
   complete_ledger | awk -F'\t' -v OFS='\t' -v fields="$1" '$1 == "F2" { print $0 OFS fields; next } { print }' | add_record_fields_except_f2 > "$ledger"
 }
-add_record_fields_except_f2() { awk -F'\t' -v OFS='\t' -v fields="$record_fields" '$1 != "F2" && (($2 == "lesson" && NF >= 3) || ($2 == "covered" && $5 ~ /^lesson:./)) { print $0 OFS fields; next } { print }'; }
+add_record_fields_except_f2() {
+  awk -F'\t' -v OFS='\t' -v fields="$record_fields" '
+    {
+      is_not_f2 = ($1 != "F2")
+      is_lesson_line = ($2 == "lesson" && NF >= 3)
+      is_lesson_catch_line = ($2 == "covered" && $5 ~ /^lesson:./)
+    }
+    is_not_f2 && (is_lesson_line || is_lesson_catch_line) { print $0 OFS fields; next } { print }'
+}
 for missing_field in class examples mechanism proof; do
-  ledger_with_f2_fields "$(record_without "$missing_field")"
+  build_ledger_with_f2_fields "$(get_record_without "$missing_field")"
   expect_check failed "a lesson with no $missing_field: field fails"
   expect_contains "it names the item and the field" "F2: lesson is missing $missing_field:" "$last_output"
-  ledger_with_f2_fields "$(record_without "$missing_field")"$'\t'"$missing_field:"
+  build_ledger_with_f2_fields "$(get_record_without "$missing_field")"$'\t'"$missing_field:"
   expect_check failed "a lesson with an empty $missing_field: field fails"
   expect_contains "it names the item and the empty field" "F2: lesson $missing_field: is empty" "$last_output"
 done
-ledger_with_f2_fields "$(record_without examples)"$'\texamples:only one case'
+build_ledger_with_f2_fields "$(get_record_without examples)"$'\texamples:only one case'
 expect_check failed "a lesson with one example fails"
 expect_contains "it says a lesson needs two unlike cases" "F2: lesson examples: has one example; a lesson needs two unlike cases" "$last_output"
-ledger_with_f2_fields "$(record_without examples)"$'\texamples:a case; ; another'
+build_ledger_with_f2_fields "$(get_record_without examples)"$'\texamples:a case; ; another'
 expect_check failed "a lesson with an empty example fails"
 expect_contains "it names the empty example" "F2: lesson examples: has an empty example" "$last_output"
-ledger_with_f2_fields "$(record_without examples)"$'\texamples:a case; another case; a third'
+build_ledger_with_f2_fields "$(get_record_without examples)"$'\texamples:a case; another case; a third'
 expect_check passed "a lesson with three examples passes"
-ledger_with_f2_fields "$(record_without mechanism)"$'\tmechanism:memo'
+build_ledger_with_f2_fields "$(get_record_without mechanism)"$'\tmechanism:memo'
 expect_check failed "a mechanism that is not on the layer ladder fails"
 expect_contains "it names the mechanism" "F2: lesson mechanism:memo is not one of check, guard, path-rule, skill, always-on" "$last_output"
-ledger_with_f2_fields "$(record_without mechanism)"$'\tmechanism:guard'
+build_ledger_with_f2_fields "$(get_record_without mechanism)"$'\tmechanism:guard'
 expect_check failed "a guard with no why-not-higher fails"
 expect_contains "it asks for why-not-higher" "F2: lesson is missing why-not-higher:" "$last_output"
-ledger_with_f2_fields "$(record_without mechanism)"$'\tmechanism:guard\twhy-not-higher:the mistake happens at commit time, outside any test'
+build_ledger_with_f2_fields "$(get_record_without mechanism)"$'\tmechanism:guard\twhy-not-higher:the mistake happens at commit time, outside any test'
 expect_check passed "a guard with why-not-higher passes"
-ledger_with_f2_fields "$(record_without mechanism)"$'\tmechanism:check'
+build_ledger_with_f2_fields "$(get_record_without mechanism)"$'\tmechanism:check'
 expect_check passed "a check needs no why-not-higher"
 complete_ledger | add_record_fields | awk -F'\t' '$1 == "F4" { print "F4\tcovered\t§R11\tno box for it\tlesson:B13\tclass:a missed box"; next } { print }' > "$ledger"
 expect_check failed "a covered line whose catch is a lesson: needs the record fields too"

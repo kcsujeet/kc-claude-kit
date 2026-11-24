@@ -136,7 +136,8 @@ perl -MJSON::PP -CS -e '
     $bare{$1} = 1 while $linkable =~ /(?<![\w\/#&-])((?:PR|[Pp]ull [Rr]equest) #?\d+)\b/g;
     $linkable =~ s/(?:PR|[Pp]ull [Rr]equest) #?\d+\b//g;
     $bare{$1} = 1 while $linkable =~ /(?<![\w\/&-])((?!(?:UTF|ISO|SHA|RFC|HTTP|TLS|SSL)-)[A-Z]{2,}-\d+(?:-\d+)?)\b/g;
-    $bare{$1} = 1 while $linkable =~ /(?<![\w\/&#])(#\d+)\b/g;
+    # A # and six digits is a colour (#333333), not a pull request.
+    $bare{$1} = 1 while $linkable =~ /(?<![\w\/&#])(#\d+)\b(?<!#\d{6})/g;
     for my $ref (sort keys %bare) {
       push @found, "names ${ref} without a link; write it as [${ref}](<url>)";
     }
