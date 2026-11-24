@@ -100,6 +100,14 @@ expect_eq ".claude/reproduce-commands adds a run command" out "$(run_stop "$repr
 expect_eq "a command that only reads that file is still not a run" held "$(run_stop "$reproduced")"
 rm -f "$repo/.claude/reproduce-commands"
 
+# A cause and a fix named in other words still need the line.
+{ emit_typed_message "$report"; emit_tool_call Read file_path "src/export.rb"; emit_tool_result; } > "$transcript"
+expect_eq "'I fixed it' beside a cause, with no label and no run, is held" held "$(run_stop "Root cause: a stale cache. I fixed it in abc123.")"
+expect_eq "'This fixes it' beside a cause, with no label and no run, is held" held "$(run_stop "Root cause: a stale cache. This fixes it.")"
+expect_eq "the word reproduced in prose is not the line" held "$(run_stop "$(printf '%s I reproduced nothing yet.' "$proposal")")"
+{ emit_typed_message "$report"; emit_tool_call Bash command "curl -s localhost:3000/orders"; emit_tool_result; } > "$transcript"
+expect_eq "a bold Reproduced label with a run goes out" out "$(run_stop "$(printf '%s\n**Reproduced:** the 500 on POST /orders.' "$proposal")")"
+
 # Which prompts and replies it leaves alone.
 { emit_typed_message "what does the export do?"; emit_tool_call Read file_path "src/export.rb"; emit_tool_result; } > "$transcript"
 expect_eq "no fix-asking prompt: a cause and a fix go out" out "$(run_stop "$proposal")"

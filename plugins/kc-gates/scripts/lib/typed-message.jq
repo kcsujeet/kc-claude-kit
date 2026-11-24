@@ -30,6 +30,8 @@ def turn_entries:
 # A tool call of an assistant entry as one line: the tool's name, a tab, then the path, command, code
 # or pattern it was given (newlines as " ; "). Empty for any other entry. Read by check-reply-sources.sh
 # and guard-unreproduced-cause.sh.
-def tool_call_lines:
-  select(.type == "assistant") | .message.content[]? | select(.type == "tool_use")
-  | .name + "\t" + ((.input.file_path // .input.path // .input.command // .input.code // .input.pattern // "") | tostring | gsub("\n"; " ; "));
+def tool_call_target:
+  (.input.file_path // .input.path // .input.command // .input.code // .input.pattern // "") | tostring | gsub("\n"; " ; ");
+
+def get_tool_call_lines:
+  select(.type == "assistant") | .message.content[]? | select(.type == "tool_use") | .name + "\t" + tool_call_target;

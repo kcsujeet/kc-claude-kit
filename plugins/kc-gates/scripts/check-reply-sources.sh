@@ -74,13 +74,13 @@ transcript=$(printf '%s' "$payload" | jq -r '.transcript_path // empty')
 # then the path or command it was given.
 turn_tool_calls=$(jq -L "$(dirname "$0")/lib" -rs '
   include "typed-message";
-  turn_entries[] | tool_call_lines
+  turn_entries[] | get_tool_call_lines
 ' "$transcript" 2>/dev/null) || exit 0
 
 misses=()
 
 has_edited_files=false
-printf '%s\n' "$turn_tool_calls" | grep -Eq '^(Edit|Write|MultiEdit|NotebookEdit)	' && has_edited_files=true
+printf '%s\n' "$turn_tool_calls" | grep -Eq "$EDIT_CALLS" && has_edited_files=true
 
 # A turn whose latest message was only a question and that then edited files: the question gets
 # its answer, and nothing is changed until the person asks.
@@ -125,7 +125,7 @@ if [ -n "$capability_sentences" ]; then
   looked_up=false
   printf '%s\n' "$turn_tool_calls" | grep -Eq '^(WebFetch|WebSearch)	|^mcp__[^	]*(doc|search|context7|resolve-library)' && looked_up=true
   if [ "$looked_up" = false ]; then
-    claim_calls=$(printf '%s\n' "$turn_tool_calls" | grep -Ev '^(Edit|Write|MultiEdit|NotebookEdit)	' | awk -F'\t' '{ print $2 }' | tr '[:upper:]' '[:lower:]')
+    claim_calls=$(printf '%s\n' "$turn_tool_calls" | grep -Ev "$EDIT_CALLS" | awk -F'\t' '{ print $2 }' | tr '[:upper:]' '[:lower:]')
     for word in $(printf '%s' "$capability_sentences" | grep -Eo "[a-z0-9_-]{3,}" | sort -u); do
       case "$CAPABILITY_STOPWORDS" in *" $word "*) continue ;; esac
       printf '%s\n' "$claim_calls" | grep -Eq -- "(^|[^[:alnum:]_-])${word}([^[:alnum:]_-]|\$)" && { looked_up=true; break; }
@@ -146,8 +146,8 @@ fi
 handed_clis=$(printf '%s\n' "$reply" | awk '
   /^[ \t]*(```|~~~)/ { inside = !inside; next }
   inside { print }
-' | command_starts | grep -Ex "$ACCOUNT_CLIS" | sort -u)
-ran_clis=$(printf '%s\n' "$turn_tool_calls" | sed -n 's/^Bash	//p' | command_starts | grep -Ex "$ACCOUNT_CLIS" | sort -u)
+' | list_command_starts | grep -Ex "$ACCOUNT_CLIS" | sort -u)
+ran_clis=$(printf '%s\n' "$turn_tool_calls" | sed -n 's/^Bash	//p' | list_command_starts | grep -Ex "$ACCOUNT_CLIS" | sort -u)
 
 unchecked_clis=()
 for cli in $handed_clis; do

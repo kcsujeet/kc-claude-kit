@@ -7,6 +7,10 @@
 # shellcheck disable=SC2034  # read by the scripts that source this file
 readonly REPLY_MAX_WORDS=180
 
+# A tool call line (get_tool_call_lines) of a tool that changes files.
+# shellcheck disable=SC2034  # read by the scripts that source this file
+readonly EDIT_CALLS=$'^(Edit|Write|MultiEdit|NotebookEdit)\t'
+
 # Prints session <id>'s misses file; fails, printing nothing, without a data folder or an id.
 reply_misses_file() {
   [ -n "${CLAUDE_PLUGIN_DATA:-}" ] && [ -n "${1:-}" ] || return 1
@@ -77,8 +81,8 @@ is_only_question() {
 # `await`, VAR=value assignments and runners (sudo, env, time, bunx, npx, bundle exec, pnpm exec and
 # the like) with their flags, and past the directory of the command's own path, so `bin/rspec spec/a.rb`
 # and `./node_modules/.bin/jest a.test.ts` read as `rspec spec/a.rb` and `jest a.test.ts`.
-# Read by check-reply-sources.sh and guard-unreproduced-cause.sh.
-stripped_commands() {
+# Read by guard-unreproduced-cause.sh, and by check-reply-sources.sh through list_command_starts.
+list_stripped_commands() {
   awk '{
     count = split($0, commands, /&&|\|\||;|\|/)
     for (i = 1; i <= count; i++) {
@@ -98,7 +102,7 @@ stripped_commands() {
   }'
 }
 
-# The first word of each command on stdin (see stripped_commands).
-command_starts() {
-  stripped_commands | awk '{ print $1 }'
+# The first word of each command on stdin (see list_stripped_commands).
+list_command_starts() {
+  list_stripped_commands | awk '{ print $1 }'
 }

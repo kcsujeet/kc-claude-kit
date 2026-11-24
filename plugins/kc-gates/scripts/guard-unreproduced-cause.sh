@@ -12,27 +12,20 @@
 #   c. The reply has no "Reproduced:" or "Not reproduced:" line, or it has a "Reproduced:" line and
 #      no tool call since the latest fix-asking message ran something that exercises the product.
 #
-# A turn that edited files since the latest fix-asking message reports a fix made, so no label is
-# required; a run of the product since that message still is, else a fix was built without
-# reproducing the problem and the reply is blocked.
+# A turn that edited files needs a run of the product but no Reproduced: or Not reproduced: line.
 #
 # What exercises the product: a Bash or REPL command that starts with a test runner (rspec, jest,
 # vitest, pytest, playwright, cypress, go test, cargo test, npm/pnpm/yarn/bun test or run test), a
 # runtime or request tool (curl, http, wget, node, python, ruby, rails, php, java), or a browser
 # (chrome, chromium); a browser, playwright or puppeteer MCP tool; or a command matching an
 # extended-regex line of the repo's optional .claude/reproduce-commands file (one per line, # starts
-# a comment; a missing file means the built-ins only), matched against each command with its runner
-# prefixes and the directory of its path dropped (stripped_commands: `bin/shop-check x` is
-# `shop-check x`). Reading or searching code (cat, sed, grep, rg,
-# git show, log or diff, the Read, Grep and Glob tools) never counts.
+# a comment; a missing file means the built-ins only). Repo patterns match the stripped command
+# (`bin/shop-check x` is `shop-check x`). Reading or searching code (cat, sed, grep, rg, git show,
+# log or diff, the Read, Grep and Glob tools) never counts.
 #
 # "Not reproduced: <reason>" with a reason of three or more words passes: it is the honest way out
 # when the problem cannot be run here. On the second try (stop_hook_active) it blocks again only when
 # a turn that edited nothing still proposes a cause and a fix with neither line.
-#
-# The command and transcript readers are shared with check-reply-sources.sh (lib/reply-misses.sh's
-# stripped_commands, lib/typed-message.jq's tool_call_lines); this script reads the calls after a
-# message index, which that one has no use for, so the two keep their own jq calls.
 #
 # Input: the Stop payload on stdin. Output: the block JSON, or nothing. Never blocks what it can't
 # read: no jq, no transcript or no reply exits 0. Hook schema: https://code.claude.com/docs/en/hooks
@@ -41,7 +34,7 @@ set -u
 # shellcheck source=lib/reply-misses.sh
 . "$(dirname "$0")/lib/reply-misses.sh"
 
-# What a command starts with (after stripped_commands) when it runs the product or its tests.
+# What a command starts with (after list_stripped_commands) when it runs the product or its tests.
 readonly RUN_WORDS='(rspec|jest|vitest|pytest|playwright|cypress|curl|http|https|wget|node|python3?|ruby|php|java|rails|chrome|chromium|google-chrome)'
 # Whole-command forms: package-manager test scripts, go and cargo tests, a browser opened by open.
 readonly RUN_SEGMENTS='^(npm|pnpm|yarn|bun)[[:space:]]+(test|run[[:space:]]+test[^[:space:]]*)([[:space:]]|$)|^(go|cargo)[[:space:]]+test([[:space:]]|$)|^open[[:space:]].*chrom'
@@ -69,9 +62,9 @@ done < <(jq -L "$(dirname "$0")/lib" -rs '
 ' "$transcript" 2>/dev/null)
 [ -n "$fix_index" ] || exit 0
 
-calls=$(jq -L "$(dirname "$0")/lib" -rs --argjson from "$fix_index" '
+tool_calls_since_fix=$(jq -L "$(dirname "$0")/lib" -rs --argjson from "$fix_index" '
   include "typed-message";
-  .[$from + 1:][] | tool_call_lines
+  .[$from + 1:][] | get_tool_call_lines
 ' "$transcript" 2>/dev/null) || exit 0
 
 lower_reply=$(printf '%s\n' "$reply" | tr '[:upper:]' '[:lower:]')
@@ -82,7 +75,7 @@ printf '%s\n' "$lower_reply" | grep -Eq 'not reproduced[*_]*:[[:space:]]*[^[:spa
 has_reproduced_line=false
 printf '%s\n' "$lower_reply" | sed 's/not reproduced//g' | grep -Eq '(^|[^[:alnum:]])reproduced[*_]*:' && has_reproduced_line=true
 has_edited_files=false
-printf '%s\n' "$calls" | grep -Eq '^(Edit|Write|MultiEdit|NotebookEdit)	' && has_edited_files=true
+printf '%s\n' "$tool_calls_since_fix" | grep -Eq "$EDIT_CALLS" && has_edited_files=true
 
 block_unreproduced_cause() {
   printf '%s' "Blocked by the kc-gates plugin: $1 Reproduce the problem the way the reporter met it before proposing a cause: their entry point, renderer or runtime and version, environment and real-shaped data (a copy of one layer, such as a template rendered alone, another browser version or a fixture, is not a reproduction). Then name the evidence on a Reproduced: line (the failing request, test run or screenshot), or say Not reproduced: <why> (at least three words) when it cannot be run here (kc-conventions:kc-assess step 3)." \
@@ -95,7 +88,6 @@ if [ -r "$repo_dir/.claude/reproduce-commands" ]; then
   extra_patterns=$(sed -e 's/^[[:space:]]*#.*//' -e '/^[[:space:]]*$/d' "$repo_dir/.claude/reproduce-commands")
 fi
 
-# True when one command (as stripped_commands prints it) runs the product or its tests.
 is_run_command() {
   local command=$1
   printf '%s' "$command" | grep -Eq "^$RUN_WORDS([[:space:]]|\$)" && return 0
@@ -105,20 +97,20 @@ is_run_command() {
 }
 
 did_run_product() {
-  local name command stripped
+  local name command stripped_command
   while IFS=$'\t' read -r name command; do
     case "$name" in
       mcp__*) printf '%s' "$name" | grep -Eiq "$BROWSER_TOOL" && return 0 ;;
       Bash | REPL)
         # A REPL script runs shell commands inside backtick templates: split on the backticks too.
         [ "$name" = REPL ] && command=$(printf '%s' "$command" | tr '`' ';')
-        while IFS= read -r stripped; do
-          is_run_command "$stripped" && return 0
-        done < <(printf '%s\n' "$command" | stripped_commands)
+        while IFS= read -r stripped_command; do
+          is_run_command "$stripped_command" && return 0
+        done < <(printf '%s\n' "$command" | list_stripped_commands)
         ;;
     esac
   done <<EOF
-$calls
+$tool_calls_since_fix
 EOF
   return 1
 }
