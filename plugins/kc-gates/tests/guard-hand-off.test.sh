@@ -268,4 +268,42 @@ check allow "allowed: every box PASS or N/A with a reason, PR" \
 check allow "allowed: every box PASS or N/A with a reason, first push" \
   "git push -u origin feature-new" "$work_dir/verdict-repo"
 
+# A small change (change-class.sh): a few prose lines alone need no pass receipt; the same branch plus
+# a script (code_small) is told to run the small pass at once, with no skip offered; a small change
+# on a risk path (full) keeps the usual block.
+prose_repo="$work_dir/prose-repo"
+git init -q -b main "$prose_repo"
+git init -q --bare "$work_dir/prose-remote.git"
+git -C "$prose_repo" remote add origin "$work_dir/prose-remote.git"
+printf 'Orders ship in one box.\nRefunds go to the card.\n' > "$prose_repo/rules.md"
+git -C "$prose_repo" add rules.md
+git -C "$prose_repo" -c user.name=t -c user.email=t@example.test commit -q -m rules
+git -C "$prose_repo" push -q origin main
+# Starts branch $1 from main and commits one added line to each file after it.
+commit_branch() {
+  local branch=$1 changed_file
+  shift
+  git -C "$prose_repo" checkout -q -b "$branch" main
+  for changed_file in "$@"; do printf 'Refunds go back to the card used.\n' >> "$prose_repo/$changed_file"; done
+  git -C "$prose_repo" add "$@"
+  git -C "$prose_repo" -c user.name=t -c user.email=t@example.test commit -q -m "$branch"
+}
+commit_branch wording rules.md
+check allow "allowed: first push of a small prose branch, no receipt and no phrase" \
+  "git push -u origin wording" "$prose_repo"
+check allow "allowed: gh pr create for a small prose branch, no receipt and no phrase" \
+  "gh pr create --fill" "$prose_repo"
+commit_branch wording-and-tool rules.md tool.sh
+check deny  "blocked: the same branch plus one script, no receipt" \
+  "git push -u origin wording-and-tool" "$prose_repo"
+small_output=$(build_payload 'git push -u origin wording-and-tool' "$prose_repo" | bash "$scripts/guard-hand-off.sh" 2>/dev/null)
+expect_contains "a small code change is told to run the small pass now" "run the pass now at the small size" "$small_output"
+expect_not_contains "a small code change is offered no skip" "KC_READY_SKIP" "$small_output"
+check deny  "blocked: gh pr create for the same branch plus one script" \
+  "gh pr create --fill" "$prose_repo"
+commit_branch risky auth-rules.md tool.sh
+check deny  "blocked: a small change with a risk line, no receipt" \
+  "git push -u origin risky" "$prose_repo"
+expect_contains "a risk line keeps the usual block" "KC_READY_SKIP=1" "$(build_payload 'git push -u origin risky' "$prose_repo" | bash "$scripts/guard-hand-off.sh" 2>/dev/null)"
+
 finish

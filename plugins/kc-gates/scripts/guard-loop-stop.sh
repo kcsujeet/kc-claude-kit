@@ -19,6 +19,12 @@
 # index as staged, is left out too: its staged diff is the default branch's own work, already handed
 # off through its own PRs, plus any conflict resolutions, which are not checked. With -a it is checked.
 #
+# The branch's whole change (from its merge-base with the default branch, the staged or -a result for
+# a commit) is classed by change-class.sh first: prose_small (a few prose lines, nothing else) is
+# never blocked, and code_small (small, no risk line) is not blocked for lines the branch's own
+# earlier commits wrote (receipted commits not yet on the default branch), only for lines a commit
+# already on the default branch wrote. full is checked as above.
+#
 # A command containing the literal KC_REWORK_APPROVED=1 passes only when the user's own words approve
 # it: the latest message they typed in the session transcript (the payload's transcript_path)
 # contains "approve rework" (user_approved in lib/hook-input.sh). The token without those words, no
@@ -115,13 +121,18 @@ was_merged_recently() {
 }
 
 # Prints "<sha> <subject> (<file>:<line>)" of the first blamed commit that was already handed off,
-# or nothing. $1 is the directory, $2 the revision to blame at; the diff is on stdin.
+# or nothing. $1 is the directory, $2 the revision to blame at, $3 the change's class
+# (change-class.sh): code_small skips commits the default branch doesn't have yet. The diff is on stdin.
 find_handed_off_fix() {
-  local dir=$1 rev=$2 default_branch_ref sha location seen=" " subject
+  local dir=$1 rev=$2 change_class=${3:-full} default_branch_ref sha location seen=" " subject
   default_branch_ref=$(get_default_branch_ref "$dir")
   while read -r sha location; do
     case "$seen" in *" $sha "*) continue ;; esac
     seen="$seen$sha "
+    if [ "$change_class" = code_small ] && [ -n "$default_branch_ref" ] \
+      && ! git -C "$dir" merge-base --is-ancestor "$sha" "$default_branch_ref" 2>/dev/null; then
+      continue
+    fi
     if bash "$scripts_dir/ready-receipt.sh" check "$sha" >/dev/null 2>&1 || was_merged_recently "$dir" "$sha" "$default_branch_ref"; then
       subject=$(git -C "$dir" show -s --format=%s "$sha" 2>/dev/null)
       printf '%s %s (%s)' "$(printf '%s' "$sha" | cut -c1-9)" "$subject" "$location"
@@ -131,8 +142,9 @@ find_handed_off_fix() {
   return 1
 }
 
+# $1 is the earlier fix, $2 the directory.
 deny_edit_of_handed_off_fix() {
-  print_pretooluse_deny "Blocked by the kc-gates plugin: this edits lines an earlier, already-handed-off fix wrote ($1): the loop-stop rule says stop and question the approach; ask the user. Ask the user: only their typed words approve it. When their latest message says \"approve rework\", prefix the command with KC_REWORK_APPROVED=1; the token without those words stays blocked."
+  print_pretooluse_deny "Blocked by the kc-gates plugin: this edits lines an earlier, already-handed-off fix wrote ($1): the loop-stop rule says stop and question the approach; ask the user. Ask the user: only their typed words approve it. When their latest message says \"approve rework\", prefix the command with KC_REWORK_APPROVED=1; the token without those words stays blocked.$(needed_phrases_sentence "$2" "$APPROVAL_PHRASE")"
 }
 
 # True when the repository in $1 is concluding a merge (MERGE_HEAD) of a commit the default branch
@@ -147,7 +159,7 @@ is_default_branch_merge() {
 
 # Checks a `git commit`; $1 is the directory, the rest the words after `git`.
 check_commit() {
-  local handed_off_fix
+  local handed_off_fix change_class stage_mode=--staged
   parse_git_command "$@"
   [ "${GIT_ARGS[0]:-}" = commit ] || return 0
   # An unborn branch has no old side to blame.
@@ -156,14 +168,17 @@ check_commit() {
   if is_default_branch_merge "$GIT_DIR" && ! is_commit_staging_all "${GIT_ARGS[@]:1}"; then
     return 0
   fi
-  handed_off_fix=$(get_commit_diff "$GIT_DIR" -U0 "${GIT_ARGS[@]:1}" | drop_version_bump_hunks | find_handed_off_fix "$GIT_DIR" HEAD) || return 0
-  deny_edit_of_handed_off_fix "$handed_off_fix"
+  ! is_commit_staging_all "${GIT_ARGS[@]:1}" || stage_mode=--all
+  change_class=$(read_change_class "$GIT_DIR" "$stage_mode")
+  [ "$change_class" != prose_small ] || return 0
+  handed_off_fix=$(get_commit_diff "$GIT_DIR" -U0 "${GIT_ARGS[@]:1}" | drop_version_bump_hunks | find_handed_off_fix "$GIT_DIR" HEAD "$change_class") || return 0
+  deny_edit_of_handed_off_fix "$handed_off_fix" "$GIT_DIR"
   return 1
 }
 
 # Checks a `gh pr create`; $1 is the directory, the rest the words after `gh pr create`.
 check_pr_create() {
-  local dir=$1 word base="" take=false merge_base handed_off_fix base_ref="" candidate_refs
+  local dir=$1 word base="" take=false merge_base handed_off_fix base_ref="" candidate_refs change_class
   shift
   for word in "$@"; do
     if $take; then base=$word; take=false; continue; fi
@@ -180,8 +195,10 @@ check_pr_create() {
   # No base or merge-base to compare with: nothing to blame, so nothing to block.
   [ -n "$base_ref" ] || return 0
   merge_base=$(git -C "$dir" merge-base "$base_ref" HEAD 2>/dev/null) || return 0
-  handed_off_fix=$(git -C "$dir" diff -U0 --no-color --no-ext-diff --no-renames "$merge_base" HEAD | drop_version_bump_hunks | find_handed_off_fix "$dir" "$merge_base") || return 0
-  deny_edit_of_handed_off_fix "$handed_off_fix"
+  change_class=$(read_change_class "$dir" --base "$merge_base" --head HEAD)
+  [ "$change_class" != prose_small ] || return 0
+  handed_off_fix=$(git -C "$dir" diff -U0 --no-color --no-ext-diff --no-renames "$merge_base" HEAD | drop_version_bump_hunks | find_handed_off_fix "$dir" "$merge_base" "$change_class") || return 0
+  deny_edit_of_handed_off_fix "$handed_off_fix" "$dir"
   return 1
 }
 

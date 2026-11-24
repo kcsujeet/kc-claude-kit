@@ -35,8 +35,9 @@ readonly APPROVAL_TOKEN='KC_PROSE_APPROVED=1'
 readonly APPROVAL_PHRASE='approve prose'
 readonly INSTRUCTION_PATHS='(^|/)(CLAUDE|AGENTS)\.md$|(^|/)\.claude/(rules/|review-conventions\.md$|hand-off-checklist\.md$)|(^|/)skills/(.*/)?SKILL\.md$|(^|/)rules/[^/]+\.md$'
 
+# $1 is the repository the commit runs in.
 deny_prose_only_rule() {
-  print_pretooluse_deny "Blocked by the kc-gates plugin: a new rule needs a check that blocks the mistake in the same commit (script, hook, test or CI); prose alone is not accepted. This commit adds rule lines to an instruction file and adds or changes no check file. Add the check, or ask the user: only their typed words approve prose alone. When their latest message says \"approve prose\", prefix the command with KC_PROSE_APPROVED=1; the token without those words stays blocked."
+  print_pretooluse_deny "Blocked by the kc-gates plugin: a new rule needs a check that blocks the mistake in the same commit (script, hook, test or CI); prose alone is not accepted. This commit adds rule lines to an instruction file and adds or changes no check file. Add the check, or ask the user: only their typed words approve prose alone. When their latest message says \"approve prose\", prefix the command with KC_PROSE_APPROVED=1; the token without those words stays blocked.$(needed_phrases_sentence "$1" "$APPROVAL_PHRASE")"
 }
 
 # Succeeds when the `git diff -U0` on stdin adds net non-blank lines to instruction files and
@@ -68,7 +69,7 @@ check_segment() {
   parse_git_command "$dir" "${git_words_list[@]}"
   [ "${GIT_ARGS[0]:-}" = commit ] || return 0
   if get_commit_diff "$GIT_DIR" -U0 "${GIT_ARGS[@]:1}" | is_prose_only_rule; then
-    deny_prose_only_rule
+    deny_prose_only_rule "$GIT_DIR"
     return 1
   fi
 }
