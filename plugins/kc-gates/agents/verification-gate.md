@@ -222,7 +222,7 @@ Example (generic file names):
 - Scope: §G1 author has no other open PR; §G2 title "Add widget filters" matches the diff; §G3 issue #12 read, constraint "no API change" holds, its linked mockup walked with filters empty and applied; §G4 diff 14KB, read whole; §G5 goal "filter widgets by status", weighed filtering in the existing list query instead of a second client-side pass, the diff already does that.
 - Locale: per-key audit below.
   - shared.json:L14: `total` = "Total" | namespace: ok (shared), plural: n/a (label), dupe: none, naming: matches value
-  - widgets.json:L9: `widgetCount` = "Widgets" | namespace: FLAG generic noun → shared.json, plural: FLAG baked-plural → ICU, dupe: none, naming: matches value
+  - widgets.json:L9: `widgetCount` = "{count} widgets" | namespace: FLAG generic noun → shared.json, plural: FLAG no plural, dupe: none, naming: matches value
 - Boolean logic: grepped &&/||: 2 hits: widget-form.tsx:L41 extracted to `canSubmitWidget`, widget-list.tsx:L18 flagged (raw `status === 'A' || status === 'B'` left inline).
 - Ternaries/casts/spreads: grepped ternaries: 1 hit: widget-list.tsx:L12 single-line, both branches short, kept. grepped as-casts: 1 hit: widget-actions.ts:L22 redundant `as Widget`, flagged. grepped conditional spreads: 0 hits.
 - Hooks/queries/mutations: n/a, diff does not touch data-fetching hooks.

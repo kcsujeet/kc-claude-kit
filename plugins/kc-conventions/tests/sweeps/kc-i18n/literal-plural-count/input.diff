@@ -1,0 +1,18 @@
+diff --git a/src/shop/nav.tsx b/src/shop/nav.tsx
+new file mode 100644
+index 0000000..1111111
+--- /dev/null
++++ b/src/shop/nav.tsx
+@@ -0,0 +1,5 @@
++const label = t('addOn', { count: 1 })
++const heading = formatMessage({ id: 'orders' }, { count: 0 })
++const rows = t('orderRows', { count: orders.length })
++const total = t('orderRows', { count })
++const sample = { count: 2 }
+diff --git a/src/shop/nav.md b/src/shop/nav.md
+new file mode 100644
+index 0000000..1111111
+--- /dev/null
++++ b/src/shop/nav.md
+@@ -0,0 +1,1 @@
++t('x', { count: 2 })

@@ -1,0 +1,2 @@
+src/shop/nav.tsx:1: const label = t('addOn', { count: 1 })
+src/shop/nav.tsx:2: const heading = formatMessage({ id: 'orders' }, { count: 0 })

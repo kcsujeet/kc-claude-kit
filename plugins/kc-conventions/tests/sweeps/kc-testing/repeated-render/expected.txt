@@ -1,0 +1,2 @@
+src/widget-card.test.tsx:2:   render(<WidgetCard title="A" />)
+src/widget-card.test.tsx:5:   render(<WidgetCard title="B" badge />)

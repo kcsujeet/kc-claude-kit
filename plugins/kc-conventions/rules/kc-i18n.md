@@ -16,7 +16,8 @@ A key is added once and read by every translator afterwards. Two keys for one st
 - A grep miss is not proof: think about semantic equivalents too, since "Save changes" and "Save" and "Update" evade each other's greps while meaning the same thing on the same button.
 - The key name says what the value says. `fooSection: "Foo"` bakes in a `Section` the value does not have.
 - Generic nouns, labels and headings live in the shared namespace, not inside a feature file. `Total`, `Notes`, `Header` are not feature-specific just because you needed one there first.
-- Every countable noun is an ICU plural, including a label that only ever shows one today. No `item`/`items` key pairs, no plural baked into the key name.
+- A fixed label, heading, column or nav item is a plain string key, one per form the screen shows (`"addOn": "Add-on"`, `"addOns": "Add-ons"`). An ICU plural message is only for a real count: it uses `#` and is read with the actual number variable. Never pass a literal count (`count: 0`, `1`, `2`) to get a word form.
+- No grammar attached to a placeholder: `"{name}'s plan"` and `"{count}th"` can't be inflected by a translator. Write the sentence so the placeholder stands alone (`"The plan for {name}"`).
 - Never concatenate translations. `t('delete') + ' ' + t('booking')` has an order that is wrong in half the languages we ship. A verb plus a noun decomposes into an action template with the noun interpolated.
 - A label next to a runtime value **is** interpolation, and that is correct. Do not invent a composite key to avoid it.
 - Text shown to people is never also used as an identifier. A value kept in state, a link, a filter or a stored field holds a key (`other`), and the screen shows its translation; the moment the label is translated, a label used as a value either stays untranslated or breaks.
