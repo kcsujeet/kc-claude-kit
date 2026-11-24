@@ -186,7 +186,10 @@ expect_said "it gives both counts" "fixes.txt has 1 open line(s), --open says 0"
 
 write_fixes 'open\tshop/tax.sh:3 refuses a blank rate\tlater\n'
 expect_write refused "an open finding with no listed reason is refused" "$fixed_head" --rounds 1 --open 1 --pass "$pass_dir"
-expect_said "it lists the reasons" "fails safe, needs a decision or pre-existing"
+expect_said "it lists the reasons" "exactly one of: fails safe | needs a decision | pre-existing"
+expect_said "it quotes what it got" "got 'later'"
+write_fixes 'open\tshop/tax.sh:3 refuses a blank rate\tfails safe, mostly\n'
+expect_write refused "an open reason with extra words after a listed one is refused" "$fixed_head" --rounds 1 --open 1 --pass "$pass_dir"
 
 # The pass folder must show every gate, verification and SCOPE:.
 expect_write refused "no --pass is refused" "$fixed_head" --rounds 1 --open 0
@@ -746,5 +749,113 @@ printf 'echo t1\necho t2\necho t3\n' >> "$repo/shop/total.sh"
 big_final_head=$(commit_all "final fixes too big")
 expect_write refused "final fixes as big as round 3 are refused" "$big_final_head" --rounds 3 --open 0 --pass "$pass_dir"
 expect_said "it sends the approach to the user" "too big to land without a gate round"
+
+# --- every problem in one refusal, and a preflight that reads shapes only --------------------
+# A pass with a gate block missing, a fix with no test and a round 2 whose uses have no verdicts
+# or malformed ones is refused once, with all of it listed.
+build_repo
+build_pass
+rm -f "$KC_READY_DIR/$fixed_head"
+rm "$pass_dir/round-1/verdicts/testing.txt"
+write_fixes 'fixed\tshop/total.sh:4 prints nothing\nopen\tshop/tax.sh:3 refuses a blank rate\tlater\n'
+save_fix_round round-2 "$round_one" "$fixed_head"
+rm "$pass_dir/round-2/verdicts/testing.txt"
+printf 'name total (shop/total.sh): 2 uses\n  shop/report.sh:3: total\n  shop/report.sh:4: total\n' > "$pass_dir/round-2/uses.txt"
+printf '  shop/report.sh:3: total fine\n' > "$pass_dir/round-2/uses-verdicts.txt"
+expect_write refused "a pass with several faults is refused" "$fixed_head" --rounds 2 --open 1 --pass "$pass_dir"
+expect_said "all at once: round 1's missing gate" "round-1: no GATE: testing block"
+expect_said "all at once: round 2's missing gate" "round-2: no GATE: testing block"
+expect_said "all at once: the fix with no test" "a fix names the test that fails when it is broken"
+expect_said "all at once: the open reason" "got 'later'"
+expect_said "all at once: the unjudged use" "2 of 2 listed use(s) have no fine, breaks or changes line"
+expect_said "all at once: the malformed verdict line, with a sample" "1 line(s) of uses-verdicts.txt do not end in a TAB and exactly fine, breaks or changes"
+expect_said "all at once: the sample is quoted" "malformed:   shop/report.sh:3: total fine"
+
+# The preflight lists the same shape problems, writes nothing, and asks the PR host nothing.
+expect_preflight() {
+  local expectation=$1 label=$2 sha=$3 actual=ok
+  shift 3
+  last_output=$(cd "$repo" && bash "$scripts/ready-receipt.sh" write "$sha" --preflight "$@" 2>&1) || actual=refused
+  expect_eq "$label" "$expectation" "$actual"
+}
+expect_preflight refused "preflight refuses the same pass" "$fixed_head" --rounds 2 --open 1 --pass "$pass_dir"
+expect_said "preflight: lists the missing gate" "round-1: no GATE: testing block"
+expect_said "preflight: lists the unjudged uses" "2 of 2 listed use(s) have no fine, breaks or changes line"
+expect_said "preflight: lists the open reason" "got 'later'"
+expect_eq "preflight writes no receipt" absent "$([ -e "$KC_READY_DIR/$fixed_head" ] && echo present || echo absent)"
+
+build_pass
+save_fix_round round-2 "$round_one" "$fixed_head"
+export KC_GH_ROUTES="$gh_fixtures/unanswered/routes.tsv"
+expect_preflight ok "preflight passes a well-formed pass even with an unanswered PR comment (it does not ask)" "$fixed_head" --rounds 2 --open 0 --pass "$pass_dir"
+expect_said "preflight says it checked shapes only" "preflight ok" 
+expect_eq "preflight writes no receipt for a good pass" absent "$([ -e "$KC_READY_DIR/$fixed_head" ] && echo present || echo absent)"
+expect_write refused "the real write still refuses the unanswered comment" "$fixed_head" --rounds 2 --open 0 --pass "$pass_dir"
+expect_said "the real write names the comment" "src/total.ts:12 @review-bot[bot]"
+export KC_GH_ROUTES="$gh_fixtures/none/routes.tsv"
+expect_write written "the real write passes once nothing is unanswered" "$fixed_head" --rounds 2 --open 0 --pass "$pass_dir"
+rm -f "$KC_READY_DIR/$fixed_head"
+expect_preflight refused "preflight with a checklist option is a usage error" "$fixed_head" --checklist
+expect_preflight refused "preflight with no --pass is a usage error" "$fixed_head" --rounds 1 --open 0
+help_text=$(bash "$scripts/ready-receipt.sh" help)
+expect_contains "help prints the uses-verdicts format" "<the use line copied exactly, its two" "$help_text"
+expect_contains "help prints the open reasons" "fails safe | needs a decision |" "$help_text"
+expect_contains "help prints the preflight mode" "--preflight" "$help_text"
+
+# A later round's always-run gates follow its delta: round 3 changes only a test file, so it needs
+# the testing gate (and verification), not the other five.
+build_repo
+build_pass
+save_fix_round round-2 "$round_one" "$fixed_head"
+printf '# more\n' >> "$repo/shop/total.test.sh"
+tests_head=$(commit_all "a test-only fix")
+save_review round-3 "$fixed_head" "$tests_head"
+build_gate_block testing > "$pass_dir/round-3/verdicts/testing.txt"
+build_gate_block verification > "$pass_dir/round-3/verdicts/verification.txt"
+printf 'summary: 0 names, 0 uses, 0 test files\n' > "$pass_dir/round-3/uses.txt"
+: > "$pass_dir/round-3/uses-verdicts.txt"
+expect_write written "a round-3 delta of one test file needs only the testing and verification blocks" "$tests_head" --rounds 3 --open 0 --pass "$pass_dir"
+rm -f "$KC_READY_DIR/$tests_head"
+rm "$pass_dir/round-3/verdicts/testing.txt"
+expect_write refused "and the testing block is still needed" "$tests_head" --rounds 3 --open 0 --pass "$pass_dir"
+expect_said "it names the testing gate" "round-3: no GATE: testing block"
+printf 'echo f3\n' >> "$repo/shop/tax.sh"
+source_head=$(commit_all "a source fix")
+rm -rf "$pass_dir/round-3"
+save_review round-3 "$fixed_head" "$source_head"
+build_gate_block testing > "$pass_dir/round-3/verdicts/testing.txt"
+build_gate_block verification > "$pass_dir/round-3/verdicts/verification.txt"
+printf 'summary: 0 names, 0 uses, 0 test files\n' > "$pass_dir/round-3/uses.txt"
+: > "$pass_dir/round-3/uses-verdicts.txt"
+expect_write refused "a source delta still needs every always-run gate" "$source_head" --rounds 3 --open 0 --pass "$pass_dir"
+expect_said "it names a gate round 1 runs" "round-3: no GATE: naming block"
+
+# A verification block made by verify-gate-blocks.sh is the round's record, and is run again here.
+build_repo
+build_pass
+rm -f "$KC_READY_DIR/$fixed_head"
+bash "$scripts/verify-gate-blocks.sh" "$pass_dir/round-1" "$repo" > "$pass_dir/round-1/verdicts/verification.txt"
+expect_write written "the script's passing output is accepted as the verification record" "$fixed_head" --rounds 1 --open 0 --pass "$pass_dir"
+rm -f "$KC_READY_DIR/$fixed_head"
+printf 'GATE: naming\nSTATUS: FAIL\nBOXES:\n- [PASS] §X1: 0 hits, swept shop/\nFINDINGS:\n- none\n' > "$pass_dir/round-1/verdicts/naming.txt"
+expect_write refused "a script block over verdicts that no longer pass is refused" "$fixed_head" --rounds 1 --open 0 --pass "$pass_dir"
+expect_said "it says whose block it is" "the verification block is verify-gate-blocks.sh's, and the script now finds:"
+expect_said "it lists what the script finds" "GATE: naming says STATUS: FAIL but no box is FAIL"
+
+# A 9,000-line uses file (a test edit once listed that many uses) is checked in linear time.
+build_repo
+build_pass
+rm -f "$KC_READY_DIR/$fixed_head"
+save_fix_round round-2 "$round_one" "$fixed_head"
+awk 'BEGIN { print "name total (shop/total.sh): 9000 uses"; for (i = 1; i <= 9000; i++) printf "  shop/report.sh:%d: total\n", i }' > "$pass_dir/round-2/uses.txt"
+awk 'BEGIN { for (i = 1; i <= 9000; i++) printf "  shop/report.sh:%d: total\tfine\n", i }' > "$pass_dir/round-2/uses-verdicts.txt"
+timing_start=$(date +%s)
+expect_write written "a 9,000-use round is written" "$fixed_head" --rounds 2 --open 0 --pass "$pass_dir"
+timing_seconds=$(( $(date +%s) - timing_start ))
+if [ "$timing_seconds" -le 30 ]; then
+  record "9,000 uses checked in ${timing_seconds}s (limit 30s)" ok
+else
+  record "9,000 uses checked in ${timing_seconds}s (limit 30s)" fail "the uses check is not linear"
+fi
 
 finish

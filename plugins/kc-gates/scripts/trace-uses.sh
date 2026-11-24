@@ -14,6 +14,11 @@
 #   - a route path;
 #   - for a props type (`OrderCardProps`), the component it types (`OrderCard`) as well.
 #
+# Not traced: test-framework names (describe, it, test, expect, render, beforeEach and the like),
+# and anything defined or changed in a test file, whose definitions are scaffolding with generic
+# names: a test edit would otherwise list every unrelated use of `render` or a local helper. The
+# tests that cover the production names a diff changes are still listed (`tests:`).
+#
 # A use is a line, in a file the repo tracks, that holds the name as a whole word (a route as a
 # plain string). Lines the diff adds and the name's own definition are left out: the review reads
 # those already. Each use gets one verdict from whoever reads the list: breaks, behaviour changes
@@ -84,10 +89,10 @@ else
   awk -v added_out="$added_file" -v squote="'" '
     function reset_hunk() { old_left = 0; new_left = 0 }
     function is_word(name) {
-      return name !~ /^(if|else|elsif|unless|for|while|switch|case|when|return|function|def|class|module|new|this|self|super|true|false|null|nil|undefined|constructor|render|default|export|import|from|async|await|const|let|var|type|interface|do|end|then|catch|try|yield|begin|rescue|ensure|raise|throw|static|public|private|protected|readonly|change|initialize|up|down)$/ && length(name) >= 3
+      return name !~ /^(if|else|elsif|unless|for|while|switch|case|when|return|function|def|class|module|new|this|self|super|true|false|null|nil|undefined|constructor|render|default|export|import|from|async|await|const|let|var|type|interface|do|end|then|catch|try|yield|begin|rescue|ensure|raise|throw|static|public|private|protected|readonly|change|initialize|up|down|describe|context|test|expect|specify|beforeEach|afterEach|beforeAll|afterAll|before|after|setup|teardown|suite|assert|mock|spy|stub|jest|vi|screen|fireEvent|waitFor|within|act|cleanup|subject|shared_examples|shared_context|it_behaves_like|include_examples)$/ && length(name) >= 3
     }
     function emit(name, kind) {
-      if (!is_word(name) || path == "") return
+      if (!is_word(name) || path == "" || is_test) return
       printf "%s\t%s\t%s\n", name, kind, path
       if (name ~ /Props$/ && length(name) > 5) printf "%s\tcomponent\t%s\n", substr(name, 1, length(name) - 5), path
     }
@@ -154,7 +159,7 @@ else
         piece = substr(text, RSTART, RLENGTH)
         sub("^[^\"" squote "]*" quotes, "", piece)
         sub(quotes "$", "", piece)
-        if (length(piece) > 1 && path != "") printf "%s\troute\t%s\n", piece, path
+        if (length(piece) > 1 && path != "" && !is_test) printf "%s\troute\t%s\n", piece, path
       }
     }
     function read_line(text, side,   name) {
@@ -200,6 +205,7 @@ else
       if (path == "/dev/null") path = old_path
       else sub(/^b\//, "", path)
       is_code = path ~ /\.(js|jsx|ts|tsx|mjs|cjs|vue|svelte|rb|py|swift|go|java|kt|php|cs|rs|sh)$/
+      is_test = path ~ /(\.(test|spec)\.[A-Za-z0-9]+$|_(test|spec)\.[A-Za-z0-9]+$|(^|\/)test_[^\/]*\.py$|(^|\/)(test|tests|spec|__tests__|e2e)\/)/
       next
     }
     /^@@ / {

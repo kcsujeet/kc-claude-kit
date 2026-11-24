@@ -13,8 +13,14 @@
 #                          webp, mp4, mov, webm; a relative path is read from the receipt's
 #                          folder), or a request line with its status (`GET /orders/7 200`).
 #
-# Prints one line per problem (`walk-item <path>: <problem>`): no receipt line, nothing seen, or
-# evidence that is neither. Exits 0 when every item has a full line, 1 when any does not, 2 on a
+# The environment the walk ran in is one line too, `env<TAB><command><TAB><evidence>`: the one command
+# that brought the app up (never a chain of steps done by hand: no `&&`, `;`, `||` or `then`), and
+# evidence the app answered after it (a request line with its status, or a capture). Required
+# whenever there is a walk-item. The check sees that the command is named, is one command and has
+# evidence; that it was run as written and is a tested one is for the reviewer.
+#
+# Prints one line per problem (`walk-item <path>: <problem>`, or `env: <problem>`): no receipt line,
+# nothing seen, or evidence that is neither. Exits 0 when every item has a full line, 1 when any does not, 2 on a
 # usage error or an unreadable <select-gates-output>. A missing or unreadable receipt is not an
 # error: every item then has no receipt line, which exits 1.
 set -euo pipefail
@@ -63,5 +69,34 @@ while IFS= read -r item; do
 done <<EOF
 $items
 EOF
+
+# The environment line.
+if [ -n "$items" ]; then
+  env_line=""
+  if [ -r "$receipt" ]; then env_line=$(awk -F'\t' '$1 == "env" { print; exit }' "$receipt"); fi
+  if [ -z "$env_line" ]; then
+    echo "env: no env line in $receipt: write env<TAB><the one command that brings the review environment up><TAB><evidence the app answered, e.g. GET /health 200>"
+    problems=$((problems + 1))
+  else
+    env_command=$(printf '%s' "$env_line" | awk -F'\t' '{ print $2 }')
+    env_evidence=$(printf '%s' "$env_line" | awk -F'\t' '{ print $3 }')
+    if ! printf '%s' "$env_command" | grep -q '[^[:space:]]'; then
+      echo "env: no command: name the one command that brought the environment up"
+      problems=$((problems + 1))
+    elif printf '%s' "$env_command" | grep -Eq '&&|;|\|\||(^|[[:space:]])then([[:space:]]|$)'; then
+      echo "env: more than one step ($env_command): put the steps in one script or target and run that, never by hand step by step"
+      problems=$((problems + 1))
+    fi
+    if printf '%s' "$env_evidence" | grep -Eiq "$KC_CAPTURE_PATH"; then
+      if [ ! -f "$env_evidence" ] && [ ! -f "$receipt_dir/$env_evidence" ]; then
+        echo "env: evidence file does not exist: $env_evidence"
+        problems=$((problems + 1))
+      fi
+    elif ! printf '%s' "$env_evidence" | grep -Eq "$request_pattern"; then
+      echo "env: evidence is neither an existing screenshot nor a request line with its status after the command (GET /health 200): $env_evidence"
+      problems=$((problems + 1))
+    fi
+  fi
+fi
 
 [ "$problems" -eq 0 ]

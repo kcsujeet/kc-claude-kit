@@ -180,6 +180,44 @@ expect_contains "--symbols lists a named function's uses" "name cartLabel (named
 expect_contains "--symbols finds the test using it" "  src/cart.test.ts:1: import { cartLabel } from './cart'" "$named"
 expect_contains "--symbols with no use says 0" "name receiptLine (named, -): 0 uses" "$named"
 
+# --- a test edit lists no test scaffolding ------------------------------------------------------
+# A test file that edits a helper, a describe block and a render wrapper names nothing: those names
+# are scaffolding whose uses (every other test) say nothing about the change. A framework name in a
+# production file is not traced either; the production function beside it still is.
+write "$shop/src/cart.test.ts" <<'EOF'
+import { cartLabel } from './cart'
+
+function renderCart(total: number) {
+  return cartLabel(total)
+}
+
+describe('cart', () => {
+  beforeEach(() => {})
+  it('labels', () => expect(renderCart(2)).toBe('$2'))
+  test('labels again', () => expect(renderCart(3)).toBe('$3'))
+})
+EOF
+write "$shop/src/matchers.ts" <<'EOF'
+export function expect(value: number) {
+  return value
+}
+export function describe(label: string) {
+  return label
+}
+export function lineTotal(price: number) {
+  return price * 2
+}
+EOF
+git -C "$shop" add -A
+git -C "$shop" -c user.email=t@example.com -c user.name=t commit -qm "test edit"
+git -C "$shop" diff HEAD~1 HEAD > "$work_dir/test-edit.diff"
+test_edit_out=$(cd "$shop" && bash "$trace_uses" "$work_dir/test-edit.diff")
+expect_eq "a helper defined in a test file is not a name" "" "$(printf '%s\n' "$test_edit_out" | grep '^name renderCart ' || true)"
+expect_eq "describe, it, test, expect and beforeEach in a test file are not names" "" "$(printf '%s\n' "$test_edit_out" | grep -E '^name (describe|it|test|expect|beforeEach|render) ' || true)"
+expect_eq "a test-framework name defined in a production file is not a name" "" "$(printf '%s\n' "$test_edit_out" | grep -E '^name (expect|describe) ' || true)"
+expect_contains "a production function beside them is still a name" "name lineTotal (definition, src/matchers.ts)" "$test_edit_out"
+expect_contains "the test edit ends with a summary of just that name" "summary: 1 names" "$test_edit_out"
+
 # --- usage ------------------------------------------------------------------------------------
 set +e
 bash "$trace_uses" >/dev/null 2>&1; no_args=$?

@@ -75,7 +75,7 @@ expect_eq "no receipt: saying it will walk, with no question, goes out" out "$(r
 printf 'app/models/order.rb\tcreated an order with a free item\tno evidence\n' > "$review/walk-receipt.tsv"
 expect_eq "a receipt line with no evidence: verdict held" held "$(run_stop "$verdict_reply")"
 
-printf 'app/models/order.rb\tcreated an order with a free item, total 0\tPOST /orders 201\n' > "$review/walk-receipt.tsv"
+printf 'env\tbin/review-env up\tGET /health 200\napp/models/order.rb\tcreated an order with a free item, total 0\tPOST /orders 201\n' > "$review/walk-receipt.tsv"
 expect_eq "full receipt: the verdict goes out" out "$(run_stop "$verdict_reply")"
 expect_eq "full receipt: the verification gate dispatches" allow "$(run_dispatch kc-gates:verification-gate)"
 
@@ -92,7 +92,7 @@ write_review app/models/order.rb
 other=$work_dir/other-review
 mkdir -p "$other"
 cp "$review/review.diff" "$review/changed-files.txt" "$other/"
-printf 'app/models/order.rb\tcreated an order\tPOST /orders 201\n' > "$other/walk-receipt.tsv"
+printf 'env\tbin/review-env up\tGET /health 200\napp/models/order.rb\tcreated an order\tPOST /orders 201\n' > "$other/walk-receipt.tsv"
 expect_eq "KC_REVIEW_DIR names the review to check" out "$(KC_REVIEW_DIR=$other run_stop "$verdict_reply")"
 
 finish

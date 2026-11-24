@@ -3,7 +3,19 @@
 # changed files and added lines, so no gate runs on a diff it has nothing to
 # grade (a React gate on a Ruby-only change) and none is left out by judgment.
 #
-# Usage: select-gates.sh <diff-file> <changed-files> [<repo-root>]
+# Usage: select-gates.sh [--later-round] <diff-file> <changed-files> [<repo-root>]
+#
+#   --later-round    The diff is a later round's delta (the fixes since the round before), not the
+#                    whole change. The always-run gates then run when the delta touches their topic,
+#                    since the lines an earlier round passed are not read again: a delta whose
+#                    changed files are all tests runs only the testing gate (the code under test is
+#                    unchanged, so correctness has nothing new to grade; testing owns whether an
+#                    assertion is exact); a delta whose every added line is a rename (see
+#                    rename-only-lines.sh) and whose removed lines are the same count runs only the
+#                    naming gate; any other delta runs the gates round 1 runs. The topic gates
+#                    (datetime, react, rails, i18n, security, project-conventions) pick themselves
+#                    by their own triggers in every round. A `round:` line says which case applied.
+#                    Without the flag (round 1) nothing changes.
 #
 #   <diff-file>      The unified diff (gather-review.sh's review.diff).
 #   <changed-files>  One path per line (gather-review.sh's changed-files.txt).
@@ -12,7 +24,7 @@
 #
 # Prints `GATES=<gate>,<gate>,...` (the ones to dispatch, in table order), then
 # one line per gate: `<gate>: run (<why>)` or `<gate>: N/A (<why>)`. naming,
-# clarity, structure, simplicity, testing and correctness always run; the
+# clarity, structure, simplicity, testing and correctness always run (round 1); the
 # verification gate is phase 2 and always runs, so it is not listed.
 #
 # Then `WALK=required` or `WALK=not-required` and a `walk: <why>` line. Required when the diff
@@ -30,9 +42,14 @@ set -euo pipefail
 
 script_name=$(basename "$0")
 usage() {
-  echo "usage: $script_name <diff-file> <changed-files> [<repo-root>]" >&2
+  echo "usage: $script_name [--later-round] <diff-file> <changed-files> [<repo-root>]" >&2
   exit 2
 }
+is_later_round=false
+if [ "${1:-}" = --later-round ]; then
+  is_later_round=true
+  shift
+fi
 [ "$#" -ge 2 ] && [ "$#" -le 3 ] || usage
 diff_file=$1
 changed_files=$2
@@ -118,9 +135,38 @@ skip_gate() {
   gate_lines+=("$1: N/A ($2)")
 }
 
-for always_gate in naming clarity structure simplicity; do
-  run_gate "$always_gate" "always"
-done
+# Which always-run gates a later round's delta needs: every one (full), only testing (tests), or only
+# naming (renames). Round 1 is always full.
+delta_kind=full
+delta_reason=""
+if $is_later_round && [ -s "$changed_files" ]; then
+  added_count=$(grep -E '^\+' "$diff_file" | grep -cvE '^\+\+\+ ' || true)
+  removed_count=$(grep -E '^-' "$diff_file" | grep -cvE '^--- ' || true)
+  renamed_count=$(bash "$plugin_root/scripts/rename-only-lines.sh" "$diff_file" | grep -c . || true)
+  if [ "$added_count" -gt 0 ] && [ "$added_count" -eq "$removed_count" ] && [ "$added_count" -eq "$renamed_count" ]; then
+    delta_kind=renames
+    delta_reason="later round: every changed line is a rename"
+  elif ! grep -qvE "$KC_RISK_TEST_PATHS" "$changed_files"; then
+    delta_kind=tests
+    delta_reason="later round: every changed file is a test"
+  fi
+fi
+
+# run_always_gate <gate> <delta kind it runs for>: round 1 and a full delta run it; a delta of another kind skips it.
+run_always_gate() {
+  if [ "$delta_kind" = full ]; then
+    run_gate "$1" "always"
+  elif [ "$delta_kind" = "$2" ]; then
+    run_gate "$1" "$delta_reason"
+  else
+    skip_gate "$1" "$delta_reason, nothing for $1 to grade"
+  fi
+}
+
+run_always_gate naming renames
+run_always_gate clarity none
+run_always_gate structure none
+run_always_gate simplicity none
 
 date_pattern='\b(Date|DateTime|Time|Temporal|Timecop|moment|dayjs|luxon|strftime|strptime|iso8601|timezone|time_zone|getTime|toISOString|toLocaleDateString|toLocaleTimeString|toLocaleString|DateTimeFormat)\b|date-fns|\.(ago|from_now|since|until)\b|\b[0-9]+\.(seconds?|minutes?|hours?|days?|weeks?|months?|years?)\b'
 date_hit=$(first_added_line "$date_pattern")
@@ -159,8 +205,8 @@ else
   fi
 fi
 
-run_gate testing "always"
-run_gate correctness "always"
+run_always_gate testing tests
+run_always_gate correctness none
 
 # A request handler, or the code around one: request_surface_pattern is the pattern the security
 # sweep (kc-conventions' request-surface.sh) matches request input with.
@@ -187,6 +233,10 @@ fi
 gates_csv=$(IFS=,; printf '%s' "${selected_gates[*]}")
 printf 'GATES=%s\n' "$gates_csv"
 printf '%s\n' "${gate_lines[@]}"
+case "$delta_kind" in
+  renames) echo "round: later, renames only (naming runs; the other always-run gates are N/A)" ;;
+  tests) echo "round: later, tests only (testing runs; the other always-run gates are N/A)" ;;
+esac
 
 walk_hit=$(kc_public_path_hit "$changed_files" "$repo_root")
 [ -n "$walk_hit" ] || walk_hit=$(kc_public_inheritor_hit "$changed_files" "$repo_root")
