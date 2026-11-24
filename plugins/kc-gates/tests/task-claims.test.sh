@@ -131,6 +131,9 @@ extra/é.rb	Dev@Example.com	mine" "$extra_listing"
 echo c > "$cleanup_repo/tasks/staged.rb"
 git -C "$cleanup_repo" add tasks/staged.rb
 expect_contains "--deleting: a staged file with no commit has no adder and is NOT YOURS" "tasks/staged.rb	unknown	NOT YOURS" "$(cd "$cleanup_repo" && bash "$task_claims" ABC-1 --repo acme/shop --deleting tasks/staged.rb)"
+git -C "$cleanup_repo" config user.email ""
+expect_contains "--deleting: an empty configured email never matches a file with no adder" "tasks/staged.rb	unknown	NOT YOURS" "$(cd "$cleanup_repo" && bash "$task_claims" ABC-1 --repo acme/shop --deleting tasks/staged.rb)"
+git -C "$cleanup_repo" config user.email dev@example.com
 git -C "$cleanup_repo" reset --quiet tasks/staged.rb
 rm "$cleanup_repo/tasks/staged.rb"
 

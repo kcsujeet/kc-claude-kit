@@ -171,7 +171,7 @@ if [ "${#deleting_paths[@]}" -gt 0 ]; then
     fi
     while IFS= read -r file; do
       adder=$(git --literal-pathspecs log --diff-filter=A --follow --format=%ae -1 -- "$file")
-      if [ "$(printf '%s' "$adder" | tr '[:upper:]' '[:lower:]')" = "$my_email" ]; then
+      if [ -n "$adder" ] && [ "$(printf '%s' "$adder" | tr '[:upper:]' '[:lower:]')" = "$my_email" ]; then
         printf '%s\t%s\tmine\n' "$file" "$adder"
       else
         printf '%s\t%s\tNOT YOURS\n' "$file" "${adder:-unknown}"
