@@ -72,3 +72,33 @@ is_only_question() {
   text=$(printf '%s' "$text" | sed -E 's/(^|[^[:alnum:]])(do|does|did)[[:space:]]+(you|we|i|they|it|he|she)([^[:alnum:]]|$)/ /g')
   ! printf '%s' "$text" | grep -Eq "(^|[^[:alnum:]])(fix|build|change|add|remove|make|update|write|implement|create|delete|run|try|edit|rename|revert|apply|commit|push|do (it|this|that))([^[:alnum:]]|$)"
 }
+
+# Each command in each line on stdin, one per line: split on && || ; |, then past a `$ ` prompt,
+# `await`, VAR=value assignments and runners (sudo, env, time, bunx, npx, bundle exec, pnpm exec and
+# the like) with their flags, and past the directory of the command's own path, so `bin/rspec spec/a.rb`
+# and `./node_modules/.bin/jest a.test.ts` read as `rspec spec/a.rb` and `jest a.test.ts`.
+# Read by check-reply-sources.sh and guard-unreproduced-cause.sh.
+stripped_commands() {
+  awk '{
+    count = split($0, commands, /&&|\|\||;|\|/)
+    for (i = 1; i <= count; i++) {
+      command = commands[i]
+      sub(/^[ \t]*((\$|await)[ \t]+)?/, "", command)
+      while (1) {
+        if (sub(/^[A-Za-z_][A-Za-z0-9_]*=[^ \t]*[ \t]+/, "", command)) continue
+        if (sub(/^(sudo|env|time|bunx|npx|pnpx|bun x|pnpm dlx|yarn dlx|bundle exec|pnpm exec)[ \t]+/, "", command)) {
+          while (sub(/^-[^ \t]*[ \t]+/, "", command)) {}
+          continue
+        }
+        break
+      }
+      sub(/^[^ \t]*\//, "", command)
+      if (command != "") print command
+    }
+  }'
+}
+
+# The first word of each command on stdin (see stripped_commands).
+command_starts() {
+  stripped_commands | awk '{ print $1 }'
+}

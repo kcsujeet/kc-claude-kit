@@ -43,6 +43,8 @@ receipt_dir=$(dirname "$receipt")
 items=$(sed -n 's/^walk-item: //p' "$select_output")
 
 request_pattern='^(GET|HEAD|POST|PUT|PATCH|DELETE)[[:space:]]+[^[:space:]]+.*[[:space:]][1-5][0-9][0-9]([^0-9]|$)'
+readonly MIN_STATES=2
+
 # True when a receipt line's fourth field names two or more states ("states: a; b"), or says
 # "only state:" with a reason of three or more words.
 has_walked_states() {
@@ -50,7 +52,7 @@ has_walked_states() {
   text=$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')
   if printf '%s' "$text" | grep -Eq '^[[:space:]]*only state:[[:space:]]*[^[:space:]]+([[:space:]]+[^[:space:]]+){2,}'; then return 0; fi
   text=$(printf '%s' "$text" | sed -E 's/^[[:space:]]*states:[[:space:]]*//')
-  [ "$(printf '%s' "$text" | tr ';' '\n' | grep -c '[^[:space:]]')" -ge 2 ]
+  [ "$(printf '%s' "$text" | tr ';' '\n' | grep -c '[^[:space:]]')" -ge "$MIN_STATES" ]
 }
 
 problems=0

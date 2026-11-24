@@ -96,6 +96,10 @@ set_gate clarity "GATE: clarity\nSTATUS: PASS\nBOXES:\n- [PASS] §C1: grepped te
 expect_clean "0 hits needs no verdicts"
 set_gate clarity "GATE: clarity\nSTATUS: PASS\nBOXES:\n- [PASS] §C1: grepped ternaries: 1 hit: shop/total.sh:6 ok; grepped as-casts: 2 hits: shop/total.sh:7 ok\nFINDINGS:\n- none\n"
 expect_problem "each sweep in a box is counted on its own" "\"grepped as-casts: 2 hits\" has 1 per-hit verdict(s)"
+set_gate clarity "GATE: clarity\nSTATUS: PASS\nBOXES:\n- [PASS] §C1: grepped ternaries: 3 hits: shared/reproduce-commands:2 ok, bin/setup:4 ok, shop/Makefile:L1 ok\nFINDINGS:\n- none\n"
+expect_clean "per-hit verdicts citing extensionless files with a directory count"
+set_gate clarity "GATE: clarity\nSTATUS: PASS\nBOXES:\n- [PASS] §C1: grepped ternaries: 2 hits: hits:3 ok, count:4 ok\nFINDINGS:\n- none\n"
+expect_problem "a plain word and a number is not a citation" "has 0 per-hit verdict(s)"
 set_gate clarity "GATE: clarity\nSTATUS: PASS\nBOXES:\n- [PASS] §C1: grepped ternaries: 2 hits: shop/total.sh:6 ok, shop/total.sh:6 ok\nFINDINGS:\n- none\n"
 expect_problem "one location twice is one verdict" "has 1 per-hit verdict(s)"
 

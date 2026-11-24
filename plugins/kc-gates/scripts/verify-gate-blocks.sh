@@ -83,7 +83,7 @@ read_blocks() {
     function say(text) { printf "P\t%s: %s\n", file, text }
     function count_locations(text,   rest, seen, total, location) {
       rest = text; total = 0
-      while (match(rest, "[A-Za-z0-9_./-]+\\.[A-Za-z0-9]+:L?[0-9]+")) {
+      while (match(rest, "([A-Za-z0-9_./-]+\\.[A-Za-z0-9]+|[A-Za-z0-9_.-]+(/[A-Za-z0-9_.-]+)+):L?[0-9]+")) {
         location = substr(rest, RSTART, RLENGTH)
         rest = substr(rest, RSTART + RLENGTH)
         if (!(location in seen)) { seen[location] = 1; total++ }

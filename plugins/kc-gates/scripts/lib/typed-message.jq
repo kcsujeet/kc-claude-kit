@@ -26,3 +26,10 @@ def is_typed_message:
 # when there is none. Called on the whole transcript, read as one array (`jq -s`).
 def turn_entries:
   .[((map(is_typed_message) | rindex(true) // -1) + 1):];
+
+# A tool call of an assistant entry as one line: the tool's name, a tab, then the path, command, code
+# or pattern it was given (newlines as " ; "). Empty for any other entry. Read by check-reply-sources.sh
+# and guard-unreproduced-cause.sh.
+def tool_call_lines:
+  select(.type == "assistant") | .message.content[]? | select(.type == "tool_use")
+  | .name + "\t" + ((.input.file_path // .input.path // .input.command // .input.code // .input.pattern // "") | tostring | gsub("\n"; " ; "));
