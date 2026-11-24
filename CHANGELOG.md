@@ -6,8 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
-### Added (reproduce the way the reporter met it, walk every shape, check a "can't" claim)
+### Added (reproduce the way the reporter met it, walk every shape, check a "can't" claim, wait on each result on its own)
 
+- `kc-gates` and `kc-conventions`: `guard-batched-wait.sh` (PreToolUse, Bash and REPL) denies a call that starts two CI watches (`gh pr checks --watch`, `gh run watch`) or one with a timeout over 10 minutes: a wait on several results returns only when the slowest ends, and a long timeout hides a hang. `kc-delegation` gains §D1. Held by `tests/guard-batched-wait.test.sh`.
 - `kc-gates` 3.17.0 and `kc-conventions` 2.6.6: `guard-unreproduced-cause.sh` (Stop hook) blocks a reply that proposes a cause and a fix for a reported problem with no `Reproduced:` or `Not reproduced: <why>` line, or a `Reproduced:` line with no run of the product, its tests or a browser since the report (reading code never counts; a repo adds run commands in `.claude/reproduce-commands`, matched against each command with its runner prefixes and path directory dropped). A turn that edited files needs no label but still a run. It replaces `check-reply-sources.sh`'s old non-blocking note for the same reply, which is removed; `list_command_starts`/`list_stripped_commands` and the tool-call reader now live in `lib/`. `kc-assess` step 3 says the reproduction is the reporter's own path (entry point, runtime and version, environment, real-shaped data) and gains §AS1; the reply-rules reminder says the same. Held by `tests/guard-unreproduced-cause.test.sh`.
 - `kc-gates`: `check-walk-receipt.sh` needs a fourth field on each walk-item line, `states: <a>; <b>; ...` (at least two shapes the changed output can take) or `only state: <why>`; `kc-ready-for-review` gains §H8. Held by `tests/check-walk-receipt.test.sh`.
 - `kc-gates` and `kc-conventions`: `check-reply-sources.sh` notes a reply that says a tool, CLI or API can't do something when nothing in the turn looked it up; `kc-claims` names the claim kind. Held by `tests/check-reply-sources.test.sh`.
