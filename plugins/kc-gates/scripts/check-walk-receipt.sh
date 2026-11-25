@@ -50,7 +50,6 @@ items=$(sed -n 's/^walk-item: //p' "$select_output")
 
 request_pattern='^(GET|HEAD|POST|PUT|PATCH|DELETE)[[:space:]]+[^[:space:]]+.*[[:space:]][1-5][0-9][0-9]([^0-9]|$)'
 readonly MIN_STATES=2
-# Viewport width classes a layout change is walked at, in px.
 readonly WIDE_DESKTOP_MIN_PX=1920
 readonly LAPTOP_MIN_PX=1024
 readonly PHONE_MAX_PX=600
