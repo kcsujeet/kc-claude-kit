@@ -55,9 +55,13 @@ awk -F '\t' '
     rule_trail[rule_count] = strip_trail; rule_use[rule_count] = use_template; rule_count++
   }
   # A bare package name from an import source; empty for the own files of a repo (relative, alias, url).
-  function get_package_name(source,   parts, part_count, is_own_file, is_scoped) {
-    is_own_file = (source ~ /^[.\/~#$]/ || source ~ /^@\//)
-    if (is_own_file || (source ~ /^[a-z]+:/ && source !~ /^node:/)) return ""
+  function get_package_name(source,   parts, part_count, is_relative_source, is_alias_source, has_url_scheme, is_node_builtin, is_own_file, is_scoped) {
+    is_relative_source = (source ~ /^[.\/~#$]/)
+    is_alias_source = (source ~ /^@\//)
+    has_url_scheme = (source ~ /^[a-z]+:/)
+    is_node_builtin = (source ~ /^node:/)
+    is_own_file = (is_relative_source || is_alias_source)
+    if (is_own_file || (has_url_scheme && !is_node_builtin)) return ""
     part_count = split(source, parts, "/")
     is_scoped = (source ~ /^@/)
     if (!is_scoped) return parts[1]
@@ -93,7 +97,9 @@ awk -F '\t' '
     is_style_file = (path ~ ENVIRON["KC_STYLE_PATHS"])
     if (!is_source_file && !is_config_file) next
     if (is_source_file) scan_rules(text, path, line)
-    if (path ~ /\.py$/ && match(text, /^[[:space:]]*(import|from)[[:space:]]+[A-Za-z_][A-Za-z0-9_]*/)) {
+    is_python_file = (path ~ /\.py$/)
+    has_python_import = match(text, /^[[:space:]]*(import|from)[[:space:]]+[A-Za-z_][A-Za-z0-9_]*/)
+    if (is_python_file && has_python_import) {
       module = substr(text, RSTART, RLENGTH); sub(/^[[:space:]]*(import|from)[[:space:]]+/, "", module)
       emit_candidate("package", module, "(import|from)[[:space:]]+" module "([^A-Za-z0-9_]|$)", path, line, text)
     }
@@ -125,18 +131,19 @@ done
 # Uses at the base per distinct token; the diff's own distinct added lines are subtracted when the
 # head is checked out. Zero uses are reported.
 : > "$work_dir/new.txt"
+tree_ref=()
+if [ -n "$base_ref" ]; then tree_ref=("$base_ref"); fi
+list_tree_files() { if [ -n "$base_ref" ]; then git -C "$repo_root" ls-tree -r --name-only "$base_ref"; else git -C "$repo_root" ls-files; fi; }
 cut -f1,2,3 "$work_dir/candidates.tsv" | sort -u | while IFS=$'\t' read -r kind token ere; do
-  token_lines_in_diff=$(awk -F '\t' -v kind="$kind" -v token="$token" '$1 == kind && $2 == token { print $4 ":" $5 }' "$work_dir/candidates.tsv" | sort -u | grep -c . || true)
-  if [ "$kind" = file-name ]; then
-    suffix=${token#\*}
-    if [ -n "$base_ref" ]; then token_uses=$(git -C "$repo_root" ls-tree -r --name-only "$base_ref" | grep -cF -e "$suffix" || true)
-    else token_uses=$(git -C "$repo_root" ls-files | grep -cF -e "$suffix" || true); fi
-  elif [ -n "$base_ref" ]; then
-    token_uses=$(git -C "$repo_root" grep -I -h -E -e "$ere" "$base_ref" -- . ':!*.md' 2>/dev/null | wc -l || true)
-  else
-    token_uses=$(git -C "$repo_root" grep -I -h -E -e "$ere" -- . ':!*.md' 2>/dev/null | wc -l || true)
+  token_lines_in_diff=0
+  if [ -z "$base_ref" ]; then
+    token_lines_in_diff=$(awk -F '\t' -v kind="$kind" -v token="$token" '{ is_kind_match = ($1 == kind); is_token_match = ($2 == token) } is_kind_match && is_token_match { print $4 ":" $5 }' "$work_dir/candidates.tsv" | sort -u | grep -c . || true)
   fi
-  if [ -n "$base_ref" ]; then token_lines_in_diff=0; fi
+  if [ "$kind" = file-name ]; then
+    token_uses=$(list_tree_files | grep -cF -e "${token#\*}" || true)
+  else
+    token_uses=$(git -C "$repo_root" grep -I -h -E -e "$ere" ${tree_ref[@]+"${tree_ref[@]}"} -- . ':!*.md' 2>/dev/null | wc -l || true)
+  fi
   if [ $((token_uses - token_lines_in_diff)) -le 0 ]; then printf '%s\t%s\n' "$kind" "$token" >> "$work_dir/new.txt"; fi
 done
 awk -F '\t' 'NR == FNR { new_tokens[$1 "\t" $2] = 1; next }

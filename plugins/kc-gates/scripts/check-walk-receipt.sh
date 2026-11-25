@@ -86,15 +86,18 @@ get_missing_width_classes() {
 
 # Prints what a states field still lacks for a dimension, or nothing when it covers it.
 get_uncovered_dimension() {
-  local dimension=$1 states_text locale_count has_two_locales has_rtl_locale
+  local dimension=$1 states_text locale_count has_two_locales has_rtl_locale has_one_locale mentions_rtl
   states_text=$(printf '%s' "$2" | tr '[:upper:]' '[:lower:]')
   case "$dimension" in
     viewport) get_missing_width_classes "$2" ;;
     locale)
-      locale_count=$(printf '%s' "$states_text" | grep -Eo '(^|[^a-z])[a-z]{2}-[a-z]{2,4}([^a-z]|$)' | grep -Eo '[a-z]{2}-[a-z]{2,4}' | sort -u | grep -c . || true)
-      has_two_locales=false; has_rtl_locale=false
+      # Locale tags keep their capitals (de-DE, zh-Hans), so a hyphenated word (no-op) is not one.
+      locale_count=$(printf '%s' "$2" | grep -Eo '(^|[^A-Za-z])[a-z]{2}-([A-Z]{2}|[A-Z][a-z]{3})([^A-Za-z]|$)' | grep -Eo '[a-z]{2}-([A-Z]{2}|[A-Z][a-z]{3})' | sort -u | grep -c . || true)
+      has_two_locales=false; has_rtl_locale=false; has_one_locale=false; mentions_rtl=false
       if [ "$locale_count" -ge 2 ]; then has_two_locales=true; fi
-      if [ "$locale_count" -ge 1 ] && printf '%s' "$states_text" | grep -Eq 'rtl'; then has_rtl_locale=true; fi
+      if [ "$locale_count" -ge 1 ]; then has_one_locale=true; fi
+      if printf '%s' "$states_text" | grep -Eq 'rtl'; then mentions_rtl=true; fi
+      if $has_one_locale && $mentions_rtl; then has_rtl_locale=true; fi
       if $has_two_locales || $has_rtl_locale; then return 0; fi
       printf 'two locales such as de-DE and ar-SA, or one and rtl' ;;
     print) printf '%s' "$states_text" | grep -Eq 'print|pdf' || printf 'a print or pdf state' ;;
@@ -145,7 +148,7 @@ while IFS= read -r item; do
     if [ -n "$uncovered" ]; then
       record_walk_problem "$item" "its diff varies along $dimension, but the states field does not cover it ($uncovered): walk the change along that dimension too and list it in states:"
     fi
-  done < <(printf '%s\n' "$dimension_lines" | awk -v item="$item" 'index($0, item ": ") == 1 { print substr($0, length(item) + 3) }')
+  done < <(printf '%s\n' "$dimension_lines" | awk -v item="$item" -v separator=": " 'index($0, item separator) == 1 { print substr($0, length(item separator) + 1) }')
 done <<EOF
 $items
 EOF

@@ -143,6 +143,8 @@ write_dimension_states 'states: de-DE; empty cart'
 expect_contains "locale: one locale fails" "varies along locale" "$(run_walk_receipt_check)"
 write_dimension_states 'states: en-US; de-DE'
 expect_eq "locale: two locales pass" clean "$(run_walk_receipt_check)"
+write_dimension_states 'states: no-op state; re-do state'
+expect_contains "locale: hyphenated words are not locales" "varies along locale" "$(run_walk_receipt_check)"
 write_dimension_states 'states: ar-SA rtl; empty cart'
 expect_eq "locale: one locale and rtl pass" clean "$(run_walk_receipt_check)"
 

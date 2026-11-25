@@ -24,7 +24,11 @@ scripts_dir=$(dirname "$0")
 is_lesson_repo() {
   local checklist="$1/.claude/hand-off-checklist.md"
   [ -f "$checklist" ] || return 1
-  awk 'NR == 1 && $0 != "---" { exit 1 } NR > 1 && $0 == "---" { exit !found } /^ledger:[[:space:]]*true/ { found = 1 }' "$checklist"
+  awk '
+    { is_first_line = (NR == 1); is_fence = ($0 == "---") }
+    is_first_line && !is_fence { exit 1 }
+    !is_first_line && is_fence { exit !found }
+    /^ledger:[[:space:]]*true/ { found = 1 }' "$checklist"
 }
 
 # Prints the box ids ("§LB1" ...) of kc-look-back's Gate checklist, or nothing when it is not installed.
@@ -39,7 +43,7 @@ get_gate_checklist_ids() {
 
 # Prints each problem with the ledger folder $2 of the repo $1 on its own line.
 get_ledger_problems() {
-  local dir=$1 ledger_dir=$2 base_ref merge_base diff_file check_output box_id missing_files="" file_name
+  local dir=$1 ledger_dir=$2 base_ref merge_base diff_file check_output check_summary check_args=() box_id missing_files="" file_name
   for file_name in feedback.tsv ledger.tsv checklist.md; do
     [ -f "$ledger_dir/$file_name" ] || missing_files="$missing_files $file_name"
   done
@@ -55,9 +59,11 @@ get_ledger_problems() {
   if [ -n "$base_ref" ]; then
     merge_base=$(git -C "$dir" merge-base "$base_ref" HEAD 2>/dev/null || echo "$base_ref")
     git -C "$dir" diff "$merge_base" HEAD > "$diff_file"
-    check_output=$(cd "$dir" && bash "$scripts_dir/feedback-ledger.sh" check "$ledger_dir/feedback.tsv" "$ledger_dir/ledger.tsv" --diff "$diff_file" --repo "$dir" --base "$merge_base" 2>&1) || echo "feedback-ledger.sh check: $(printf '%s' "$check_output" | tr '\n' ' ' | cut -c1-500)"
-  else
-    check_output=$(cd "$dir" && bash "$scripts_dir/feedback-ledger.sh" check "$ledger_dir/feedback.tsv" "$ledger_dir/ledger.tsv" --diff "$diff_file" 2>&1) || echo "feedback-ledger.sh check: $(printf '%s' "$check_output" | tr '\n' ' ' | cut -c1-500)"
+    check_args+=(--repo "$dir" --base "$merge_base")
+  fi
+  if ! check_output=$(cd "$dir" && bash "$scripts_dir/feedback-ledger.sh" check "$ledger_dir/feedback.tsv" "$ledger_dir/ledger.tsv" --diff "$diff_file" "${check_args[@]}" 2>&1); then
+    check_summary=$(printf '%s' "$check_output" | tr '\n' ' ' | cut -c1-500)
+    echo "feedback-ledger.sh check: $check_summary"
   fi
   rm -f "$diff_file"
   local ids
@@ -74,7 +80,7 @@ get_ledger_problems() {
 
 # Checks one shell segment of the command, run in directory $2.
 check_segment() {
-  local segment=$1 dir=$2 git_args_text git_words_list=() is_target=false repo_dir branch ledger_dir problems
+  local segment=$1 dir=$2 git_args_text git_words_list=() is_target=false repo_dir branch ledger_dir problems problem_summary
   git_args_text=$(git_words "$segment")
   if [ -n "$git_args_text" ]; then
     read -ra git_words_list <<< "$git_args_text"
@@ -92,7 +98,8 @@ check_segment() {
   ledger_dir=${KC_LEDGER_DIR:-$(git -C "$repo_dir" rev-parse --absolute-git-dir)/kc-ledger/${branch//\//-}}
   problems=$(get_ledger_problems "$repo_dir" "$ledger_dir")
   [ -n "$problems" ] || return 0
-  print_pretooluse_deny "Blocked by the kc-gates plugin: this is a lesson PR (the repo's hand-off checklist has ledger: true), and its ledger is not complete. $(printf '%s' "$problems" | tr '\n' ' ' | sed 's/["\\]//g' | cut -c1-900)"
+  problem_summary=$(printf '%s' "$problems" | tr '\n' ' ' | sed 's/["\\]//g' | cut -c1-900)
+  print_pretooluse_deny "Blocked by the kc-gates plugin: this is a lesson PR (the repo's hand-off checklist has ledger: true), and its ledger is not complete. $problem_summary"
   return 1
 }
 

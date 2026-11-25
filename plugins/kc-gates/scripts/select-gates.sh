@@ -97,11 +97,12 @@ list_walk_dimensions() {
       has_size_style_key = (line ~ /(^|[^A-Za-z0-9_-])(width|height|(min|max)-?[Ww]idth|(min|max)-?[Hh]eight|position|top|left|right|bottom|inset|font-?[Ss]ize|transform|flex|gap|display|overflow|z-?[Ii]ndex|aspect-?[Rr]atio|(padding|margin|inset|grid|flex)([A-Z][A-Za-z]*|-[a-z-]+)|p[trblxy]|m[trblxy])\x27?"?[[:space:]]*:/)
       has_class_list = (line ~ /(className|class)[ =]/)
       has_utility_class = (line ~ /(^|[ "\x27`])(w|h|min-w|max-w|min-h|max-h|p[trblxy]?|m[trblxy]?|inset|top|left|right|bottom|gap|text-(xs|sm|base|lg|[0-9]?xl)|translate-[xy])-[^ "\x27`]+|(^|[ "\x27`])(absolute|relative|fixed|sticky)([ "\x27`]|$)/)
-      if (has_size_style_key || (has_class_list && has_utility_class)) add_walk_dimension("viewport")
+      has_utility_class_list = (has_class_list && has_utility_class)
+      if (has_size_style_key || has_utility_class_list) add_walk_dimension("viewport")
       if (line ~ /(useTranslations?|i18n|I18n|Intl\.|toLocale[A-Za-z]*\(|(^|[^A-Za-z0-9_])t\(["\x27`]|translate\(|formatDate|formatCurrency|formatNumber|FormattedMessage)/) add_walk_dimension("locale")
       if (tolower(line) ~ /@media[[:space:]]+print|window\.print|@page|page-break|break-(before|after|inside)|print-color-adjust|pdf/) add_walk_dimension("print")
       has_list_markup = (is_list_ui_file && line ~ /(\.map\(|v-for|<table|<ul|<ol|[Pp]aginat|\.each[[:space:](]|\.slice\()/)
-      has_export = (line ~ /(csv|xlsx|[Ee]xport[A-Z(])/)
+      has_export = (tolower(line) ~ /(csv|xlsx|export[a-z(])/)
       if (has_list_markup || has_export) add_walk_dimension("data-size")
     }
     END { for (key in seen) print key }

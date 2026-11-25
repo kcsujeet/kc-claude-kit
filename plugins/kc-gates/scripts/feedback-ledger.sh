@@ -281,7 +281,12 @@ run_check() {
         padded_text = text; gsub(/[^a-z0-9._-]+/, " ", padded_text); padded_text = " " padded_text " "
         word_count = split(text, words, /[^a-z0-9]+/)
       }
-      function is_unit_prefix(unit, word) { return length(word) >= min_word_length && index(unit, word) == 1 && length(unit) - length(word) <= 1 }
+      function is_unit_prefix(unit, word,   is_long_enough, starts_with_word, is_within_one_letter) {
+        is_long_enough = (length(word) >= min_word_length)
+        starts_with_word = (index(unit, word) == 1)
+        is_within_one_letter = (length(unit) - length(word) <= 1)
+        return is_long_enough && starts_with_word && is_within_one_letter
+      }
       {
         token = $0; is_unit = (token ~ /^unit:/); sub(/^unit:/, "", token)
         if (index(padded_text, " " token " ") > 0) { print token; next }
@@ -291,14 +296,17 @@ run_check() {
   }
   # The ladder field is described in this file's header.
   check_lesson_ladder() {
-    local item=$1 from=$2 ladder_text instance step_count empty_step_count class_text item_text tokens hit example examples_text
+    local item=$1 from=$2 ladder_step_count=3 has_wrong_step_count has_empty_step ladder_text instance step_count empty_step_count class_text item_text tokens hit example examples_text
     ladder_text=$(get_lesson_field ladder "$from")
     item_text=$(awk -F'\t' -v id="$item" '$1 == id { print $3; exit }' "$feedback_list")
     instance=""
     if [ -n "$ladder_text" ]; then
       instance=$(printf '%s' "$ladder_text" | awk -F' -> ' '{ print $1 }')
       read -r step_count empty_step_count <<< "$(printf '%s' "$ladder_text" | awk -F' -> ' '{ for (i = 1; i <= NF; i++) if ($i ~ /^[[:space:]]*$/) empty++; print NF, empty + 0 }')"
-      if [ "$step_count" -ne 3 ] || [ "$empty_step_count" -gt 0 ]; then
+      has_wrong_step_count=false; has_empty_step=false
+      if [ "$step_count" -ne "$ladder_step_count" ]; then has_wrong_step_count=true; fi
+      if [ "$empty_step_count" -gt 0 ]; then has_empty_step=true; fi
+      if $has_wrong_step_count || $has_empty_step; then
         record_problem "$item: lesson ladder: must read <instance> -> <mechanism> -> <class>, three non-empty steps"
       fi
     fi
