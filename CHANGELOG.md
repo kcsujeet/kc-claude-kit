@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added (a turn that did work ends with a Better: line)
+
+- `kc-gates` 3.18.0: new Stop hook `guard-better-line.sh` blocks the end of a turn that made a tool call that is not a read (an edit, a write, an agent, or a command that is not plainly read-only) unless the reply has a `Better:` line with a number or a named alternative tried (`Better: none` alone or `Better: looks fine` blocks). The block tells Claude to measure what it just did, look for a better way even if it works, and apply it or say what was tried. It passes on the second try (`stop_hook_active`). Held by `tests/guard-better-line.test.sh`.
+
 ### Changed (new code needs precedent, walks cover every dimension, no behaviour by reasoning, bot link-backs need no reply, lessons state the class)
 
 - `kc-conventions` 2.7.2: new sweep `kc-simplicity/no-precedent.sh` and box `kc-simplicity` §P19: every token an added line introduces that has zero uses in the repo at the base (a package, a CSS unit, at-rule or property, a browser global, a test-mocking call, a config key, a file-name pattern) fails unless the author uses the way the repo already does that job or says why not. `kc-look-back` gains a Gate checklist (§LB1 to §LB5: class without the instance's tokens, ladder, three unlike held examples, widen before adding, the check catches the class). §R19 now checks 1920 px and says measure, never estimate. Held by `tests/run-sweeps.sh` fixture `kc-simplicity/no-precedent` and `tests/no-precedent-base-ref.test.sh`.
