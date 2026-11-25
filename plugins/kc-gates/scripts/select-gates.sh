@@ -36,7 +36,8 @@
 # is then as every audience that can reach it, signed out included. When required, one
 # `walk-item: <path>` line per changed non-test source file follows, so a receipt can be counted
 # against them. A walk-item whose added lines vary along a dimension a walk must cover
-# (viewport: layout styling; locale; print or PDF; data size: a list or table) also gets a
+# (viewport: layout styling; locale; print or PDF; data size: a list or table; exits: a form,
+# dialog, drawer or confirmation, or a save it sends) also gets a
 # `walk-dimension: <path>: <dimension>` line: check-walk-receipt.sh then wants the states field to
 # cover that dimension.
 #
@@ -82,7 +83,8 @@ added_lines=$(grep -E '^\+' "$diff_file" | grep -vE '^\+\+\+ ' | sed 's/^+//' ||
 added_source=$(kc_added_code "$diff_file" "$KC_RISK_SOURCE_PATHS")
 
 # Prints `<path><TAB><dimension>` for each dimension the added lines of a UI file vary along:
-# viewport (size, position, spacing or font style), locale, print, and data-size (lists, tables).
+# viewport (size, position, spacing or font style), locale, print, data-size (lists, tables) and
+# exits (a form, dialog, drawer or confirmation, or a save it sends: every way out is walked).
 list_walk_dimensions() {
   awk '
     function add_walk_dimension(dimension) { seen[path "\t" dimension] = 1 }
@@ -104,6 +106,9 @@ list_walk_dimensions() {
       has_list_markup = (is_list_ui_file && line ~ /(\.map\(|v-for|<table|<ul|<ol|[Pp]aginat|\.each[[:space:](]|\.slice\()/)
       has_export = (line ~ /[Ee]xport[A-Z(]/ || tolower(line) ~ /(csv|xlsx)/)
       if (has_list_markup || has_export) add_walk_dimension("data-size")
+      has_form_or_dialog = (is_list_ui_file && line ~ /(onSubmit|handleSubmit|<form[[:space:]>]|[Dd]ialog|[Mm]odal|[Dd]rawer|[Cc]onfirm(ation)?[A-Z(]|onCancel|onClose)/)
+      has_save_call = (line ~ /(mutateAsync|mutate|save[A-Za-z]*|submit[A-Za-z]*)\(/ && line ~ /(await|onSuccess|onError|then\()/)
+      if (has_form_or_dialog || has_save_call) add_walk_dimension("exits")
     }
     END { for (key in seen) print key }
   ' "$1"

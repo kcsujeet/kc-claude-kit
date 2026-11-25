@@ -162,6 +162,17 @@ expect_contains "data-size: no empty state and no large state fails" "an empty s
 write_dimension_states 'states: empty cart; 500 rows'
 expect_eq "data-size: empty and 500 rows pass" clean "$(run_walk_receipt_check)"
 
+# Exits: a form or dialog is walked through each way out, a failed save included.
+printf 'GATES=naming\nWALK=required\nwalk: x\nwalk-item: src/cart/total.tsx\nwalk-dimension: src/cart/total.tsx: exits\n' > "$select_output"
+write_dimension_states 'states: fill the address and save; empty address shows required'
+exits_missing=$(run_walk_receipt_check)
+expect_contains "exits: only the happy path names the cancel that is missing" "a cancel or close" "$exits_missing"
+expect_contains "exits: only the happy path names the failed save that is missing" "a failed save" "$exits_missing"
+write_dimension_states 'states: change name, confirm, saves; change name, cancel, asks again; save fails with 500, stays open'
+expect_eq "exits: confirm, cancel and a failed save cover it" clean "$(run_walk_receipt_check)"
+write_dimension_states 'states: apply in the drawer; close the drawer'
+expect_contains "exits: no failed save fails" "a failed save" "$(run_walk_receipt_check)"
+
 printf 'GATES=naming\nWALK=required\nwalk: x\nwalk-item: src/cart/total.tsx\nwalk-dimension: src/cart/total.tsx: viewport\nwalk-dimension: src/cart/total.tsx: print\n' > "$select_output"
 write_dimension_states 'states: 1920px; 1280px; 390px'
 expect_contains "two dimensions: the one left uncovered is named" "varies along print" "$(run_walk_receipt_check)"

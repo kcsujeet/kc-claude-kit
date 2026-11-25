@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Changed (a form or dialog is walked through every way out)
+
+- `kc-gates` 3.17.6 and `kc-verify` 2.2.13: `select-gates.sh` marks a new walk dimension, `exits`, on a UI file whose added lines submit a form or open a dialog, drawer or confirmation, or await a save; `check-walk-receipt.sh` then wants the walk-item's states to name a submit or confirm, a cancel or close, and a failed save. `kc-ui` lists the dimension beside viewport, data size, locale and print. Held by `tests/check-walk-receipt.test.sh` and `tests/select-gates.test.sh`.
+
 ### Changed (new code needs precedent, walks cover every dimension, no behaviour by reasoning, bot link-backs need no reply, lessons state the class)
 
 - `kc-conventions` 2.7.2: new sweep `kc-simplicity/no-precedent.sh` and box `kc-simplicity` §P19: every token an added line introduces that has zero uses in the repo at the base (a package, a CSS unit, at-rule or property, a browser global, a test-mocking call, a config key, a file-name pattern) fails unless the author uses the way the repo already does that job or says why not. `kc-look-back` gains a Gate checklist (§LB1 to §LB5: class without the instance's tokens, ladder, three unlike held examples, widen before adding, the check catches the class). §R19 now checks 1920 px and says measure, never estimate. Held by `tests/run-sweeps.sh` fixture `kc-simplicity/no-precedent` and `tests/no-precedent-base-ref.test.sh`.
