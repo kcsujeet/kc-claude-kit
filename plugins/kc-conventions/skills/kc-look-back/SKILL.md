@@ -38,3 +38,13 @@ Put a lesson at the first layer that holds it, and write prose last: a lesson th
 - A look-back that listed the agent's own slips and none of the QA report's rows.
 - A look-back that kept the two corrections that came with an explanation and dropped the one-word ones ("no", "why?").
 - A look-back that missed a rejected tool call that redirected the whole approach.
+
+## Gate checklist
+
+The ledger folder carries a ticked copy of this list as `checklist.md` (each box `- [x] §LBn ...`), and `guard-lesson-ledger.sh` blocks `git push`, `gh pr create` and `gh pr merge` on a lesson PR until `feedback-ledger.sh check` passes and every box is ticked.
+
+- [ ] §LB1 The lesson's class is named without the instance's code tokens: no backticked word, identifier, unit or file name from the feedback item or the fix. Held by `feedback-ledger.sh check`.
+- [ ] §LB2 The ledger line climbs a ladder: `ladder:<instance> -> <mechanism> -> <class>`, asking at each step what other mistakes that step would catch. Held by `feedback-ledger.sh check`.
+- [ ] §LB3 Three or more unlike examples, from different areas and none sharing a token with the instance, each held as a test fixture.
+- [ ] §LB4 An existing rule, script or box was widened before a new one was added (name it in the PR description), or the description says why none could be.
+- [ ] §LB5 The check catches the class, not only the token that bit: fixtures from unlike areas pass and fail it, and the instance's own case is one of them.

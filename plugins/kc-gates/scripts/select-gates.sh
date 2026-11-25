@@ -100,7 +100,9 @@ list_walk_dimensions() {
       if (has_size_style_key || (has_class_list && has_utility_class)) add_walk_dimension("viewport")
       if (line ~ /(useTranslations?|i18n|I18n|Intl\.|toLocale[A-Za-z]*\(|(^|[^A-Za-z0-9_])t\(["\x27`]|translate\(|formatDate|formatCurrency|formatNumber|FormattedMessage)/) add_walk_dimension("locale")
       if (tolower(line) ~ /@media[[:space:]]+print|window\.print|@page|page-break|break-(before|after|inside)|print-color-adjust|pdf/) add_walk_dimension("print")
-      if (is_list_ui_file && line ~ /(\.map\(|v-for|<table|<ul|<ol|[Pp]aginat|\.each[[:space:](]|\.slice\()/) add_walk_dimension("data-size")
+      has_list_markup = (is_list_ui_file && line ~ /(\.map\(|v-for|<table|<ul|<ol|[Pp]aginat|\.each[[:space:](]|\.slice\()/)
+      has_export = (line ~ /(csv|xlsx|[Ee]xport[A-Z(])/)
+      if (has_list_markup || has_export) add_walk_dimension("data-size")
     }
     END { for (key in seen) print key }
   ' "$1"

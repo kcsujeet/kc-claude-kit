@@ -247,6 +247,8 @@ walk_dim_print=$(get_walk_dimensions "$work_dir/walk-dim-print")
 expect_contains "dimension: a print stylesheet is print" "print" "$walk_dim_print"
 make_case "$work_dir/walk-dim-list" '{items.map((item) => <li key={item.id}>{item.name}</li>)}' src/cart/Total.tsx
 expect_eq "dimension: a mapped list is data-size" "data-size" "$(get_walk_dimensions "$work_dir/walk-dim-list")"
+make_case "$work_dir/walk-dim-export" 'const rows = toCsv(orders)' src/cart/Total.tsx
+expect_eq "dimension: an export is data-size" "data-size" "$(get_walk_dimensions "$work_dir/walk-dim-export")"
 make_case "$work_dir/walk-dim-none" 'const total = items.length' src/cart/Total.tsx
 expect_eq "dimension: plain logic varies along none" "" "$(get_walk_dimensions "$work_dir/walk-dim-none")"
 expect_eq "dimension: plain logic still has its walk-item" "walk-item: src/cart/Total.tsx" "$(select_gates_output "$work_dir/walk-dim-none" | grep '^walk-item:')"
