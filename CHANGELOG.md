@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Changed (a walk is done on the surface the change reaches)
+
+- `kc-gates` 3.17.6: `select-gates.sh` names each walk-item's QA surface (`walk-item: <path> surface: browser|api|terminal|unit`, one classifier in `lib/qa-surface.sh`, overridable per repo in `.claude/qa-surfaces.txt`), and `check-walk-receipt.sh` accepts only that surface's evidence: a screenshot or recording (browser), `curl <args>: <file>` with the saved response holding an HTTP status line or a bare request line (api), a run transcript `exit <N>: <file>` (terminal; unit also takes a request line or capture). A mismatch says the surface and the evidence it needs; a walk-item line with no surface keeps accepting any kind. The env line takes the kinds of the items' surfaces. The walk wording in `kc-code-review`, `verification-gate` and the guards says "its QA surface (browser, API, terminal, unit)". Held by `tests/check-walk-receipt.test.sh`, `tests/select-gates.test.sh`.
+
 ### Changed (new code needs precedent, walks cover every dimension, no behaviour by reasoning, bot link-backs need no reply, lessons state the class)
 
 - `kc-conventions` 2.7.2: new sweep `kc-simplicity/no-precedent.sh` and box `kc-simplicity` §P19: every token an added line introduces that has zero uses in the repo at the base (a package, a CSS unit, at-rule or property, a browser global, a test-mocking call, a config key, a file-name pattern) fails unless the author uses the way the repo already does that job or says why not. `kc-look-back` gains a Gate checklist (§LB1 to §LB5: class without the instance's tokens, ladder, three unlike held examples, widen before adding, the check catches the class). §R19 now checks 1920 px and says measure, never estimate. Held by `tests/run-sweeps.sh` fixture `kc-simplicity/no-precedent` and `tests/no-precedent-base-ref.test.sh`.

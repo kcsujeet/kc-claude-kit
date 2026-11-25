@@ -30,11 +30,11 @@
 # Then `WALK=required` or `WALK=not-required` and a `walk: <why>` line. Required when the diff
 # changes any non-test source file (KC_RISK_TEST_PATHS and KC_RISK_SOURCE_PATHS from
 # lib/risk-paths.sh; docs, lockfiles, locale and config-only diffs are not-required): the review
-# then walks every behaviour the diff changes in the running app or at the API before its
+# then walks every behaviour the diff changes on its QA surface (browser, API, terminal, unit) before its
 # verdict. The stronger form is a changed file path a signed-out visitor reaches (the same path
 # test pass-size.sh makes: built-in patterns plus the repo's .claude/public-paths.txt): the walk
 # is then as every audience that can reach it, signed out included. When required, one
-# `walk-item: <path>` line per changed non-test source file follows, so a receipt can be counted
+# `walk-item: <path> surface: <browser|api|terminal|unit>` line per changed non-test source file follows (lib/qa-surface.sh; a repo overrides it in .claude/qa-surfaces.txt), so a receipt can be counted
 # against them. A walk-item whose added lines vary along a dimension a walk must cover
 # (viewport: layout styling; locale; print or PDF; data size: a list or table) also gets a
 # `walk-dimension: <path>: <dimension>` line: check-walk-receipt.sh then wants the states field to
@@ -63,6 +63,8 @@ repo_root=${3:-.}
 plugin_root=$(cd "$(dirname "$0")/.." && pwd)
 # shellcheck source=lib/risk-paths.sh
 . "$plugin_root/scripts/lib/risk-paths.sh"
+# shellcheck source=lib/qa-surface.sh
+. "$plugin_root/scripts/lib/qa-surface.sh"
 
 # kc-conventions is installed beside this plugin: next to it in a checkout, or under the highest
 # version of its own folder in the plugin cache (cache/<marketplace>/<plugin>/<version>).
@@ -277,13 +279,16 @@ if [ -n "$walk_hit" ]; then
   echo "walk: public or guest path, walk it as every audience that can reach it, signed out included ($walk_hit)"
 elif [ -n "$walk_items" ]; then
   echo "WALK=required"
-  echo "walk: the diff changes source behaviour, walk each changed file's behaviour in the running app or at the API"
+  echo "walk: the diff changes source behaviour, walk each changed file's behaviour on its QA surface (browser, API, terminal, unit), as its walk-item line names it"
 else
   echo "WALK=not-required"
   echo "walk: no non-test source file in the diff"
 fi
 if [ -n "$walk_items" ]; then
-  printf '%s\n' "$walk_items" | sed 's/^/walk-item: /'
+  while IFS= read -r walk_path; do
+    [ -n "$walk_path" ] || continue
+    echo "walk-item: $walk_path surface: $(kc_qa_surface "$walk_path" "$repo_root")"
+  done <<< "$walk_items"
   walk_dimensions=$(list_walk_dimensions "$diff_file")
   while IFS= read -r walk_path; do
     [ -n "$walk_path" ] || continue
