@@ -234,14 +234,24 @@ expect_eq "a config-only diff: WALK=not-required" "WALK=not-required" "$(walk_li
 expect_eq "a docs-only diff: no walk-item lines" "0" "$(select_gates_output "$work_dir/walk-docs" | grep -c '^walk-item:' || true)"
 expect_eq "a test-only diff: no walk-item lines" "0" "$(select_gates_output "$work_dir/walk-spec" | grep -c '^walk-item:' || true)"
 
-# Layout styling: a walk-item whose added lines set layout gets a walk-layout line too.
-make_case "$work_dir/walk-layout-sx" "<Box sx={{ containerType: 'size', pt: '20cqw' }} />" src/cart/Total.tsx
-expect_eq "layout: a style-object key makes a walk-layout line" "walk-layout: src/cart/Total.tsx" "$(select_gates_output "$work_dir/walk-layout-sx" | grep '^walk-layout:')"
-make_case "$work_dir/walk-layout-class" '<div className="absolute w-1/2 p-4" />' src/cart/Total.tsx
-expect_eq "layout: utility classes make a walk-layout line" "walk-layout: src/cart/Total.tsx" "$(select_gates_output "$work_dir/walk-layout-class" | grep '^walk-layout:')"
-make_case "$work_dir/walk-layout-none" 'const total = items.length' src/cart/Total.tsx
-expect_eq "layout: plain logic makes no walk-layout line" "0" "$(select_gates_output "$work_dir/walk-layout-none" | grep -c '^walk-layout:' || true)"
-expect_eq "layout: plain logic still has its walk-item" "walk-item: src/cart/Total.tsx" "$(select_gates_output "$work_dir/walk-layout-none" | grep '^walk-item:')"
+# Dimensions a walk must cover: each one the added lines of a UI file vary along is a walk-dimension line.
+dimensions_of() { select_gates_output "$1" | sed -n 's/^walk-dimension: [^:]*: //p' | paste -sd, -; }
+make_case "$work_dir/walk-dim-sx" "<Box sx={{ containerType: 'size', pt: '20cqw' }} />" src/cart/Total.tsx
+expect_eq "dimension: a style-object key is viewport" "viewport" "$(dimensions_of "$work_dir/walk-dim-sx")"
+make_case "$work_dir/walk-dim-class" '<div className="absolute w-1/2 p-4" />' src/cart/Total.tsx
+expect_eq "dimension: utility classes are viewport" "viewport" "$(dimensions_of "$work_dir/walk-dim-class")"
+make_case "$work_dir/walk-dim-locale" 'const label = t("cart.total")' src/cart/Total.tsx
+expect_eq "dimension: a translation call is locale" "locale" "$(dimensions_of "$work_dir/walk-dim-locale")"
+make_case "$work_dir/walk-dim-print" 'const onClick = () => window.print()' src/cart/Total.tsx
+walk_dim_print=$(dimensions_of "$work_dir/walk-dim-print")
+expect_contains "dimension: a print stylesheet is print" "print" "$walk_dim_print"
+make_case "$work_dir/walk-dim-list" '{items.map((item) => <li key={item.id}>{item.name}</li>)}' src/cart/Total.tsx
+expect_eq "dimension: a mapped list is data-size" "data-size" "$(dimensions_of "$work_dir/walk-dim-list")"
+make_case "$work_dir/walk-dim-none" 'const total = items.length' src/cart/Total.tsx
+expect_eq "dimension: plain logic varies along none" "" "$(dimensions_of "$work_dir/walk-dim-none")"
+expect_eq "dimension: plain logic still has its walk-item" "walk-item: src/cart/Total.tsx" "$(select_gates_output "$work_dir/walk-dim-none" | grep '^walk-item:')"
+make_case "$work_dir/walk-dim-script" 'padding: 4px; items.map(x)' tools/layout.sh
+expect_eq "dimension: a script is not a UI file" "" "$(dimensions_of "$work_dir/walk-dim-script")"
 
 # select-gates and pass-size.sh decide "public path" with the same function: the signed-out
 # reason appears exactly when pass-size.sh reports a public-path risk.

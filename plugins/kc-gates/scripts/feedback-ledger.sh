@@ -52,7 +52,13 @@
 #       also states what it is a lesson of, as tab-separated tagged fields after the fields
 #       above, in any order (each missing or empty one is its own problem):
 #         class:<one sentence naming the class of mistake>
-#         examples:<a>; <b>[; <c>]       two or more unlike cases the rule catches, split on "; "
+#         examples:<a>; <b>; <c>[; ...]  three or more cases from different areas, split on "; "; none
+#                                        repeats a code token of the instance (see ladder)
+#         ladder:<instance> -> <mechanism> -> <class>
+#                                        the climb from the case the feedback was about, through
+#                                        the check that blocked it, to the class; the class field
+#                                        carries no code token (backticked words, identifiers, file
+#                                        names, units) of the feedback item or the instance
 #         mechanism:<check|guard|path-rule|skill|always-on>
 #                                        the layer the lesson sits at, as kc-look-back's "Placing
 #                                        a lesson by layer" ladder names them
@@ -254,12 +260,68 @@ run_check() {
     field_text=${field_text#"${field_text%%[![:space:]]*}"}
     printf '%s' "${field_text%"${field_text##*[![:space:]]}"}"
   }
-  # A lesson record names its class, two unlike examples, the layer it sits at, why no higher
+  # The code tokens of a text, lowercase, one per line: backticked words, camelCase and snake_case
+  # identifiers, file names and numbers with a unit (20cqw gives cqw). A lesson's class is written
+  # without them, since they belong to the instance the lesson came from.
+  get_code_tokens() {
+    {
+      # shellcheck disable=SC2016  # the backticks are literal Markdown
+      printf '%s' "$1" | grep -Eo '`[^`]+`' | tr -d '`' | grep -Eo '[A-Za-z0-9_.-]+' || true
+      printf '%s' "$1" | grep -Eo '[a-z]+[A-Z][A-Za-z0-9]*|[A-Za-z0-9]+_[A-Za-z0-9_]+|[A-Za-z0-9_-]+\.[A-Za-z]{1,5}|[0-9]+[A-Za-z]+' || true
+    } | sed -E 's/^[0-9]+//' | awk 'length($0) >= 3' | tr '[:upper:]' '[:lower:]' | sort -u
+  }
+  # Prints the tokens (stdin) that the text contains, or that start a word of it with at most one
+  # letter more (cq in the class, cqw in the instance).
+  get_tokens_found_in() {
+    awk -v text="$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')" '
+      BEGIN { word_count = split(text, words, /[^a-z0-9]+/) }
+      {
+        token = $0
+        if (index(text, token) > 0) { print token; next }
+        for (i = 1; i <= word_count; i++)
+          if (length(words[i]) >= 2 && index(token, words[i]) == 1 && length(token) - length(words[i]) <= 1) { print token; break }
+      }'
+  }
+  # A lesson climbs a ladder from the instance to the class: ladder:<instance> -> <mechanism> -> <class>.
+  # The class and the examples carry no code token of the feedback item or the instance, and the
+  # examples are three or more cases from areas other than the instance's.
+  check_lesson_ladder() {
+    local item=$1 from=$2 ladder_text instance mechanism_step class_step class_text item_text tokens hit example rest
+    ladder_text=$(get_lesson_field ladder "$from")
+    item_text=$(awk -F'\t' -v id="$item" '$1 == id { print $3; exit }' "$feedback_list")
+    instance=""
+    if [ -n "$ladder_text" ]; then
+      instance=${ladder_text%% -> *}
+      rest=${ladder_text#* -> }
+      mechanism_step=${rest%% -> *}
+      class_step=${rest#* -> }
+      if [ "$rest" = "$ladder_text" ] || [ "$class_step" = "$rest" ] || [ -z "${instance// /}" ] || [ -z "${mechanism_step// /}" ] || [ -z "${class_step// /}" ]; then
+        record_problem "$item: lesson ladder: must read <instance> -> <mechanism> -> <class>, three non-empty steps"
+      fi
+    fi
+    tokens=$(get_code_tokens "$item_text $instance")
+    [ -n "$tokens" ] || return 0
+    class_text=$(get_lesson_field class "$from")
+    hit=$(printf '%s\n' "$tokens" | get_tokens_found_in "$class_text" | head -n 1)
+    if [ -n "$hit" ]; then
+      record_problem "$item: lesson class: names \"$hit\", a code token of the feedback or its fix; state the class without it (the habit that catches the whole kind of mistake, not the instance it came from)"
+    fi
+    rest=$(get_lesson_field examples "$from")
+    while [ -n "$rest" ]; do
+      example=${rest%%; *}
+      hit=$(printf '%s\n' "$tokens" | get_tokens_found_in "$example" | head -n 1)
+      if [ -n "$hit" ]; then
+        record_problem "$item: lesson examples: \"$example\" repeats \"$hit\" from the instance; give cases from other areas that share none of its tokens"
+      fi
+      case "$rest" in *"; "*) rest=${rest#*; } ;; *) rest="" ;; esac
+    done
+  }
+  # A lesson record names its class, three unlike examples, the layer it sits at, why no higher
   # layer holds it, and its proof. $1 is the item, $2 the number of the first tagged field.
   check_lesson_record() {
-    local item=$1 from=$2 tag field_text rest example example_count=0 empty_example=false min_lesson_examples=2
+    local item=$1 from=$2 tag field_text rest example example_count=0 empty_example=false min_lesson_examples=3
     local is_why_not_higher_tag mechanism_is_check is_optional_why_not_higher
-    for tag in class examples mechanism why-not-higher proof; do
+    for tag in class examples mechanism why-not-higher proof ladder; do
       field_text=$(get_lesson_field "$tag" "$from")
       if [ -n "$field_text" ]; then continue; fi
       is_why_not_higher_tag=false
@@ -289,6 +351,7 @@ run_check() {
         record_problem "$item: lesson examples: has one example; a lesson needs $min_lesson_examples unlike cases, separated by \"; \""
       fi
     fi
+    check_lesson_ladder "$item" "$from"
     field_text=$(get_lesson_field mechanism "$from")
     case "$field_text" in
       "" | check | guard | path-rule | skill | always-on) ;;

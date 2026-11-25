@@ -35,9 +35,10 @@
 # test pass-size.sh makes: built-in patterns plus the repo's .claude/public-paths.txt): the walk
 # is then as every audience that can reach it, signed out included. When required, one
 # `walk-item: <path>` line per changed non-test source file follows, so a receipt can be counted
-# against them. A walk-item whose added lines set layout styling (a size, position, spacing,
-# font size, transform or flex/grid property in a style object, stylesheet or class list) also gets
-# a `walk-layout: <path>` line: check-walk-receipt.sh then wants the viewport widths walked.
+# against them. A walk-item whose added lines vary along a dimension a walk must cover
+# (viewport: layout styling; locale; print or PDF; data size: a list or table) also gets a
+# `walk-dimension: <path>: <dimension>` line: check-walk-receipt.sh then wants the states field to
+# cover that dimension.
 #
 # Exits 0 on success, 2 on a usage error or a missing input file.
 set -euo pipefail
@@ -255,9 +256,11 @@ else
 fi
 if [ -n "$walk_items" ]; then
   printf '%s\n' "$walk_items" | sed 's/^/walk-item: /'
-  layout_paths=$(kc_list_layout_paths "$diff_file")
+  walk_dimensions=$(kc_list_walk_dimensions "$diff_file")
   while IFS= read -r walk_path; do
-    [ -n "$walk_path" ] && printf '%s\n' "$layout_paths" | grep -qxF "$walk_path" && echo "walk-layout: $walk_path"
+    [ -n "$walk_path" ] || continue
+    printf '%s\n' "$walk_dimensions" | awk -F '\t' -v path="$walk_path" '$1 == path { print $2 }' | sort |
+      while IFS= read -r dimension; do echo "walk-dimension: $walk_path: $dimension"; done
   done <<< "$walk_items"
 fi
 true

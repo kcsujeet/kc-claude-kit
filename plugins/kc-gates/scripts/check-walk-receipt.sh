@@ -18,10 +18,15 @@
 #                          `only state: <why>` (three or more words) when it has one. One walk of one
 #                          state is not QA: list every shape the output can take and walk each.
 #
-# A walk-item that select-gates.sh also marks `walk-layout: <path>` (its diff sets layout styling)
-# must list the viewport widths walked on its states field, written with px (`1920px`, `1280px`,
-# `390px`): a wide desktop (1920 or more), a laptop (1024 to 1919) and a phone (600 or less). A
-# layout that holds at two widths can slide, clip or collapse at a third.
+# A walk-item that select-gates.sh also marks `walk-dimension: <path>: <dimension>` (its diff varies
+# along a dimension a walk must cover) needs its states field to cover each such dimension, since
+# a walk of the states the author picked can miss the one the change varies along:
+#   viewport   widths written with px: a wide desktop (1920 or more), a laptop (1024 to 1919) and a
+#              phone (600 or less), such as `1920px; 1280px; 390px`
+#   locale     two locale codes (`de-DE`, `ar-SA`), or one and `rtl`
+#   print      the word `print` or `pdf`
+#   data-size  an empty or zero state and a large one (many, long, overflow, paginated, or a count
+#              such as `500 rows`)
 #
 # The environment the walk ran in is one line too, `env<TAB><command><TAB><evidence>`: the one command
 # that brought the app up (never a chain of steps done by hand: no `&&`, `;`, `||` or `then`), and
@@ -84,7 +89,25 @@ get_missing_width_classes() {
   printf '%s' "$missing"
 }
 
-layout_items=$(sed -n 's/^walk-layout: //p' "$select_output")
+# Prints what a states field still lacks for a dimension, or nothing when it covers it.
+get_uncovered_dimension() {
+  local dimension=$1 text locale_codes
+  text=$(printf '%s' "$2" | tr '[:upper:]' '[:lower:]')
+  case "$dimension" in
+    viewport) get_missing_width_classes "$2" ;;
+    locale)
+      locale_codes=$(printf '%s' "$text" | grep -Eo '(^|[^a-z])[a-z]{2}-[a-z]{2,4}([^a-z]|$)' | grep -Eo '[a-z]{2}-[a-z]{2,4}' | sort -u | grep -c . || true)
+      if [ "$locale_codes" -ge 2 ] || { [ "$locale_codes" -ge 1 ] && printf '%s' "$text" | grep -Eq 'rtl'; }; then return 0; fi
+      printf 'two locales such as de-DE and ar-SA, or one and rtl' ;;
+    print) printf '%s' "$text" | grep -Eq 'print|pdf' || printf 'a print or pdf state' ;;
+    data-size)
+      printf '%s' "$text" | grep -Eq 'empty|zero|no rows|no items' || printf 'an empty state; '
+      printf '%s' "$text" | grep -Eq 'many|long|large|overflow|truncat|paginat|[0-9]{2,} (rows|items|results|records)' || printf 'a large state' ;;
+  esac
+  return 0
+}
+
+dimension_lines=$(sed -n 's/^walk-dimension: //p' "$select_output")
 
 problems=0
 record_walk_problem() { echo "walk-item $1: $2"; problems=$((problems + 1)); }
@@ -118,12 +141,13 @@ while IFS= read -r item; do
   if ! has_walked_states "$states"; then
     record_walk_problem "$item" "fewer than two states walked: list every shape the change's output can take (empty, one long row, many short rows, each option) and walk each; write states: <a>; <b> as the fourth field, or only state: <why, three or more words> when it has one"
   fi
-  if printf '%s\n' "$layout_items" | grep -qxF "$item"; then
-    absent_widths=$(get_missing_width_classes "$states")
-    if [ -n "$absent_widths" ]; then
-      record_walk_problem "$item" "its diff changes layout styling but the states field names no viewport width for: $absent_widths; walk the screen at each and list the widths with px (states: 1920px; 1280px; 390px)"
+  while IFS= read -r dimension; do
+    [ -n "$dimension" ] || continue
+    uncovered=$(get_uncovered_dimension "$dimension" "$states")
+    if [ -n "$uncovered" ]; then
+      record_walk_problem "$item" "its diff varies along $dimension, but the states field does not cover it ($uncovered): walk the change along that dimension too and list it in states:"
     fi
-  fi
+  done < <(printf '%s\n' "$dimension_lines" | sed -n "s|^$item: ||p")
 done <<EOF
 $items
 EOF

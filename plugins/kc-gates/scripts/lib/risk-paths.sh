@@ -33,19 +33,27 @@ kc_added_code() {
     /^\+/ { if (code) print substr($0, 2) }' "$1"
 }
 
-# kc_list_layout_paths <diff-file>: the paths whose added lines set layout styling: a size, position,
-# spacing, font-size, transform, flex or grid property as a style-object key or stylesheet
-# declaration, or a utility class (w-, p-4, absolute, text-lg) on a line with className or class.
-kc_list_layout_paths() {
+# kc_list_walk_dimensions <diff-file>: `<path><TAB><dimension>` for each dimension the added lines of a
+# UI file (a template, component or stylesheet) vary along, so a walk covers every dimension and not
+# only the states the author picked:
+#   viewport   a size, position, spacing, font-size, transform, flex or grid property, or a utility class
+#   locale     a translation call, a locale formatter or a locale-dependent format
+#   print      a print stylesheet, page-break rule or PDF generation
+#   data-size  a list, table, map over items, pagination or slice (the data can be empty or huge)
+kc_list_walk_dimensions() {
   awk '
-    /^\+\+\+ / { path = substr($0, 5); sub(/^b\//, "", path); next }
-    /^\+/ {
-      line = substr($0, 2)
+    function add(dimension) { seen[path "\t" dimension] = 1 }
+    /^\+\+\+ / { path = substr($0, 5); sub(/^b\//, "", path); ui = (path ~ /\.(jsx|tsx|js|ts|mjs|vue|svelte|html|erb|haml|css|scss|less)$/); list_ui = (path ~ /\.(jsx|tsx|vue|svelte|html|erb|haml)$/); next }
+    /^\+/ && ui {
+      line = substr($0, 2); lower = tolower(line)
       if (line ~ /(^|[^A-Za-z0-9_-])(width|height|(min|max)-?[Ww]idth|(min|max)-?[Hh]eight|position|top|left|right|bottom|inset|font-?[Ss]ize|transform|flex|gap|display|overflow|z-?[Ii]ndex|aspect-?[Rr]atio|(padding|margin|inset|grid|flex)([A-Z][A-Za-z]*|-[a-z-]+)|p[trblxy]|m[trblxy])\x27?"?[[:space:]]*:/ ||
           (line ~ /(className|class)[ =]/ && line ~ /(^|[ "\x27`])(w|h|min-w|max-w|min-h|max-h|p[trblxy]?|m[trblxy]?|inset|top|left|right|bottom|gap|text-(xs|sm|base|lg|[0-9]?xl)|translate-[xy])-[^ "\x27`]+|(^|[ "\x27`])(absolute|relative|fixed|sticky)([ "\x27`]|$)/))
-        seen[path] = 1
+        add("viewport")
+      if (line ~ /(useTranslations?|i18n|I18n|Intl\.|toLocale[A-Za-z]*\(|(^|[^A-Za-z0-9_])t\(["\x27`]|translate\(|formatDate|formatCurrency|formatNumber|FormattedMessage)/) add("locale")
+      if (lower ~ /@media[[:space:]]+print|window\.print|@page|page-break|break-(before|after|inside)|print-color-adjust|pdf/) add("print")
+      if (list_ui && line ~ /(\.map\(|v-for|<table|<ul|<ol|[Pp]aginat|\.each[[:space:](]|\.slice\()/) add("data-size")
     }
-    END { for (p in seen) print p }
+    END { for (key in seen) print key }
   ' "$1"
 }
 

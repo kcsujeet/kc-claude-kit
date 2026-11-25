@@ -449,7 +449,7 @@ run_git symbolic-ref refs/remotes/origin/HEAD refs/remotes/origin/main
 expect_write refused "a checklist asking for the ledger refuses a receipt without one" "$lesson_head" --checklist
 expect_said "it asks for the ledger" "pass --ledger <dir>"
 ledger_dir=$work_dir/ledger-$RANDOM
-record_fields=$'\tclass:a total that drops cents\texamples:an order total; a refund amount\tmechanism:check\tproof:shop/total.test.sh'
+record_fields=$'\tclass:a total that drops cents\texamples:an order total; a refund amount; a tax line\tmechanism:check\tproof:shop/total.test.sh\tladder:a rounding slip -> a total test -> a total that drops cents'
 mkdir -p "$ledger_dir"
 printf 'F1\ttyped\tprint cents\nF2\ttyped\tgo ahead\n' > "$ledger_dir/feedback.tsv"
 printf 'F1\tlesson\t§X2%s\n' "$record_fields" > "$ledger_dir/ledger.tsv"
