@@ -28,4 +28,15 @@ actual=$(bash "$sweep" "$work_dir/change.diff" "$repo" --base "$base_commit")
 assert_sweep_output_equals "a unit the base never used is flagged, one it used is not" \
   "src/base.css:2: [no precedent: unit cqw] .card { width: 20cqw; height: 50vh; }" "$actual"
 
+printf 'a\n' > "$repo/src/legacy.test.ts"
+run_git add -A && run_git commit -q -m base-test
+base_commit=$(run_git rev-parse HEAD)
+printf 'b\n' > "$repo/src/card.spec.ts"
+printf 'c\n' > "$repo/src/card.test.ts"
+run_git add -A && run_git commit -q -m head-tests
+run_git diff "$base_commit" HEAD > "$work_dir/tests.diff"
+actual=$(bash "$sweep" "$work_dir/tests.diff" "$repo" --base "$base_commit")
+assert_sweep_output_equals "a file-name suffix the base never had is flagged, one it had is not" \
+  "src/card.spec.ts:1: [no precedent: file-name *.spec.ts] card.spec.ts" "$actual"
+
 [ "$failures" -eq 0 ]

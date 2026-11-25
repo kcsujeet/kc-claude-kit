@@ -86,13 +86,15 @@ get_missing_width_classes() {
 
 # Prints what a states field still lacks for a dimension, or nothing when it covers it.
 get_uncovered_dimension() {
-  local dimension=$1 states_text locale_count has_two_locales has_rtl_locale has_one_locale mentions_rtl
+  local dimension=$1 states_text locale_pattern locale_count has_two_locales has_rtl_locale has_one_locale mentions_rtl
   states_text=$(printf '%s' "$2" | tr '[:upper:]' '[:lower:]')
   case "$dimension" in
     viewport) get_missing_width_classes "$2" ;;
     locale)
-      # Locale tags keep their capitals (de-DE, zh-Hans), so a hyphenated word (no-op) is not one.
-      locale_count=$(printf '%s' "$2" | grep -Eo '(^|[^A-Za-z])[a-z]{2}-([A-Z]{2}|[A-Z][a-z]{3})([^A-Za-z]|$)' | grep -Eo '[a-z]{2}-([A-Z]{2}|[A-Z][a-z]{3})' | sort -u | grep -c . || true)
+      # Locale tags keep their capitals (de-DE, zh-Hans) unless the field says locale or lang, so a hyphenated word (no-op) is not one.
+      locale_pattern='[a-z]{2}-([A-Z]{2}|[A-Z][a-z]{3})'
+      if printf '%s' "$states_text" | grep -Eq 'locale|lang'; then locale_pattern='[A-Za-z]{2}-([A-Za-z]{2}|[A-Za-z]{4})'; fi
+      locale_count=$(printf '%s' "$2" | grep -Ewo "$locale_pattern" | tr '[:upper:]' '[:lower:]' | sort -u | grep -c . || true)
       has_two_locales=false; has_rtl_locale=false; has_one_locale=false; mentions_rtl=false
       if [ "$locale_count" -ge 2 ]; then has_two_locales=true; fi
       if [ "$locale_count" -ge 1 ]; then has_one_locale=true; fi

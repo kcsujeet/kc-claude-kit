@@ -54,4 +54,22 @@ check_verdict allow "allowed: a complete ledger and every box ticked" "git push 
 check_verdict allow "allowed: gh pr create with a complete ledger" "gh pr create --fill"
 check_verdict allow "allowed: gh pr merge with a complete ledger" "gh pr merge 5 --squash"
 
+# A repo with no base branch still reaches the ledger check (an empty argument list under set -u).
+nobase_repo="$work_dir/nobase"
+git init -q -b feature "$nobase_repo"
+mkdir -p "$nobase_repo/.claude"
+printf -- '---\nledger: true\n---\n' > "$nobase_repo/.claude/hand-off-checklist.md"
+run_git_in "$nobase_repo" add .
+run_git_in "$nobase_repo" commit -q -m base
+printf 'F1\tone-off\tx\nF9\tone-off\tnot on the list\n' > "$KC_LEDGER_DIR/ledger.tsv"
+check_verdict deny "blocked: a failing ledger is still checked in a repo with no base branch" "git push -u origin feature" "$nobase_repo"
+expect_contains "it names the ledger problem" "feedback-ledger.sh check:" "$last_hook_output"
+printf 'F1\tone-off\tx\n' > "$KC_LEDGER_DIR/ledger.tsv"
+check_verdict allow "allowed: a complete ledger in a repo with no base branch" "git push -u origin feature" "$nobase_repo"
+
+# Front matter that never closes does not make a lesson repo.
+unclosed_repo="$work_dir/unclosed"
+make_repo "$unclosed_repo" $'---\nledger: true'
+check_verdict allow "allowed: a checklist whose front matter never closes" "git push -u origin lesson-branch" "$unclosed_repo"
+
 finish

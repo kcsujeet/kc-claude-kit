@@ -27,8 +27,9 @@ is_lesson_repo() {
   awk '
     { is_first_line = (NR == 1); is_fence = ($0 == "---") }
     is_first_line && !is_fence { exit 1 }
-    !is_first_line && is_fence { exit !found }
-    /^ledger:[[:space:]]*true/ { found = 1 }' "$checklist"
+    !is_first_line && is_fence { closed = 1; exit }
+    /^ledger:[[:space:]]*true/ { found = 1 }
+    END { exit !(closed && found) }' "$checklist"
 }
 
 # Prints the box ids ("§LB1" ...) of kc-look-back's Gate checklist, or nothing when it is not installed.
@@ -61,7 +62,7 @@ get_ledger_problems() {
     git -C "$dir" diff "$merge_base" HEAD > "$diff_file"
     check_args+=(--repo "$dir" --base "$merge_base")
   fi
-  if ! check_output=$(cd "$dir" && bash "$scripts_dir/feedback-ledger.sh" check "$ledger_dir/feedback.tsv" "$ledger_dir/ledger.tsv" --diff "$diff_file" "${check_args[@]}" 2>&1); then
+  if ! check_output=$(cd "$dir" && bash "$scripts_dir/feedback-ledger.sh" check "$ledger_dir/feedback.tsv" "$ledger_dir/ledger.tsv" --diff "$diff_file" ${check_args[@]+"${check_args[@]}"} 2>&1); then
     check_summary=$(printf '%s' "$check_output" | tr '\n' ' ' | cut -c1-500)
     echo "feedback-ledger.sh check: $check_summary"
   fi

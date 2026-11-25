@@ -98,8 +98,7 @@ awk -F '\t' '
     if (!is_source_file && !is_config_file) next
     if (is_source_file) scan_rules(text, path, line)
     is_python_file = (path ~ /\.py$/)
-    has_python_import = match(text, /^[[:space:]]*(import|from)[[:space:]]+[A-Za-z_][A-Za-z0-9_]*/)
-    if (is_python_file && has_python_import) {
+    if (is_python_file && match(text, /^[[:space:]]*(import|from)[[:space:]]+[A-Za-z_][A-Za-z0-9_]*/)) {
       module = substr(text, RSTART, RLENGTH); sub(/^[[:space:]]*(import|from)[[:space:]]+/, "", module)
       emit_candidate("package", module, "(import|from)[[:space:]]+" module "([^A-Za-z0-9_]|$)", path, line, text)
     }
@@ -133,14 +132,14 @@ done
 : > "$work_dir/new.txt"
 tree_ref=()
 if [ -n "$base_ref" ]; then tree_ref=("$base_ref"); fi
-list_tree_files() { if [ -n "$base_ref" ]; then git -C "$repo_root" ls-tree -r --name-only "$base_ref"; else git -C "$repo_root" ls-files; fi; }
 cut -f1,2,3 "$work_dir/candidates.tsv" | sort -u | while IFS=$'\t' read -r kind token ere; do
   token_lines_in_diff=0
   if [ -z "$base_ref" ]; then
     token_lines_in_diff=$(awk -F '\t' -v kind="$kind" -v token="$token" '{ is_kind_match = ($1 == kind); is_token_match = ($2 == token) } is_kind_match && is_token_match { print $4 ":" $5 }' "$work_dir/candidates.tsv" | sort -u | grep -c . || true)
   fi
   if [ "$kind" = file-name ]; then
-    token_uses=$(list_tree_files | grep -cF -e "${token#\*}" || true)
+    if [ -n "$base_ref" ]; then token_uses=$(git -C "$repo_root" ls-tree -r --name-only "$base_ref" | grep -cF -e "${token#\*}" || true)
+    else token_uses=$(git -C "$repo_root" ls-files | grep -cF -e "${token#\*}" || true); fi
   else
     token_uses=$(git -C "$repo_root" grep -I -h -E -e "$ere" ${tree_ref[@]+"${tree_ref[@]}"} -- . ':!*.md' 2>/dev/null | wc -l || true)
   fi

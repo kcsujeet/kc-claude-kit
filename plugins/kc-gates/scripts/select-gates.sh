@@ -102,7 +102,7 @@ list_walk_dimensions() {
       if (line ~ /(useTranslations?|i18n|I18n|Intl\.|toLocale[A-Za-z]*\(|(^|[^A-Za-z0-9_])t\(["\x27`]|translate\(|formatDate|formatCurrency|formatNumber|FormattedMessage)/) add_walk_dimension("locale")
       if (tolower(line) ~ /@media[[:space:]]+print|window\.print|@page|page-break|break-(before|after|inside)|print-color-adjust|pdf/) add_walk_dimension("print")
       has_list_markup = (is_list_ui_file && line ~ /(\.map\(|v-for|<table|<ul|<ol|[Pp]aginat|\.each[[:space:](]|\.slice\()/)
-      has_export = (tolower(line) ~ /(csv|xlsx|export[a-z(])/)
+      has_export = (line ~ /[Ee]xport[A-Z(]/ || tolower(line) ~ /(csv|xlsx)/)
       if (has_list_markup || has_export) add_walk_dimension("data-size")
     }
     END { for (key in seen) print key }

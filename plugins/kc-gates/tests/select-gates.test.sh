@@ -249,6 +249,10 @@ make_case "$work_dir/walk-dim-list" '{items.map((item) => <li key={item.id}>{ite
 expect_eq "dimension: a mapped list is data-size" "data-size" "$(get_walk_dimensions "$work_dir/walk-dim-list")"
 make_case "$work_dir/walk-dim-export" 'const rows = toCsv(orders)' src/cart/Total.tsx
 expect_eq "dimension: an export is data-size" "data-size" "$(get_walk_dimensions "$work_dir/walk-dim-export")"
+make_case "$work_dir/walk-dim-export-call" 'exportRows(orders)' src/cart/Total.tsx
+expect_eq "dimension: exportRows( is data-size" "data-size" "$(get_walk_dimensions "$work_dir/walk-dim-export-call")"
+make_case "$work_dir/walk-dim-exports" 'module.exports = total; export const sum = 1' src/cart/Total.tsx
+expect_eq "dimension: exports and export const are not data-size" "" "$(get_walk_dimensions "$work_dir/walk-dim-exports")"
 make_case "$work_dir/walk-dim-none" 'const total = items.length' src/cart/Total.tsx
 expect_eq "dimension: plain logic varies along none" "" "$(get_walk_dimensions "$work_dir/walk-dim-none")"
 expect_eq "dimension: plain logic still has its walk-item" "walk-item: src/cart/Total.tsx" "$(select_gates_output "$work_dir/walk-dim-none" | grep '^walk-item:')"
