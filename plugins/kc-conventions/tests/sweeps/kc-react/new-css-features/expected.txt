@@ -6,4 +6,12 @@ src/Card.tsx:7: [new to the repo: cqh] const stack = { '& .a': { pt: '5cqh' }, c
 src/Card.tsx:7: [new to the repo: container-type] const stack = { '& .a': { pt: '5cqh' }, containerType: 'size' }
 src/Card.tsx:8: [new to the repo: svh] const sheet = `@supports (aspect-ratio: 1) { .x { width: 10svh } }`
 src/Card.tsx:8: [new to the repo: @supports (aspect-ratio)] const sheet = `@supports (aspect-ratio: 1) { .x { width: 10svh } }`
+src/Card.tsx:10: [new to the repo: cqi] const reversed = { pt: '9cqi', containerType: 'size' }
+src/Card.tsx:10: [new to the repo: container-type] const reversed = { pt: '9cqi', containerType: 'size' }
+src/Card.tsx:11: [new to the repo: @container] const query = `@container (min-width: 400px) { .y { color: red } }`
+src/Card.tsx:12: [new to the repo: :has()] const picker = { '&:has(input:checked)': { color: 'red' }, gridTemplateRows: 'subgrid' }
+src/Card.tsx:12: [new to the repo: subgrid] const picker = { '&:has(input:checked)': { color: 'red' }, gridTemplateRows: 'subgrid' }
+src/Card.tsx:13: [new to the repo: @layer] const layered = `@layer base { .z { color: color-mix(in srgb, red, blue) } }`
+src/Card.tsx:13: [new to the repo: color-mix()] const layered = `@layer base { .z { color: color-mix(in srgb, red, blue) } }`
 src/Card.tsx:3: [cq unit on the container: it measures the next container up, not this element]   pt: '20cqw',
+src/Card.tsx:10: [cq unit on the container: it measures the next container up, not this element] const reversed = { pt: '9cqi', containerType: 'size' }

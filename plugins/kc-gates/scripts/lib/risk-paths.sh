@@ -33,10 +33,10 @@ kc_added_code() {
     /^\+/ { if (code) print substr($0, 2) }' "$1"
 }
 
-# kc_layout_paths <diff-file>: the paths whose added lines set layout styling: a size, position,
+# kc_list_layout_paths <diff-file>: the paths whose added lines set layout styling: a size, position,
 # spacing, font-size, transform, flex or grid property as a style-object key or stylesheet
 # declaration, or a utility class (w-, p-4, absolute, text-lg) on a line with className or class.
-kc_layout_paths() {
+kc_list_layout_paths() {
   awk '
     /^\+\+\+ / { path = substr($0, 5); sub(/^b\//, "", path); next }
     /^\+/ {

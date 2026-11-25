@@ -25,6 +25,7 @@ expect_contains "an unanswered inline bot comment is named by path:line and auth
 expect_contains "an unanswered top-level human comment is named" "top-level @sam: Can you add a test?" "$output"
 expect_not_contains "a top-level comment from a [bot] login is skipped" "coverage-bot" "$output"
 expect_not_contains "a top-level comment from a Bot-type account without [bot] is skipped" "preview-deploys" "$output"
+expect_not_contains "a top-level comment from a [bot] login with no type is skipped" "tracker-link" "$output"
 case "$output" in
   *"src/tax.ts"*) record "an inline thread the author replied to is not listed" fail "$output" ;;
   *) record "an inline thread the author replied to is not listed" ok ;;

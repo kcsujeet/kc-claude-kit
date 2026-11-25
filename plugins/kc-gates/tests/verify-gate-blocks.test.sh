@@ -161,7 +161,7 @@ expect_contains "several problems: the citation" "sha abcdef0 is not the head" "
 # --- layout asserted by reasoning ---------------------------------------------
 build_round
 set_gate react "GATE: react\nSTATUS: PASS\nBOXES:\n- [PASS] §R19: layout fine at 1920, estimated by calculation: 20cqw leaves 384px\nFINDINGS:\n- none\n"
-expect_problem "a layout box passed by calculation" "§R19 asserts a rendered layout by reasoning (\"by calculation\")"
+expect_problem "a layout box passed by calculation" "§R19 asserts a rendered layout by reasoning (\"estimated\")"
 expect_contains "it tells the gate to measure in the running app" "measure it in the running app" "$last_output"
 set_gate react "GATE: react\nSTATUS: PASS\nBOXES:\n- [PASS] §R19: the card should render without overflow on narrow screens\nFINDINGS:\n- none\n"
 expect_problem "a layout box that says should render" "asserts a rendered layout by reasoning"
@@ -175,6 +175,14 @@ set_gate react "GATE: react\nSTATUS: FAIL\nBOXES:\n- [FAIL] §R19: estimated wid
 expect_clean "a FAIL box is not held to it"
 set_gate react "GATE: react\nSTATUS: PASS\nBOXES:\n- [PASS] §R1: estimated delivery date is shown by the order page\nFINDINGS:\n- none\n"
 expect_clean "estimated with no layout word is not a layout claim"
+set_gate testing "GATE: testing\nSTATUS: PASS\nBOXES:\n- [PASS] §T1: the empty state will display a notice; read shop/total.sh:7@$short\nFINDINGS:\n- none\n"
+expect_clean "a reasoning phrase with no layout word is not a layout claim"
+set_gate react "GATE: react\nSTATUS: PASS\nBOXES:\n- [PASS] §R19: column width computed by hand is 41px\nFINDINGS:\n- none\n"
+expect_problem "a layout box computed by hand" "(\"computed by hand\")"
+set_gate react "GATE: react\nSTATUS: PASS\nBOXES:\n- [PASS] §R19: the header wouldn't overflow on paper\nFINDINGS:\n- none\n"
+expect_problem "a layout box that holds on paper" "asserts a rendered layout by reasoning"
+set_gate react "GATE: react\nSTATUS: PASS\nBOXES:\n- [PASS] §R19: in theory the sidebar column stays visible on a narrow screen\nFINDINGS:\n- none\n"
+expect_problem "a layout box that holds in theory" "(\"in theory\")"
 
 # An agent's verification block is read like any gate's.
 build_round

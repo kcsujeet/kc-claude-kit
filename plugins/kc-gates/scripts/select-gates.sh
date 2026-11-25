@@ -255,7 +255,7 @@ else
 fi
 if [ -n "$walk_items" ]; then
   printf '%s\n' "$walk_items" | sed 's/^/walk-item: /'
-  layout_paths=$(kc_layout_paths "$diff_file")
+  layout_paths=$(kc_list_layout_paths "$diff_file")
   while IFS= read -r walk_path; do
     [ -n "$walk_path" ] && printf '%s\n' "$layout_paths" | grep -qxF "$walk_path" && echo "walk-layout: $walk_path"
   done <<< "$walk_items"

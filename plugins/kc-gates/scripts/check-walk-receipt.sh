@@ -49,6 +49,10 @@ items=$(sed -n 's/^walk-item: //p' "$select_output")
 
 request_pattern='^(GET|HEAD|POST|PUT|PATCH|DELETE)[[:space:]]+[^[:space:]]+.*[[:space:]][1-5][0-9][0-9]([^0-9]|$)'
 readonly MIN_STATES=2
+# Viewport width classes a layout change is walked at, in px.
+readonly WIDE_DESKTOP_MIN_PX=1920
+readonly LAPTOP_MIN_PX=1024
+readonly PHONE_MAX_PX=600
 
 # True when a receipt line's fourth field names two or more states ("states: a; b"), or says
 # "only state:" with a reason of three or more words.
@@ -61,22 +65,22 @@ has_walked_states() {
 }
 
 # Prints the widths in a states field (`1920px`, `1920w`, `1920x1080`, `@1920`), one per line.
-viewport_widths() {
+get_viewport_widths() {
   printf '%s' "$1" | grep -Eo '([0-9]{3,4})(px|w)([^a-z]|$)|@[0-9]{3,4}|[0-9]{3,4}x[0-9]{3,4}' | sed -E 's/^@//; s/[^0-9].*$//' || true
 }
 
 # Prints the width classes missing from a states field, or nothing when all three are there.
-missing_widths() {
+get_missing_width_classes() {
   local widths missing="" w has_wide=false has_laptop=false has_phone=false
-  widths=$(viewport_widths "$1" | awk '!seen[$0]++')
+  widths=$(get_viewport_widths "$1" | awk '!seen[$0]++')
   for w in $widths; do
-    if [ "$w" -ge 1920 ]; then has_wide=true
-    elif [ "$w" -ge 1024 ]; then has_laptop=true
-    elif [ "$w" -le 600 ]; then has_phone=true; fi
+    if [ "$w" -ge "$WIDE_DESKTOP_MIN_PX" ]; then has_wide=true
+    elif [ "$w" -ge "$LAPTOP_MIN_PX" ]; then has_laptop=true
+    elif [ "$w" -le "$PHONE_MAX_PX" ]; then has_phone=true; fi
   done
-  $has_wide || missing="a wide desktop (1920px or more)"
-  $has_laptop || missing="${missing:+$missing, }a laptop (1024px to 1919px)"
-  $has_phone || missing="${missing:+$missing, }a phone (600px or less)"
+  $has_wide || missing="a wide desktop (${WIDE_DESKTOP_MIN_PX}px or more)"
+  $has_laptop || missing="${missing:+$missing, }a laptop (${LAPTOP_MIN_PX}px to $((WIDE_DESKTOP_MIN_PX - 1))px)"
+  $has_phone || missing="${missing:+$missing, }a phone (${PHONE_MAX_PX}px or less)"
   printf '%s' "$missing"
 }
 
@@ -115,7 +119,7 @@ while IFS= read -r item; do
     record_walk_problem "$item" "fewer than two states walked: list every shape the change's output can take (empty, one long row, many short rows, each option) and walk each; write states: <a>; <b> as the fourth field, or only state: <why, three or more words> when it has one"
   fi
   if printf '%s\n' "$layout_items" | grep -qxF "$item"; then
-    absent_widths=$(missing_widths "$states")
+    absent_widths=$(get_missing_width_classes "$states")
     if [ -n "$absent_widths" ]; then
       record_walk_problem "$item" "its diff changes layout styling but the states field names no viewport width for: $absent_widths; walk the screen at each and list the widths with px (states: 1920px; 1280px; 390px)"
     fi

@@ -109,14 +109,16 @@ read_blocks() {
         rest = substr(after, next_sweep)
       }
     }
-    # True when text claims how something renders from reasoning, with no capture path and no
-    # "measured <number>" beside it. The phrase found is left in reasoning_phrase.
-    function reasons_about_layout(text,   lower) {
+    # True when text about layout (a width, an overflow, a screen) claims how it renders from
+    # reasoning, with no capture path and no "measured <number>" beside it. The phrase found is
+    # left in reasoning_phrase.
+    function is_layout_claim_from_reasoning(text,   lower, mentions_layout_term) {
       lower = tolower(text)
+      mentions_layout_term = (lower ~ /(layout|width|height|viewport|[0-9]px|overflow|clip|align|spacing|margin|padding|breakpoint|column|screen|responsive|visual|pixel|wrap|fit|wide|narrow|scroll)/)
+      if (!mentions_layout_term) return 0
       if (lower ~ /[A-Za-z0-9_\/-]+\.(png|jpe?g|gif|webp|mp4|mov|webm)([^A-Za-z0-9]|$)/) return 0
       if (lower ~ /measured[^0-9]{0,30}[0-9]/) return 0
-      if (match(lower, /(should|will|would|shouldn.t|wouldn.t) (still )?(render|fit|look|display|wrap|align|overflow|not overflow|not clip)|by (my )?calculation|calculated by hand|computed by hand|on paper|in theory/)) { reasoning_phrase = substr(lower, RSTART, RLENGTH); return 1 }
-      if (lower ~ /(layout|width|height|viewport|[0-9]px|overflow|clip|align|spacing|margin|padding|breakpoint|column|screen|responsive|visual|pixel)/ && match(lower, /(^|[^a-z])(estimated|estimate|estimating)([^a-z]|$)/)) { reasoning_phrase = "estimated"; return 1 }
+      if (match(lower, /(should|will|would|shouldn.t|wouldn.t) (still )?(render|fit|look|display|wrap|align|overflow|not overflow|not clip)|by (my )?calculation|calculated by hand|computed by hand|on paper|in theory|(^|[^a-z])(estimated|estimate|estimating)([^a-z]|$)/)) { reasoning_phrase = substr(lower, RSTART, RLENGTH); return 1 }
       return 0
     }
     function flush_box(   lead) {
@@ -129,7 +131,7 @@ read_blocks() {
       if (box_verdict == "N/A") nas++
       if (box_verdict == "FAIL" && lead ~ /^(PASS|passes|N\/A)([^A-Za-z]|$)/) say(name ": " box_id " is marked FAIL but its text says " substr(lead, 1, 12))
       if (box_verdict != "FAIL" && lead ~ /^(FAIL|fails)([^A-Za-z]|$)/) say(name ": " box_id " is marked " box_verdict " but its text says " substr(lead, 1, 12))
-      if (box_verdict != "FAIL" && reasons_about_layout(box_text)) say(name ": " box_id " asserts a rendered layout by reasoning (\"" reasoning_phrase "\"): measure it in the running app (kc-verify:kc-ui) and cite the screenshot or recording path, or write the measured value (measured 412px wide at 1920)")
+      if (box_verdict != "FAIL" && is_layout_claim_from_reasoning(box_text)) say(name ": " box_id " asserts a rendered layout by reasoning (\"" trim(reasoning_phrase) "\"): measure it in the running app (kc-verify:kc-ui) and cite the screenshot or recording path, or write the measured value (measured 412px wide at 1920)")
       if (kind == "scope") printf "B\t%s\n", box_id
       check_sweeps(box_id, box_text)
     }

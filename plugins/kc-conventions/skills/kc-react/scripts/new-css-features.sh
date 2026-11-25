@@ -37,16 +37,22 @@ pathspecs=('*.css' '*.scss' '*.less' '*.js' '*.jsx' '*.ts' '*.tsx' '*.mjs' '*.vu
 
 kc_added_lines "$diff_file" > "$work_dir/added.tsv"
 
+# Written once, read by both awk programs below.
+export KC_CQ_UNITS='cqw|cqh|cqi|cqb|cqmin|cqmax'
+export KC_CONTAINER_KEY='(containerType|container-type)[^[:alnum:][:space:]:]?[[:space:]]*:'
+
 # Features: <name><TAB><ERE> per added line that uses one, in a style or script file.
 awk -F '\t' '
   function add_feature(name, ere) { names[n] = name; eres[n] = ere; n++ }
+  function add_unit(unit) { add_feature(unit, "[0-9.]" unit "([^A-Za-z0-9_]|$)") }
   BEGIN {
     n = 0
-    units = "cqw cqh cqi cqb cqmin cqmax dvh dvw dvi dvb dvmin dvmax svh svw lvh lvw"
-    count = split(units, unit_list, " ")
-    for (i = 1; i <= count; i++) add_feature(unit_list[i], "[0-9.]" unit_list[i] "([^A-Za-z0-9_]|$)")
+    cq_count = split(ENVIRON["KC_CQ_UNITS"], cq_list, "|")
+    for (i = 1; i <= cq_count; i++) add_unit(cq_list[i])
+    viewport_count = split("dvh dvw dvi dvb dvmin dvmax svh svw lvh lvw", viewport_list, " ")
+    for (i = 1; i <= viewport_count; i++) add_unit(viewport_list[i])
     add_feature("@container", "@container([^A-Za-z0-9_-]|$)")
-    add_feature("container-type", "(containerType|container-type)[\047\"]?[[:space:]]*:")
+    add_feature("container-type", ENVIRON["KC_CONTAINER_KEY"])
     add_feature(":has()", ":has\\(")
     add_feature("@layer", "@layer([^A-Za-z0-9_-]|$)")
     add_feature("subgrid", "subgrid")
@@ -69,13 +75,13 @@ awk -F '\t' '
 : > "$work_dir/new.txt"
 cut -f1,2 "$work_dir/candidates.tsv" | sort -u | while IFS=$'\t' read -r feature_name feature_ere; do
   if [ -n "$base_ref" ]; then
-    uses=$(git -C "$repo_root" grep -I -h -E -e "$feature_ere" "$base_ref" -- "${pathspecs[@]}" 2>/dev/null | wc -l || true)
-    added=0
+    feature_use_count=$(git -C "$repo_root" grep -I -h -E -e "$feature_ere" "$base_ref" -- "${pathspecs[@]}" 2>/dev/null | wc -l || true)
+    feature_use_count_in_diff=0
   else
-    uses=$(git -C "$repo_root" grep -I -h -E -e "$feature_ere" -- "${pathspecs[@]}" 2>/dev/null | wc -l || true)
-    added=$(cut -f1 "$work_dir/candidates.tsv" | grep -cxF "$feature_name" || true)
+    feature_use_count=$(git -C "$repo_root" grep -I -h -E -e "$feature_ere" -- "${pathspecs[@]}" 2>/dev/null | wc -l || true)
+    feature_use_count_in_diff=$(cut -f1 "$work_dir/candidates.tsv" | grep -cxF "$feature_name" || true)
   fi
-  if [ $((uses - added)) -le 0 ]; then printf '%s\n' "$feature_name" >> "$work_dir/new.txt"; fi
+  if [ $((feature_use_count - feature_use_count_in_diff)) -le 0 ]; then printf '%s\n' "$feature_name" >> "$work_dir/new.txt"; fi
 done
 awk -F '\t' 'NR == FNR { new_names[$0] = 1; next }
   ($1 in new_names) { printf "%s:%s: [new to the repo: %s] %s\n", $3, $4, $1, $5 }
@@ -84,18 +90,20 @@ awk -F '\t' 'NR == FNR { new_names[$0] = 1; next }
 # A cq unit on the same style object or rule as the container-type that makes it a container.
 awk -F '\t' '
   function reset_scopes() { depth = 0; next_id = 1; stack[0] = 0; delete has_container; delete pending }
-  function emit(path, line, text) { printf "%s:%s: [cq unit on the container: it measures the next container up, not this element] %s\n", path, line, text }
-  function scan(segment, scope, path, line, text) {
-    if (segment ~ /(containerType|container-type)[\047"]?[[:space:]]*:/ || segment ~ /(^|[^A-Za-z-])container[\047"]?[[:space:]]*:[^;]*size/) {
+  function emit_cq_on_container_hit(path, line, text) { printf "%s:%s: [cq unit on the container: it measures the next container up, not this element] %s\n", path, line, text }
+  function is_container_type_declaration(segment) { return segment ~ ENVIRON["KC_CONTAINER_KEY"] }
+  function is_container_shorthand_with_size(segment) { return segment ~ /(^|[^A-Za-z-])container[^[:alnum:][:space:]:]?[[:space:]]*:[^;]*size/ }
+  function scan_segment_for_cq_units(segment, scope, path, line, text) {
+    if (is_container_type_declaration(segment) || is_container_shorthand_with_size(segment)) {
       has_container[scope] = 1
-      for (key in pending) { split(key, parts, SUBSEP); if (parts[1] == scope) { emit(path, parts[2], pending[key]); delete pending[key] } }
+      for (key in pending) { split(key, parts, SUBSEP); if (parts[1] == scope) { emit_cq_on_container_hit(path, parts[2], pending[key]); delete pending[key] } }
     }
-    if (segment ~ /[0-9.](cqw|cqh|cqi|cqb|cqmin|cqmax)([^A-Za-z0-9_]|$)/) {
-      if (has_container[scope]) emit(path, line, text)
+    if (segment ~ cq_unit_pattern) {
+      if (has_container[scope]) emit_cq_on_container_hit(path, line, text)
       else pending[scope, line] = text
     }
   }
-  BEGIN { reset_scopes() }
+  BEGIN { cq_unit_pattern = "[0-9.](" ENVIRON["KC_CQ_UNITS"] ")([^A-Za-z0-9_]|$)"; reset_scopes() }
   {
     path = $1; line = $2 + 0; text = $0; sub(/^[^\t]*\t[^\t]*\t/, "", text)
     if (path !~ ENVIRON["KC_PATHS"]) next
@@ -104,10 +112,10 @@ awk -F '\t' '
     segment = ""
     for (i = 1; i <= length(text); i++) {
       ch = substr(text, i, 1)
-      if (ch == "{") { scan(segment, stack[depth], path, line, text); segment = ""; depth++; stack[depth] = next_id++ }
-      else if (ch == "}") { scan(segment, stack[depth], path, line, text); segment = ""; if (depth > 0) depth-- }
+      if (ch == "{") { scan_segment_for_cq_units(segment, stack[depth], path, line, text); segment = ""; depth++; stack[depth] = next_id++ }
+      else if (ch == "}") { scan_segment_for_cq_units(segment, stack[depth], path, line, text); segment = ""; if (depth > 0) depth-- }
       else segment = segment ch
     }
-    scan(segment, stack[depth], path, line, text)
+    scan_segment_for_cq_units(segment, stack[depth], path, line, text)
   }
 ' "$work_dir/added.tsv"
