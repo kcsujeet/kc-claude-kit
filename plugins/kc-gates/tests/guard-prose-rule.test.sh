@@ -102,4 +102,73 @@ for instruction_file in AGENTS.md .claude/review-conventions.md .claude/hand-off
   reset_repo
 done
 
+# A merge brings in lines already reviewed elsewhere; only the lines this branch introduces count.
+merge_repo="$work_dir/merge-repo"
+git init -q -b main "$merge_repo"
+printf '# Rules\n\n- Name things by role.\n' > "$merge_repo/CLAUDE.md"
+run_git_in "$merge_repo" add .
+run_git_in "$merge_repo" commit -q -m base
+run_git_in "$merge_repo" checkout -q -b lesson
+printf 'x\n' > "$merge_repo/lesson.txt"
+run_git_in "$merge_repo" add .
+run_git_in "$merge_repo" commit -q -m lesson
+run_git_in "$merge_repo" checkout -q main
+echo '- A rule main already reviewed.' >> "$merge_repo/CLAUDE.md"
+run_git_in "$merge_repo" commit -q -am "main rule"
+run_git_in "$merge_repo" checkout -q lesson
+run_git_in "$merge_repo" merge -q --no-commit --no-ff main > /dev/null
+check_verdict allow "allowed: a merge of the base branch bringing a reviewed rule line" "git commit --no-edit" "$merge_repo"
+run_git_in "$merge_repo" merge --abort
+run_git_in "$merge_repo" checkout -q -b prose main
+echo '- A prose-only rule from the branch.' >> "$merge_repo/CLAUDE.md"
+run_git_in "$merge_repo" commit -q -am "branch prose"
+run_git_in "$merge_repo" checkout -q main
+run_git_in "$merge_repo" merge -q --no-commit --no-ff prose > /dev/null
+check_verdict deny "blocked: a merge whose branch side adds a prose-only rule" "git commit --no-edit" "$merge_repo"
+run_git_in "$merge_repo" merge --abort
+run_git_in "$merge_repo" checkout -q -b quoted main
+mkdir -p "$merge_repo/rules"
+printf -- '- A rule.\n' > "$merge_repo/rules/a'\$(touch\${IFS}INJECTED)'b.md"
+run_git_in "$merge_repo" add -A
+run_git_in "$merge_repo" commit -q -m "odd path"
+run_git_in "$merge_repo" checkout -q main
+run_git_in "$merge_repo" merge -q --no-commit --no-ff quoted > /dev/null
+check_verdict deny "blocked: a merge adding a rule under a quote-and-substitution path, with no command run" "git commit --no-edit" "$merge_repo"
+expect_eq "the path was never run as a command" "" "$(find "$work_dir" "$PWD" -maxdepth 3 -name INJECTED 2>/dev/null)"
+run_git_in "$merge_repo" merge --abort
+echo '- Prefer early returns.' >> "$merge_repo/CLAUDE.md"
+run_git_in "$merge_repo" add CLAUDE.md
+check_verdict deny "blocked: a normal commit adding prose still blocks" "git commit -m 'rule'" "$merge_repo"
+
+# The merged commit is one the default branch has, but the default branch's file has since dropped the line.
+dup_repo="$work_dir/dup-repo"
+git init -q -b main "$dup_repo"
+mkdir -p "$dup_repo/rules"
+printf '# A\n\n- one\n\n# B\n\n- two\n' > "$dup_repo/AGENTS.md"
+run_git_in "$dup_repo" add .
+run_git_in "$dup_repo" commit -q -m base
+run_git_in "$dup_repo" branch lesson
+run_git_in "$dup_repo" checkout -q -b old
+printf '\n- Old\n' >> "$dup_repo/AGENTS.md"
+run_git_in "$dup_repo" commit -q -am "old"
+run_git_in "$dup_repo" checkout -q -b other main
+printf '# A\n\n- one\n- Dup\n\n# B\n\n- two\n\n- Dup\n' > "$dup_repo/AGENTS.md"
+printf -- '- Dup\n' > "$dup_repo/rules/x.md"
+run_git_in "$dup_repo" add .
+run_git_in "$dup_repo" commit -q -m "other adds dup lines"
+run_git_in "$dup_repo" checkout -q main
+printf '# A\n\n- one\n- Dup\n\n# B\n\n- two\n' > "$dup_repo/AGENTS.md"
+run_git_in "$dup_repo" commit -q -am "main has dup"
+run_git_in "$dup_repo" merge -q --no-edit old > /dev/null
+printf '# A\n\n- one\n- Dup\n\n# B\n\n- two\n' > "$dup_repo/AGENTS.md"
+run_git_in "$dup_repo" commit -q -am "main drops old"
+run_git_in "$dup_repo" checkout -q lesson
+run_git_in "$dup_repo" merge -q --no-commit --no-ff old > /dev/null
+check_verdict allow "allowed: a merge of a commit the default branch has, its line since dropped there" "git commit --no-edit" "$dup_repo"
+run_git_in "$dup_repo" merge --abort
+run_git_in "$dup_repo" checkout -q main
+run_git_in "$dup_repo" merge -q --no-commit --no-ff other > /dev/null
+check_verdict deny "blocked: a line known in one file does not excuse the same line in another file" "git commit --no-edit" "$dup_repo"
+run_git_in "$dup_repo" merge --abort
+
 finish

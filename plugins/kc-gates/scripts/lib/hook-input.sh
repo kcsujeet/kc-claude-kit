@@ -134,6 +134,25 @@ is_commit_staging_all() {
   return 1
 }
 
+# The default branch of the repository in $1 as a ref that exists, or nothing.
+get_default_branch_ref() {
+  local dir=$1 remote_default candidate
+  remote_default=$(git -C "$dir" symbolic-ref -q --short refs/remotes/origin/HEAD 2>/dev/null) || remote_default=""
+  for candidate in $remote_default origin/main origin/master main master; do
+    git -C "$dir" rev-parse -q --verify "$candidate^{commit}" >/dev/null 2>&1 && { printf '%s' "$candidate"; return; }
+  done
+}
+
+# True when the repository in $1 is concluding a merge (MERGE_HEAD) of a commit the default branch
+# already has: its staged diff carries the default branch's own changes, not this branch's.
+is_default_branch_merge() {
+  local dir=$1 merge_head default_branch_ref
+  merge_head=$(git -C "$dir" rev-parse -q --verify MERGE_HEAD 2>/dev/null) || return 1
+  default_branch_ref=$(get_default_branch_ref "$dir")
+  # With no default branch the ref is empty and merge-base fails, so nothing is skipped.
+  git -C "$dir" merge-base --is-ancestor "$merge_head" "$default_branch_ref" 2>/dev/null
+}
+
 # get_commit_diff <dir> "<diff options>" <word>...: the diff a `git commit` with these words after
 # `commit` would record: the staged diff, or with -a/--all the working tree against HEAD. A
 # repository with no commit yet is diffed against the empty tree.

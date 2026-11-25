@@ -97,15 +97,6 @@ list_blamed_old_lines() {
   print_blame_of_file
 }
 
-# The default branch of the repository in $1 as a ref that exists, or nothing.
-get_default_branch_ref() {
-  local dir=$1 remote_default candidate
-  remote_default=$(git -C "$dir" symbolic-ref -q --short refs/remotes/origin/HEAD 2>/dev/null) || remote_default=""
-  for candidate in $remote_default origin/main origin/master main master; do
-    git -C "$dir" rev-parse -q --verify "$candidate^{commit}" >/dev/null 2>&1 && { printf '%s' "$candidate"; return; }
-  done
-}
-
 # True when commit $2 (in directory $1) reached the default branch $3 through a pull request that
 # merged in the last HANDED_OFF_DAYS days. Each step fails to "not merged": a lookup that can't be
 # made never blocks.
@@ -145,16 +136,6 @@ find_handed_off_fix() {
 # $1 is the earlier fix, $2 the directory.
 deny_edit_of_handed_off_fix() {
   print_pretooluse_deny "Blocked by the kc-gates plugin: this edits lines an earlier, already-handed-off fix wrote ($1): the loop-stop rule says stop and question the approach; ask the user. Ask the user: only their typed words approve it. When their latest message says \"approve rework\", prefix the command with KC_REWORK_APPROVED=1; the token without those words stays blocked.$(needed_phrases_sentence "$2" "$APPROVAL_PHRASE")"
-}
-
-# True when the repository in $1 is concluding a merge (MERGE_HEAD) of a commit the default branch
-# already has: its staged diff carries the default branch's own changes, not this branch's.
-is_default_branch_merge() {
-  local dir=$1 merge_head default_branch_ref
-  merge_head=$(git -C "$dir" rev-parse -q --verify MERGE_HEAD 2>/dev/null) || return 1
-  default_branch_ref=$(get_default_branch_ref "$dir")
-  # With no default branch the ref is empty and merge-base fails, so nothing is skipped.
-  git -C "$dir" merge-base --is-ancestor "$merge_head" "$default_branch_ref" 2>/dev/null
 }
 
 # Checks a `git commit`; $1 is the directory, the rest the words after `git`.

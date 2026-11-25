@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Fixed (a guard blames a commit only for lines its branch introduces)
+
+- `kc-gates` 3.17.6: `guard-prose-rule.sh` no longer blocks a merge commit for rule lines the merge carries in from the default branch (or from a merged commit the default branch has): while a merge is being concluded, added lines already present in that file there are not counted, via the new `drop_carried_in_lines` in `guard-prose-rule.sh` (reviewed lines are read by git into files, so a path never reaches a shell); a line the merging branch itself adds still blocks. `get_default_branch_ref` and `is_default_branch_merge` moved to `lib/hook-input.sh`. `guard-loop-stop.sh` already skips a default-branch merge, and the ledger and pull-request guards diff from the merge-base, so they were not changed. Held by `tests/guard-prose-rule.test.sh`.
+
 ### Changed (new code needs precedent, walks cover every dimension, no behaviour by reasoning, bot link-backs need no reply, lessons state the class)
 
 - `kc-conventions` 2.7.2: new sweep `kc-simplicity/no-precedent.sh` and box `kc-simplicity` §P19: every token an added line introduces that has zero uses in the repo at the base (a package, a CSS unit, at-rule or property, a browser global, a test-mocking call, a config key, a file-name pattern) fails unless the author uses the way the repo already does that job or says why not. `kc-look-back` gains a Gate checklist (§LB1 to §LB5: class without the instance's tokens, ladder, three unlike held examples, widen before adding, the check catches the class). §R19 now checks 1920 px and says measure, never estimate. Held by `tests/run-sweeps.sh` fixture `kc-simplicity/no-precedent` and `tests/no-precedent-base-ref.test.sh`.
