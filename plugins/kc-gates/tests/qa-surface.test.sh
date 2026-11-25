@@ -8,8 +8,12 @@ tests_dir=$(cd "$(dirname "$0")" && pwd)
 # shellcheck source=lib/harness.sh
 . "$tests_dir/lib/harness.sh"
 scripts_dir="$(dirname "$tests_dir")/scripts"
-# shellcheck source=../scripts/lib/qa-surface.sh
-. "$scripts_dir/lib/qa-surface.sh"
+
+# The surface the shared classifier gives a path, run in its own shell so a missing lib fails the
+# expectation instead of the whole file.
+kc_get_qa_surface() {
+  bash -c '. "$1/lib/qa-surface.sh" && kc_get_qa_surface "$2" "$3"' _ "$scripts_dir" "$1" "$2" 2>/dev/null || echo missing
+}
 
 repo=$work_dir/repo
 mkdir -p "$repo/.claude"
