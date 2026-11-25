@@ -27,8 +27,17 @@ index 0000000..bbc2c61
 +const paste = (text: string) => navigator.clipboard.writeText(text)
 diff --git a/src/layout.css b/src/layout.css
 new file mode 100644
-index 0000000..2367593
+index 0000000..5b81bc1
 --- /dev/null
 +++ b/src/layout.css
-@@ -0,0 +1 @@
+@@ -0,0 +1,2 @@
 +.card { container-type: size; padding: 1rem; }
++@container (min-width: 20px) { .card { width: 1px; } }
+diff --git a/src/report.py b/src/report.py
+new file mode 100644
+index 0000000..070ac53
+--- /dev/null
++++ b/src/report.py
+@@ -0,0 +1,2 @@
++import requests
++import os

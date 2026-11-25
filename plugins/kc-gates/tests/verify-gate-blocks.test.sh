@@ -179,6 +179,8 @@ set_gate testing "GATE: testing\nSTATUS: PASS\nBOXES:\n- [PASS] §T1: the empty 
 expect_problem "any gate's box that says what will display, with nothing run" "(\"will display\")"
 set_gate testing "GATE: testing\nSTATUS: PASS\nBOXES:\n- [PASS] §T1: the page should load in 40ms; 12 passed\nFINDINGS:\n- none\n"
 expect_clean "a behaviour claim beside a passed-test count passes"
+set_gate testing "GATE: testing\nSTATUS: PASS\nBOXES:\n- [PASS] §T1: the page should load; exit 0\nFINDINGS:\n- none\n"
+expect_clean "a behaviour claim beside exit 0 passes"
 set_gate testing "GATE: testing\nSTATUS: PASS\nBOXES:\n- [PASS] §T1: the page would load quickly; GET /cart 200\nFINDINGS:\n- none\n"
 expect_clean "a behaviour claim beside a request line passes"
 set_gate testing "GATE: testing\nSTATUS: PASS\nBOXES:\n- [PASS] §T1: the response time is estimated at 40ms from the query count\nFINDINGS:\n- none\n"

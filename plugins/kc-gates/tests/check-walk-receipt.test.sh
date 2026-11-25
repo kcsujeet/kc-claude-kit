@@ -165,4 +165,8 @@ printf 'GATES=naming\nWALK=required\nwalk: x\nwalk-item: src/cart/total.tsx\n' >
 write_dimension_states 'states: empty cart; two items'
 expect_eq "no walk-dimension line needs no dimension" clean "$(run_walk_receipt_check)"
 
+printf 'GATES=naming\nWALK=required\nwalk: x\nwalk-item: app/[locale]/page.tsx\nwalk-dimension: app/[locale]/page.tsx: print\n' > "$select_output"
+printf 'env\tbin/review-env up\tGET /health 200\napp/[locale]/page.tsx\tpage\tPOST /orders 201\tstates: screen; narrow screen\n' > "$receipt"
+expect_contains "a path with regex characters still gets its dimension checked" "varies along print" "$(run_walk_receipt_check)"
+
 finish

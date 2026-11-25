@@ -455,5 +455,7 @@ run_l5 $'class:new code with no precedent in the codebase\texamples:a storefront
 expect_contains "ladder: an example repeating the instance's token fails" "F1: lesson examples: \"a cqw width\" repeats \"cqw\"" "$l5_output"
 run_l5 $'class:new code with no precedent in the codebase\texamples:a storefront slug; a date range\tladder:a cq unit on the container -> a sweep -> new code with no precedent in the codebase'
 expect_contains "ladder: two examples fail" "a lesson needs 3 unlike cases" "$l5_output"
+run_l5 $'class:a layout rule, e.g. one about mapping each state\t'"$good_examples"$'\tladder:a cq unit on the container -> a sweep -> a layout rule, e.g. one about mapping each state'
+expect_eq "ladder: e.g. and a word that contains a token's letters (map in mapping) are not code tokens" 0 "$l5_status"
 
 finish

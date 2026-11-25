@@ -4,9 +4,9 @@
 #
 # Usage: no-precedent.sh <diff-file|-> [<repo-root>] [--base <ref>]
 #
-# Prints `path:line: [no precedent: <kind> <token>] text` per added line. The token kinds:
-#   package    a bare module or package an added line imports (import ... from 'x', require('x'),
-#              python `import x`); relative and alias paths are the repo's own files and are skipped
+# Prints `path:line: [no precedent: <kind> <token>] text` per added line. The kinds:
+#   package    a bare module an added line imports (import ... from 'x', require('x'), python
+#              `import x`); relative and alias paths are the repo's own files and are skipped
 #   unit       a CSS length, angle or container unit after a number (20cqw, 100dvh, 2fr)
 #   at-rule    a CSS at-rule (@container, @supports, @layer, @scope, @property)
 #   css-prop   a property declared in a stylesheet (css, scss, less)
@@ -14,11 +14,10 @@
 #   test-mock  a mocking or stubbing call (vi.mock, jest.spyOn, sinon.stub, cy.intercept)
 #   config-key a key added to a config file (yaml, toml, ini, *rc, *.config.*, tsconfig, package.json)
 #   file-name  the compound suffix of an added file (*.spec.tsx, *.stories.tsx, *.module.css)
-# A hit means no other file in the repo does that. The author uses the way the codebase already
-# does that job, or says why it can't. Without --base the repo's tracked files are read as the
-# head checkout and the diff's own added lines are subtracted; with --base the tokens are counted
-# in the tree at that ref. Markdown files are not counted as uses. Exits 0 with or without hits,
-# 2 on a usage error.
+# A hit means no other file in the repo does that: use the way the codebase already does the job,
+# or say why it can't. Without --base the repo's tracked files are read as the head checkout and
+# the diff's own added lines are subtracted; with --base the tree at that ref is read. Markdown
+# files are not counted as uses. Exits 0 with or without hits, 2 on a usage error.
 set -euo pipefail
 
 script_dir=$(cd "$(dirname "$0")" && pwd)
@@ -51,61 +50,54 @@ kc_added_lines "$diff_file" > "$work_dir/added.tsv"
 awk -F '\t' '
   function emit_candidate(kind, token, ere, path, line, text) { printf "%s\t%s\t%s\t%s\t%s\t%s\n", kind, token, ere, path, line, text }
   function escape_ere(token) { gsub(/[][\\.^$*+?(){}|\/-]/, "\\\\&", token); return token }
-  function package_of(name,   parts, count) {
-    if (name ~ /^[.\/~#$]/ || name ~ /^@\// || name ~ /^[a-z]+:/ && name !~ /^node:/) return ""
-    count = split(name, parts, "/")
-    if (name ~ /^@/) return (count >= 2) ? parts[1] "/" parts[2] : ""
-    return parts[1]
+  function add_rule(kind, pattern, strip_lead, strip_trail, use_template) {
+    rule_kind[rule_count] = kind; rule_pattern[rule_count] = pattern; rule_lead[rule_count] = strip_lead
+    rule_trail[rule_count] = strip_trail; rule_use[rule_count] = use_template; rule_count++
   }
-  function emit_package(name, path, line, text,   package) {
-    package = package_of(name)
-    if (package == "") return
-    emit_candidate("package", package, "(^|[^A-Za-z0-9_@/.-])" escape_ere(package) "([^A-Za-z0-9_-]|$)", path, line, text)
+  # A bare package name from an import source; empty for the own files of a repo (relative, alias, url).
+  function get_package_name(source,   parts, part_count, is_own_file, is_scoped) {
+    is_own_file = (source ~ /^[.\/~#$]/ || source ~ /^@\//)
+    if (is_own_file || (source ~ /^[a-z]+:/ && source !~ /^node:/)) return ""
+    part_count = split(source, parts, "/")
+    is_scoped = (source ~ /^@/)
+    if (!is_scoped) return parts[1]
+    if (part_count < 2) return ""
+    return parts[1] "/" parts[2]
   }
-  function scan_all(text, pattern, group_pattern, path, line, kind,   rest, found, token) {
-    rest = text
-    while (match(rest, pattern)) {
-      found = substr(rest, RSTART, RLENGTH)
-      rest = substr(rest, RSTART + RLENGTH)
-      token = found; gsub(group_pattern, "", token)
-      if (kind == "package") emit_package(token, path, line, text)
+  function scan_rules(text, path, line,   rule, rest, found, token) {
+    for (rule = 0; rule < rule_count; rule++) {
+      rest = text
+      while (match(rest, rule_pattern[rule])) {
+        found = substr(rest, RSTART, RLENGTH)
+        rest = substr(rest, RSTART + RLENGTH - 1)
+        token = found; sub(rule_lead[rule], "", token); sub(rule_trail[rule], "", token)
+        if (rule_kind[rule] == "package") token = get_package_name(token)
+        if (token == "") continue
+        use_ere = rule_use[rule]; sub(/%s/, escape_ere(token), use_ere)
+        emit_candidate(rule_kind[rule], token, use_ere, path, line, text)
+      }
     }
+  }
+  BEGIN {
+    rule_count = 0
+    add_rule("package", "(from|import|require\\(?)[[:space:]]*[\047\"][^\047\"]+[\047\"]", "^[^\047\"]*[\047\"]", "[\047\"]$", "(^|[^A-Za-z0-9_@/.-])%s([^A-Za-z0-9_-]|$)")
+    add_rule("unit", "[0-9.](cqw|cqh|cqi|cqb|cqmin|cqmax|dvh|dvw|dvi|dvb|dvmin|dvmax|svh|svw|svi|svb|svmin|svmax|lvh|lvw|lvi|lvb|lvmin|lvmax|vmin|vmax|vh|vw|rem|em|ex|ch|fr|deg|rad|turn)([^A-Za-z0-9_]|$)", "^[0-9.]", "[^A-Za-z0-9_]$", "[0-9.]%s([^A-Za-z0-9_]|$)")
+    add_rule("at-rule", "@(container|supports|layer|scope|property|starting-style)([^A-Za-z0-9_-]|$)", "^$", "[^A-Za-z0-9_-]$", "%s([^A-Za-z0-9_-]|$)")
+    add_rule("global-api", "(^|[^A-Za-z0-9_.])(navigator|window|document|screen|localStorage|sessionStorage|indexedDB|crypto)\\.[A-Za-z_]+", "^[^A-Za-z]", "^$", "(^|[^A-Za-z0-9_.])%s([^A-Za-z0-9_]|$)")
+    add_rule("test-mock", "(^|[^A-Za-z0-9_.])(vi|jest|sinon|cy|nock)\\.[A-Za-z_]+", "^[^A-Za-z]", "^$", "(^|[^A-Za-z0-9_.])%s([^A-Za-z0-9_]|$)")
   }
   {
     path = $1; line = $2; text = $0; sub(/^[^\t]*\t[^\t]*\t/, "", text)
-    if (path !~ ENVIRON["KC_SOURCE_PATHS"] && path !~ ENVIRON["KC_CONFIG_PATHS"]) next
-    if (path ~ ENVIRON["KC_SOURCE_PATHS"]) {
-      scan_all(text, "(from|import|require\\(?)[[:space:]]*[\047\"][^\047\"]+[\047\"]", "^[^\047\"]*[\047\"]|[\047\"]$", path, line, "package")
-      if (path ~ /\.py$/ && match(text, /^[[:space:]]*(import|from)[[:space:]]+[A-Za-z_][A-Za-z0-9_]*/)) {
-        module = substr(text, RSTART, RLENGTH); sub(/^[[:space:]]*(import|from)[[:space:]]+/, "", module)
-        emit_candidate("package", module, "(import|from)[[:space:]]+" module "([^A-Za-z0-9_]|$)", path, line, text)
-      }
-      rest = text
-      while (match(rest, /[0-9.](cqw|cqh|cqi|cqb|cqmin|cqmax|dvh|dvw|dvi|dvb|dvmin|dvmax|svh|svw|svi|svb|svmin|svmax|lvh|lvw|lvi|lvb|lvmin|lvmax|vmin|vmax|vh|vw|rem|em|ex|ch|fr|deg|rad|turn)([^A-Za-z0-9_]|$)/)) {
-        unit = substr(rest, RSTART + 1, RLENGTH - 1); sub(/[^A-Za-z0-9_]$/, "", unit)
-        emit_candidate("unit", unit, "[0-9.]" unit "([^A-Za-z0-9_]|$)", path, line, text)
-        rest = substr(rest, RSTART + RLENGTH - 1)
-      }
-      rest = text
-      while (match(rest, /@(container|supports|layer|scope|property|starting-style)([^A-Za-z0-9_-]|$)/)) {
-        rule = substr(rest, RSTART, RLENGTH); sub(/[^A-Za-z0-9_-]$/, "", rule)
-        emit_candidate("at-rule", rule, rule "([^A-Za-z0-9_-]|$)", path, line, text)
-        rest = substr(rest, RSTART + RLENGTH - 1)
-      }
-      rest = text
-      while (match(rest, /(^|[^A-Za-z0-9_.])(navigator|window|document|screen|localStorage|sessionStorage|indexedDB|crypto)\.[A-Za-z_]+/)) {
-        api = substr(rest, RSTART, RLENGTH); sub(/^[^A-Za-z]/, "", api)
-        emit_candidate("global-api", api, "(^|[^A-Za-z0-9_.])" escape_ere(api) "([^A-Za-z0-9_]|$)", path, line, text)
-        rest = substr(rest, RSTART + RLENGTH)
-      }
-      rest = text
-      while (match(rest, /(^|[^A-Za-z0-9_.])(vi|jest|sinon|cy|nock)\.[A-Za-z_]+/)) {
-        mock = substr(rest, RSTART, RLENGTH); sub(/^[^A-Za-z]/, "", mock)
-        emit_candidate("test-mock", mock, "(^|[^A-Za-z0-9_.])" escape_ere(mock) "([^A-Za-z0-9_]|$)", path, line, text)
-        rest = substr(rest, RSTART + RLENGTH)
-      }
+    is_source_file = (path ~ ENVIRON["KC_SOURCE_PATHS"])
+    is_config_file = (path ~ ENVIRON["KC_CONFIG_PATHS"])
+    is_style_file = (path ~ ENVIRON["KC_STYLE_PATHS"])
+    if (!is_source_file && !is_config_file) next
+    if (is_source_file) scan_rules(text, path, line)
+    if (path ~ /\.py$/ && match(text, /^[[:space:]]*(import|from)[[:space:]]+[A-Za-z_][A-Za-z0-9_]*/)) {
+      module = substr(text, RSTART, RLENGTH); sub(/^[[:space:]]*(import|from)[[:space:]]+/, "", module)
+      emit_candidate("package", module, "(import|from)[[:space:]]+" module "([^A-Za-z0-9_]|$)", path, line, text)
     }
-    if (path ~ ENVIRON["KC_STYLE_PATHS"]) {
+    if (is_style_file) {
       rest = text
       while (match(rest, /(^|[{;])[[:space:]]*[a-z][a-z-]*[[:space:]]*:[^;{}]*;/)) {
         prop = substr(rest, RSTART, RLENGTH); sub(/^[{;]?[[:space:]]*/, "", prop); sub(/[[:space:]]*:.*$/, "", prop)
@@ -113,14 +105,14 @@ awk -F '\t' '
         rest = substr(rest, RSTART + RLENGTH - 1)
       }
     }
-    if (path ~ ENVIRON["KC_CONFIG_PATHS"] && match(text, /^[[:space:]]*[\047\"]?[A-Za-z_][A-Za-z0-9_.-]*[\047\"]?[[:space:]]*:/)) {
+    if (is_config_file && match(text, /^[[:space:]]*[\047\"]?[A-Za-z_][A-Za-z0-9_.-]*[\047\"]?[[:space:]]*:/)) {
       key = substr(text, RSTART, RLENGTH); gsub(/^[[:space:]]*[\047\"]?|[\047\"]?[[:space:]]*:$/, "", key)
       emit_candidate("config-key", key, "(^|[^A-Za-z0-9_.-])[\047\"]?" escape_ere(key) "[\047\"]?[[:space:]]*:", path, line, text)
     }
   }
 ' "$work_dir/added.tsv" > "$work_dir/candidates.tsv"
 
-# File-name suffixes: the compound suffix of every added file (Card.spec.tsx -> *.spec.tsx).
+# File-name suffixes: the compound suffix of every added file (Card.spec.tsx gives *.spec.tsx).
 kc_added_files "$diff_file" | while IFS= read -r added_path; do
   base_name=${added_path##*/}
   case "$base_name" in
@@ -130,23 +122,22 @@ kc_added_files "$diff_file" | while IFS= read -r added_path; do
   printf 'file-name\t*%s\t-\t%s\t1\t%s\n' "$suffix" "$added_path" "$base_name" >> "$work_dir/candidates.tsv"
 done
 
-# Uses at the base, per distinct token; zero uses are reported.
+# Uses at the base per distinct token; the diff's own distinct added lines are subtracted when the
+# head is checked out. Zero uses are reported.
 : > "$work_dir/new.txt"
 cut -f1,2,3 "$work_dir/candidates.tsv" | sort -u | while IFS=$'\t' read -r kind token ere; do
+  token_lines_in_diff=$(awk -F '\t' -v kind="$kind" -v token="$token" '$1 == kind && $2 == token { print $4 ":" $5 }' "$work_dir/candidates.tsv" | sort -u | grep -c . || true)
   if [ "$kind" = file-name ]; then
     suffix=${token#\*}
-    if [ -n "$base_ref" ]; then uses=$(git -C "$repo_root" ls-tree -r --name-only "$base_ref" | grep -cF -e "$suffix" || true)
-    else uses=$(git -C "$repo_root" ls-files | grep -cF -e "$suffix" || true); fi
-    in_diff=$(cut -f1,2 "$work_dir/candidates.tsv" | grep -cxF "$(printf 'file-name\t%s' "$token")" || true)
-    if [ -n "$base_ref" ]; then in_diff=0; fi
+    if [ -n "$base_ref" ]; then token_uses=$(git -C "$repo_root" ls-tree -r --name-only "$base_ref" | grep -cF -e "$suffix" || true)
+    else token_uses=$(git -C "$repo_root" ls-files | grep -cF -e "$suffix" || true); fi
   elif [ -n "$base_ref" ]; then
-    uses=$(git -C "$repo_root" grep -I -h -E -e "$ere" "$base_ref" -- . ':!*.md' 2>/dev/null | wc -l || true)
-    in_diff=0
+    token_uses=$(git -C "$repo_root" grep -I -h -E -e "$ere" "$base_ref" -- . ':!*.md' 2>/dev/null | wc -l || true)
   else
-    uses=$(git -C "$repo_root" grep -I -h -E -e "$ere" -- . ':!*.md' 2>/dev/null | wc -l || true)
-    in_diff=$(cut -f1,2 "$work_dir/candidates.tsv" | grep -cxF "$(printf '%s\t%s' "$kind" "$token")" || true)
+    token_uses=$(git -C "$repo_root" grep -I -h -E -e "$ere" -- . ':!*.md' 2>/dev/null | wc -l || true)
   fi
-  if [ $((uses - in_diff)) -le 0 ]; then printf '%s\t%s\n' "$kind" "$token" >> "$work_dir/new.txt"; fi
+  if [ -n "$base_ref" ]; then token_lines_in_diff=0; fi
+  if [ $((token_uses - token_lines_in_diff)) -le 0 ]; then printf '%s\t%s\n' "$kind" "$token" >> "$work_dir/new.txt"; fi
 done
 awk -F '\t' 'NR == FNR { new_tokens[$1 "\t" $2] = 1; next }
   (($1 "\t" $2) in new_tokens) { printf "%s:%s: [no precedent: %s %s] %s\n", $4, $5, $1, $2, $6 }

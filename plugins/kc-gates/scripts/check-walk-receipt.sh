@@ -18,15 +18,11 @@
 #                          `only state: <why>` (three or more words) when it has one. One walk of one
 #                          state is not QA: list every shape the output can take and walk each.
 #
-# A walk-item that select-gates.sh also marks `walk-dimension: <path>: <dimension>` (its diff varies
-# along a dimension a walk must cover) needs its states field to cover each such dimension, since
-# a walk of the states the author picked can miss the one the change varies along:
-#   viewport   widths written with px: a wide desktop (1920 or more), a laptop (1024 to 1919) and a
-#              phone (600 or less), such as `1920px; 1280px; 390px`
-#   locale     two locale codes (`de-DE`, `ar-SA`), or one and `rtl`
-#   print      the word `print` or `pdf`
-#   data-size  an empty or zero state and a large one (many, long, overflow, paginated, or a count
-#              such as `500 rows`)
+# A walk-item that select-gates.sh marks `walk-dimension: <path>: <dimension>` needs its states field
+# to cover that dimension (the walk of the states the author picked can miss the one the change
+# varies along): viewport (widths in px: 1920 or more, 1024 to 1919, 600 or less), locale (two
+# codes such as de-DE, or one and rtl), print (the word print or pdf), data-size (an empty state
+# and a large one).
 #
 # The environment the walk ran in is one line too, `env<TAB><command><TAB><evidence>`: the one command
 # that brought the app up (never a chain of steps done by hand: no `&&`, `;`, `||` or `then`), and
@@ -76,12 +72,12 @@ get_viewport_widths() {
 
 # Prints the width classes missing from a states field, or nothing when all three are there.
 get_missing_width_classes() {
-  local widths missing="" w has_wide=false has_laptop=false has_phone=false
-  widths=$(get_viewport_widths "$1" | awk '!seen[$0]++')
-  for w in $widths; do
-    if [ "$w" -ge "$WIDE_DESKTOP_MIN_PX" ]; then has_wide=true
-    elif [ "$w" -ge "$LAPTOP_MIN_PX" ]; then has_laptop=true
-    elif [ "$w" -le "$PHONE_MAX_PX" ]; then has_phone=true; fi
+  local widths missing="" width has_wide=false has_laptop=false has_phone=false
+  widths=$(get_viewport_widths "$1")
+  for width in $widths; do
+    if [ "$width" -ge "$WIDE_DESKTOP_MIN_PX" ]; then has_wide=true
+    elif [ "$width" -ge "$LAPTOP_MIN_PX" ]; then has_laptop=true
+    elif [ "$width" -le "$PHONE_MAX_PX" ]; then has_phone=true; fi
   done
   $has_wide || missing="a wide desktop (${WIDE_DESKTOP_MIN_PX}px or more)"
   $has_laptop || missing="${missing:+$missing, }a laptop (${LAPTOP_MIN_PX}px to $((WIDE_DESKTOP_MIN_PX - 1))px)"
@@ -91,18 +87,21 @@ get_missing_width_classes() {
 
 # Prints what a states field still lacks for a dimension, or nothing when it covers it.
 get_uncovered_dimension() {
-  local dimension=$1 text locale_codes
-  text=$(printf '%s' "$2" | tr '[:upper:]' '[:lower:]')
+  local dimension=$1 states_text locale_count has_two_locales has_rtl_locale
+  states_text=$(printf '%s' "$2" | tr '[:upper:]' '[:lower:]')
   case "$dimension" in
     viewport) get_missing_width_classes "$2" ;;
     locale)
-      locale_codes=$(printf '%s' "$text" | grep -Eo '(^|[^a-z])[a-z]{2}-[a-z]{2,4}([^a-z]|$)' | grep -Eo '[a-z]{2}-[a-z]{2,4}' | sort -u | grep -c . || true)
-      if [ "$locale_codes" -ge 2 ] || { [ "$locale_codes" -ge 1 ] && printf '%s' "$text" | grep -Eq 'rtl'; }; then return 0; fi
+      locale_count=$(printf '%s' "$states_text" | grep -Eo '(^|[^a-z])[a-z]{2}-[a-z]{2,4}([^a-z]|$)' | grep -Eo '[a-z]{2}-[a-z]{2,4}' | sort -u | grep -c . || true)
+      has_two_locales=false; has_rtl_locale=false
+      if [ "$locale_count" -ge 2 ]; then has_two_locales=true; fi
+      if [ "$locale_count" -ge 1 ] && printf '%s' "$states_text" | grep -Eq 'rtl'; then has_rtl_locale=true; fi
+      if $has_two_locales || $has_rtl_locale; then return 0; fi
       printf 'two locales such as de-DE and ar-SA, or one and rtl' ;;
-    print) printf '%s' "$text" | grep -Eq 'print|pdf' || printf 'a print or pdf state' ;;
+    print) printf '%s' "$states_text" | grep -Eq 'print|pdf' || printf 'a print or pdf state' ;;
     data-size)
-      printf '%s' "$text" | grep -Eq 'empty|zero|no rows|no items' || printf 'an empty state; '
-      printf '%s' "$text" | grep -Eq 'many|long|large|overflow|truncat|paginat|[0-9]{2,} (rows|items|results|records)' || printf 'a large state' ;;
+      printf '%s' "$states_text" | grep -Eq 'empty|zero|no rows|no items' || printf 'an empty state; '
+      printf '%s' "$states_text" | grep -Eq 'many|long|large|overflow|truncat|paginat|[0-9]{2,} (rows|items|results|records)' || printf 'a large state' ;;
   esac
   return 0
 }
@@ -147,7 +146,7 @@ while IFS= read -r item; do
     if [ -n "$uncovered" ]; then
       record_walk_problem "$item" "its diff varies along $dimension, but the states field does not cover it ($uncovered): walk the change along that dimension too and list it in states:"
     fi
-  done < <(printf '%s\n' "$dimension_lines" | sed -n "s|^$item: ||p")
+  done < <(printf '%s\n' "$dimension_lines" | awk -v item="$item" 'index($0, item ": ") == 1 { print substr($0, length(item) + 3) }')
 done <<EOF
 $items
 EOF

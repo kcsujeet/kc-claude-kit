@@ -1,1 +1,2 @@
 .card { container-type: size; padding: 1rem; }
+@container (min-width: 20px) { .card { width: 1px; } }

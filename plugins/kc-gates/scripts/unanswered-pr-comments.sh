@@ -1,15 +1,12 @@
 #!/usr/bin/env bash
 # Lists the review comments on the current branch's pull request that its author has not answered:
-# inline comments (`pulls/<n>/comments`, grouped into threads by in_reply_to_id) and top-level ones
-# (`issues/<n>/comments`), from anyone but the author. Inline comments from bot reviewers are
-# listed: a review bot posts inline when the PR goes ready and a pass that never read it hands the
-# PR on with it open. Top-level comments from a bot account (`user.type` is `Bot`, or the login
-# ends in `[bot]`) are not: a deploy-preview or issue-tracker link-back bot posts one automatically
-# and nothing in it asks for a reply. A repo whose bot does ask (a coverage or review summary)
-# lists its login in `.claude/reply-needed-bots`, one per line (optional), and that bot's
-# top-level comments are listed too. A comment is answered when the PR's author wrote a comment
-# after it in the same thread (top-level comments are one thread). ready-receipt.sh refuses a
-# receipt while any comment is unanswered.
+# inline comments (grouped into threads by in_reply_to_id) and top-level ones, from anyone but the
+# author. Top-level comments from a bot account (`user.type` is `Bot`, or the login ends in
+# `[bot]`) are skipped, since a link-back or deploy bot posts them without asking anything; inline
+# bot comments are kept. A repo lists a bot whose top-level comments need a reply, one login per
+# line, in `.claude/reply-needed-bots`. A comment is answered when the author wrote a later comment
+# in its thread (top-level comments are one thread). ready-receipt.sh refuses a receipt while one
+# is unanswered.
 #
 # Usage: unanswered-pr-comments.sh      (from the repo of the branch)
 # Output: one line per unanswered comment, `<path>:<line> @<author>: <start of the comment>` (or
