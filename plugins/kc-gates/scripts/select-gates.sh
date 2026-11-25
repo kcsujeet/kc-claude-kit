@@ -287,7 +287,7 @@ fi
 if [ -n "$walk_items" ]; then
   while IFS= read -r walk_path; do
     [ -n "$walk_path" ] || continue
-    echo "walk-item: $walk_path surface: $(kc_qa_surface "$walk_path" "$repo_root")"
+    echo "walk-item: $walk_path surface: $(kc_get_qa_surface "$walk_path" "$repo_root")"
   done <<< "$walk_items"
   walk_dimensions=$(list_walk_dimensions "$diff_file")
   while IFS= read -r walk_path; do

@@ -223,8 +223,8 @@ expect_eq "a private source change: one walk-item per non-test source file, none
 walk-item: app/services/pricing.rb surface: unit" "$(printf '%s\n' "$walk_private" | grep '^walk-item:')"
 expect_eq "a private source change does not claim a signed-out audience" "0" "$(printf '%s\n' "$walk_private" | grep -c 'signed out' || true)"
 
-# QA surface per walk-item: browser, api, terminal, unit; a repo overrides it in .claude/qa-surfaces.txt.
-make_case "$work_dir/walk-surface" 'x = 1' src/ui/Cart.tsx app/views/orders/show.html.erb app/controllers/orders_controller.rb src/api/orders.ts app/public/orders/page.tsx app/public/orders_controller.rb scripts/sync.sh jobs/cleanup.rb lib/pricing.rb lib/cli/run.rb src/share/view.ts
+# QA surface per walk-item (kc_get_qa_surface in lib/qa-surface.sh): browser, api, terminal, unit; a repo overrides it in .claude/qa-surfaces.txt.
+make_case "$work_dir/walk-surface" 'x = 1' src/ui/Cart.tsx app/views/orders/show.html.erb app/controllers/orders_controller.rb src/api/orders.ts app/public/orders/page.tsx app/public/orders_controller.rb scripts/sync.sh jobs/cleanup.rb lib/pricing.rb lib/cli/run.rb src/share/view.ts pages/api/orders.ts app/api/orders/route.ts app/controllers/pages/x_controller.rb src/pages/Cart.ts src/public/summary.rb
 mkdir -p "$work_dir/walk-surface/repo/.claude"
 printf '# surfaces\nlib/cli/* terminal\nsrc/ui/Cart.tsx unit\nlib/pricing.rb nonsense\n' > "$work_dir/walk-surface/repo/.claude/qa-surfaces.txt"
 printf '^src/share/\n' > "$work_dir/walk-surface/repo/.claude/public-paths.txt"
@@ -239,6 +239,11 @@ expect_contains "surface: a job file is terminal" "walk-item: jobs/cleanup.rb su
 expect_contains "surface: any other source is unit (an override naming no surface is skipped)" "walk-item: lib/pricing.rb surface: unit" "$surface_lines"
 expect_contains "surface: the override file wins over the built-in patterns" "walk-item: src/ui/Cart.tsx surface: unit" "$surface_lines"
 expect_contains "surface: an override glob can make a library file terminal" "walk-item: lib/cli/run.rb surface: terminal" "$surface_lines"
+expect_contains "surface: a pages/api file is api, not browser" "walk-item: pages/api/orders.ts surface: api" "$surface_lines"
+expect_contains "surface: a route handler under app/api is api" "walk-item: app/api/orders/route.ts surface: api" "$surface_lines"
+expect_contains "surface: a controller under a pages folder is api" "walk-item: app/controllers/pages/x_controller.rb surface: api" "$surface_lines"
+expect_contains "surface: a non-UI file under a pages folder is browser" "walk-item: src/pages/Cart.ts surface: browser" "$surface_lines"
+expect_contains "surface: a file only the built-in public list matches is api" "walk-item: src/public/summary.rb surface: api" "$surface_lines"
 expect_contains "surface: a path in the repo's public-paths.txt is api" "walk-item: src/share/view.ts surface: api" "$surface_lines"
 make_case "$work_dir/walk-surface-default" 'x = 1' src/ui/Cart.tsx
 expect_contains "surface: with no override file the built-in patterns apply" "walk-item: src/ui/Cart.tsx surface: browser" "$(select_gates_output "$work_dir/walk-surface-default")"

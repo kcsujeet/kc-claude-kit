@@ -158,6 +158,14 @@ write_surfaces 'exit 0: run.txt' 'total.png' 'curl -si https://shop.test/orders/
 expect_contains "curl: a curl line with no saved response fails" "is a api surface" "$(run_walk_receipt_check)"
 write_surfaces 'it came up' 'total.png' 'curl -si https://shop.test/orders/7: resp.txt' 'exit 0: run.txt' 'exit 0: run.txt'
 expect_contains "env: with all four surfaces it may use any of their kinds, prose fails" "env: evidence is none of" "$(run_walk_receipt_check)"
+cp "$work_dir/resp.txt" "$work_dir/out.png"
+write_surfaces 'exit 0: run.txt' 'total.png' 'curl -si https://shop.test/orders/7: out.png' 'exit 0: run.txt' 'exit 0: run.txt'
+expect_eq "surfaces: a curl line whose saved file is named like a capture is still a curl response" clean "$(run_walk_receipt_check)"
+printf 'GATES=naming\nWALK=required\nwalk: x\nwalk-item: src/ui/Cart.tsx surface: browser\n' > "$select_output"
+printf 'env\tbin/review-env up\tGET /health 200\nsrc/ui/Cart.tsx\tcart shows 2 items\ttotal.png\tstates: one item; many items\n' > "$receipt"
+expect_contains "env: a browser-only walk takes a capture for the env line, not a request line" "env: evidence is none of a screenshot or recording, after the command: GET /health 200" "$(run_walk_receipt_check)"
+printf 'env\tbin/review-env up\ttotal.png\nsrc/ui/Cart.tsx\tcart shows 2 items\ttotal.png\tstates: one item; many items\n' > "$receipt"
+expect_eq "env: a browser-only walk with a capture env line passes" clean "$(run_walk_receipt_check)"
 printf 'GATES=naming\nWALK=required\nwalk: x\nwalk-item: scripts/sync.sh surface: terminal\n' > "$select_output"
 printf 'env\tscripts/sync.sh --dry-run\tGET /health 200\nscripts/sync.sh\tdry run listed 3 orders\texit 0: run.txt\tstates: dry run; --help\n' > "$receipt"
 expect_contains "env: a terminal-only walk needs a transcript for the env line, not a request line" "env: evidence is none of a run transcript (exit 0: run.txt), after the command: GET /health 200" "$(run_walk_receipt_check)"

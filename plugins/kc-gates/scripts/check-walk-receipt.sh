@@ -37,7 +37,8 @@
 #
 # The environment the walk ran in is one line too, `env<TAB><command><TAB><evidence>`: the one command
 # that brought the app up (never a chain of steps done by hand: no `&&`, `;`, `||` or `then`), and
-# evidence it ran or answered after it (a request line with its status, a capture, or a transcript). Required
+# evidence of the kinds the items' surfaces take, joined (a browser-only diff: a capture; api: a curl
+# response or request line; terminal: a transcript; a line with no surface takes any). Required
 # whenever there is a walk-item; for a command-line change it is the one command that ran it,
 # and its evidence can be its transcript (exit 0: run.txt). The check sees that the command is named, is one command and has
 # evidence; that it was run as written and is a tested one is for the reviewer.
@@ -75,48 +76,48 @@ find_evidence_file() {
 
 # Prints what is wrong with a run transcript (`exit <N>: <path>`), or nothing when its file exists and has text.
 get_transcript_problem() {
-  local path file
-  path=$(printf '%s' "$1" | sed -E 's/^exit [0-9]+:[[:space:]]*//')
-  file=$(find_evidence_file "$path")
-  if [ -z "$file" ]; then printf 'transcript file does not exist: %s' "$path"
-  elif [ ! -s "$file" ]; then printf 'transcript file is empty: %s' "$path"; fi
+  local transcript_path transcript_file
+  transcript_path=$(printf '%s' "$1" | sed -E 's/^exit [0-9]+:[[:space:]]*//')
+  transcript_file=$(find_evidence_file "$transcript_path")
+  if [ -z "$transcript_file" ]; then printf 'transcript file does not exist: %s' "$transcript_path"
+  elif [ ! -s "$transcript_file" ]; then printf 'transcript file is empty: %s' "$transcript_path"; fi
 }
 
 # Prints what is wrong with a curl request's saved response (`curl <args>: <path>`), or nothing when
 # its file exists and holds an HTTP status line (curl -i or -si keeps it).
 get_curl_problem() {
-  local path file
-  path=$(printf '%s' "$1" | sed -E 's/^.*:[[:space:]]+//')
-  file=$(find_evidence_file "$path")
-  if [ -z "$file" ]; then printf 'curl response file does not exist: %s' "$path"
-  elif [ ! -s "$file" ]; then printf 'curl response file is empty: %s' "$path"
-  elif ! grep -Eq '^HTTP/[0-9.]+ [1-5][0-9][0-9]' "$file"; then printf 'curl response file has no HTTP status line (save it with curl -si): %s' "$path"; fi
+  local response_path response_file
+  response_path=$(printf '%s' "$1" | sed -E 's/^.*:[[:space:]]+//')
+  response_file=$(find_evidence_file "$response_path")
+  if [ -z "$response_file" ]; then printf 'curl response file does not exist: %s' "$response_path"
+  elif [ ! -s "$response_file" ]; then printf 'curl response file is empty: %s' "$response_path"
+  elif ! grep -Eq '^HTTP/[0-9.]+ [1-5][0-9][0-9]' "$response_file"; then printf 'curl response file has no HTTP status line (save it with curl -si): %s' "$response_path"; fi
 }
 
 # get_evidence_problem <allowed kinds> <evidence>: prints "wrong-kind" when the evidence is not one
 # of the allowed kinds (capture, request, curl, transcript), or what is wrong with its file; nothing
 # when it is good.
 get_evidence_problem() {
-  local allowed=" $1 " evidence=$2 kind
-  if printf '%s' "$evidence" | grep -Eq "$transcript_pattern"; then kind=transcript
-  elif printf '%s' "$evidence" | grep -Eq "$curl_pattern"; then kind=curl
-  elif printf '%s' "$evidence" | grep -Eiq "$KC_CAPTURE_PATH"; then kind=capture
-  elif printf '%s' "$evidence" | grep -Eq "$request_pattern"; then kind=request
+  local allowed_evidence_kinds=" $1 " receipt_evidence=$2 evidence_kind
+  if printf '%s' "$receipt_evidence" | grep -Eq "$transcript_pattern"; then evidence_kind=transcript
+  elif printf '%s' "$receipt_evidence" | grep -Eq "$curl_pattern"; then evidence_kind=curl
+  elif printf '%s' "$receipt_evidence" | grep -Eiq "$KC_CAPTURE_PATH"; then evidence_kind=capture
+  elif printf '%s' "$receipt_evidence" | grep -Eq "$request_pattern"; then evidence_kind=request
   else printf 'wrong-kind'; return 0; fi
-  case "$allowed" in *" $kind "*) ;; *) printf 'wrong-kind'; return 0 ;; esac
-  case "$kind" in
-    transcript) get_transcript_problem "$evidence" ;;
-    curl) get_curl_problem "$evidence" ;;
-    capture) [ -n "$(find_evidence_file "$evidence")" ] || printf 'evidence file does not exist: %s' "$evidence" ;;
+  case "$allowed_evidence_kinds" in *" $evidence_kind "*) ;; *) printf 'wrong-kind'; return 0 ;; esac
+  case "$evidence_kind" in
+    transcript) get_transcript_problem "$receipt_evidence" ;;
+    curl) get_curl_problem "$receipt_evidence" ;;
+    capture) [ -n "$(find_evidence_file "$receipt_evidence")" ] || printf 'evidence file does not exist: %s' "$receipt_evidence" ;;
   esac
 }
 
 # Adds a surface's evidence kinds to the kinds the env line may use.
 env_kinds=""
 add_env_kinds() {
-  local kind
-  for kind in $(kc_surface_evidence_kinds "$1"); do
-    case " $env_kinds " in *" $kind "*) ;; *) env_kinds="$env_kinds $kind" ;; esac
+  local evidence_kind
+  for evidence_kind in $(kc_get_surface_evidence_kinds "$1"); do
+    case " $env_kinds " in *" $evidence_kind "*) ;; *) env_kinds="$env_kinds $evidence_kind" ;; esac
   done
 }
 readonly WIDE_DESKTOP_MIN_PX=1920
@@ -187,47 +188,47 @@ record_walk_problem() { echo "walk-item $1: $2"; problems=$((problems + 1)); }
 while IFS= read -r item_line; do
   [ -n "$item_line" ] || continue
   # `<path> surface: <surface>`; an older line with no surface is the path alone.
-  item=$item_line
+  walk_item_path=$item_line
   surface=""
-  case "$item_line" in
-    *" surface: "browser | *" surface: "api | *" surface: "terminal | *" surface: "unit) surface=${item_line##* surface: }; item=${item_line% surface: *} ;;
-  esac
+  if [[ $item_line =~ ^(.*)\ surface:\ ($KC_QA_SURFACES)$ ]]; then walk_item_path=${BASH_REMATCH[1]}; surface=${BASH_REMATCH[2]}; fi
   add_env_kinds "$surface"
+  allowed_kinds=$(kc_get_surface_evidence_kinds "$surface")
+  allowed_kinds_text=$(kc_describe_evidence_kinds "$allowed_kinds")
   line=""
   if [ -r "$receipt" ]; then
-    line=$(awk -F'\t' -v item="$item" '$1 == item { print; exit }' "$receipt")
+    line=$(awk -F'\t' -v item="$walk_item_path" '$1 == item { print; exit }' "$receipt")
   fi
   if [ -z "$line" ]; then
-    record_walk_problem "$item" "no receipt line in $receipt: walk it on its QA surface (browser, API, terminal, unit), then write <path><TAB><what was seen><TAB><evidence>"
+    record_walk_problem "$walk_item_path" "no receipt line in $receipt: walk it on its QA surface (browser, API, terminal, unit), then write <path><TAB><what was seen><TAB><evidence>"
     continue
   fi
   seen=$(printf '%s' "$line" | awk -F'\t' '{ print $2 }')
   evidence=$(printf '%s' "$line" | awk -F'\t' '{ print $3 }')
   if ! printf '%s' "$seen" | grep -q '[^[:space:]]'; then
-    record_walk_problem "$item" "nothing seen: say what the walk showed for this file's behaviour"
+    record_walk_problem "$walk_item_path" "nothing seen: say what the walk showed for this file's behaviour"
     continue
   fi
-  evidence_problem=$(get_evidence_problem "$(kc_surface_evidence_kinds "$surface")" "$evidence")
+  evidence_problem=$(get_evidence_problem "$allowed_kinds" "$evidence")
   if [ "$evidence_problem" = "wrong-kind" ]; then
     if [ -n "$surface" ]; then
-      record_walk_problem "$item" "$item is a $surface surface: give $(kc_describe_evidence_kinds "$(kc_surface_evidence_kinds "$surface")"), not: $evidence"
+      record_walk_problem "$walk_item_path" "$walk_item_path is a $surface surface: give $allowed_kinds_text, not: $evidence"
     else
-      record_walk_problem "$item" "evidence is none of $(kc_describe_evidence_kinds "$(kc_surface_evidence_kinds "")"): $evidence"
+      record_walk_problem "$walk_item_path" "evidence is none of $allowed_kinds_text: $evidence"
     fi
   elif [ -n "$evidence_problem" ]; then
-    record_walk_problem "$item" "$evidence_problem"
+    record_walk_problem "$walk_item_path" "$evidence_problem"
   fi
   states=$(printf '%s' "$line" | awk -F'\t' '{ print $4 }')
   if ! has_walked_states "$states"; then
-    record_walk_problem "$item" "fewer than two states walked: list every shape the change's output can take (empty, one long row, many short rows, each option) and walk each; write states: <a>; <b> as the fourth field, or only state: <why, three or more words> when it has one"
+    record_walk_problem "$walk_item_path" "fewer than two states walked: list every shape the change's output can take (empty, one long row, many short rows, each option) and walk each; write states: <a>; <b> as the fourth field, or only state: <why, three or more words> when it has one"
   fi
   while IFS= read -r dimension; do
     [ -n "$dimension" ] || continue
     uncovered=$(get_uncovered_dimension "$dimension" "$states")
     if [ -n "$uncovered" ]; then
-      record_walk_problem "$item" "its diff varies along $dimension, but the states field does not cover it ($uncovered): walk the change along that dimension too and list it in states:"
+      record_walk_problem "$walk_item_path" "its diff varies along $dimension, but the states field does not cover it ($uncovered): walk the change along that dimension too and list it in states:"
     fi
-  done < <(printf '%s\n' "$dimension_lines" | awk -v item="$item" -v separator=": " 'index($0, item separator) == 1 { print substr($0, length(item separator) + 1) }')
+  done < <(printf '%s\n' "$dimension_lines" | awk -v item="$walk_item_path" -v separator=": " 'index($0, item separator) == 1 { print substr($0, length(item separator) + 1) }')
 done <<EOF
 $items
 EOF
