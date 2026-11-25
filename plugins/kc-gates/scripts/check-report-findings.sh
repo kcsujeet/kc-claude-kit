@@ -12,7 +12,9 @@
 # Every finding line under FINDINGS: in those blocks that cites a path with a line number
 # (`path:line`, `path:Lline`, optionally with `@sha`) must appear in the reply as
 # `<basename>:<line>` or `<basename>:L<line>`, or on a line of the reply starting with
-# `Dropped:` (matched by file basename and line number, in either spelling) that gives the reason.
+# `Dropped:` that names it as `<basename>:<line>`, `<basename>:L<line>` or `<basename> line <N>`
+# and gives reason text after it. A Dropped: line that names only the file and line
+# (`Dropped: cart.ts:4`), or the file with no line (`Dropped: cart.ts (ran 4 tests)`), does not count.
 #
 # Prints one line per missing finding. Exits 0 when none is missing, 1 when any is, 2 on a usage
 # error or an unreadable reply.
@@ -22,14 +24,32 @@ script_name=$(basename "$0")
 [ "$#" -eq 2 ] || { echo "usage: $script_name <verdicts-dir> <reply-file|->" >&2; exit 2; }
 verdicts_dir=$1
 reply_arg=$2
-if [ "$reply_arg" != - ] && [ ! -r "$reply_arg" ]; then
+reply_from_stdin=false
+[ "$reply_arg" = - ] && reply_from_stdin=true
+reply_file_is_unreadable=false
+[ ! -r "$reply_arg" ] && reply_file_is_unreadable=true
+if ! "$reply_from_stdin" && "$reply_file_is_unreadable"; then
   echo "$script_name: cannot read $reply_arg" >&2
   exit 2
 fi
-[ -d "$verdicts_dir" ] || exit 0
 
 reply=$(cat "$reply_arg")
-dropped_lines=$(printf '%s\n' "$reply" | grep -E '^[[:space:]]*(-|\*)?[[:space:]]*\**Dropped:' || true)
+reported_lines=$(grep -Ev '^[[:space:]]*(-|\*)?[[:space:]]*\**Dropped:' <<<"$reply" || true)
+dropped_lines=$(grep -E '^[[:space:]]*(-|\*)?[[:space:]]*\**Dropped:' <<<"$reply" || true)
+
+# True when a Dropped: line names <file> <line> as `file:line`, `file:Lline` or `file line N` and has
+# reason text after it (other file:line references on the line are not reason text).
+is_dropped_with_reason() {
+  local escaped_name=$1 line_number=$2 dropped_line reason
+  local name_pattern="(^|[^A-Za-z0-9_.-])$escaped_name(:L?|[[:space:]]+line[[:space:]]+)$line_number([^0-9]|\$)"
+  while IFS= read -r dropped_line; do
+    [[ $dropped_line =~ $name_pattern ]] || continue
+    reason=${dropped_line#*"${BASH_REMATCH[0]}"}
+    reason=$(sed -E 's/[A-Za-z0-9_.\/-]+(:L?|[[:space:]]+line[[:space:]]+)[0-9]+//g' <<<"$reason")
+    [[ $reason =~ [A-Za-z] ]] && return 0
+  done <<<"$dropped_lines"
+  return 1
+}
 
 # One "basename:line" per cited finding, each once.
 findings=$(
@@ -51,19 +71,18 @@ findings=$(
   done | sort -u
 )
 
-missing=0
+has_missing_finding=0
 while IFS= read -r finding; do
   [ -n "$finding" ] || continue
   file_name=${finding%:*}
   line_number=${finding##*:}
-  pattern="(^|[^A-Za-z0-9_.-])$(printf '%s' "$file_name" | sed 's/[][\.^$*+?(){}|/]/\\&/g'):L?$line_number([^0-9]|$)"
-  if printf '%s\n' "$reply" | grep -Eq "$pattern"; then continue; fi
-  # A Dropped: line may give the file and the line apart ("cart.ts line 4").
   escaped_name=$(printf '%s' "$file_name" | sed 's/[][\.^$*+?(){}|/]/\\&/g')
-  if printf '%s\n' "$dropped_lines" | grep -E "(^|[^A-Za-z0-9_.-])$escaped_name([^A-Za-z0-9_.-]|$)" | grep -Eq "(^|[^0-9])L?$line_number([^0-9]|$)"; then continue; fi
+  pattern="(^|[^A-Za-z0-9_.-])$escaped_name:L?$line_number([^0-9]|$)"
+  if grep -Eq "$pattern" <<<"$reported_lines"; then continue; fi
+  if is_dropped_with_reason "$escaped_name" "$line_number"; then continue; fi
   echo "a gate found $finding and the reply neither reports it nor lists it under Dropped: with a reason"
-  missing=1
+  has_missing_finding=1
 done <<EOF
 $findings
 EOF
-exit "$missing"
+exit "$has_missing_finding"

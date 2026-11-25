@@ -28,12 +28,7 @@
 #     and no stretch of 14 or more words in a sentence without a comma, semicolon, colon,
 #     parenthesis or dash between them (a long unbroken run reads as one heavy block; the
 #     same "long" reason excuses it);
-#   - carry a "covered" record, empty or a bare "n/a" refused: a review that raises as a problem
-#     what the author already decided or explained did not read the author's words first (the
-#     pull request description, the linked ticket, the replies and code comments). Examples: a
-#     missing null check called a bug when the description says a migration always sets the
-#     field; a feature flag asked for when the ticket says the product decided against one; a
-#     rename suggested that the author explained in a reply;
+#   - carry a "covered" record, empty or a bare "n/a" refused (kc-post-review's examples show why);
 #   - hold at most 2 non-blank lines of code across its code blocks, unless "code" says why: a
 #     comment says what is wrong and what should happen, and the author, who knows the code,
 #     writes the fix;
@@ -85,6 +80,8 @@ perl -MJSON::PP -CS -e '
   if (ref $drafts ne "ARRAY") { print STDERR "drafts file is not a JSON array\n"; exit 2 }
   my $labels = qr/suggestion|nitpick|issue|question|chore|todo|note|thought|praise/;
   my $problems = 0;
+  my $heavy_stretch_words = 14;
+  sub is_not_applicable_record { my ($text) = @_; return $text =~ m{^\s*n/?a\W*$}i }
   my $index = 0;
   for my $draft (@$drafts) {
     $index++;
@@ -94,7 +91,7 @@ perl -MJSON::PP -CS -e '
     my @found;
     my $covered = $draft->{covered} // "";
     $covered = "" if ref $covered;
-    if ($covered !~ /\S/ || $covered =~ m{^\s*n/?a\W*$}i) {
+    if ($covered !~ /\S/ || is_not_applicable_record($covered)) {
       push @found, "no \"covered\": read the pull request description, the linked ticket and the author\x27s replies first; say what they say about this and why it is still worth raising, or drop the draft";
     }
     my ($first, $rest) = split /\n/, $body, 2;
@@ -110,7 +107,8 @@ perl -MJSON::PP -CS -e '
     (my $prose = $rest) =~ s/```.*?```//gs;
     $prose =~ s/`[^`]*`/code/g;
     my @sentences = grep { /\w/ } split /(?<=[.!?])\s+/, $prose;
-    unless (defined $draft->{long} && $draft->{long} =~ /\S/) {
+    my $has_long_reason = defined $draft->{long} && $draft->{long} =~ /\S/;
+    unless ($has_long_reason) {
       push @found, sprintf("has %d sentences; keep to 3 or say why in \"long\"", scalar @sentences) if @sentences > 3;
       for my $sentence (@sentences) {
         my $words = () = $sentence =~ /\S+/g;
@@ -120,16 +118,15 @@ perl -MJSON::PP -CS -e '
         }
       }
     }
-    unless (defined $draft->{long} && $draft->{long} =~ /\S/) {
-      for my $sentence (@sentences) {
+    unless ($has_long_reason) {
+      SENTENCE: for my $sentence (@sentences) {
         for my $clause (split /[,;:()\x{2013}\x{2014}]|\s-+\s|--/, $sentence) {
           my @words = $clause =~ /\S+/g;
-          next if @words < 14;
+          next if @words < $heavy_stretch_words;
           my $preview = join " ", @words[0 .. 5];
           push @found, sprintf("has a %d-word stretch with no comma or pause (\"%s...\"); break it into short clauses", scalar @words, $preview);
-          last;
+          last SENTENCE;
         }
-        last if grep { /-word stretch/ } @found;
       }
     }
     my $code_lines = 0;
@@ -142,7 +139,7 @@ perl -MJSON::PP -CS -e '
       $ran = "" if ref $ran;
       if ($ran !~ /\S/) {
         push @found, "asks for a change with no \"ran\": run it on a scratch copy and say what it passed, or \"n/a: <why>\"";
-      } elsif ($ran =~ m{^\s*n/?a\W*$}i) {
+      } elsif (is_not_applicable_record($ran)) {
         push @found, "says \"ran\": n/a with no reason; give the why";
       } elsif ($first =~ /^\*\*issue\b/ && $ran =~ m{^\s*n/?a\b}i) {
         push @found, "is an issue with \"ran\": n/a; an issue says something is broken, so reproduce it (a failing test, a request, a screenshot) and say in \"ran\" what showed it, or use another label";
@@ -151,7 +148,7 @@ perl -MJSON::PP -CS -e '
       $walked = "" if ref $walked;
       if ($walked !~ /\S/) {
         push @found, "asks for a change with no \"walked\": list each state the asked-for change reaches with what it shows before and after, or \"n/a: <why>\" when no behaviour change is asked";
-      } elsif ($walked =~ m{^\s*n/?a\W*$}i) {
+      } elsif (is_not_applicable_record($walked)) {
         push @found, "says \"walked\": n/a with no reason; give the why, or list the states the change reaches with before and after";
       }
     }

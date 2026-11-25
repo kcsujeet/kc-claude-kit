@@ -119,6 +119,18 @@ expect_not_contains "§G7 verdicts: the block leaves out the finding the reply n
 expect_eq "§G7 verdicts: a reply naming both findings goes out" out "$(run_stop "$verdict_reply"$'\n- 🟠 `refund.ts:42`: skips archived orders. (non-blocking)')"
 expect_eq "§G7 verdicts: a finding on a Dropped: line goes out" out "$(run_stop "$verdict_reply"$'\nDropped: refund.ts:42 (the author already fixed it)')"
 expect_eq "§G7 verdicts: a reply with no verdict is untouched" out "$(run_stop "$unfinished_reply")"
+bare_with_findings=$bare_verdict
+both_output=$(run_stop "$bare_with_findings")
+expect_eq "§G7 verdicts: a reply with a report problem and a missing finding is held" held "$both_output"
+expect_contains "§G7 verdicts: the block holds the report problem" "Does it work / what can it break" "$(cat "$work_dir/last-output")"
+expect_contains "§G7 verdicts: the block holds the missing finding too" "a gate found refund.ts:42 and the reply neither reports it nor lists it under Dropped: with a reason" "$(cat "$work_dir/last-output")"
+expect_not_contains "§G7 verdicts: a reply with no Dropped: reason is not excused" "a gate found cart.ts:4" "$(cat "$work_dir/last-output")"
+expect_eq "§G7 verdicts: Dropped: with only file:line and no reason is held" held "$(run_stop "$verdict_reply"$'\nDropped: refund.ts:42')"
+# A folder with verdicts but no saved review (no review.diff) is not a review to check.
+verdicts_only=$work_dir/verdicts-only
+mkdir -p "$verdicts_only/verdicts"
+cp "$review/verdicts/naming.txt" "$verdicts_only/verdicts/"
+expect_eq "§G7 verdicts: a folder with no review files is not checked" out "$(KC_REVIEW_DIR=$verdicts_only run_stop "$verdict_reply")"
 rm -rf "$review/verdicts"
 expect_eq "§G7 verdicts: no verdicts folder, nothing to check" out "$(run_stop "$verdict_reply")"
 
