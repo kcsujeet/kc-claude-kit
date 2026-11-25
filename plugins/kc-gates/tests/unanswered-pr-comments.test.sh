@@ -35,6 +35,15 @@ case "$output" in
   *) record "the author's own comments are not listed" ok ;;
 esac
 
+# A repo lists the bots whose top-level comments need a reply in .claude/reply-needed-bots.
+mkdir -p "$work_dir/opted-in/.claude"
+git init -q "$work_dir/opted-in"
+printf 'coverage-bot[bot]\n' > "$work_dir/opted-in/.claude/reply-needed-bots"
+export KC_GH_ROUTES="$fixtures/unanswered/routes.tsv"
+opted_in_output=$(cd "$work_dir/opted-in" && bash "$script" 2>&1) || true
+expect_contains "a bot the repo lists keeps its top-level comment" "top-level @coverage-bot[bot]: Coverage dropped 2%." "$opted_in_output"
+expect_not_contains "and other bots stay skipped" "preview-deploys" "$opted_in_output"
+
 run_with answered
 expect_eq "every comment answered exits 0" 0 "$status"
 expect_eq "and prints nothing" "" "$output"

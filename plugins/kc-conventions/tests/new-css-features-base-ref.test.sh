@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Tests skills/kc-react/scripts/new-css-features.sh with a base ref (its third argument): uses are
+# Tests (§R39) skills/kc-react/scripts/new-css-features.sh with a base ref (its third argument): uses are
 # counted in the repo at that ref, so a unit the base already used is not new, and one it never
 # used is, even when the checkout is already at the head.
 set -euo pipefail

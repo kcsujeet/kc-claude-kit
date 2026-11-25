@@ -5,7 +5,9 @@
 # listed: a review bot posts inline when the PR goes ready and a pass that never read it hands the
 # PR on with it open. Top-level comments from a bot account (`user.type` is `Bot`, or the login
 # ends in `[bot]`) are not: a deploy-preview or issue-tracker link-back bot posts one automatically
-# and nothing in it asks for a reply. A comment is answered when the PR's author wrote a comment
+# and nothing in it asks for a reply. A repo whose bot does ask (a coverage or review summary)
+# lists its login in `.claude/reply-needed-bots`, one per line (optional), and that bot's
+# top-level comments are listed too. A comment is answered when the PR's author wrote a comment
 # after it in the same thread (top-level comments are one thread). ready-receipt.sh refuses a
 # receipt while any comment is unanswered.
 #
@@ -28,14 +30,19 @@ pr_author=$(printf '%s' "$pr_json" | jq -r '.author.login // empty')
 inline=$(gh api --paginate "repos/{owner}/{repo}/pulls/$pr_number/comments?per_page=100" 2>/dev/null) || skip "gh could not read the review comments"
 top_level=$(gh api --paginate "repos/{owner}/{repo}/issues/$pr_number/comments?per_page=100" 2>/dev/null) || skip "gh could not read the PR comments"
 
-unanswered=$(jq -rn --arg author "$pr_author" --slurpfile inline_pages <(printf '%s' "$inline" | jq -s 'add // []') \
+reply_needed_file="$(git rev-parse --show-toplevel 2>/dev/null || pwd)/.claude/reply-needed-bots"
+reply_needed_bots=$( { [ -r "$reply_needed_file" ] && grep -v '^[[:space:]]*$' "$reply_needed_file"; } | jq -R . | jq -s . )
+
+unanswered=$(jq -rn --arg author "$pr_author" --argjson reply_needed_bots "${reply_needed_bots:-[]}" --slurpfile inline_pages <(printf '%s' "$inline" | jq -s 'add // []') \
   --slurpfile top_pages <(printf '%s' "$top_level" | jq -s 'add // []') '
   def snippet: (.body // "") | gsub("[\r\n\t]+"; " ") | .[0:60];
   def root_id($by_id):
     if .in_reply_to_id != null and ($by_id[.in_reply_to_id | tostring] != null)
     then $by_id[.in_reply_to_id | tostring] | root_id($by_id)
     else .id end;
-  def is_bot: .user.type == "Bot" or ((.user.login // "") | endswith("[bot]"));
+  def is_ignorable_bot:
+    (.user.type == "Bot" or ((.user.login // "") | endswith("[bot]")))
+    and ((.user.login // "") as $login | $reply_needed_bots | index($login) | not);
   def unanswered_in($thread):
     . as $comment
     | $comment.user.login != $author
@@ -47,7 +54,7 @@ unanswered=$(jq -rn --arg author "$pr_author" --slurpfile inline_pages <(printf 
   | ($rooted[] | . as $comment
       | select($comment | unanswered_in($rooted | map(select(.root == $comment.root))))
       | "\(.path):\(.line // .original_line // "?") @\(.user.login): \(snippet)"),
-    ($top_pages[0] as $top | $top[] | select(is_bot | not) | select(unanswered_in($top))
+    ($top_pages[0] as $top | $top[] | select(is_ignorable_bot | not) | select(unanswered_in($top))
       | "top-level @\(.user.login): \(snippet)")
 ')
 
