@@ -124,6 +124,7 @@ Most skills start on their own when the topic comes up. You can also type any of
 | `kc-assess` | Assessing a task before building: claims check, reproduce first, every reader of the broken value. |
 | `kc-investigate` | Investigating a production problem from the records that already exist, hop by hop, before building a probe or a fix. |
 | `kc-look-back` | The look-back at hand-off: list the feedback, a verdict each, lessons as one batch, where a lesson belongs. |
+| `kc-raise-the-bar` | Working is the floor: measure what was done, look for a better way that deletes before it adds, apply it or record what was tried. |
 | `kc-claims` | Checking a claim against its source before stating it. |
 | `kc-init` | Copies the rules into a project, to commit them there. The home copy installs itself. |
 

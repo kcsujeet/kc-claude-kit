@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ### Added (a turn that did work ends with a Better: line)
 
 - `kc-gates` 3.18.0: new Stop hook `guard-better-line.sh` blocks the end of a turn that made a tool call that is not a read (an edit, a write, an agent, or a command that is not plainly read-only) unless the reply has a `Better:` line with a number or a named alternative tried (`Better: none` alone or `Better: looks fine` blocks). The block tells Claude to measure what it just did, look for a better way even if it works, and apply it or say what was tried. It passes on the second try (`stop_hook_active`). Held by `tests/guard-better-line.test.sh`.
+- `kc-conventions` 2.8.0: new skill `kc-raise-the-bar` (user-invocable): working is the floor; measure what was done, list alternatives that delete before they add, try one, apply it or record what was tried, end with the `Better:` line; a gain may not cost clarity, correctness or simplicity. The hook's block message points to it. Case `evals/raise-the-bar-export`.
 
 ### Changed (new code needs precedent, walks cover every dimension, no behaviour by reasoning, bot link-backs need no reply, lessons state the class)
 
