@@ -3,7 +3,7 @@ src/Card.spec.tsx:1: [no precedent: test-mock jest.spyOn] jest.spyOn(api, 'load'
 src/Card.tsx:1: [no precedent: package dayjs] import dayjs from 'dayjs'
 src/Card.tsx:4: [no precedent: unit cqw] const pad = { pt: '20cqw', height: '100dvh' }
 src/Card.tsx:4: [no precedent: unit dvh] const pad = { pt: '20cqw', height: '100dvh' }
-src/Card.tsx:5: [no precedent: global-api navigator.share] const share = (data: object) => navigator.share(data)
+src/Card.tsx:6: [no precedent: global-api navigator.share] const share = (data: object) => navigator.share(data)
 src/layout.css:1: [no precedent: css-prop container-type] .card { container-type: size; padding: 1rem; }
 src/layout.css:2: [no precedent: at-rule @container] @container (min-width: 20px) { .card { width: 1px; } }
 src/layout.css:2: [no precedent: css-prop width] @container (min-width: 20px) { .card { width: 1px; } }

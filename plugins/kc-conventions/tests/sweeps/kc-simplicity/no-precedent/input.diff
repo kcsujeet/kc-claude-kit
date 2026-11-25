@@ -18,11 +18,12 @@ new file mode 100644
 index 0000000..bbc2c61
 --- /dev/null
 +++ b/src/Card.tsx
-@@ -0,0 +1,6 @@
+@@ -0,0 +1,7 @@
 +import dayjs from 'dayjs'
 +import { useState } from 'react'
 +import { copy } from './useClipboard'
 +const pad = { pt: '20cqw', height: '100dvh' }
++const spread = { top: '100vh', height: '100vh' }
 +const share = (data: object) => navigator.share(data)
 +const paste = (text: string) => navigator.clipboard.writeText(text)
 diff --git a/src/layout.css b/src/layout.css

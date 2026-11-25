@@ -289,8 +289,7 @@ run_check() {
         for (i = 1; i <= word_count; i++) if (is_unit_prefix(token, words[i])) { print token; break }
       }'
   }
-  # A lesson climbs a ladder from the instance to the class: ladder:<instance> -> <mechanism> -> <class>.
-  # Its class and examples carry no code token of the feedback item or the instance.
+  # The ladder field is described in this file's header.
   check_lesson_ladder() {
     local item=$1 from=$2 ladder_text instance step_count empty_step_count class_text item_text tokens hit example examples_text
     ladder_text=$(get_lesson_field ladder "$from")
