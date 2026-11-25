@@ -136,9 +136,10 @@ run_git_in "$merge_repo" merge -q --no-commit --no-ff quoted > /dev/null
 check_verdict deny "blocked: a merge adding a rule under a quote-and-substitution path, with no command run" "git commit --no-edit" "$merge_repo"
 expect_eq "the path was never run as a command" "" "$(find "$work_dir" "$PWD" -maxdepth 3 -name INJECTED 2>/dev/null)"
 run_git_in "$merge_repo" merge --abort
-echo '- Prefer early returns.' >> "$merge_repo/CLAUDE.md"
+run_git_in "$merge_repo" checkout -q lesson
+echo '- A rule main already reviewed.' >> "$merge_repo/CLAUDE.md"
 run_git_in "$merge_repo" add CLAUDE.md
-check_verdict deny "blocked: a normal commit adding prose still blocks" "git commit -m 'rule'" "$merge_repo"
+check_verdict deny "blocked: a normal commit adding a line the default branch already has" "git commit -m 'rule'" "$merge_repo"
 
 # The merged commit is one the default branch has, but the default branch's file has since dropped the line.
 dup_repo="$work_dir/dup-repo"

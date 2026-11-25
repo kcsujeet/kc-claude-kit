@@ -43,42 +43,39 @@ deny_prose_only_rule() {
   print_pretooluse_deny "Blocked by the kc-gates plugin: a new rule needs a check that blocks the mistake in the same commit (script, hook, test or CI); prose alone is not accepted. This commit adds rule lines to an instruction file and adds or changes no check file. Add the check, or ask the user: only their typed words approve prose alone. When their latest message says \"approve prose\", prefix the command with KC_PROSE_APPROVED=1; the token without those words stays blocked.$(needed_phrases_sentence "$1" "$APPROVAL_PHRASE")"
 }
 
-# Copies the `git diff -U0` on stdin to stdout without the added lines a merge only carries in: while
-# a merge is being concluded, a line already in that file at the default branch (or at the merged
-# commit, when the default branch has it) was reviewed where it was written. Outside a merge the diff
-# passes unchanged. The reviewed lines are read by git into files first, so a path never reaches a shell.
+# Drops the added lines of a `git diff -U0` (stdin) that a merge only carries in: lines already in that
+# file at the default branch, or at the merged commit when the default branch has it. Outside a merge
+# the diff passes unchanged. Git reads each reviewed file into a scratch file, so a path reaches no shell.
 drop_carried_in_lines() {
-  local dir=$1 default_ref refs scratch path file_number=0
+  local dir=$1 reviewed_refs ref scratch path file_number=0
   if ! git -C "$dir" rev-parse -q --verify MERGE_HEAD > /dev/null 2>&1; then
     cat
     return
   fi
-  default_ref=$(get_default_branch_ref "$dir")
-  refs=$default_ref
+  reviewed_refs=$(get_default_branch_ref "$dir")
   if is_default_branch_merge "$dir"; then
-    refs="$refs $(git -C "$dir" rev-parse MERGE_HEAD)"
+    reviewed_refs="$reviewed_refs $(git -C "$dir" rev-parse MERGE_HEAD)"
   fi
   scratch=$(mktemp -d)
   cat > "$scratch/diff"
   while IFS= read -r path; do
     file_number=$((file_number + 1))
-    printf '%s\n' "$path" >> "$scratch/paths"
-    # shellcheck disable=SC2086 # $refs is a list of refs
-    for ref in $refs; do git -C "$dir" show "$ref:$path" 2> /dev/null; done > "$scratch/$file_number"
+    # shellcheck disable=SC2086 # $reviewed_refs is a list of refs
+    for ref in $reviewed_refs; do git -C "$dir" show "$ref:$path" 2> /dev/null; done > "$scratch/$file_number"
   done < <(sed -n 's/^+++ b\///p' "$scratch/diff")
   awk -v scratch="$scratch" '
-    BEGIN { while ((getline path < (scratch "/paths")) > 0) file_number_of[path] = ++count }
     /^diff --git / { in_header = 1; delete reviewed_lines }
     /^@@/ { in_header = 0 }
-    in_header && /^\+\+\+ / {
-      path = substr($0, 7)
-      if (path in file_number_of) {
-        reviewed_file = scratch "/" file_number_of[path]
-        while ((getline line < reviewed_file) > 0) reviewed_lines[line] = 1
-        close(reviewed_file)
-      }
+    in_header && /^\+\+\+ b\// {
+      reviewed_file = scratch "/" ++file_number
+      while ((getline line < reviewed_file) > 0) reviewed_lines[line] = 1
+      close(reviewed_file)
     }
-    !in_header && /^\+/ && (substr($0, 2) in reviewed_lines) { next }
+    !in_header && /^\+/ {
+      line_text = substr($0, 2)
+      is_carried_in = line_text in reviewed_lines
+      if (is_carried_in) next
+    }
     { print }' "$scratch/diff"
   rm -rf "$scratch"
 }
