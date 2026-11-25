@@ -18,6 +18,11 @@
 #                          `only state: <why>` (three or more words) when it has one. One walk of one
 #                          state is not QA: list every shape the output can take and walk each.
 #
+# A walk-item that select-gates.sh also marks `walk-layout: <path>` (its diff sets layout styling)
+# must list the viewport widths walked on its states field, written with px (`1920px`, `1280px`,
+# `390px`): a wide desktop (1920 or more), a laptop (1024 to 1919) and a phone (600 or less). A
+# layout that holds at two widths can slide, clip or collapse at a third.
+#
 # The environment the walk ran in is one line too, `env<TAB><command><TAB><evidence>`: the one command
 # that brought the app up (never a chain of steps done by hand: no `&&`, `;`, `||` or `then`), and
 # evidence the app answered after it (a request line with its status, or a capture). Required
@@ -55,6 +60,28 @@ has_walked_states() {
   [ "$(printf '%s' "$text" | tr ';' '\n' | grep -c '[^[:space:]]')" -ge "$MIN_STATES" ]
 }
 
+# Prints the widths in a states field (`1920px`, `1920w`, `1920x1080`, `@1920`), one per line.
+viewport_widths() {
+  printf '%s' "$1" | grep -Eo '([0-9]{3,4})(px|w)([^a-z]|$)|@[0-9]{3,4}|[0-9]{3,4}x[0-9]{3,4}' | sed -E 's/^@//; s/[^0-9].*$//' || true
+}
+
+# Prints the width classes missing from a states field, or nothing when all three are there.
+missing_widths() {
+  local widths missing="" w has_wide=false has_laptop=false has_phone=false
+  widths=$(viewport_widths "$1" | awk '!seen[$0]++')
+  for w in $widths; do
+    if [ "$w" -ge 1920 ]; then has_wide=true
+    elif [ "$w" -ge 1024 ]; then has_laptop=true
+    elif [ "$w" -le 600 ]; then has_phone=true; fi
+  done
+  $has_wide || missing="a wide desktop (1920px or more)"
+  $has_laptop || missing="${missing:+$missing, }a laptop (1024px to 1919px)"
+  $has_phone || missing="${missing:+$missing, }a phone (600px or less)"
+  printf '%s' "$missing"
+}
+
+layout_items=$(sed -n 's/^walk-layout: //p' "$select_output")
+
 problems=0
 record_walk_problem() { echo "walk-item $1: $2"; problems=$((problems + 1)); }
 
@@ -86,6 +113,12 @@ while IFS= read -r item; do
   states=$(printf '%s' "$line" | awk -F'\t' '{ print $4 }')
   if ! has_walked_states "$states"; then
     record_walk_problem "$item" "fewer than two states walked: list every shape the change's output can take (empty, one long row, many short rows, each option) and walk each; write states: <a>; <b> as the fourth field, or only state: <why, three or more words> when it has one"
+  fi
+  if printf '%s\n' "$layout_items" | grep -qxF "$item"; then
+    absent_widths=$(missing_widths "$states")
+    if [ -n "$absent_widths" ]; then
+      record_walk_problem "$item" "its diff changes layout styling but the states field names no viewport width for: $absent_widths; walk the screen at each and list the widths with px (states: 1920px; 1280px; 390px)"
+    fi
   fi
 done <<EOF
 $items

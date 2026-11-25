@@ -33,6 +33,22 @@ kc_added_code() {
     /^\+/ { if (code) print substr($0, 2) }' "$1"
 }
 
+# kc_layout_paths <diff-file>: the paths whose added lines set layout styling: a size, position,
+# spacing, font-size, transform, flex or grid property as a style-object key or stylesheet
+# declaration, or a utility class (w-, p-4, absolute, text-lg) on a line with className or class.
+kc_layout_paths() {
+  awk '
+    /^\+\+\+ / { path = substr($0, 5); sub(/^b\//, "", path); next }
+    /^\+/ {
+      line = substr($0, 2)
+      if (line ~ /(^|[^A-Za-z0-9_-])(width|height|(min|max)-?[Ww]idth|(min|max)-?[Hh]eight|position|top|left|right|bottom|inset|font-?[Ss]ize|transform|flex|gap|display|overflow|z-?[Ii]ndex|aspect-?[Rr]atio|(padding|margin|inset|grid|flex)([A-Z][A-Za-z]*|-[a-z-]+)|p[trblxy]|m[trblxy])\x27?"?[[:space:]]*:/ ||
+          (line ~ /(className|class)[ =]/ && line ~ /(^|[ "\x27`])(w|h|min-w|max-w|min-h|max-h|p[trblxy]?|m[trblxy]?|inset|top|left|right|bottom|gap|text-(xs|sm|base|lg|[0-9]?xl)|translate-[xy])-[^ "\x27`]+|(^|[ "\x27`])(absolute|relative|fixed|sticky)([ "\x27`]|$)/))
+        seen[path] = 1
+    }
+    END { for (p in seen) print p }
+  ' "$1"
+}
+
 # Paths a signed-out visitor reaches, built in; a repo adds its own in .claude/public-paths.txt.
 # The extension list is narrower than KC_RISK_SOURCE_PATHS on purpose: a shell script serves no
 # visitor.

@@ -234,6 +234,15 @@ expect_eq "a config-only diff: WALK=not-required" "WALK=not-required" "$(walk_li
 expect_eq "a docs-only diff: no walk-item lines" "0" "$(select_gates_output "$work_dir/walk-docs" | grep -c '^walk-item:' || true)"
 expect_eq "a test-only diff: no walk-item lines" "0" "$(select_gates_output "$work_dir/walk-spec" | grep -c '^walk-item:' || true)"
 
+# Layout styling: a walk-item whose added lines set layout gets a walk-layout line too.
+make_case "$work_dir/walk-layout-sx" "<Box sx={{ containerType: 'size', pt: '20cqw' }} />" src/cart/Total.tsx
+expect_eq "layout: a style-object key makes a walk-layout line" "walk-layout: src/cart/Total.tsx" "$(select_gates_output "$work_dir/walk-layout-sx" | grep '^walk-layout:')"
+make_case "$work_dir/walk-layout-class" '<div className="absolute w-1/2 p-4" />' src/cart/Total.tsx
+expect_eq "layout: utility classes make a walk-layout line" "walk-layout: src/cart/Total.tsx" "$(select_gates_output "$work_dir/walk-layout-class" | grep '^walk-layout:')"
+make_case "$work_dir/walk-layout-none" 'const total = items.length' src/cart/Total.tsx
+expect_eq "layout: plain logic makes no walk-layout line" "0" "$(select_gates_output "$work_dir/walk-layout-none" | grep -c '^walk-layout:' || true)"
+expect_eq "layout: plain logic still has its walk-item" "walk-item: src/cart/Total.tsx" "$(select_gates_output "$work_dir/walk-layout-none" | grep '^walk-item:')"
+
 # select-gates and pass-size.sh decide "public path" with the same function: the signed-out
 # reason appears exactly when pass-size.sh reports a public-path risk.
 pass_size="$(dirname "$tests_dir")/scripts/pass-size.sh"

@@ -1,0 +1,9 @@
+src/Card.tsx:2: [new to the repo: container-type]   containerType: 'size',
+src/Card.tsx:3: [new to the repo: cqw]   pt: '20cqw',
+src/Card.tsx:6: [new to the repo: cqw] const row = { containerType: 'inline-size', '& .mark': { pt: '20cqw' } }
+src/Card.tsx:6: [new to the repo: container-type] const row = { containerType: 'inline-size', '& .mark': { pt: '20cqw' } }
+src/Card.tsx:7: [new to the repo: cqh] const stack = { '& .a': { pt: '5cqh' }, containerType: 'size' }
+src/Card.tsx:7: [new to the repo: container-type] const stack = { '& .a': { pt: '5cqh' }, containerType: 'size' }
+src/Card.tsx:8: [new to the repo: svh] const sheet = `@supports (aspect-ratio: 1) { .x { width: 10svh } }`
+src/Card.tsx:8: [new to the repo: @supports (aspect-ratio)] const sheet = `@supports (aspect-ratio: 1) { .x { width: 10svh } }`
+src/Card.tsx:3: [cq unit on the container: it measures the next container up, not this element]   pt: '20cqw',

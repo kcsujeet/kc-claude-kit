@@ -116,4 +116,30 @@ expect_contains "§H8: only state with a one-word reason fails" "fewer than two 
 write_states 'only state:'
 expect_contains "§H8: only state with no reason fails" "fewer than two states walked" "$(run_walk_receipt_check)"
 
+# Layout styling: a walk-layout item must list a wide desktop, a laptop and a phone width.
+printf 'GATES=naming\nWALK=required\nwalk: x\nwalk-item: src/cart/total.tsx\nwalk-layout: src/cart/total.tsx\n' > "$select_output"
+write_layout_states() { printf 'env\tbin/review-env up\tGET /health 200\nsrc/cart/total.tsx\tcard sits at the top\tPOST /orders 201\t%s\n' "$1" > "$receipt"; }
+write_layout_states 'states: 1280px; 390px'
+layout_missing=$(run_walk_receipt_check)
+expect_contains "layout: no wide desktop width fails" "walk-item src/cart/total.tsx: its diff changes layout styling but the states field names no viewport width for: a wide desktop (1920px or more)" "$layout_missing"
+expect_not_contains "layout: it does not list the widths that are there" "laptop" "$layout_missing"
+write_layout_states 'states: empty cart; two items'
+layout_none=$(run_walk_receipt_check)
+expect_contains "layout: states with no widths list all three" "a wide desktop (1920px or more), a laptop (1024px to 1919px), a phone (600px or less)" "$layout_none"
+write_layout_states 'states: 1920px; 390px'
+expect_contains "layout: no laptop width fails" "a laptop (1024px to 1919px)" "$(run_walk_receipt_check)"
+write_layout_states 'states: 1920px; 1280px'
+expect_contains "layout: no phone width fails" "a phone (600px or less)" "$(run_walk_receipt_check)"
+write_layout_states 'states: 1920px; 1440px; 1280px; 768px; 390px'
+expect_eq "layout: wide, laptop and phone pass" clean "$(run_walk_receipt_check)"
+write_layout_states 'only state: one fixed layout for all'
+expect_contains "layout: only state does not excuse the widths" "names no viewport width" "$(run_walk_receipt_check)"
+write_layout_states 'states: 1920x1080; 1366w; @375'
+expect_eq "layout: widths written as 1920x1080, 1366w and @375 count" clean "$(run_walk_receipt_check)"
+write_layout_states 'states: 1000 rows; 2000 rows; 500 rows'
+expect_contains "layout: counts without px are not widths" "names no viewport width" "$(run_walk_receipt_check)"
+printf 'GATES=naming\nWALK=required\nwalk: x\nwalk-item: src/cart/total.tsx\n' > "$select_output"
+write_layout_states 'states: empty cart; two items'
+expect_eq "layout: a walk-item with no walk-layout line needs no widths" clean "$(run_walk_receipt_check)"
+
 finish

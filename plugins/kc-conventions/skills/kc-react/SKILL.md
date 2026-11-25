@@ -121,6 +121,7 @@ The react gate agent ticks every box against the diff. A box is FAIL if any matc
 - [ ] §R35 An empty slot (an image, a file, an avatar, a list) reads as empty: muted styling the filled state doesn't share, and an icon that names what belongs there, matching 2 cited empty slots in the codebase. A placeholder styled like content, or an icon for something else (a person icon where a logo goes), FAILS. (N/A: no empty slot added or changed)
 - [ ] §R36 A field that picks a record is a picker component for that kind of record, in its own file, shaped like 2 cited existing pickers (the props they take, how they narrow, how they show an empty list). A form or field component that fetches records and builds the options itself FAILS. (N/A: no record picker added or changed)
 - [ ] §R37 Markup shared by two or more components is a component taking the differences as props. A hook or function whose return value carries JSX for callers to render FAILS, unless the codebase's API for that spot takes options with node labels and 2 cited similar call sites build them inline. (N/A: no shared markup added or moved)
+- [ ] §R39 CSS the diff adds stays with what the repo already uses, and a container-query unit measures the box it means: every hit of the `new-css-features.sh` sweep (a unit or feature with zero uses at the base, such as a viewport or container-query unit, `@container`, `@supports` on a property, `:has()`, `subgrid`) FAILS unless the author uses the units the repo already uses (`%`, `rem`, `vh`) or a comment says why they can't; a container-query length unit (`cqw`, `cqh`, `cqi`, `cqb`, `cqmin`, `cqmax`) on the same style object or rule as the `container-type` that makes its element a container FAILS, since it measures the next container up, often the viewport. **Enumerate**: `grepped new css features: N hits`, one verdict per hit. (N/A: `grepped new css features: 0 hits`)
 - [ ] §R38 Every value a render reads for what it shows or passes on comes from a subscription (a watched form field, a store selector, state, a hook's return value). A one-off read during render (`getValues()`, `getState()`, `ref.current`, a module variable that changes) FAILS: a memoizing compiler or `memo` can keep its first result, and a ref is unset on the first render; read it in an effect or event handler, or subscribe. (N/A: no render reads a form, store or ref)
 
 ## Review detail
@@ -422,9 +423,9 @@ A wrapper element that only repeats its parent's styling, or that adds no layout
 
 #### §R19. Check layout at narrow widths
 
-A change to sizing or layout that looks right on a wide screen can collapse on a narrow one. For any diff touching width, height, min/max sizing, flex or grid layout, or positioning, check it at 375, 600, 768, and 1024 px:
+A change to sizing or layout that looks right on a wide screen can collapse on a narrow one. For any diff touching width, height, min/max sizing, flex or grid layout, or positioning, check it at 375, 600, 768, 1024 and 1920 px (a wide desktop shows what a viewport-relative unit or an unbounded width does when the screen is bigger than the design):
 
-- Compute (or measure in a running app) the usable width per column or cell at each width, after subtracting padding, gaps, and fixed-width siblings.
+- Measure in the running app, never estimate, the usable width per column or cell at each width, after subtracting padding, gaps, and fixed-width siblings. A box that says a layout holds "by calculation" or "estimated" FAILS (`verify-gate-blocks.sh` rejects it): cite the screenshot path or the measured value.
 - Confirm the content still renders readably at each: text does not overflow, controls stay tappable, nothing is clipped.
 - Put the numbers in the finding ("7 columns at 375 px leave 41 px per cell after padding").
 
@@ -481,6 +482,12 @@ Save the diff under review to a file (`gh pr diff <num> > /tmp/review.diff`, or 
 
   ```bash
   bash "${CLAUDE_PLUGIN_ROOT}/skills/kc-react/scripts/mutate-async.sh" <diff-file>
+  ```
+
+- `new-css-features.sh` (§R39): added CSS units and features with zero uses in the repo at the base, and a container-query unit on the element that is its own container. Receipt: `grepped new css features: N hits`. It reads the repo as its second argument, and the base ref as an optional third (without one it counts the head checkout minus the added lines).
+
+  ```bash
+  bash "${CLAUDE_PLUGIN_ROOT}/skills/kc-react/scripts/new-css-features.sh" <diff-file> <repo-root>
   ```
 
 - `memo-hooks.sh` (§R16): added lines calling `useMemo` or `useCallback`. Receipt: `grepped memo hooks: N hits`.

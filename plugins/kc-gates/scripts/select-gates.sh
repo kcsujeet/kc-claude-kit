@@ -35,7 +35,9 @@
 # test pass-size.sh makes: built-in patterns plus the repo's .claude/public-paths.txt): the walk
 # is then as every audience that can reach it, signed out included. When required, one
 # `walk-item: <path>` line per changed non-test source file follows, so a receipt can be counted
-# against them.
+# against them. A walk-item whose added lines set layout styling (a size, position, spacing,
+# font size, transform or flex/grid property in a style object, stylesheet or class list) also gets
+# a `walk-layout: <path>` line: check-walk-receipt.sh then wants the viewport widths walked.
 #
 # Exits 0 on success, 2 on a usage error or a missing input file.
 set -euo pipefail
@@ -253,4 +255,9 @@ else
 fi
 if [ -n "$walk_items" ]; then
   printf '%s\n' "$walk_items" | sed 's/^/walk-item: /'
+  layout_paths=$(kc_layout_paths "$diff_file")
+  while IFS= read -r walk_path; do
+    [ -n "$walk_path" ] && printf '%s\n' "$layout_paths" | grep -qxF "$walk_path" && echo "walk-layout: $walk_path"
+  done <<< "$walk_items"
 fi
+true

@@ -1,10 +1,13 @@
 #!/usr/bin/env bash
 # Lists the review comments on the current branch's pull request that its author has not answered:
 # inline comments (`pulls/<n>/comments`, grouped into threads by in_reply_to_id) and top-level ones
-# (`issues/<n>/comments`), from anyone but the author, bot reviewers included. A comment is
-# answered when the PR's author wrote a comment after it in the same thread (top-level comments
-# are one thread). ready-receipt.sh refuses a receipt while any comment is unanswered, since a
-# bot posts when the PR goes ready and a pass that never read it hands the PR on with it open.
+# (`issues/<n>/comments`), from anyone but the author. Inline comments from bot reviewers are
+# listed: a review bot posts inline when the PR goes ready and a pass that never read it hands the
+# PR on with it open. Top-level comments from a bot account (`user.type` is `Bot`, or the login
+# ends in `[bot]`) are not: a deploy-preview or issue-tracker link-back bot posts one automatically
+# and nothing in it asks for a reply. A comment is answered when the PR's author wrote a comment
+# after it in the same thread (top-level comments are one thread). ready-receipt.sh refuses a
+# receipt while any comment is unanswered.
 #
 # Usage: unanswered-pr-comments.sh      (from the repo of the branch)
 # Output: one line per unanswered comment, `<path>:<line> @<author>: <start of the comment>` (or
@@ -32,6 +35,7 @@ unanswered=$(jq -rn --arg author "$pr_author" --slurpfile inline_pages <(printf 
     if .in_reply_to_id != null and ($by_id[.in_reply_to_id | tostring] != null)
     then $by_id[.in_reply_to_id | tostring] | root_id($by_id)
     else .id end;
+  def is_bot: .user.type == "Bot" or ((.user.login // "") | endswith("[bot]"));
   def unanswered_in($thread):
     . as $comment
     | $comment.user.login != $author
@@ -43,7 +47,7 @@ unanswered=$(jq -rn --arg author "$pr_author" --slurpfile inline_pages <(printf 
   | ($rooted[] | . as $comment
       | select($comment | unanswered_in($rooted | map(select(.root == $comment.root))))
       | "\(.path):\(.line // .original_line // "?") @\(.user.login): \(snippet)"),
-    ($top_pages[0] as $top | $top[] | select(unanswered_in($top))
+    ($top_pages[0] as $top | $top[] | select(is_bot | not) | select(unanswered_in($top))
       | "top-level @\(.user.login): \(snippet)")
 ')
 

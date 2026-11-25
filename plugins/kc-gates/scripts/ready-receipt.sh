@@ -107,7 +107,7 @@
 #     not have (a new kind: payments, data deletion), --scope-approved carries
 #     the user's words approving that.
 # A write of a pass or an --after receipt is also refused while the PR has a comment its author has
-# not answered (unanswered-pr-comments.sh: inline and top-level, bot reviewers included); with no
+# not answered (unanswered-pr-comments.sh: inline and top-level; top-level comments from bot accounts are skipped); with no
 # PR or no network that check prints a note and passes.
 # It checks presence and shape, not whether the verdicts are true. Run it from
 # the repo root; the commits must be in the local clone.

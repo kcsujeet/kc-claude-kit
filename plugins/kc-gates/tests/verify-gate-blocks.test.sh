@@ -158,6 +158,24 @@ expect_contains "several problems: the contradiction and the status" "says STATU
 expect_contains "several problems: the sweep" "has 1 per-hit verdict(s)" "$last_output"
 expect_contains "several problems: the citation" "sha abcdef0 is not the head" "$last_output"
 
+# --- layout asserted by reasoning ---------------------------------------------
+build_round
+set_gate react "GATE: react\nSTATUS: PASS\nBOXES:\n- [PASS] §R19: layout fine at 1920, estimated by calculation: 20cqw leaves 384px\nFINDINGS:\n- none\n"
+expect_problem "a layout box passed by calculation" "§R19 asserts a rendered layout by reasoning (\"by calculation\")"
+expect_contains "it tells the gate to measure in the running app" "measure it in the running app" "$last_output"
+set_gate react "GATE: react\nSTATUS: PASS\nBOXES:\n- [PASS] §R19: the card should render without overflow on narrow screens\nFINDINGS:\n- none\n"
+expect_problem "a layout box that says should render" "asserts a rendered layout by reasoning"
+set_gate react "GATE: react\nSTATUS: PASS\nBOXES:\n- [PASS] §R19: estimated column width 41px at 375\nFINDINGS:\n- none\n"
+expect_problem "an estimated width" "asserts a rendered layout by reasoning (\"estimated\")"
+set_gate react "GATE: react\nSTATUS: PASS\nBOXES:\n- [PASS] §R19: it would fit, see captures/wide-1920.png\nFINDINGS:\n- none\n"
+expect_clean "reasoning words beside a screenshot path pass"
+set_gate react "GATE: react\nSTATUS: PASS\nBOXES:\n- [PASS] §R19: should render fine; measured 412px wide at 1920\nFINDINGS:\n- none\n"
+expect_clean "reasoning words beside a measured value pass"
+set_gate react "GATE: react\nSTATUS: FAIL\nBOXES:\n- [FAIL] §R19: estimated width is wrong, would overflow\nFINDINGS:\n- x\n"
+expect_clean "a FAIL box is not held to it"
+set_gate react "GATE: react\nSTATUS: PASS\nBOXES:\n- [PASS] §R1: estimated delivery date is shown by the order page\nFINDINGS:\n- none\n"
+expect_clean "estimated with no layout word is not a layout claim"
+
 # An agent's verification block is read like any gate's.
 build_round
 set_gate verification "GATE: verification\nSTATUS: PASS\nBOXES:\n- [FAIL] §V3: PASS\nFINDINGS:\n- none\n"
