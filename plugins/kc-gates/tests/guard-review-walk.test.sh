@@ -15,14 +15,20 @@ TMPDIR=$work_dir/tmp
 mkdir -p "$TMPDIR"
 export TMPDIR
 review=$TMPDIR/kc-review-abc123
-cd "$work_dir"
+# The session runs in a checkout that holds the review's head commit.
+repo_dir=$work_dir/repo
+mkdir -p "$repo_dir"
+git -C "$repo_dir" init -q
+git -C "$repo_dir" -c user.name=t -c user.email=t@example.test commit -q --allow-empty -m base
+head_sha=$(git -C "$repo_dir" rev-parse HEAD)
+cd "$repo_dir"
 
 # Saves a review the way gather-review.sh does, changing <path>.
 write_review() {
   mkdir -p "$review"
   printf -- '--- a/%s\n+++ b/%s\n@@ -0,0 +1 @@\n+x\n' "$1" "$1" > "$review/review.diff"
   printf '%s\n' "$1" > "$review/changed-files.txt"
-  printf 'HEAD_SHA=abc123\nPR=12\nURL=https://github.com/acme/shop/pull/12\n' > "$review/meta.env"
+  printf 'HEAD_SHA=%s\nPR=12\nURL=https://github.com/acme/shop/pull/12\n' "$head_sha" > "$review/meta.env"
 }
 
 # Runs the guard on a Stop payload with <reply>; prints held or out, and keeps its output in
@@ -132,5 +138,17 @@ cp "$review/verdicts/naming.txt" "$verdicts_only/verdicts/"
 expect_eq "§G7 verdicts: a folder with no review files is not checked" out "$(KC_REVIEW_DIR=$verdicts_only run_stop "$verdict_reply")"
 rm -rf "$review/verdicts"
 expect_eq "§G7 verdicts: no verdicts folder, nothing to check" out "$(run_stop "$verdict_reply")"
+
+# Another session's review, gathered in another repo, never holds this session's replies: a reply
+# asking whether to build something, in a checkout without that review's head commit, goes out.
+write_review app/models/order.rb
+rm -f "$review/walk-receipt.tsv"
+other_repo=$work_dir/other-repo
+mkdir -p "$other_repo"
+git -C "$other_repo" init -q
+expect_eq "another repo's unwalked review: a question there goes out" out "$(cd "$other_repo" && run_stop "$qa_offer_reply")"
+expect_eq "another repo's unwalked review: a verdict there goes out" out "$(cd "$other_repo" && run_stop "$verdict_reply")"
+expect_eq "outside any checkout: a question goes out" out "$(cd "$work_dir" && run_stop "$qa_offer_reply")"
+expect_eq "the review's own repo: the same question is still held" held "$(run_stop "$qa_offer_reply")"
 
 finish
