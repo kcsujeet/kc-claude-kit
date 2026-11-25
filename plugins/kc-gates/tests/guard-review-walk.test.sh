@@ -107,4 +107,19 @@ cp "$review/review.diff" "$review/changed-files.txt" "$other/"
 printf 'env\tbin/review-env up\tGET /health 200\napp/models/order.rb\tcreated an order\tPOST /orders 201\tstates: empty cart; two items\n' > "$other/walk-receipt.tsv"
 expect_eq "KC_REVIEW_DIR names the review to check" out "$(KC_REVIEW_DIR=$other run_stop "$verdict_reply")"
 
+# Confirmed findings stay in the report: with a verdicts/ folder in the review, a verdict reply that
+# neither names a gate's finding (basename and line) nor lists it under Dropped: is blocked.
+write_review docs/notes.md
+mkdir -p "$review/verdicts"
+# shellcheck disable=SC2016 # backticks in the fixture text are literal
+printf 'STATUS: FAIL\nFINDINGS:\n- 🟡 src/cart.ts:L4: `tmp` is opaque. Rename `total`.\n- 🟠 src/orders/refund.ts:42@abc1234: skips archived orders.\n' > "$review/verdicts/naming.txt"
+expect_eq "§G7 verdicts: a verdict that leaves out a confirmed finding is held" held "$(run_stop "$verdict_reply")"
+expect_contains "§G7 verdicts: the block names the missing finding" "a gate found refund.ts:42 and the reply neither reports it nor lists it under Dropped: with a reason" "$(cat "$work_dir/last-output")"
+expect_not_contains "§G7 verdicts: the block leaves out the finding the reply names" "a gate found cart.ts:4" "$(cat "$work_dir/last-output")"
+expect_eq "§G7 verdicts: a reply naming both findings goes out" out "$(run_stop "$verdict_reply"$'\n- 🟠 `refund.ts:42`: skips archived orders. (non-blocking)')"
+expect_eq "§G7 verdicts: a finding on a Dropped: line goes out" out "$(run_stop "$verdict_reply"$'\nDropped: refund.ts:42 (the author already fixed it)')"
+expect_eq "§G7 verdicts: a reply with no verdict is untouched" out "$(run_stop "$unfinished_reply")"
+rm -rf "$review/verdicts"
+expect_eq "§G7 verdicts: no verdicts folder, nothing to check" out "$(run_stop "$verdict_reply")"
+
 finish

@@ -2,45 +2,45 @@
   {
     "path": "src/widgets/list.ts",
     "line": 3,
-    "body": "**note**:\nFine on its own."
+    "covered": "read the description and the ticket: neither says this", "body": "**note**:\nFine on its own."
   },
   {
     "path": "src/widgets/list.ts",
     "line": 10,
-    "body": "**note**:\nOutside every hunk."
+    "covered": "read the description and the ticket: neither says this", "body": "**note**:\nOutside every hunk."
   },
   {
     "path": "src/other.ts",
     "line": 1,
-    "body": "**note**:\nNot in the diff."
+    "covered": "read the description and the ticket: neither says this", "body": "**note**:\nNot in the diff."
   },
   {
     "path": "src/widgets/list.ts",
     "line": 3,
-    "body": "   "
+    "covered": "read the description and the ticket: neither says this", "body": "   "
   },
   {
     "path": "src/widgets/list.ts",
     "start_line": 4,
     "line": 23,
-    "body": "**note**:\nAcross two hunks."
+    "covered": "read the description and the ticket: neither says this", "body": "**note**:\nAcross two hunks."
   },
   {
     "path": "src/widgets/list.ts",
     "start_line": 3,
     "line": 3,
-    "body": "**note**:\nEmpty range."
+    "covered": "read the description and the ticket: neither says this", "body": "**note**:\nEmpty range."
   },
   {
     "path": "src/widgets/list.ts",
     "line": 4,
     "side": "LEFT",
-    "body": "**note**:\nAdded line on the old side."
+    "covered": "read the description and the ticket: neither says this", "body": "**note**:\nAdded line on the old side."
   },
   {
     "path": "src/widgets/list.ts",
     "line": 3,
     "side": "MIDDLE",
-    "body": "**note**:\nBad side."
+    "covered": "read the description and the ticket: neither says this", "body": "**note**:\nBad side."
   }
 ]

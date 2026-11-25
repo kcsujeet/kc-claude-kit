@@ -4,7 +4,10 @@
 #
 # Usage: check-draft-format.sh <drafts.json> [<head-sha>]
 #   <drafts.json>  the JSON array of {path, line, body, ...} that build-comment-payloads.sh takes;
-#                  a draft may carry "long": "<reason>" when its length is the stated exception,
+#                  every draft with a body carries "covered": what the reviewer read of the author's
+#                  own words before drafting (the pull request description, the linked ticket, the
+#                  author's replies and code comments) and why they do not already answer the
+#                  point; a draft may carry "long": "<reason>" when its length is the stated exception,
 #                  and "code": "<reason>" when its code is; an `issue` or `suggestion` draft carries
 #                  "ran": what its asked-for change was run against and the result, or
 #                  "n/a: <why>" when it asks for no behaviour change, or asks for an outcome and a
@@ -21,7 +24,16 @@
 #     Conventional Comments `**suggestion:**`, `**nitpick (non-blocking):**`), and use no `(blocking)`;
 #   - hold no em dash, no `§` rule citation, no emoji, and not open with a praise phrase
 #     (Good catch, Good call, Fair, Real bug, Nice find);
-#   - outside code blocks, have at most 3 sentences and none over 25 words, unless "long" says why;
+#   - outside code blocks, have at most 3 sentences and none over 25 words, unless "long" says why,
+#     and no stretch of 14 or more words in a sentence without a comma, semicolon, colon,
+#     parenthesis or dash between them (a long unbroken run reads as one heavy block; the
+#     same "long" reason excuses it);
+#   - carry a "covered" record, empty or a bare "n/a" refused: a review that raises as a problem
+#     what the author already decided or explained did not read the author's words first (the
+#     pull request description, the linked ticket, the replies and code comments). Examples: a
+#     missing null check called a bug when the description says a migration always sets the
+#     field; a feature flag asked for when the ticket says the product decided against one; a
+#     rename suggested that the author explained in a reply;
 #   - hold at most 2 non-blank lines of code across its code blocks, unless "code" says why: a
 #     comment says what is wrong and what should happen, and the author, who knows the code,
 #     writes the fix;
@@ -80,6 +92,11 @@ perl -MJSON::PP -CS -e '
     my $body = $draft->{body} // "";
     next unless $body =~ /\S/;  # build-comment-payloads.sh reports an empty body
     my @found;
+    my $covered = $draft->{covered} // "";
+    $covered = "" if ref $covered;
+    if ($covered !~ /\S/ || $covered =~ m{^\s*n/?a\W*$}i) {
+      push @found, "no \"covered\": read the pull request description, the linked ticket and the author\x27s replies first; say what they say about this and why it is still worth raising, or drop the draft";
+    }
     my ($first, $rest) = split /\n/, $body, 2;
     $rest //= "";
     if ($first !~ /^\*\*($labels)( \((non-blocking|if-minor)\))?(:\*\*|\*\*( \((non-blocking|if-minor)\))?:)\s*$/) {
@@ -101,6 +118,18 @@ perl -MJSON::PP -CS -e '
           push @found, "has a $words-word sentence; split it or say why in \"long\"";
           last;
         }
+      }
+    }
+    unless (defined $draft->{long} && $draft->{long} =~ /\S/) {
+      for my $sentence (@sentences) {
+        for my $clause (split /[,;:()\x{2013}\x{2014}]|\s-+\s|--/, $sentence) {
+          my @words = $clause =~ /\S+/g;
+          next if @words < 14;
+          my $preview = join " ", @words[0 .. 5];
+          push @found, sprintf("has a %d-word stretch with no comma or pause (\"%s...\"); break it into short clauses", scalar @words, $preview);
+          last;
+        }
+        last if grep { /-word stretch/ } @found;
       }
     }
     my $code_lines = 0;

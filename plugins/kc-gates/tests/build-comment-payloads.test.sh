@@ -161,7 +161,7 @@ git -C "$code_repo" add -A
 git -C "$code_repo" -c user.email=t@example.com -c user.name=t commit -q -m one
 code_sha=$(git -C "$code_repo" rev-parse HEAD)
 printf 'diff --git a/cart.rb b/cart.rb\n--- a/cart.rb\n+++ b/cart.rb\n@@ -1,2 +1,2 @@\n line one\n-line two\n+line 2\n' > "$work_dir/code.diff"
-jq -n '[{path: "cart.rb", line: 2, body: "**question**:\nCould this use `discount(cart) { false }` here?"}]' > "$work_dir/invented-code.json"
+jq -n '[{path: "cart.rb", line: 2, covered: "read the description: it does not mention the discount", body: "**question**:\nCould this use `discount(cart) { false }` here?"}]' > "$work_dir/invented-code.json"
 code_status=0
 (cd "$code_repo" && bash "$builder" "$work_dir/invented-code.json" "$work_dir/code.diff" "$code_sha" --pr 12 --out-dir "$work_dir/out-code") > /dev/null 2> "$work_dir/code-stderr.txt" || code_status=$?
 expect_eq "§PC5: the builder refuses code found nowhere in the repo" 1 "$code_status"
