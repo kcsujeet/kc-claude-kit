@@ -34,8 +34,9 @@ if ! "$reply_from_stdin" && "$reply_file_is_unreadable"; then
 fi
 
 reply=$(cat "$reply_arg")
-reported_lines=$(grep -Ev '^[[:space:]]*(-|\*)?[[:space:]]*\**Dropped:' <<<"$reply" || true)
-dropped_lines=$(grep -E '^[[:space:]]*(-|\*)?[[:space:]]*\**Dropped:' <<<"$reply" || true)
+dropped_line_pattern='^[[:space:]]*(-|\*)?[[:space:]]*\**Dropped:'
+reported_lines=$(grep -Ev "$dropped_line_pattern" <<<"$reply" || true)
+dropped_lines=$(grep -E "$dropped_line_pattern" <<<"$reply" || true)
 
 # True when a Dropped: line names <file> <line> as `file:line`, `file:Lline` or `file line N` and has
 # reason text after it (other file:line references on the line are not reason text).

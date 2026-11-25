@@ -217,8 +217,6 @@ draft "$work_dir/heavy.json" "$heavy_body" '{}'
 expect_contains "a 16-word stretch with no pause is flagged, with its first words" '16-word stretch with no comma or pause ("after cancelling the order the cart...")' "$(result "$work_dir/heavy.json")"
 draft "$work_dir/paused.json" $'**note**:\nI tried it locally: after cancelling, the cart still had the coupon, but the address stayed the same.' '{}'
 expect_eq "the same point with commas and a colon is clean" clean "$(result "$work_dir/paused.json")"
-draft "$work_dir/heavy-dash.json" $'**note**:\nAfter cancelling the order the cart still had the coupon and the address - was unchanged (a bug).' '{}'
-expect_eq "a spaced dash and a parenthesis break a stretch" clean "$(result "$work_dir/heavy-dash.json")"
 sep_head='After cancelling the order the cart kept the coupon'
 sep_tail=' the shipping address was unchanged after that too.'
 draft "$work_dir/sep-semicolon.json" $'**note**:\n'"$sep_head;$sep_tail" '{}'
@@ -229,12 +227,20 @@ draft "$work_dir/sep-parens.json" $'**note**:\n'"$sep_head (the shipping address
 expect_eq "a 14+ word sentence broken only by parentheses is clean" clean "$(result "$work_dir/sep-parens.json")"
 draft "$work_dir/sep-dash.json" $'**note**:\n'"$sep_head -$sep_tail" '{}'
 expect_eq "a 14+ word sentence broken only by a spaced dash is clean" clean "$(result "$work_dir/sep-dash.json")"
+draft "$work_dir/sep-double-dash.json" $'**note**:\n'"$sep_head--$sep_tail" '{}'
+expect_eq "a 14+ word sentence broken only by a double dash is clean" clean "$(result "$work_dir/sep-double-dash.json")"
+draft "$work_dir/sep-en-dash.json" $'**note**:\n'"$sep_head"$'\xe2\x80\x93'"$sep_tail" '{}'
+expect_eq "a 14+ word sentence broken only by an en dash is clean" clean "$(result "$work_dir/sep-en-dash.json")"
 draft "$work_dir/sep-none.json" $'**note**:\n'"$sep_head$sep_tail" '{}'
 expect_contains "the same sentence with no break is flagged" "-word stretch" "$(result "$work_dir/sep-none.json")"
 draft "$work_dir/heavy-code.json" $'**note**:\nAfter cancelling `the order` the cart still had the coupon and the shipping address was unchanged.' '{}'
 expect_contains "inline code counts as one word, so the stretch is still found" "-word stretch" "$(result "$work_dir/heavy-code.json")"
 jq '.[0].long = "explains why the cart keeps its coupon"' "$work_dir/heavy.json" > "$work_dir/heavy-long.json"
 expect_eq "a stretch with a reason in \"long\" is clean" clean "$(result "$work_dir/heavy-long.json")"
+draft "$work_dir/fourteen.json" $'**note**:\nAfter cancelling the order the cart still had the coupon and address changed again.' '{}'
+expect_contains "a 14-word stretch is flagged" "14-word stretch" "$(result "$work_dir/fourteen.json")"
+draft "$work_dir/two-heavy.json" $'**note**:\nAfter cancelling the order the cart still had the coupon and address changed again. Later the refund went out to the card and the receipt was never sent.' '{}'
+expect_eq "two heavy sentences give one stretch message" 1 "$(result "$work_dir/two-heavy.json" | grep -c -- '-word stretch')"
 draft "$work_dir/thirteen.json" $'**note**:\nAfter cancelling the order the cart still had the coupon and address changed.' '{}'
 expect_eq "a 13-word stretch is clean" clean "$(result "$work_dir/thirteen.json")"
 

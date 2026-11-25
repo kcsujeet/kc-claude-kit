@@ -57,33 +57,39 @@ expect_contains "Dropped: with the file but no line (a number in the reason) doe
   "$(get_check_output $'Dropped: total.ts (ran 4 tests)\n- refund.ts:42 reported')"
 expect_eq "Dropped: with file:line and a reason counts" clean \
   "$(get_check_output $'Dropped: total.ts:4 not reachable from checkout\n- refund.ts:42 reported')"
-expect_contains "Dropped: listing two findings with no reason counts for neither" "refund.ts:42" \
-  "$(get_check_output $'Dropped: total.ts:4, refund.ts:42')"
+two_no_reason=$(get_check_output $'Dropped: total.ts:4, refund.ts:42')
+expect_contains "Dropped: listing two findings with no reason counts for neither" "refund.ts:42" "$two_no_reason"
+expect_contains "Dropped: listing two findings with no reason also reports total.ts:4" "total.ts:4" "$two_no_reason"
+expect_contains "Dropped: with a longer line number (L44) does not cover line 4" "total.ts:4" \
+  "$(get_check_output $'Dropped: total.ts:L44 not reachable\n- refund.ts:42 reported')"
+expect_contains "Dropped: with a longer file name (subtotal.ts) does not cover total.ts" "total.ts:4" \
+  "$(get_check_output $'Dropped: subtotal.ts:4 not reachable\n- refund.ts:42 reported')"
+expect_eq "a bold **Dropped:** line with file:line and a reason counts" clean \
+  "$(get_check_output $'**Dropped:** total.ts:4 not reachable\n- refund.ts:42 reported')"
+expect_contains "a bold **Dropped:** line with no reason does not count" "total.ts:4" \
+  "$(get_check_output $'**Dropped:** total.ts:4\n- refund.ts:42 reported')"
 
 # A large reply that names the findings early must not hit SIGPIPE when grep stops reading.
 large_filler=$(head -c 300000 /dev/zero | tr '\0' 'x')
 expect_eq "a 300KB reply that names the findings early is clean" clean \
   "$(get_check_output "- total.ts:L4 and refund.ts:42 reported"$'\n'"$large_filler")"
 
+# Prints the exit status of the command given, with its output discarded.
+get_exit_status() {
+  local status=0
+  "$@" > /dev/null 2>&1 || status=$?
+  echo "$status"
+}
+
 reply_file=$work_dir/reply.md
 printf -- '- total.ts:L4 and refund.ts:42 reported\n' > "$reply_file"
-status=0
-bash "$check_report_findings_script" "$verdicts" "$reply_file" > /dev/null || status=$?
-expect_eq "a reply file works as well as stdin" 0 "$status"
+expect_eq "a reply file works as well as stdin" 0 "$(get_exit_status bash "$check_report_findings_script" "$verdicts" "$reply_file")"
 
-status=0
-bash "$check_report_findings_script" "$work_dir/no-verdicts" "$reply_file" > /dev/null || status=$?
-expect_eq "no verdicts directory: nothing to check" 0 "$status"
+expect_eq "no verdicts directory: nothing to check" 0 "$(get_exit_status bash "$check_report_findings_script" "$work_dir/no-verdicts" "$reply_file")"
 mkdir "$work_dir/empty-verdicts"
-status=0
-bash "$check_report_findings_script" "$work_dir/empty-verdicts" "$reply_file" > /dev/null || status=$?
-expect_eq "an empty verdicts directory: nothing to check" 0 "$status"
+expect_eq "an empty verdicts directory: nothing to check" 0 "$(get_exit_status bash "$check_report_findings_script" "$work_dir/empty-verdicts" "$reply_file")"
 
-status=0
-bash "$check_report_findings_script" "$verdicts" "$work_dir/no-such-reply.md" > /dev/null 2>&1 || status=$?
-expect_eq "an unreadable reply exits 2" 2 "$status"
-status=0
-bash "$check_report_findings_script" > /dev/null 2>&1 || status=$?
-expect_eq "no arguments exit 2" 2 "$status"
+expect_eq "an unreadable reply exits 2" 2 "$(get_exit_status bash "$check_report_findings_script" "$verdicts" "$work_dir/no-such-reply.md")"
+expect_eq "no arguments exit 2" 2 "$(get_exit_status bash "$check_report_findings_script")"
 
 finish

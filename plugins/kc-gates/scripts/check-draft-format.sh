@@ -91,7 +91,8 @@ perl -MJSON::PP -CS -e '
     my @found;
     my $covered = $draft->{covered} // "";
     $covered = "" if ref $covered;
-    if ($covered !~ /\S/ || is_not_applicable_record($covered)) {
+    my $is_blank_covered = $covered !~ /\S/;
+    if ($is_blank_covered || is_not_applicable_record($covered)) {
       push @found, "no \"covered\": read the pull request description, the linked ticket and the author\x27s replies first; say what they say about this and why it is still worth raising, or drop the draft";
     }
     my ($first, $rest) = split /\n/, $body, 2;
@@ -117,8 +118,6 @@ perl -MJSON::PP -CS -e '
           last;
         }
       }
-    }
-    unless ($has_long_reason) {
       SENTENCE: for my $sentence (@sentences) {
         for my $clause (split /[,;:()\x{2013}\x{2014}]|\s-+\s|--/, $sentence) {
           my @words = $clause =~ /\S+/g;
