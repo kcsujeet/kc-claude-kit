@@ -18,6 +18,12 @@
 #                          `only state: <why>` (three or more words) when it has one. One walk of one
 #                          state is not QA: list every shape the output can take and walk each.
 #
+# A walk-item that select-gates.sh marks `walk-dimension: <path>: <dimension>` needs its states field
+# to cover that dimension (the walk of the states the author picked can miss the one the change
+# varies along): viewport (widths in px: 1920 or more, 1024 to 1919, 600 or less), locale (two
+# codes such as de-DE, or one and rtl), print (the word print or pdf), data-size (an empty state
+# and a large one).
+#
 # The environment the walk ran in is one line too, `env<TAB><command><TAB><evidence>`: the one command
 # that brought the app up (never a chain of steps done by hand: no `&&`, `;`, `||` or `then`), and
 # evidence the app answered after it (a request line with its status, or a capture). Required
@@ -44,6 +50,9 @@ items=$(sed -n 's/^walk-item: //p' "$select_output")
 
 request_pattern='^(GET|HEAD|POST|PUT|PATCH|DELETE)[[:space:]]+[^[:space:]]+.*[[:space:]][1-5][0-9][0-9]([^0-9]|$)'
 readonly MIN_STATES=2
+readonly WIDE_DESKTOP_MIN_PX=1920
+readonly LAPTOP_MIN_PX=1024
+readonly PHONE_MAX_PX=600
 
 # True when a receipt line's fourth field names two or more states ("states: a; b"), or says
 # "only state:" with a reason of three or more words.
@@ -54,6 +63,54 @@ has_walked_states() {
   text=$(printf '%s' "$text" | sed -E 's/^[[:space:]]*states:[[:space:]]*//')
   [ "$(printf '%s' "$text" | tr ';' '\n' | grep -c '[^[:space:]]')" -ge "$MIN_STATES" ]
 }
+
+# Prints the widths in a states field (`1920px`, `1920w`, `1920x1080`, `@1920`), one per line.
+get_viewport_widths() {
+  printf '%s' "$1" | grep -Eo '([0-9]{3,4})(px|w)([^a-z]|$)|@[0-9]{3,4}|[0-9]{3,4}x[0-9]{3,4}' | sed -E 's/^@//; s/[^0-9].*$//' || true
+}
+
+# Prints the width classes missing from a states field, or nothing when all three are there.
+get_missing_width_classes() {
+  local widths missing="" width has_wide=false has_laptop=false has_phone=false
+  widths=$(get_viewport_widths "$1")
+  for width in $widths; do
+    if [ "$width" -ge "$WIDE_DESKTOP_MIN_PX" ]; then has_wide=true
+    elif [ "$width" -ge "$LAPTOP_MIN_PX" ]; then has_laptop=true
+    elif [ "$width" -le "$PHONE_MAX_PX" ]; then has_phone=true; fi
+  done
+  $has_wide || missing="a wide desktop (${WIDE_DESKTOP_MIN_PX}px or more)"
+  $has_laptop || missing="${missing:+$missing, }a laptop (${LAPTOP_MIN_PX}px to $((WIDE_DESKTOP_MIN_PX - 1))px)"
+  $has_phone || missing="${missing:+$missing, }a phone (${PHONE_MAX_PX}px or less)"
+  printf '%s' "$missing"
+}
+
+# Prints what a states field still lacks for a dimension, or nothing when it covers it.
+get_uncovered_dimension() {
+  local dimension=$1 states_text locale_pattern locale_count has_two_locales has_rtl_locale has_one_locale mentions_rtl
+  states_text=$(printf '%s' "$2" | tr '[:upper:]' '[:lower:]')
+  case "$dimension" in
+    viewport) get_missing_width_classes "$2" ;;
+    locale)
+      # Locale tags keep their capitals (de-DE, zh-Hans) unless the field says locale or lang, so a hyphenated word (no-op) is not one.
+      locale_pattern='[a-z]{2}-([A-Z]{2}|[A-Z][a-z]{3})'
+      if printf '%s' "$states_text" | grep -Eq 'locale|lang'; then locale_pattern='[A-Za-z]{2}-([A-Za-z]{2}|[A-Za-z]{4})'; fi
+      locale_count=$(printf '%s' "$2" | grep -Ewo "$locale_pattern" | tr '[:upper:]' '[:lower:]' | sort -u | grep -c . || true)
+      has_two_locales=false; has_rtl_locale=false; has_one_locale=false; mentions_rtl=false
+      if [ "$locale_count" -ge 2 ]; then has_two_locales=true; fi
+      if [ "$locale_count" -ge 1 ]; then has_one_locale=true; fi
+      if printf '%s' "$states_text" | grep -Eq 'rtl'; then mentions_rtl=true; fi
+      if $has_one_locale && $mentions_rtl; then has_rtl_locale=true; fi
+      if $has_two_locales || $has_rtl_locale; then return 0; fi
+      printf 'two locales such as de-DE and ar-SA, or one and rtl' ;;
+    print) printf '%s' "$states_text" | grep -Eq 'print|pdf' || printf 'a print or pdf state' ;;
+    data-size)
+      printf '%s' "$states_text" | grep -Eq 'empty|zero|no rows|no items' || printf 'an empty state; '
+      printf '%s' "$states_text" | grep -Eq 'many|long|large|overflow|truncat|paginat|[0-9]{2,} (rows|items|results|records)' || printf 'a large state' ;;
+  esac
+  return 0
+}
+
+dimension_lines=$(sed -n 's/^walk-dimension: //p' "$select_output")
 
 problems=0
 record_walk_problem() { echo "walk-item $1: $2"; problems=$((problems + 1)); }
@@ -87,6 +144,13 @@ while IFS= read -r item; do
   if ! has_walked_states "$states"; then
     record_walk_problem "$item" "fewer than two states walked: list every shape the change's output can take (empty, one long row, many short rows, each option) and walk each; write states: <a>; <b> as the fourth field, or only state: <why, three or more words> when it has one"
   fi
+  while IFS= read -r dimension; do
+    [ -n "$dimension" ] || continue
+    uncovered=$(get_uncovered_dimension "$dimension" "$states")
+    if [ -n "$uncovered" ]; then
+      record_walk_problem "$item" "its diff varies along $dimension, but the states field does not cover it ($uncovered): walk the change along that dimension too and list it in states:"
+    fi
+  done < <(printf '%s\n' "$dimension_lines" | awk -v item="$item" -v separator=": " 'index($0, item separator) == 1 { print substr($0, length(item separator) + 1) }')
 done <<EOF
 $items
 EOF

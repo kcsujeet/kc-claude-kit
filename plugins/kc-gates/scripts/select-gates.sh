@@ -35,7 +35,10 @@
 # test pass-size.sh makes: built-in patterns plus the repo's .claude/public-paths.txt): the walk
 # is then as every audience that can reach it, signed out included. When required, one
 # `walk-item: <path>` line per changed non-test source file follows, so a receipt can be counted
-# against them.
+# against them. A walk-item whose added lines vary along a dimension a walk must cover
+# (viewport: layout styling; locale; print or PDF; data size: a list or table) also gets a
+# `walk-dimension: <path>: <dimension>` line: check-walk-receipt.sh then wants the states field to
+# cover that dimension.
 #
 # Exits 0 on success, 2 on a usage error or a missing input file.
 set -euo pipefail
@@ -77,6 +80,34 @@ added_lines=$(grep -E '^\+' "$diff_file" | grep -vE '^\+\+\+ ' | sed 's/^+//' ||
 
 # Added lines of non-test source files, for the checks that read code and not prose.
 added_source=$(kc_added_code "$diff_file" "$KC_RISK_SOURCE_PATHS")
+
+# Prints `<path><TAB><dimension>` for each dimension the added lines of a UI file vary along:
+# viewport (size, position, spacing or font style), locale, print, and data-size (lists, tables).
+list_walk_dimensions() {
+  awk '
+    function add_walk_dimension(dimension) { seen[path "\t" dimension] = 1 }
+    /^\+\+\+ / {
+      path = substr($0, 5); sub(/^b\//, "", path)
+      is_ui_file = (path ~ /\.(jsx|tsx|js|ts|mjs|vue|svelte|html|erb|haml|css|scss|less)$/)
+      is_list_ui_file = (path ~ /\.(jsx|tsx|vue|svelte|html|erb|haml)$/)
+      next
+    }
+    /^\+/ && is_ui_file {
+      line = substr($0, 2)
+      has_size_style_key = (line ~ /(^|[^A-Za-z0-9_-])(width|height|(min|max)-?[Ww]idth|(min|max)-?[Hh]eight|position|top|left|right|bottom|inset|font-?[Ss]ize|transform|flex|gap|display|overflow|z-?[Ii]ndex|aspect-?[Rr]atio|(padding|margin|inset|grid|flex)([A-Z][A-Za-z]*|-[a-z-]+)|p[trblxy]|m[trblxy])\x27?"?[[:space:]]*:/)
+      has_class_list = (line ~ /(className|class)[ =]/)
+      has_utility_class = (line ~ /(^|[ "\x27`])(w|h|min-w|max-w|min-h|max-h|p[trblxy]?|m[trblxy]?|inset|top|left|right|bottom|gap|text-(xs|sm|base|lg|[0-9]?xl)|translate-[xy])-[^ "\x27`]+|(^|[ "\x27`])(absolute|relative|fixed|sticky)([ "\x27`]|$)/)
+      has_utility_class_list = (has_class_list && has_utility_class)
+      if (has_size_style_key || has_utility_class_list) add_walk_dimension("viewport")
+      if (line ~ /(useTranslations?|i18n|I18n|Intl\.|toLocale[A-Za-z]*\(|(^|[^A-Za-z0-9_])t\(["\x27`]|translate\(|formatDate|formatCurrency|formatNumber|FormattedMessage)/) add_walk_dimension("locale")
+      if (tolower(line) ~ /@media[[:space:]]+print|window\.print|@page|page-break|break-(before|after|inside)|print-color-adjust|pdf/) add_walk_dimension("print")
+      has_list_markup = (is_list_ui_file && line ~ /(\.map\(|v-for|<table|<ul|<ol|[Pp]aginat|\.each[[:space:](]|\.slice\()/)
+      has_export = (line ~ /[Ee]xport[A-Z(]/ || tolower(line) ~ /(csv|xlsx)/)
+      if (has_list_markup || has_export) add_walk_dimension("data-size")
+    }
+    END { for (key in seen) print key }
+  ' "$1"
+}
 
 # Prints the first changed path matching an extended regex, or nothing.
 first_changed_path() {
@@ -253,4 +284,11 @@ else
 fi
 if [ -n "$walk_items" ]; then
   printf '%s\n' "$walk_items" | sed 's/^/walk-item: /'
+  walk_dimensions=$(list_walk_dimensions "$diff_file")
+  while IFS= read -r walk_path; do
+    [ -n "$walk_path" ] || continue
+    printf '%s\n' "$walk_dimensions" | awk -F '\t' -v path="$walk_path" '$1 == path { print $2 }' | sort |
+      while IFS= read -r dimension; do echo "walk-dimension: $walk_path: $dimension"; done
+  done <<< "$walk_items"
 fi
+true

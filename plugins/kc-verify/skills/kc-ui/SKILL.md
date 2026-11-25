@@ -88,7 +88,7 @@ A behaviour a person sets off is walked through every way they set it off, not o
 
 ### Step 4 — vary the environment
 
-- **Narrow and wide viewport.** The narrow one is where things break; check it first.
+- **Narrow, laptop and wide viewport.** The narrow one is where things break; check it first. A change to size, position, spacing, font size or transform is walked at a phone width (390 or less), a laptop (1280) and a wide desktop (1920 or more): a unit or offset that is relative to the screen moves when the screen is bigger than the design. Walk every dimension the change varies along, not only the states you picked: viewport, data size (empty and large), locale (two, one right-to-left) and print or PDF. List them on the walk receipt's `states:` field (widths with px); `check-walk-receipt.sh` fails a change whose states leave one uncovered.
 - **Dark and light**, if the project supports both. A colour defined only inside one theme block is invisible in the other.
 - **Largest font scale** the platform offers. Text that fits at default clips at 200%.
 
@@ -156,7 +156,7 @@ Do not report a UI change verified until every box is ticked:
 - [ ] Each create form was submitted for every option that changes it, and the new record's landing state (on or off, sections shown) was compared with the design.
 - [ ] A list or page was filled past the viewport, and the background, footer and scrolling held.
 - [ ] Every reported layout defect was traced through its ancestors in code and reproduced at the content size the report shows, in the renderer and version that produced it (named, with where that came from), before it was fixed or left open, and the fix was seen in that version and the current one.
-- [ ] Narrow viewport, the other theme and the largest font scale were done, or the report says why not.
+- [ ] Narrow viewport, the other theme and the largest font scale were done, or the report says why not; every dimension the change varies along (viewport widths including 1920 or more, data size, locale, print) was walked and named on the walk receipt's `states:` field.
 - [ ] Every UI fix was seen fixed in a browser before it was reported done or anyone was told it is fixed, internal admin pages included (signed in through a dev-only credential, as in Step 2), not only covered by specs.
 - [ ] The report lists each state checked, each finding with the state that produces it, and what was not checked.
 - [ ] After a QA pass on shipped work, no code changed until the user agreed which findings are bugs, which are questions, and which go in a hotfix versus a ticket.

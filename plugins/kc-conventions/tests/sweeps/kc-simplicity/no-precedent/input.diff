@@ -1,0 +1,44 @@
+diff --git a/config.yml b/config.yml
+index f69399f..19d289e 100644
+--- a/config.yml
++++ b/config.yml
+@@ -1 +1,2 @@
+ retries: 2
++timeout: 30
+diff --git a/src/Card.spec.tsx b/src/Card.spec.tsx
+new file mode 100644
+index 0000000..b47e5b6
+--- /dev/null
++++ b/src/Card.spec.tsx
+@@ -0,0 +1,2 @@
++jest.spyOn(api, 'load')
++vi.mock('./api')
+diff --git a/src/Card.tsx b/src/Card.tsx
+new file mode 100644
+index 0000000..bbc2c61
+--- /dev/null
++++ b/src/Card.tsx
+@@ -0,0 +1,7 @@
++import dayjs from 'dayjs'
++import { useState } from 'react'
++import { copy } from './useClipboard'
++const pad = { pt: '20cqw', height: '100dvh' }
++const spread = { top: '100vh', height: '100vh' }
++const share = (data: object) => navigator.share(data)
++const paste = (text: string) => navigator.clipboard.writeText(text)
+diff --git a/src/layout.css b/src/layout.css
+new file mode 100644
+index 0000000..5b81bc1
+--- /dev/null
++++ b/src/layout.css
+@@ -0,0 +1,2 @@
++.card { container-type: size; padding: 1rem; }
++@container (min-width: 20px) { .card { width: 1px; } }
+diff --git a/src/report.py b/src/report.py
+new file mode 100644
+index 0000000..070ac53
+--- /dev/null
++++ b/src/report.py
+@@ -0,0 +1,2 @@
++import requests
++import os

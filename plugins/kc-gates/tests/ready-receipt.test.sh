@@ -140,7 +140,7 @@ rm -f "$KC_READY_DIR/$round_one"
 export KC_GH_ROUTES="$gh_fixtures/unanswered/routes.tsv"
 expect_write refused "a pass is refused while the PR has an unanswered comment" "$round_one" --rounds 1 --open 0 --size small --pass "$pass_dir"
 expect_said "it names the inline comment by path:line and author" "src/total.ts:12 @review-bot[bot]"
-expect_said "it names the top-level comment" "top-level @coverage-bot[bot]"
+expect_said "it names the top-level human comment, and a top-level bot comment is skipped" "top-level @sam"
 expect_eq "no receipt is written" absent "$([ -e "$KC_READY_DIR/$round_one" ] && echo present || echo absent)"
 export KC_GH_ROUTES="$gh_fixtures/answered/routes.tsv"
 expect_write written "the same pass is written once the author has replied to every comment" "$round_one" --rounds 1 --open 0 --size small --pass "$pass_dir"
@@ -449,7 +449,7 @@ run_git symbolic-ref refs/remotes/origin/HEAD refs/remotes/origin/main
 expect_write refused "a checklist asking for the ledger refuses a receipt without one" "$lesson_head" --checklist
 expect_said "it asks for the ledger" "pass --ledger <dir>"
 ledger_dir=$work_dir/ledger-$RANDOM
-record_fields=$'\tclass:a total that drops cents\texamples:an order total; a refund amount\tmechanism:check\tproof:shop/total.test.sh'
+record_fields=$'\tclass:a total that drops cents\texamples:an order total; a refund amount; a tax line\tmechanism:check\tproof:shop/total.test.sh\tladder:a rounding slip -> a total test -> a total that drops cents'
 mkdir -p "$ledger_dir"
 printf 'F1\ttyped\tprint cents\nF2\ttyped\tgo ahead\n' > "$ledger_dir/feedback.tsv"
 printf 'F1\tlesson\t§X2%s\n' "$record_fields" > "$ledger_dir/ledger.tsv"

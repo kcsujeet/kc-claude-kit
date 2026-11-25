@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Tests scripts/unanswered-pr-comments.sh with the stub gh: it lists each inline or top-level
-# comment on the branch's PR that its author has not answered (bot authors included), passes when
+# comment on the branch's PR that its author has not answered (a bot's top-level comment is
+# skipped, its inline comments are not), passes when
 # every comment has a later reply from the author, and passes with a note when there is no PR.
 set -euo pipefail
 
@@ -21,7 +22,10 @@ run_with() {
 run_with unanswered
 expect_eq "unanswered comments exit 1" 1 "$status"
 expect_contains "an unanswered inline bot comment is named by path:line and author" "src/total.ts:12 @review-bot[bot]: This rounds down." "$output"
-expect_contains "an unanswered top-level bot comment is named" "top-level @coverage-bot[bot]: Coverage dropped 2%." "$output"
+expect_contains "an unanswered top-level human comment is named" "top-level @sam: Can you add a test?" "$output"
+expect_not_contains "a top-level comment from a [bot] login is skipped" "coverage-bot" "$output"
+expect_not_contains "a top-level comment from a Bot-type account without [bot] is skipped" "preview-deploys" "$output"
+expect_not_contains "a top-level comment from a [bot] login with no type is skipped" "tracker-link" "$output"
 case "$output" in
   *"src/tax.ts"*) record "an inline thread the author replied to is not listed" fail "$output" ;;
   *) record "an inline thread the author replied to is not listed" ok ;;
@@ -30,6 +34,15 @@ case "$output" in
   *"@me"*) record "the author's own comments are not listed" fail "$output" ;;
   *) record "the author's own comments are not listed" ok ;;
 esac
+
+# A repo lists the bots whose top-level comments need a reply in .claude/reply-needed-bots.
+mkdir -p "$work_dir/opted-in/.claude"
+git init -q "$work_dir/opted-in"
+printf 'coverage-bot[bot]\n' > "$work_dir/opted-in/.claude/reply-needed-bots"
+export KC_GH_ROUTES="$fixtures/unanswered/routes.tsv"
+opted_in_output=$(cd "$work_dir/opted-in" && bash "$script" 2>&1) || true
+expect_contains "a bot the repo lists keeps its top-level comment" "top-level @coverage-bot[bot]: Coverage dropped 2%." "$opted_in_output"
+expect_not_contains "and other bots stay skipped" "preview-deploys" "$opted_in_output"
 
 run_with answered
 expect_eq "every comment answered exits 0" 0 "$status"

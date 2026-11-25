@@ -52,7 +52,13 @@
 #       also states what it is a lesson of, as tab-separated tagged fields after the fields
 #       above, in any order (each missing or empty one is its own problem):
 #         class:<one sentence naming the class of mistake>
-#         examples:<a>; <b>[; <c>]       two or more unlike cases the rule catches, split on "; "
+#         examples:<a>; <b>; <c>[; ...]  three or more cases from different areas, split on "; "; none
+#                                        repeats a code token of the instance (see ladder)
+#         ladder:<instance> -> <mechanism> -> <class>
+#                                        the climb from the case the feedback was about, through
+#                                        the check that blocked it, to the class; the class field
+#                                        carries no code token (backticked words, identifiers, file
+#                                        names, units) of the feedback item or the instance
 #         mechanism:<check|guard|path-rule|skill|always-on>
 #                                        the layer the lesson sits at, as kc-look-back's "Placing
 #                                        a lesson by layer" ladder names them
@@ -254,12 +260,79 @@ run_check() {
     field_text=${field_text#"${field_text%%[![:space:]]*}"}
     printf '%s' "${field_text%"${field_text##*[![:space:]]}"}"
   }
-  # A lesson record names its class, two unlike examples, the layer it sits at, why no higher
+  # The code tokens of a text, lowercase, one per line, so a class can be written without them:
+  # backticked words, camelCase and snake_case identifiers, file names, and the unit of a number
+  # (20cqw gives unit:cqw).
+  get_code_tokens() {
+    local min_token_length=3  # shorter ones (pt, e.g) are ordinary words or abbreviations
+    {
+      # shellcheck disable=SC2016  # the backticks are literal Markdown
+      printf '%s' "$1" | grep -Eo '`[^`]+`' | tr -d '`' | grep -Eo '[A-Za-z0-9_.-]+' || true
+      printf '%s' "$1" | grep -Eo '[a-z]+[A-Z][A-Za-z0-9]*|[A-Za-z0-9]+_[A-Za-z0-9_]+|[A-Za-z0-9_-]+\.(sh|js|jsx|ts|tsx|mjs|css|scss|json|ya?ml|md|rb|py|go|rs|html|toml|txt)' || true
+      printf '%s' "$1" | grep -Eo '[0-9]+[A-Za-z]+' | sed -E 's/^[0-9]+/unit:/' || true
+    } | awk -v min="$min_token_length" '{ plain = $0; sub(/^unit:/, "", plain); if (length(plain) >= min) print }' | tr '[:upper:]' '[:lower:]' | sort -u
+  }
+  # Prints the tokens (stdin) that a text contains as whole words. A unit token also matches a word
+  # of the text that starts it with at most one letter fewer (cq in the class, cqw in the instance).
+  get_tokens_found_in() {
+    awk -v text="$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')" '
+      BEGIN {
+        min_word_length = 2  # a one-letter word starts every token
+        padded_text = text; gsub(/[^a-z0-9._-]+/, " ", padded_text); padded_text = " " padded_text " "
+        word_count = split(text, words, /[^a-z0-9]+/)
+      }
+      function is_unit_prefix(unit, word,   is_long_enough, starts_with_word, is_within_one_letter) {
+        is_long_enough = (length(word) >= min_word_length)
+        starts_with_word = (index(unit, word) == 1)
+        is_within_one_letter = (length(unit) - length(word) <= 1)
+        return is_long_enough && starts_with_word && is_within_one_letter
+      }
+      {
+        token = $0; is_unit = (token ~ /^unit:/); sub(/^unit:/, "", token)
+        if (index(padded_text, " " token " ") > 0) { print token; next }
+        if (!is_unit) next
+        for (i = 1; i <= word_count; i++) if (is_unit_prefix(token, words[i])) { print token; break }
+      }'
+  }
+  # The ladder field is described in this file's header.
+  check_lesson_ladder() {
+    local item=$1 from=$2 ladder_step_count=3 has_wrong_step_count has_empty_step ladder_text instance step_count empty_step_count class_text item_text tokens hit example examples_text
+    ladder_text=$(get_lesson_field ladder "$from")
+    item_text=$(awk -F'\t' -v id="$item" '$1 == id { print $3; exit }' "$feedback_list")
+    instance=""
+    if [ -n "$ladder_text" ]; then
+      instance=$(printf '%s' "$ladder_text" | awk -F' -> ' '{ print $1 }')
+      read -r step_count empty_step_count <<< "$(printf '%s' "$ladder_text" | awk -F' -> ' '{ for (i = 1; i <= NF; i++) if ($i ~ /^[[:space:]]*$/) empty++; print NF, empty + 0 }')"
+      has_wrong_step_count=false; has_empty_step=false
+      if [ "$step_count" -ne "$ladder_step_count" ]; then has_wrong_step_count=true; fi
+      if [ "$empty_step_count" -gt 0 ]; then has_empty_step=true; fi
+      if $has_wrong_step_count || $has_empty_step; then
+        record_problem "$item: lesson ladder: must read <instance> -> <mechanism> -> <class>, three non-empty steps"
+      fi
+    fi
+    tokens=$(get_code_tokens "$item_text $instance")
+    [ -n "$tokens" ] || return 0
+    class_text=$(get_lesson_field class "$from")
+    hit=$(printf '%s\n' "$tokens" | get_tokens_found_in "$class_text" | head -n 1)
+    if [ -n "$hit" ]; then
+      record_problem "$item: lesson class: names \"$hit\", a code token of the feedback or its fix; state the class without it (the habit that catches the whole kind of mistake, not the instance it came from)"
+    fi
+    examples_text=$(get_lesson_field examples "$from")
+    while [ -n "$examples_text" ]; do
+      example=${examples_text%%; *}
+      hit=$(printf '%s\n' "$tokens" | get_tokens_found_in "$example" | head -n 1)
+      if [ -n "$hit" ]; then
+        record_problem "$item: lesson examples: \"$example\" repeats \"$hit\" from the instance; give cases from other areas that share none of its tokens"
+      fi
+      case "$examples_text" in *"; "*) examples_text=${examples_text#*; } ;; *) examples_text="" ;; esac
+    done
+  }
+  # A lesson record names its class, three unlike examples, the layer it sits at, why no higher
   # layer holds it, and its proof. $1 is the item, $2 the number of the first tagged field.
   check_lesson_record() {
-    local item=$1 from=$2 tag field_text rest example example_count=0 empty_example=false min_lesson_examples=2
+    local item=$1 from=$2 tag field_text rest example example_count=0 empty_example=false min_lesson_examples=3
     local is_why_not_higher_tag mechanism_is_check is_optional_why_not_higher
-    for tag in class examples mechanism why-not-higher proof; do
+    for tag in class examples mechanism why-not-higher proof ladder; do
       field_text=$(get_lesson_field "$tag" "$from")
       if [ -n "$field_text" ]; then continue; fi
       is_why_not_higher_tag=false
@@ -289,6 +362,7 @@ run_check() {
         record_problem "$item: lesson examples: has one example; a lesson needs $min_lesson_examples unlike cases, separated by \"; \""
       fi
     fi
+    check_lesson_ladder "$item" "$from"
     field_text=$(get_lesson_field mechanism "$from")
     case "$field_text" in
       "" | check | guard | path-rule | skill | always-on) ;;

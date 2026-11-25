@@ -76,7 +76,7 @@ complete_ledger() {
 }
 ledger=$work_dir/ledger.tsv
 # The tagged fields every lesson record carries (class, examples, mechanism, proof).
-record_fields=$'class:a name that hides what a value is\texamples:an order total; a storefront slug\tmechanism:check\tproof:plugin/tests/rules.test.sh'
+record_fields=$'class:a name that hides what a value is\texamples:an order total; a storefront slug; a webhook payload\tmechanism:check\tproof:plugin/tests/rules.test.sh\tladder:a total read as cents -> a rename check -> a name that hides what a value is'
 # Appends them to each lesson line that names a rule, and to each covered line with a lesson: catch.
 add_record_fields() {
   awk -F'\t' -v OFS='\t' -v fields="$record_fields" '
@@ -281,7 +281,7 @@ for missing_field in class examples mechanism proof; do
 done
 build_ledger_with_f2_fields "$(get_record_without examples)"$'\texamples:only one case'
 expect_check failed "a lesson with one example fails"
-expect_contains "it says a lesson needs 2 unlike cases" "F2: lesson examples: has one example; a lesson needs 2 unlike cases" "$last_output"
+expect_contains "it says a lesson needs 3 unlike cases" "F2: lesson examples: has one example; a lesson needs 3 unlike cases" "$last_output"
 build_ledger_with_f2_fields "$(get_record_without examples)"$'\texamples:a case; ; another'
 expect_check failed "a lesson with an empty example fails"
 expect_contains "it names the empty example" "F2: lesson examples: has an empty example" "$last_output"
@@ -432,5 +432,30 @@ expect_eq "--repo without --base is a usage error" 2 "$status"
 status=0
 bash "$script" check "$work_dir/held-list.tsv" "$work_dir/held-ledger.tsv" --base base > /dev/null 2>&1 || status=$?
 expect_eq "--base without --repo is a usage error" 2 "$status"
+
+# The ladder: a lesson climbs from the instance to a class written without the instance's code tokens.
+l5_list=$work_dir/l5-list.tsv
+# shellcheck disable=SC2016  # the backticks are literal Markdown
+printf 'F1\ttyped\tThe mark slid down: `pt: '"'"'20cqw'"'"'` is on the element that sets `containerType: '"'"'size'"'"'`, so cq units measure the viewport\n' > "$l5_list"
+l5_fields=$'mechanism:check\tproof:plugin/tests/rules.test.sh'
+run_l5() { printf 'F1\tlesson\t§B13\t%s\t%s\n' "$l5_fields" "$1" > "$work_dir/l5-ledger.tsv"; l5_status=0; l5_output=$(bash "$script" check "$l5_list" "$work_dir/l5-ledger.tsv" --diff "$diff_file" --rules "$rules_dir" 2>&1) || l5_status=$?; }
+good_examples=$'examples:a storefront slug; a webhook retry; a date range'
+run_l5 $'class:new code with no precedent in the codebase\t'"$good_examples"$'\tladder:a cq unit on the container -> a no-precedent sweep -> new code with no precedent in the codebase'
+expect_eq "ladder: a class free of the instance's tokens passes" 0 "$l5_status"
+run_l5 $'class:a cq unit on the containerType element\t'"$good_examples"$'\tladder:a cq unit on the container -> a sweep -> a cq unit on the containerType element'
+expect_eq "ladder: a class naming the instance's code fails" 1 "$l5_status"
+expect_contains "ladder: it names the token" "F1: lesson class: names \"containertype\"" "$l5_output"
+run_l5 $'class:a cq measure taken against the wrong box\t'"$good_examples"$'\tladder:a cq unit on the container -> a sweep -> a cq measure taken against the wrong box'
+expect_contains "ladder: a unit prefix of the instance's unit fails (cq for cqw)" "F1: lesson class: names \"cqw\"" "$l5_output"
+run_l5 $'class:new code with no precedent in the codebase\t'"$good_examples"
+expect_contains "ladder: no ladder field fails" "F1: lesson is missing ladder:" "$l5_output"
+run_l5 $'class:new code with no precedent in the codebase\t'"$good_examples"$'\tladder:a cq unit on the container -> new code with no precedent in the codebase'
+expect_contains "ladder: two steps fail" "F1: lesson ladder: must read <instance> -> <mechanism> -> <class>" "$l5_output"
+run_l5 $'class:new code with no precedent in the codebase\texamples:a storefront slug; a cqw width; a date range\tladder:a cq unit on the container -> a sweep -> new code with no precedent in the codebase'
+expect_contains "ladder: an example repeating the instance's token fails" "F1: lesson examples: \"a cqw width\" repeats \"cqw\"" "$l5_output"
+run_l5 $'class:new code with no precedent in the codebase\texamples:a storefront slug; a date range\tladder:a cq unit on the container -> a sweep -> new code with no precedent in the codebase'
+expect_contains "ladder: two examples fail" "a lesson needs 3 unlike cases" "$l5_output"
+run_l5 $'class:a layout rule, e.g. one about mapping each state\t'"$good_examples"$'\tladder:a cq unit on the container -> a sweep -> a layout rule, e.g. one about mapping each state'
+expect_eq "ladder: e.g. and a word that contains a token's letters (map in mapping) are not code tokens" 0 "$l5_status"
 
 finish

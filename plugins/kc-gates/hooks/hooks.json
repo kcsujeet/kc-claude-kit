@@ -74,6 +74,12 @@
           },
           {
             "type": "command",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/guard-lesson-ledger.sh\"",
+            "shell": "bash",
+            "timeout": 30
+          },
+          {
+            "type": "command",
             "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/guard-merge.sh\"",
             "shell": "bash",
             "timeout": 30

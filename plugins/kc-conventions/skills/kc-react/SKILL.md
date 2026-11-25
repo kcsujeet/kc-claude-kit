@@ -422,9 +422,9 @@ A wrapper element that only repeats its parent's styling, or that adds no layout
 
 #### §R19. Check layout at narrow widths
 
-A change to sizing or layout that looks right on a wide screen can collapse on a narrow one. For any diff touching width, height, min/max sizing, flex or grid layout, or positioning, check it at 375, 600, 768, and 1024 px:
+A change to sizing or layout that looks right on a wide screen can collapse on a narrow one. For any diff touching width, height, min/max sizing, flex or grid layout, or positioning, check it at 375, 600, 768, 1024 and 1920 px (a wide desktop shows what a viewport-relative unit or an unbounded width does when the screen is bigger than the design):
 
-- Compute (or measure in a running app) the usable width per column or cell at each width, after subtracting padding, gaps, and fixed-width siblings.
+- Measure in the running app, never estimate, the usable width per column or cell at each width, after subtracting padding, gaps, and fixed-width siblings. A box that says a layout holds "by calculation" or "estimated" FAILS (`verify-gate-blocks.sh` rejects it): cite the screenshot path or the measured value.
 - Confirm the content still renders readably at each: text does not overflow, controls stay tappable, nothing is clipped.
 - Put the numbers in the finding ("7 columns at 375 px leave 41 px per cell after padding").
 

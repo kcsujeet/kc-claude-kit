@@ -29,6 +29,7 @@ paths:
   - §P16. The shape of the whole change is the simplest that works
   - §P17. A flow people know from other products works the way they know it
   - §P18. A caller the convention misses passes the value, not a smarter guess
+  - §P19. New code has precedent in the codebase
 
 ## Rules
 
@@ -71,6 +72,7 @@ The simplicity gate agent ticks every box against the diff. A box is FAIL if any
 - [ ] §P15 Deferred work is done when its condition is met: grep the repo for the markers of the work this diff finishes (its feature or phase name, `once`, `after`, `remove when`); each one whose condition the diff meets FAILS unless the diff removes the code it guards. Each one left in place states what it still waits on. (N/A: the diff finishes no deferred work)
 - [ ] §P16 The shape of the whole change is the simplest that works: state the result the diff is after, then at least one other way to get it, and compare. A diff that runs two mechanisms for one job (two storage shapes, two lookups, a branch on a mode through every step), recomputes downstream what an earlier step already knew, or adds a layer an existing one could carry FAILS when the other way is materially simpler, and the finding describes that shape in a sentence or a short sketch. Line findings that shape would delete go under this one, not beside it. (N/A: never; even a one-line change has a goal another shape could meet)
 - [ ] §P17 Familiar flows stay familiar: every flow people go through that the diff adds or reshapes (sign-up, sign-in, password reset, checkout, account settings, navigation, or any other task most products run the same way) asks for things in the order, and behaves the way, people know from other products. A step dropped, merged, moved or added against that order to save a screen or a request FAILS; a departure the developer chose is fine only when the diff or the PR says so, and otherwise is a `question`. A flow that copies a departure the codebase already has is raised as one too, not taken as precedent (§P13). **Enumerate** each flow with its steps in order beside the order most products use. (N/A: the diff adds or reshapes no flow a person goes through)
+- [ ] §P19 New code has precedent in the codebase: every hit of the `no-precedent.sh` sweep (a package, CSS unit or property, browser global, test-mocking call, config key or file-name pattern the diff introduces that nothing else in the repo uses at the base) FAILS unless the author uses the way the repo already does that job (name the file that does it) or a comment or the description says why it can't. Receipt: `grepped no precedent: N hits`, one verdict per hit. (N/A: `grepped no precedent: 0 hits`)
 - [ ] §P18 A value a shared unit derives by convention (a name built from another name, a default read from a string pattern) is not made cleverer for one caller it gets wrong (pluralization rules, another regex, a special case); that caller passes the value through an optional override, and every other caller keeps the old default. (N/A: no derived value changed or worked around in the diff)
 
 ## Review detail
@@ -337,9 +339,19 @@ Example: a shared form autocomplete keeps picked records at `name` with `_ids` t
 This is not §P10's single-caller prop: the caller cannot own the behavior, because the shared unit is the one writing to the wrong place.
 
 
+### §P19. New code has precedent in the codebase
+
+A way of doing a job that nothing else in the repo does (a package no file imports, a unit or property no stylesheet uses, a browser API where a hook already wraps it, a mocking style the other tests don't use, a config key or file-name pattern that stands alone) is a decision the repo never made. Before accepting it, find how the codebase does that kind of job (grep the siblings) and use that; keep the new way only with the reason it can't be done the existing way. A hit is a prompt to look, not proof of a fault: a first use that is the point of the change (the dependency a feature is about) states so. Examples: `navigator.clipboard` called in a component when a copy hook exists; `@container` units in a repo that sizes in `%`; `jest.spyOn` in a repo that mocks with `vi.mock`; a `*.spec.tsx` file beside `*.test.tsx` files.
+
 ## Sweeps
 
-Save the diff under review to a file and run the script over it; `-` reads the diff from stdin. No other sweep is bundled for this topic.
+Save the diff under review to a file and run the script over it; `-` reads the diff from stdin. Each hit gets its own verdict.
+
+- `no-precedent.sh` (§P19): tokens the added lines introduce with zero uses in the repo at the base. Receipt: `grepped no precedent: N hits`.
+
+  ```bash
+  bash "${CLAUDE_PLUGIN_ROOT}/skills/kc-simplicity/scripts/no-precedent.sh" <diff-file> <repo-root>
+  ```
 
 - `added-lines.sh` (citation map): every added line as `path:line: text`, with the source line number at the head SHA. Cite every finding's line from this output or from a sweep hit, never from a position in the diff file.
 

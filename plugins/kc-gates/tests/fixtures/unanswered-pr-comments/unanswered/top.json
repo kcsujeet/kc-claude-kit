@@ -1,4 +1,7 @@
 [
- {"id": 11, "user": {"login": "coverage-bot[bot]"}, "created_at": "2026-01-01T11:00:00Z", "body": "Coverage dropped 2%."},
- {"id": 12, "user": {"login": "me"}, "created_at": "2026-01-01T09:00:00Z", "body": "Opened."}
+ {"id": 11, "user": {"login": "coverage-bot[bot]", "type": "Bot"}, "created_at": "2026-01-01T11:00:00Z", "body": "Coverage dropped 2%."},
+ {"id": 12, "user": {"login": "me", "type": "User"}, "created_at": "2026-01-01T09:00:00Z", "body": "Opened."},
+ {"id": 13, "user": {"login": "preview-deploys", "type": "Bot"}, "created_at": "2026-01-01T11:05:00Z", "body": "Preview ready."},
+ {"id": 14, "user": {"login": "sam", "type": "User"}, "created_at": "2026-01-01T11:10:00Z", "body": "Can you add a test?"},
+ {"id": 15, "user": {"login": "tracker-link[bot]"}, "created_at": "2026-01-01T11:15:00Z", "body": "Linked to ABC-1."}
 ]

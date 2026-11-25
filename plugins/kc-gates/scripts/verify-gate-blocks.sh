@@ -20,6 +20,10 @@
 #     only a file's name is told where the file is);
 #   - a sweep receipt `grepped <what>: <n> hits` is followed, in its box, by at least n distinct
 #     `path:line` verdicts;
+#   - a PASS or N/A box that states runtime or visual behaviour (how something renders, loads, fits or
+#     behaves) by reasoning ("estimated", "by calculation", "should render", "would fit", "in theory")
+#     with no screenshot or recording path, `measured <number>`, passed-test count, request line or
+#     exit 0: the gate runs or measures it and cites that;
 #   - a box marked FAIL whose text opens with PASS or N/A, or marked PASS or N/A whose text opens
 #     with FAIL;
 #   - a gate's STATUS that its boxes contradict (PASS with a FAIL box, FAIL with none, PASS (N/A)
@@ -106,6 +110,19 @@ read_blocks() {
         rest = substr(after, next_sweep)
       }
     }
+    # True when text states how something renders, loads, looks or behaves from reasoning, with no
+    # capture path, no "measured <number>", no passed-test count, no request line and no exit 0
+    # beside it. The phrase found is left in reasoning_phrase.
+    function is_unrun_behaviour_claim(text,   lower, mentions_behaviour_term) {
+      lower = tolower(text)
+      mentions_behaviour_term = (lower ~ /(layout|width|height|viewport|[0-9]px|overflow|clip|align|spacing|margin|padding|breakpoint|column|screen|responsive|visual|pixel|wrap|fit|wide|narrow|scroll|render|display|load|latency|response time|behave|appears?|looks?)/)
+      if (!mentions_behaviour_term) return 0
+      if (lower ~ /[A-Za-z0-9_\/-]+\.(png|jpe?g|gif|webp|mp4|mov|webm)([^A-Za-z0-9]|$)/) return 0
+      if (lower ~ /measured[^0-9]{0,30}[0-9]/) return 0
+      if (lower ~ /[0-9]+ passed|exit(ed)?( code)? 0|(get|post|put|patch|delete) [^ ]+ [1-5][0-9][0-9]/) return 0
+      if (match(lower, /(should|will|would|shouldn.t|wouldn.t) (still )?(render|fit|look|display|show|appear|wrap|align|overflow|not overflow|not clip|load|behave)|by (my )?calculation|calculated by hand|computed by hand|on paper|in theory|presumably|(^|[^a-z])(estimated|estimate|estimating)([^a-z]|$)/)) { reasoning_phrase = substr(lower, RSTART, RLENGTH); return 1 }
+      return 0
+    }
     function flush_box(   lead) {
       if (!in_box) return
       in_box = 0
@@ -116,6 +133,7 @@ read_blocks() {
       if (box_verdict == "N/A") nas++
       if (box_verdict == "FAIL" && lead ~ /^(PASS|passes|N\/A)([^A-Za-z]|$)/) say(name ": " box_id " is marked FAIL but its text says " substr(lead, 1, 12))
       if (box_verdict != "FAIL" && lead ~ /^(FAIL|fails)([^A-Za-z]|$)/) say(name ": " box_id " is marked " box_verdict " but its text says " substr(lead, 1, 12))
+      if (box_verdict != "FAIL" && is_unrun_behaviour_claim(box_text)) say(name ": " box_id " states behaviour it did not run or measure (\"" trim(reasoning_phrase) "\"): run or measure it (in the running app for what a person sees, a test or a request otherwise) and cite the screenshot or recording path, the passed-test count, the request line or the value (measured 412px wide at 1920)")
       if (kind == "scope") printf "B\t%s\n", box_id
       check_sweeps(box_id, box_text)
     }
