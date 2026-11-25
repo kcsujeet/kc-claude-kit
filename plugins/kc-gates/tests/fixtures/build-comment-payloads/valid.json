@@ -1,7 +1,7 @@
 [
-  { "path": "src/widgets/list.ts", "line": 3, "body": "**suggestion:**\nCould we name this `widgetTotal`?", "ran": "n/a: a rename", "walked": "n/a: a rename" },
-  { "path": "src/widgets/list.ts", "start_line": 2, "line": 4, "body": "**question:**\nAre these three exported on purpose?" },
-  { "path": "src/widgets/list.ts", "line": 2, "side": "LEFT", "body": "**note:**\n`list` had two importers." },
-  { "path": "src/widgets/header.tsx", "line": 1, "body": "**nitpick:**\nWorth a doc comment." },
-  { "path": "src/widgets/list.ts", "line": 5, "body": "**thought:**\nThe default export could go." }
+  { "path": "src/widgets/list.ts", "line": 3, "covered": "read the description and the ticket: neither says this", "body": "**suggestion:**\nCould we name this `widgetTotal`?", "ran": "n/a: a rename", "walked": "n/a: a rename" },
+  { "path": "src/widgets/list.ts", "start_line": 2, "line": 4, "covered": "read the description and the ticket: neither says this", "body": "**question:**\nAre these three exported on purpose?" },
+  { "path": "src/widgets/list.ts", "line": 2, "side": "LEFT", "covered": "read the description and the ticket: neither says this", "body": "**note:**\n`list` had two importers." },
+  { "path": "src/widgets/header.tsx", "line": 1, "covered": "read the description and the ticket: neither says this", "body": "**nitpick:**\nWorth a doc comment." },
+  { "path": "src/widgets/list.ts", "line": 5, "covered": "read the description and the ticket: neither says this", "body": "**thought:**\nThe default export could go." }
 ]

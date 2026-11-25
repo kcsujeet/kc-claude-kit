@@ -20,6 +20,10 @@
 #     blocked when its report does not lead with the does-it-work section or leaves a style
 #     finding unlabeled, so the reader sees effectiveness and blast radius first. A reply with no
 #     verdict is never checked.
+#   - Stop: a reply that gives a verdict is also run through check-report-findings.sh when the
+#     review folder has a verdicts/ directory (kc-code-review Step 4 saves each gate block there):
+#     every finding a gate confirmed, cited as path:line, must be in the reply by file basename
+#     and line, or on a "Dropped:" line, so a confirmed finding never vanishes from the report.
 # Everything the guard can't read (no jq, no review folder, select-gates.sh failing) lets the
 # action through: it never blocks what it can't read. Always exits 0.
 # Hook schema: https://code.claude.com/docs/en/hooks
@@ -77,15 +81,28 @@ problems=$(get_walk_problems)
 if [ -z "$problems" ]; then
   report_problems=
   report_problems_max_chars=600
-  is_stop_event=false
+  findings_problems=
+  findings_problems_max_chars=1200
   is_verdict_reply=false
-  [ "$event" = Stop ] && is_stop_event=true
   [ "${stop_kind:-}" = verdict ] && is_verdict_reply=true
-  if "$is_stop_event" && "$is_verdict_reply"; then
+  if "$is_verdict_reply"; then
+    review_dir=${KC_REVIEW_DIR:-$(find_review_dir "" "")}
+    verdicts_dir=$review_dir/verdicts
     report_problems=$(printf '%s' "$reply" | bash "$(dirname "$0")/check-review-report.sh" - 2>&1 | tr '\n' ' ' | cut -c1-"$report_problems_max_chars")
+    if has_review_files "$review_dir" && [ -d "$verdicts_dir" ]; then
+      findings_problems=$(printf '%s' "$reply" | bash "$(dirname "$0")/check-report-findings.sh" "$verdicts_dir" - 2>&1 | tr '\n' ' ' | cut -c1-"$findings_problems_max_chars")
+    fi
   fi
-  if [ -n "$report_problems" ]; then
+  has_report_problems=false
+  [ -n "$report_problems" ] && has_report_problems=true
+  has_findings_problems=false
+  [ -n "$findings_problems" ] && has_findings_problems=true
+  if "$has_findings_problems" && ! "$has_report_problems"; then
+    block_reason="Blocked by the kc-gates plugin: this reply gives a review verdict, but the report leaves out findings the gates confirmed. Add each to the report, or list it on a \"Dropped: <file:line> <reason>\" line that names the finding as file:line and says why. $findings_problems"
+    printf '%s' "$block_reason" | jq -Rsc '{decision: "block", reason: .}'
+  elif "$has_report_problems"; then
     block_reason="Blocked by the kc-gates plugin: this reply gives a review verdict, but its report does not lead with whether the change works and what it can break. Add a \"**Does it work / what can it break**\" section right under the \`### Review:\` title, above the gate table: what was measured with before and after numbers (or \"not measured: <why>\"), and a \"Uses:\" line with the trace-uses.sh count and which uses were run or checked. End each naming and clarity finding with \"(non-blocking)\". $report_problems"
+    "$has_findings_problems" && block_reason="$block_reason $findings_problems"
     printf '%s' "$block_reason" | jq -Rsc '{decision: "block", reason: .}'
   fi
   exit 0

@@ -10,10 +10,11 @@ check="$(dirname "$tests_dir")/scripts/check-draft-format.sh"
 require_jq
 
 # Writes one draft with <body> to <file>, plus the fields of the jq object <extra> (default: an
-# "n/a" run record, which an issue or suggestion needs).
+# "n/a" run record, which an issue or suggestion needs). Every draft carries "covered" unless
+# <extra> overrides it.
 draft() {
   local file=$1 body=$2 extra=${3:-'{ran: "cart spec with an empty cart: fails before, passes after", walked: "empty cart: 0 before, 0 after; cart with an archived item: counted before, skipped after"}'}
-  jq -n --arg body "$body" "[{path: \"src/cart/total.ts\", line: 12, body: \$body} + $extra]" > "$file"
+  jq -n --arg body "$body" "[{path: \"src/cart/total.ts\", line: 12, body: \$body, covered: \"read the description and the ticket: neither says how archived items count\"} + $extra]" > "$file"
 }
 
 # Runs the check on <file>; prints its output, or "clean" when it passes.
@@ -46,7 +47,7 @@ expect_eq "§PC4: a suggestion may still say n/a with a reason" clean "$(result 
 write_rendered_file_draft() {
   local extra=${4:-'{}'}
   jq -n --arg body "$2" --arg path "$3" --argjson extra "$extra" \
-    '[{path: $path, line: 12, body: $body, ran: "n/a: layout only", walked: "n/a: layout only"} + $extra]' > "$1"
+    '[{path: $path, line: 12, body: $body, covered: "read the description: it says nothing about narrow screens", ran: "n/a: layout only", walked: "n/a: layout only"} + $extra]' > "$1"
 }
 ui_body=$'**suggestion**:\nThe price wraps under the button on a narrow screen. Keeping them on one row would match the list.'
 write_rendered_file_draft "$work_dir/ui-unseen.json" "$ui_body" "src/storefront/OrderRow.tsx"
@@ -209,6 +210,52 @@ draft "$work_dir/ran.json" "$run_fix" '{ran: "applied on a scratch copy: new tes
 expect_eq "an issue with a run record is clean" clean "$(result "$work_dir/ran.json")"
 draft "$work_dir/question-no-ran.json" $'**question:**\nIs the swap meant to run on the first pass too?' '{}'
 expect_eq "a question needs no \"ran\"" clean "$(result "$work_dir/question-no-ran.json")"
+
+# --- a long unbroken stretch of words reads as one heavy run ----------------------------------
+heavy_body=$'**note**:\nLocally, after cancelling the order the cart still had the coupon and the shipping address was unchanged.'
+draft "$work_dir/heavy.json" "$heavy_body" '{}'
+expect_contains "a 16-word stretch with no pause is flagged, with its first words" '16-word stretch with no comma or pause ("after cancelling the order the cart...")' "$(result "$work_dir/heavy.json")"
+draft "$work_dir/paused.json" $'**note**:\nI tried it locally: after cancelling, the cart still had the coupon, but the address stayed the same.' '{}'
+expect_eq "the same point with commas and a colon is clean" clean "$(result "$work_dir/paused.json")"
+sep_head='After cancelling the order the cart kept the coupon'
+sep_tail=' the shipping address was unchanged after that too.'
+draft "$work_dir/sep-semicolon.json" $'**note**:\n'"$sep_head;$sep_tail" '{}'
+expect_eq "a 14+ word sentence broken only by a semicolon is clean" clean "$(result "$work_dir/sep-semicolon.json")"
+draft "$work_dir/sep-colon.json" $'**note**:\n'"$sep_head:$sep_tail" '{}'
+expect_eq "a 14+ word sentence broken only by a colon is clean" clean "$(result "$work_dir/sep-colon.json")"
+draft "$work_dir/sep-parens.json" $'**note**:\n'"$sep_head (the shipping address was unchanged after that too)." '{}'
+expect_eq "a 14+ word sentence broken only by parentheses is clean" clean "$(result "$work_dir/sep-parens.json")"
+draft "$work_dir/sep-dash.json" $'**note**:\n'"$sep_head -$sep_tail" '{}'
+expect_eq "a 14+ word sentence broken only by a spaced dash is clean" clean "$(result "$work_dir/sep-dash.json")"
+draft "$work_dir/sep-double-dash.json" $'**note**:\n'"$sep_head--$sep_tail" '{}'
+expect_eq "a 14+ word sentence broken only by a double dash is clean" clean "$(result "$work_dir/sep-double-dash.json")"
+draft "$work_dir/sep-en-dash.json" $'**note**:\n'"$sep_head"$'\xe2\x80\x93'"$sep_tail" '{}'
+expect_eq "a 14+ word sentence broken only by an en dash is clean" clean "$(result "$work_dir/sep-en-dash.json")"
+draft "$work_dir/sep-none.json" $'**note**:\n'"$sep_head$sep_tail" '{}'
+expect_contains "the same sentence with no break is flagged" "-word stretch" "$(result "$work_dir/sep-none.json")"
+draft "$work_dir/heavy-code.json" $'**note**:\nAfter cancelling `the order` the cart still had the coupon and the shipping address was unchanged.' '{}'
+expect_contains "inline code counts as one word, so the stretch is still found" "-word stretch" "$(result "$work_dir/heavy-code.json")"
+jq '.[0].long = "explains why the cart keeps its coupon"' "$work_dir/heavy.json" > "$work_dir/heavy-long.json"
+expect_eq "a stretch with a reason in \"long\" is clean" clean "$(result "$work_dir/heavy-long.json")"
+draft "$work_dir/fourteen.json" $'**note**:\nAfter cancelling the order the cart still had the coupon and address changed again.' '{}'
+expect_contains "a 14-word stretch is flagged" "14-word stretch" "$(result "$work_dir/fourteen.json")"
+draft "$work_dir/two-heavy.json" $'**note**:\nAfter cancelling the order the cart still had the coupon and address changed again. Later the refund went out to the card and the receipt was never sent.' '{}'
+expect_eq "two heavy sentences give one stretch message" 1 "$(result "$work_dir/two-heavy.json" | grep -c -- '-word stretch')"
+draft "$work_dir/thirteen.json" $'**note**:\nAfter cancelling the order the cart still had the coupon and address changed.' '{}'
+expect_eq "a 13-word stretch is clean" clean "$(result "$work_dir/thirteen.json")"
+
+# --- the author's own words are read first ("covered") ------------------------------------------
+cover_body=$'**note**:\nThe total skips archived items, but the list shows them.'
+draft "$work_dir/no-covered.json" "$cover_body" '{covered: null}'
+no_covered=$(result "$work_dir/no-covered.json")
+expect_contains "§PC8: a draft with no \"covered\" is flagged" 'no "covered": read the pull request description, the linked ticket and the author'"'"'s replies first' "$no_covered"
+expect_contains "§PC8: the \"covered\" problem says what to do" "or drop the draft" "$no_covered"
+draft "$work_dir/blank-covered.json" "$cover_body" '{covered: "  "}'
+expect_contains "§PC8: a blank \"covered\" is flagged" 'no "covered"' "$(result "$work_dir/blank-covered.json")"
+draft "$work_dir/na-covered.json" "$cover_body" '{covered: "n/a"}'
+expect_contains "§PC8: a bare n/a \"covered\" is flagged" 'no "covered"' "$(result "$work_dir/na-covered.json")"
+draft "$work_dir/covered-ok.json" "$cover_body" '{covered: "description says archived items stay in the list; it does not say the total counts them"}'
+expect_eq "§PC8: a draft with a real \"covered\" is clean" clean "$(result "$work_dir/covered-ok.json")"
 
 printf 'not json' > "$work_dir/broken.json"
 status=0
