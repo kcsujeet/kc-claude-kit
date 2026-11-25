@@ -105,9 +105,9 @@ get_uncovered_dimension() {
       printf 'two locales such as de-DE and ar-SA, or one and rtl' ;;
     print) printf '%s' "$states_text" | grep -Eq 'print|pdf' || printf 'a print or pdf state' ;;
     exits)
-      printf '%s' "$states_text" | grep -Eq 'submit|save|confirm|apply|send|ok([^a-z]|$)' || printf 'a submit or confirm; '
+      printf '%s' "$states_text" | grep -Eq 'submit|save|confirm|apply|send|(^|[^a-z])ok([^a-z]|$)' || printf 'a submit or confirm; '
       printf '%s' "$states_text" | grep -Eq 'cancel|close|dismiss|escape|discard' || printf 'a cancel or close; '
-      printf '%s' "$states_text" | grep -Eq 'fail|error|reject|offline|timeout|[45][0-9][0-9]' || printf 'a failed save' ;;
+      printf '%s' "$states_text" | grep -Eq 'fail|error|reject|offline|timeout|(^|[^0-9a-z])[45][0-9][0-9]([^0-9a-z]|$)' || printf 'a failed save' ;;
     data-size)
       printf '%s' "$states_text" | grep -Eq 'empty|zero|no rows|no items' || printf 'an empty state; '
       printf '%s' "$states_text" | grep -Eq 'many|long|large|overflow|truncat|paginat|[0-9]{2,} (rows|items|results|records)' || printf 'a large state' ;;

@@ -107,7 +107,9 @@ list_walk_dimensions() {
       has_export = (line ~ /[Ee]xport[A-Z(]/ || tolower(line) ~ /(csv|xlsx)/)
       if (has_list_markup || has_export) add_walk_dimension("data-size")
       has_form_or_dialog = (is_list_ui_file && line ~ /(onSubmit|handleSubmit|<form[[:space:]>]|[Dd]ialog|[Mm]odal|[Dd]rawer|[Cc]onfirm(ation)?[A-Z(]|onCancel|onClose)/)
-      has_save_call = (line ~ /(mutateAsync|mutate|save[A-Za-z]*|submit[A-Za-z]*)\(/ && line ~ /(await|onSuccess|onError|then\()/)
+      has_save_call_name = (line ~ /(mutateAsync|mutate|save[A-Za-z]*|submit[A-Za-z]*)\(/)
+      has_save_outcome_handler = (line ~ /(await|onSuccess|onError|then\()/)
+      has_save_call = (has_save_call_name && has_save_outcome_handler)
       if (has_form_or_dialog || has_save_call) add_walk_dimension("exits")
     }
     END { for (key in seen) print key }

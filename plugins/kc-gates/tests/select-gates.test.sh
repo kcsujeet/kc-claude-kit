@@ -249,6 +249,10 @@ make_case "$work_dir/walk-dim-dialog" 'const onSubmit = methods.handleSubmit(sav
 expect_eq "dimension: a form submit is exits" "exits" "$(get_walk_dimensions "$work_dir/walk-dim-dialog")"
 make_case "$work_dir/walk-dim-save" 'onSuccess: async () => { await saveNote() }' src/cart/useNote.ts
 expect_eq "dimension: an awaited save in a hook is exits" "exits" "$(get_walk_dimensions "$work_dir/walk-dim-save")"
+make_case "$work_dir/walk-dim-save-no-outcome" 'const done = saveNote(note)' src/cart/useNote.ts
+expect_eq "dimension: a save call nobody awaits is no exits" "" "$(get_walk_dimensions "$work_dir/walk-dim-save-no-outcome")"
+make_case "$work_dir/walk-dim-await-load" 'const note = await loadNote()' src/cart/useNote.ts
+expect_eq "dimension: an awaited load is no exits" "" "$(get_walk_dimensions "$work_dir/walk-dim-await-load")"
 make_case "$work_dir/walk-dim-plain" 'const total = sum(prices)' src/cart/Total.tsx
 expect_eq "dimension: plain code is no exits" "" "$(get_walk_dimensions "$work_dir/walk-dim-plain")"
 make_case "$work_dir/walk-dim-list" '{items.map((item) => <li key={item.id}>{item.name}</li>)}' src/cart/Total.tsx
