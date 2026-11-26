@@ -10,6 +10,8 @@ repo=$(mktemp -d)
 trap 'rm -rf "$repo"' EXIT
 passes=0
 failures=0
+# The script runs from a folder with several entries, so an unquoted glob in it would expand.
+mkdir "$repo/cwd" && touch "$repo"/cwd/{a,b,c,d,e,f,g}
 
 pass() { echo "ok   $1"; passes=$((passes + 1)); }
 fail() { echo "FAIL $1"; failures=$((failures + 1)); }
@@ -17,7 +19,7 @@ fail() { echo "FAIL $1"; failures=$((failures + 1)); }
 last_output=""
 expect_verdict() {
   local expectation=$1 label=$2 actual=pass
-  last_output=$(bash "$script" "$repo" 2>&1) || actual=fail
+  last_output=$(cd "$repo/cwd" && bash "$script" "$repo" 2>&1) || actual=fail
   if [ "$actual" = "$expectation" ]; then pass "$label"; else fail "$label (expected $expectation, got $actual: $last_output)"; fi
 }
 expect_output() {
