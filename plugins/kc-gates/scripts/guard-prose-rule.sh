@@ -44,10 +44,10 @@ deny_prose_only_rule() {
 }
 
 # Drops the added lines of a `git diff -U0` (stdin) that a merge only carries in: lines already in that
-# file at the default branch, or at the merged commit when the default branch has it. Outside a merge
-# the diff passes unchanged. Git reads each reviewed file into a scratch file, so a path reaches no shell.
+# file at the default branch, or at the merged commit when the default branch has it. Git reads each
+# reviewed file into a scratch file, so a path reaches no shell.
 drop_carried_in_lines() {
-  local dir=$1 reviewed_refs ref scratch path file_number=0
+  local dir=$1 reviewed_refs ref scratch changed_path file_number=0
   if ! git -C "$dir" rev-parse -q --verify MERGE_HEAD > /dev/null 2>&1; then
     cat
     return
@@ -58,11 +58,12 @@ drop_carried_in_lines() {
   fi
   scratch=$(mktemp -d)
   cat > "$scratch/diff"
-  while IFS= read -r path; do
+  while IFS= read -r changed_path; do
     file_number=$((file_number + 1))
     # shellcheck disable=SC2086 # $reviewed_refs is a list of refs
-    for ref in $reviewed_refs; do git -C "$dir" show "$ref:$path" 2> /dev/null; done > "$scratch/$file_number"
-  done < <(sed -n 's/^+++ b\///p' "$scratch/diff")
+    for ref in $reviewed_refs; do git -C "$dir" show "$ref:$changed_path" 2> /dev/null; done > "$scratch/$file_number"
+  # The awk below numbers the files by the same header test, so both lists stay in step.
+  done < <(awk '/^diff --git / { in_header = 1 } /^@@/ { in_header = 0 } in_header && /^\+\+\+ b\// { print substr($0, 7) }' "$scratch/diff")
   awk -v scratch="$scratch" '
     /^diff --git / { in_header = 1; delete reviewed_lines }
     /^@@/ { in_header = 0 }

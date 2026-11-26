@@ -136,6 +136,7 @@ run_git_in "$merge_repo" merge -q --no-commit --no-ff quoted > /dev/null
 check_verdict deny "blocked: a merge adding a rule under a quote-and-substitution path, with no command run" "git commit --no-edit" "$merge_repo"
 expect_eq "the path was never run as a command" "" "$(find "$work_dir" "$PWD" -maxdepth 3 -name INJECTED 2>/dev/null)"
 run_git_in "$merge_repo" merge --abort
+# Outside a merge the filter does not run, so a line the default branch has stays blocked.
 run_git_in "$merge_repo" checkout -q lesson
 echo '- A rule main already reviewed.' >> "$merge_repo/CLAUDE.md"
 run_git_in "$merge_repo" add CLAUDE.md
@@ -171,5 +172,22 @@ run_git_in "$dup_repo" checkout -q main
 run_git_in "$dup_repo" merge -q --no-commit --no-ff other > /dev/null
 check_verdict deny "blocked: a line known in one file does not excuse the same line in another file" "git commit --no-edit" "$dup_repo"
 run_git_in "$dup_repo" merge --abort
+
+# An added line shaped like a file header must not shift which reviewed file a later path reads.
+hdr_repo="$work_dir/hdr-repo"
+git init -q -b main "$hdr_repo"
+mkdir -p "$hdr_repo/rules"
+printf '# A\n' > "$hdr_repo/AGENTS.md"
+printf '# Y\n' > "$hdr_repo/rules/y.md"
+run_git_in "$hdr_repo" add .
+run_git_in "$hdr_repo" commit -q -m base
+run_git_in "$hdr_repo" branch lesson
+printf '# A\n++ b/rules/z.md\n' > "$hdr_repo/AGENTS.md"
+printf '# Y\n- Y rule\n' > "$hdr_repo/rules/y.md"
+run_git_in "$hdr_repo" commit -q -am "main adds a header-shaped line and a rule"
+run_git_in "$hdr_repo" checkout -q lesson
+run_git_in "$hdr_repo" merge -q --no-commit --no-ff main > /dev/null
+check_verdict allow "allowed: a carried-in header-shaped line does not misnumber the next file" "git commit --no-edit" "$hdr_repo"
+run_git_in "$hdr_repo" merge --abort
 
 finish
