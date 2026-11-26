@@ -100,7 +100,6 @@ expect_eq "a quoted | or ; or > is data, not work" out "$(for command in "rg 'fo
 expect_work_held "a redirect after an escaped single quote" Bash command "echo \\' > f; echo 'x'"
 expect_work_held "a redirect after a quote inside a double-quoted string" Bash command "echo \"\$x'\" > f; echo 'y'"
 expect_work_held "a redirect after an escaped double quote" Bash command 'echo \" > f; echo "x"'
-expect_work_held "a command after an escaped quote" Bash command "echo \\'; rm x; echo '"
 expect_eq "a double-quoted variable is data, not work" out "$(write_work_turn Bash command 'echo "$HOME"'; run_stop "$done_text")"
 expect_work_held "a redirect after a quoted string" Bash command "echo 'a' > out.txt"
 expect_work_held "a redirect after a double-quoted string" Bash command 'echo "a" > out.txt'

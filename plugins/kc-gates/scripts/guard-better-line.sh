@@ -51,8 +51,7 @@ better_lines_file="${CLAUDE_PLUGIN_DATA:-}/better-lines/$session_id"
 is_read_only_command() {
   local command_without_quoted_text command_without_safe_operators segment
   printf '%s' "$1" | grep -Eq '\$\(|`' && return 1
-  # Quoted text is data: drop it. A quote or backslash left over (an escaped quote, or a quote inside a
-  # double-quoted string) is one the shell may pair differently from sed, so it counts as work.
+  # Quoted text is data: drop it. A quote or backslash left over is one the shell may pair differently, so it is work.
   command_without_quoted_text=$(printf '%s' "$1" | sed -E "$QUOTED_TEXT")
   printf '%s' "$command_without_quoted_text" | grep -Eq "['\"\\\\]" && return 1
   command_without_safe_operators=$(printf '%s' "$command_without_quoted_text" | sed -E 's#[0-9]*>&[0-9]##g; s#[0-9]*>>?[[:space:]]*/dev/null##g; s#&&# #g')
