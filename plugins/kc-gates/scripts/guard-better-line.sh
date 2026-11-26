@@ -73,13 +73,12 @@ is_work_call() {
 # True when the file holds a record dated at or after $1 that says what was improved or what was
 # checked (see the header).
 has_record_since() {
-  [ -r "$better_lines_file" ] || return 1
   awk -F'\t' -v turn_start="$1" '
     ($1 "") < (turn_start "") { next }
     tolower($2) == "none" { if (split($3, words, " ") >= 2) found = 1; next }
     NF >= 4 && $2 != "" && $3 != "" && $4 != "" && $3 != $4 \
       && tolower($2) !~ /^(posted|fixed|merged|confirmed|pushed|committed|created|added|updated|ran|opened|wrote|sent|done|deleted|removed|renamed|applied|checked|verified|reviewed)([^[:alnum:]]|$)/ { found = 1 }
-    END { exit !found }' "$better_lines_file"
+    END { exit !found }' "$better_lines_file" 2>/dev/null
 }
 
 did_work=false
