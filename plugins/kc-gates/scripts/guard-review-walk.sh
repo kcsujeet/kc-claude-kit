@@ -54,7 +54,9 @@ get_walk_problems() {
   has_review_files "$review_dir" || return 0
   selected=$(mktemp)
   if bash "$scripts_dir/select-gates.sh" "$review_dir/review.diff" "$review_dir/changed-files.txt" . > "$selected" 2>/dev/null; then
-    bash "$scripts_dir/check-walk-receipt.sh" "$selected" "$review_dir/walk-receipt.tsv" 2>&1 | tr '\n' ' ' | cut -c1-600
+    uses_arg=()
+    if [ -r "$review_dir/uses.txt" ]; then uses_arg=("$review_dir/uses.txt"); fi
+    bash "$scripts_dir/check-walk-receipt.sh" "$selected" "$review_dir/walk-receipt.tsv" ${uses_arg[@]+"${uses_arg[@]}"} 2>&1 | tr '\n' ' ' | cut -c1-600
   fi
   rm -f "$selected"
 }

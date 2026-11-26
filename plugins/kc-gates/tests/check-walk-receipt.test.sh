@@ -272,3 +272,53 @@ printf 'env\tbin/review-env up\tGET /health 200\napp/[locale]/page.tsx\tpage\tPO
 expect_contains "a path with regex characters still gets its dimension checked" "varies along print" "$(run_walk_receipt_check)"
 
 finish
+
+# Consumers (§V11, §B8): a changed unit is walked from every consumer's side. uses.txt is
+# trace-uses.sh's output; each consumer file of an item needs an entry in the fifth field with an
+# omitted or partial input and its output before and after, or an only-state reason.
+printf 'GATES=naming\nWALK=required\nwalk: x\nwalk-item: app/models/order.rb surface: api\n' > "$select_output"
+uses=$work_dir/uses.txt
+cat > "$uses" <<'USES'
+name Order (definition, app/models/order.rb): 3 uses
+  app/services/checkout.rb:12: Order.create(params)
+  app/services/checkout.rb:40: Order.find(id)
+  app/jobs/export_job.rb:5: Order.all
+  spec/models/order_spec.rb:3: Order.new
+  app/models/order.rb:9: Order.first
+name Other (definition, app/models/other.rb): 1 uses
+  app/views/other_view.rb:2: Other.x
+tests: 1
+  spec/models/order_spec.rb
+summary: 2 names, 5 uses, 1 test files
+USES
+write_consumer_receipt() {
+  printf 'env\tbin/review-env up\tGET /health 200\napp/models/order.rb\tsaved an order\tPOST /orders 201\tstates: full form; empty cart\t%s\n' "$1" > "$receipt"
+}
+run_consumer_check() {
+  local output status=0
+  output=$(bash "$walk_receipt_checker" "$select_output" "$receipt" "$uses") || status=$?
+  if [ "$status" -eq 0 ]; then echo clean; else printf '%s\n' "$output"; fi
+}
+full_entries='consumers: app/services/checkout.rb: omitted the discount field; before discount stayed on; after it reads off | app/jobs/export_job.rb: only state: it always passes every field'
+write_consumer_receipt "$full_entries"
+expect_eq "§V11: every consumer with an omitted state and before/after (or an only-state reason) passes" clean "$(run_consumer_check)"
+write_consumer_receipt ''
+missing_field=$(run_consumer_check)
+expect_contains "§V11: an item with consumers and no fifth field fails, naming a consumer" "consumer app/services/checkout.rb uses what this item changes and has no entry" "$missing_field"
+expect_contains "§V11: every consumer file is named" "consumer app/jobs/export_job.rb uses what this item changes" "$missing_field"
+expect_eq "a test file, the item itself and another item's consumer are not consumers" 2 "$(printf '%s\n' "$missing_field" | grep -c 'consumer app/')"
+write_consumer_receipt 'consumers: app/services/checkout.rb: omitted the discount field; before on; after off'
+expect_contains "§V11: a consumer left out of the field fails" "consumer app/jobs/export_job.rb uses what this item changes" "$(run_consumer_check)"
+write_consumer_receipt 'consumers: app/services/checkout.rb: saved with all fields; before on; after on | app/jobs/export_job.rb: only state: it always passes every field'
+expect_contains "§V11: an entry with no omitted or partial input fails" "consumer app/services/checkout.rb: walk it with an input left out or partial" "$(run_consumer_check)"
+write_consumer_receipt 'consumers: app/services/checkout.rb: omitted the discount field; after it reads off | app/jobs/export_job.rb: only state: it always passes every field'
+expect_contains "§V11: an entry with no before state fails" "consumer app/services/checkout.rb: give what it received before and after" "$(run_consumer_check)"
+write_consumer_receipt 'consumers: app/services/checkout.rb: omitted the discount field; before on; after off | app/jobs/export_job.rb: only state: n/a'
+expect_contains "§V11: an only-state reason under three words fails" "consumer app/jobs/export_job.rb: walk it with an input left out or partial" "$(run_consumer_check)"
+write_consumer_receipt "$full_entries"
+printf 'name Order (definition, app/models/order.rb): 1 uses\n  app/models/order.rb:9: Order.first\ntests: 0\nsummary: 1 names, 1 uses, 0 test files\n' > "$uses"
+printf 'env\tbin/review-env up\tGET /health 200\napp/models/order.rb\tsaved an order\tPOST /orders 201\tstates: full form; empty cart\n' > "$receipt"
+expect_eq "§V11: an item with no consumer outside itself and its tests needs no fifth field" clean "$(run_consumer_check)"
+status=0
+bash "$walk_receipt_checker" "$select_output" "$receipt" "$work_dir/no-such-uses.txt" > /dev/null 2>&1 || status=$?
+expect_eq "an unreadable uses file exits 2" 2 "$status"
