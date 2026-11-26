@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Fixed (a question to the person is a product, scope or irreversible call, in plain words)
+
+- `kc-gates` 3.18.2: new PreToolUse hook `guard-ask-product-only.sh` (matcher `AskUserQuestion`) denies a question whose text, header or options hold code or review words (a backtick, a file path or name, a section id, `kc-...`, "gate", "finding", "round 2", "verdict", "checklist") or whose question does not begin `Product:`, `Scope:`, `Irreversible:` or `Intent:`; the reason says to settle a code-level choice with the fewest moving parts and go on. `kc-code-review`'s contested-call rule and `kc-ready-for-review` step 6 no longer route code-style conflicts to the user: only product, scope and irreversible calls are asked, and the rest is settled by the agent and recorded, as the working agreement already said. Held by `tests/guard-ask-product-only.test.sh`.
+
 ### Fixed (a merge of the default branch into a clean head stays clean)
 
 - `kc-gates` 3.18.1: `ready-receipt.sh check <sha> --clean` (and so `guard-merge.sh`, which now runs it in the pull request's repo) counts a merge of the default branch into a commit with a clean receipt as clean, with no new pass and no "approve merge", when the merge is what `git merge-tree` makes of its two parents (the second a commit the default branch has; git 2.38 or later): every other file must match git's own merge, so a stale copy of a file the default branch changed, reordered lines or an unresolved conflict keep it not clean. The only resolution allowed is in a `plugin.json` (its `"version"` lines) and a `CHANGELOG.md` (version numbers and entry order). `write <sha> --after <clean-sha>` says when it notices such a merge; `--after` on a fix commit still never makes the head clean. Same class as the prose-rule fix below (a guard blames a change for content it only carried in). Held by `tests/ready-receipt-merge.test.sh`.
