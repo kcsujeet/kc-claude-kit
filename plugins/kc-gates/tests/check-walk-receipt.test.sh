@@ -329,6 +329,7 @@ write_consumer_receipt ''
 expect_eq "§V11: variable reads, assignments and comments of an enclosing name are not consumers" clean "$(run_consumer_check)"
 # The same use line is a consumer when the name is a definition, not only the hunk's context; a `$name` read is not.
 {
+  # shellcheck disable=SC2016 # fixture text, not an expansion
   printf 'name script_name (definition, app/models/order.rb): 2 uses\n  lib/passed.rb:1: render(script_name, other)\n  lib/read.rb:1: echo "usage: $script_name"\n'
   printf 'tests: 0\nsummary: 1 names, 2 uses, 0 test files\n'
 } > "$uses_file"
