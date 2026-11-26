@@ -181,8 +181,7 @@ import { formatMoney } from '../money/formatMoney'
 import type { Order } from './types'
 
 export function listOpenTotals(orders: Order[]): string {
-  const openTotals = orders.filter((order) => order.status === 'open').map((order) => formatMoney(order.totalCents)).join(', ')
-  return openTotals
+  return orders.filter((order) => order.status === 'open').map((order) => formatMoney(order.totalCents)).join(', ')
 }
 TS
 
