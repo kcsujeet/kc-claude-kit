@@ -185,6 +185,12 @@
           },
           {
             "type": "command",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/guard-better-line.sh\"",
+            "shell": "bash",
+            "timeout": 10
+          },
+          {
+            "type": "command",
             "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/guard-review-walk.sh\"",
             "shell": "bash",
             "timeout": 30
