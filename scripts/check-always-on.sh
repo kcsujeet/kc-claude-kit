@@ -197,6 +197,30 @@ done
 sort -rn "$scratch/tool-hooks" | sed 's/^/  /'
 echo "  max: $tool_hooks_max bytes per ordinary call"
 
+# A once-per-turn reminder (remind-better-line.sh) stays silent on the ordinary calls above, so it is
+# run once more against the Edit payload with a fresh plugin data folder, as a turn's first work call.
+# Report only: it is paid once per turn, not on every call.
+echo
+echo "Once-per-turn tool-hook output (first work call of a turn, bytes printed; report only):"
+for hooks_file in "$root"/plugins/*/hooks/hooks.json; do
+  [ -f "$hooks_file" ] || continue
+  plugin_dir=$(dirname "$(dirname "$hooks_file")")
+  commands=$(jq -r '(.hooks.PostToolUse // [])[].hooks[] | select(.type == "command" and ((.async // false) | not)) | .command' "$hooks_file" 2>/dev/null || true)
+  while IFS= read -r command; do
+    [ -n "$command" ] || continue
+    case "$command" in */update-*.sh*) continue ;; esac
+    size=$(
+      cd "$work_dir" &&
+        printf '%s' "$payload_edit" |
+        env -i PATH="$bin_dir" HOME="$home_dir" CLAUDE_CONFIG_DIR="$home_dir" \
+          CLAUDE_PLUGIN_ROOT="$plugin_dir" CLAUDE_PROJECT_DIR="$work_dir" CLAUDE_PLUGIN_DATA="$(mktemp -d "$scratch/data.XXXXXX")" \
+          "$bin_dir/bash" -c "$command" 2>&1 | wc -c | tr -d ' '
+    ) || size=0
+    [ "$size" -eq 0 ] || name=${command##*/}
+    echo "  $size $(basename "$plugin_dir")/${name%\"} (PostToolUse)"
+  done <<< "$commands"
+done
+
 # --- skill and agent bodies -------------------------------------------------------------
 : > "$scratch/skill-bodies"
 : > "$scratch/agent-bodies"

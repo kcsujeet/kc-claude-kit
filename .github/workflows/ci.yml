@@ -91,6 +91,15 @@ jobs:
       - name: Budget change check tests
         run: bash scripts/tests/check-budget-change.test.sh
 
+      - name: Stop hook check tests
+        run: bash scripts/tests/check-stop-hooks.test.sh
+
+      # An end-of-turn hook (Stop, SubagentStop) runs after the person has read the reply, so one that
+      # reminds or blocks only adds noise. Each must be in .claude/stop-hooks-allowed.txt with the
+      # reason it has to run at the end of a turn and neither reminds nor blocks.
+      - name: End-of-turn hooks are allowlisted and silent
+        run: bash scripts/check-stop-hooks.sh
+
       - name: Every plugin script has a test
         run: bash scripts/check-test-coverage.sh
 

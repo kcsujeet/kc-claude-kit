@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # UserPromptSubmit hook: before Claude writes its reply, reminds it of the reply rules the Stop
-# hooks check (check-reply-length.sh, check-reply-sources.sh), and names what the last reply
-# missed. The check runs here, at the start of the turn, because no hook runs before a reply is
-# shown: a Stop hook that blocks makes Claude write the reply again, and the person sees both.
+# hooks note (check-reply-length.sh, check-reply-sources.sh), and names what the last reply
+# missed. The reminder runs here, at the start of the turn, because no hook runs before a reply is
+# shown, and a Stop hook that blocks makes Claude write the reply again, so the person sees both.
 #
 # When the prompt is a question, the reminder adds the trigger for "answer the question asked": the
 # first sentence answers that question in its own terms, before any other work. A question is a
@@ -12,11 +12,13 @@
 #
 # When the prompt asks to fix or address something reported (asks_fix), it adds the trigger for
 # kc-assess step 3: reproduce each problem before proposing a cause, and name the evidence on a
-# `Reproduced:` line. check-reply-sources.sh notes a proposal without one.
+# `Reproduced:` line. guard-unreproduced-cause.sh denies the first edit before it was run.
 #
 # When the prompt asks where work stands or what is left (asks_status), it adds one line: read the
 # ticket's and pull request's state with a tool before stating it. No line otherwise, so the
 # claim is checked before the reply, not corrected after it.
+#
+# It also clears the session's once-per-turn marker for remind-better-line.sh (lib/reply-misses.sh).
 #
 # Input: the UserPromptSubmit payload on stdin (its session_id and prompt). Output: the reminder,
 # which Claude Code adds to the turn as context; the misses file is removed once named. Always
@@ -48,6 +50,8 @@ fi
 
 command -v jq >/dev/null 2>&1 || exit 0
 session_id=$(printf '%s' "$input" | jq -r '.session_id // empty' 2>/dev/null)
+# A new turn: remind-better-line.sh may speak again on its first work call.
+marker_file=$(better_line_marker_file "$session_id") && rm -f "$marker_file"
 misses_file=$(reply_misses_file "$session_id")
 [ -s "$misses_file" ] || exit 0
 

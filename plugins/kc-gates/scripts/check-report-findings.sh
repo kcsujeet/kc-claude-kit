@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Checks a review report names every finding the gates confirmed, so a confirmed finding never
 # vanishes between a gate's block and the report (kc-code-review Step 4 saves each gate block to
-# verdicts/<gate>.txt in the review folder; guard-review-walk.sh runs this on a verdict reply).
+# verdicts/<gate>.txt in the review folder; kc-code-review Step 4 runs this on the report before it is sent).
 #
 # Usage: check-report-findings.sh <verdicts-dir> <reply-file|->
 #

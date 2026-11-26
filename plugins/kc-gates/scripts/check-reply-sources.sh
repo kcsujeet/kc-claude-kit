@@ -15,7 +15,8 @@
 # A reply that lists look-back lessons when the session never ran `feedback-ledger.sh list` is
 # noted: a look-back written from memory keeps the feedback that stood out and drops the rest.
 #
-# A cause proposed with no reproduction is guard-unreproduced-cause.sh's, which blocks it.
+# A cause proposed with no reproduction is guard-unreproduced-cause.sh's, which denies the first edit
+# made for a reported problem (PreToolUse), before the reply.
 #
 # A turn whose latest message was only a question (is_only_question) and that made Edit or Write
 # calls is noted too: a question is not a change request.

@@ -17,6 +17,14 @@ reply_misses_file() {
   printf '%s\n' "$CLAUDE_PLUGIN_DATA/reply-misses/$1"
 }
 
+# Prints the file that marks session <id>'s turn as already reminded to raise the bar
+# (remind-better-line.sh sets it, remind-reply-rules.sh clears it at the next prompt); fails,
+# printing nothing, without a data folder or an id.
+better_line_marker_file() {
+  [ -n "${CLAUDE_PLUGIN_DATA:-}" ] && [ -n "${1:-}" ] || return 1
+  printf '%s\n' "$CLAUDE_PLUGIN_DATA/better-line-reminded/$1"
+}
+
 # Appends each argument after <id> as one line of session <id>'s misses file.
 append_reply_misses() {
   local misses_file
