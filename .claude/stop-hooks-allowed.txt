@@ -1,0 +1,7 @@
+# End-of-turn hooks (Stop, SubagentStop) the kit allows. scripts/check-stop-hooks.sh reads this.
+# One line per hook: <plugin> <event> <command name> <reason>. The reason says why it must run at the
+# end of the turn and that it neither reminds nor blocks. A reminder or a block at the end of a turn
+# runs after the person read the reply: put it on the action instead (PreToolUse, or additionalContext
+# from UserPromptSubmit or PostToolUse).
+kc-gates Stop check-reply-sources.sh needs the finished reply to record a miss silently for the next turn; prints nothing, never blocks
+kc-gates Stop check-reply-length.sh needs the finished reply to count its words and record a miss silently for the next turn; prints nothing, never blocks

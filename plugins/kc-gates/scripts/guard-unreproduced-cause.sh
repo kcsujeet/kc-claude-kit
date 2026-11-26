@@ -1,18 +1,18 @@
 #!/usr/bin/env bash
-# Stop hook: blocks a reply that proposes a cause and a fix for a reported problem before the
-# problem was reproduced the way the reporter met it (kc-conventions:kc-assess step 3). A cause read
-# from code is a guess, and a copy of one layer (a template rendered alone, another browser version,
-# a fixture) is not the report; it has to be the reporter's own path: same entry point, renderer or
-# runtime and version, environment and real-shaped data.
+# PreToolUse hook (Edit, Write, MultiEdit, NotebookEdit): denies the first file change made for a
+# reported problem before the problem was reproduced the way the reporter met it
+# (kc-conventions:kc-assess step 3). A cause read from code is a guess, and a copy of one layer (a
+# template rendered alone, another browser version, a fixture) is not the report; it has to be the
+# reporter's own path: same entry point, renderer or runtime and version, environment and
+# real-shaped data. The check runs before the edit, while it can still change what Claude does; a
+# Stop hook that checked the reply instead ran after the person had read it.
 #
-# It blocks when all of these hold:
+# It denies when all of these hold:
 #
 #   a. Some typed message in the session asked to fix something reported (asks_fix).
-#   b. The reply proposes a cause and a fix (proposes_cause_and_fix).
-#   c. The reply has no "Reproduced:" or "Not reproduced:" line, or it has a "Reproduced:" line and
-#      no tool call since the latest fix-asking message ran something that exercises the product.
-#
-# A turn that edited files needs a run of the product but no Reproduced: or Not reproduced: line.
+#   b. No tool call since the latest such message ran something that exercises the product, and no
+#      text Claude wrote since then has a "Not reproduced: <reason>" line (three or more words).
+#   c. The file is not a test or spec (writing the failing test is how a problem gets reproduced).
 #
 # What exercises the product: a Bash or REPL command that starts with a test runner (rspec, jest,
 # vitest, pytest, playwright, cypress, go test, cargo test, npm/pnpm/yarn/bun test or run test), a
@@ -23,12 +23,13 @@
 # (`bin/shop-check x` is `shop-check x`). Reading or searching code (cat, sed, grep, rg, git show,
 # log or diff, the Read, Grep and Glob tools) never counts.
 #
-# "Not reproduced: <reason>" with a reason of three or more words passes: it is the honest way out
-# when the problem cannot be run here. On the second try (stop_hook_active) it blocks again only when
-# a turn that edited nothing still proposes a cause and a fix with neither line.
+# "Not reproduced: <reason>" is the honest way out when the problem cannot be run here, or needs no
+# run (a typo). A reply that only proposes a cause is not checked: remind-reply-rules.sh tells
+# Claude the rule when the prompt asks for a fix.
 #
-# Input: the Stop payload on stdin. Output: the block JSON, or nothing. Never blocks what it can't
-# read: no jq, no transcript or no reply exits 0. Hook schema: https://code.claude.com/docs/en/hooks
+# Input: the PreToolUse payload on stdin. Output: the deny JSON, or nothing. Never denies what it
+# can't read: no jq, no transcript or no file path exits 0. Hook schema:
+# https://code.claude.com/docs/en/hooks
 set -u
 
 # shellcheck source=lib/reply-misses.sh
@@ -40,17 +41,18 @@ readonly RUN_WORDS='(rspec|jest|vitest|pytest|playwright|cypress|curl|http|https
 readonly RUN_SEGMENTS='^(npm|pnpm|yarn|bun)[[:space:]]+(test|run[[:space:]]+test[^[:space:]]*)([[:space:]]|$)|^(go|cargo)[[:space:]]+test([[:space:]]|$)|^open[[:space:]].*chrom'
 readonly BROWSER_TOOL='^mcp__.*(playwright|puppeteer|browser|chrom)'
 
+
 command -v jq >/dev/null 2>&1 || exit 0
 payload=$(cat)
-reply=$(printf '%s' "$payload" | jq -r '.last_assistant_message // empty' 2>/dev/null)
 transcript=$(printf '%s' "$payload" | jq -r '.transcript_path // empty' 2>/dev/null)
-stop_hook_active=$(printf '%s' "$payload" | jq -r '.stop_hook_active // false' 2>/dev/null)
 repo_dir=$(printf '%s' "$payload" | jq -r '.cwd // empty' 2>/dev/null)
-[ -n "$reply" ] || exit 0
+edited_path=$(printf '%s' "$payload" | jq -r '.tool_input.file_path // .tool_input.notebook_path // empty' 2>/dev/null)
+[ "$(printf '%s' "$payload" | jq -r '.hook_event_name // empty' 2>/dev/null)" = PreToolUse ] || exit 0
 [ -r "$transcript" ] || exit 0
 [ -n "$repo_dir" ] || repo_dir=$PWD
 
-proposes_cause_and_fix "$reply" || exit 0
+# Writing a test or spec is how a problem gets reproduced.
+printf '%s' "$edited_path" | grep -Eiq '(^|/)(tests?|specs?|__tests__)/|\.(test|spec)\.[a-z]+$|_(test|spec)\.[a-z]+$' && exit 0
 
 fix_index=""
 while IFS=$'\t' read -r index text; do
@@ -66,22 +68,11 @@ tool_calls_since_fix=$(jq -L "$(dirname "$0")/lib" -rs --argjson from "$fix_inde
   include "typed-message";
   .[$from + 1:][] | get_tool_call_lines
 ' "$transcript" 2>/dev/null) || exit 0
+written_since_fix=$(jq -rs --argjson from "$fix_index" '
+  .[$from + 1:][] | select(.type == "assistant") | .message.content[]? | select(.type == "text") | .text
+' "$transcript" 2>/dev/null | tr '[:upper:]' '[:lower:]')
 
-lower_reply=$(printf '%s\n' "$reply" | tr '[:upper:]' '[:lower:]')
-has_reproduction_line=false
-names_reproduction "$reply" && has_reproduction_line=true
-has_reason=false
-printf '%s\n' "$lower_reply" | grep -Eq 'not reproduced[*_]*:[[:space:]]*[^[:space:]]+([[:space:]]+[^[:space:]]+){2,}' && has_reason=true
-has_reproduced_line=false
-printf '%s\n' "$lower_reply" | sed 's/not reproduced//g' | grep -Eq '(^|[^[:alnum:]])reproduced[*_]*:' && has_reproduced_line=true
-has_edited_files=false
-printf '%s\n' "$tool_calls_since_fix" | grep -Eq "$EDIT_CALLS" && has_edited_files=true
-
-block_unreproduced_cause() {
-  printf '%s' "Blocked by the kc-gates plugin: $1 Reproduce the problem the way the reporter met it before proposing a cause: their entry point, renderer or runtime and version, environment and real-shaped data (a copy of one layer, such as a template rendered alone, another browser version or a fixture, is not a reproduction). Then name the evidence on a Reproduced: line (the failing request, test run or screenshot), or say Not reproduced: <why> (at least three words) when it cannot be run here (kc-conventions:kc-assess step 3)." \
-    | jq -Rsc '{decision: "block", reason: .}'
-  exit 0
-}
+printf '%s\n' "$written_since_fix" | grep -Eq 'not reproduced[*_]*:[[:space:]]*[^[:space:]]+([[:space:]]+[^[:space:]]+){2,}' && exit 0
 
 extra_patterns=""
 if [ -r "$repo_dir/.claude/reproduce-commands" ]; then
@@ -115,19 +106,7 @@ EOF
   return 1
 }
 
-if [ "$has_edited_files" = true ]; then
-  [ "$stop_hook_active" = true ] && exit 0
-  did_run_product || block_unreproduced_cause "a fix was built without reproducing the problem through the reporter's path: nothing since the report ran the product, its tests or a browser (reading code does not count)."
-  exit 0
-fi
-
-if [ "$stop_hook_active" = true ]; then
-  [ "$has_reproduction_line" = true ] || block_unreproduced_cause "this reply proposes a cause and a fix with no Reproduced: or Not reproduced: line."
-  exit 0
-fi
-
-[ "$has_reason" = true ] && exit 0
-[ "$has_reproduction_line" = true ] || block_unreproduced_cause "this reply proposes a cause and a fix for a reported problem with no Reproduced: or Not reproduced: line."
-[ "$has_reproduced_line" = true ] || block_unreproduced_cause "its Not reproduced: line gives no reason (say why in at least three words)."
-did_run_product || block_unreproduced_cause "its Reproduced: line has no run behind it: nothing since the report ran the product, its tests or a browser (reading code does not count)."
+did_run_product && exit 0
+printf '%s' "Blocked by the kc-gates plugin: this change is for a reported problem, but nothing since the report ran the product, its tests or a browser (reading code does not count). Reproduce the problem the way the reporter met it first: their entry point, renderer or runtime and version, environment and real-shaped data (a copy of one layer, such as a template rendered alone, another browser version or a fixture, is not a reproduction). Then edit again. When it cannot be run here or needs no run, write a Not reproduced: <why> line (at least three words) in a message before the edit, since a line in the same message may not be seen yet (kc-conventions:kc-assess step 3)." \
+  | jq -Rsc '{hookSpecificOutput: {hookEventName: "PreToolUse", permissionDecision: "deny", permissionDecisionReason: .}}'
 exit 0

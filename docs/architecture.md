@@ -37,9 +37,10 @@ kc-claude-kit/
     │   ├── scripts/guard-github-post.sh, guard-hand-off.sh, guard-loop-stop.sh, guard-prose-rule.sh, guard-batched-wait.sh, guard-merge.sh, remind-look-back.sh, remind-look-back-prompt.sh, remind-after-replies.sh, check-reply-sources.sh, check-reply-length.sh, guard-late-answer.sh, remind-reply-rules.sh, update-after-merge.sh, lib/hook-input.sh, lib/reply-misses.sh, lib/typed-message.jq
     │   ├── scripts/change-class.sh, approvals-needed.sh  # a small change's lighter path through the guards; every typed phrase ahead in one block
     │   ├── scripts/guard-ask-product-only.sh  # denies a question to the person that holds code or review words or does not say its product, scope, irreversible or intent kind
-    │   ├── scripts/guard-unreproduced-cause.sh  # holds a cause and fix proposed before the reported problem was run
+    │   ├── scripts/remind-better-line.sh, lib/work-call.sh  # PostToolUse: on a turn's first work call, a line to measure and look for a better way
+    │   ├── scripts/guard-unreproduced-cause.sh  # denies the first file change for a reported problem before it was run (PreToolUse)
+    │   ├── scripts/guard-review-walk.sh, lib/review-dir.sh  # no verification gate dispatch while the walk receipt fails (PreToolUse)
     │   ├── scripts/guard-unchecked-claim.sh     # PreToolUse: denies a commit message, PR or issue text or tracker write that states a fact about code, data or a tool that nothing in the turn read
-    │   ├── scripts/guard-review-walk.sh, lib/review-dir.sh  # no review verdict, and no verification gate, while the walk receipt fails
     │   ├── scripts/update-marketplace.sh, check-loaded-version.sh  # plugin updates during a session; every plugin links the check
     │   ├── scripts/*.sh                    # gather-review, scope-facts, review-threads, build-comment-payloads, check-draft-names
     │   ├── tests/
@@ -130,6 +131,10 @@ Plugins ship subagents from `agents/`, named `plugin:agent` ([plugins](https://c
 "Prefer scripts for deterministic operations", and for a script that is executed "only the script's output consumes tokens" ([skill best practices](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/best-practices)). Sweeps are scripts with fixture tests, so a broken regex fails CI instead of passing a review. The same goes for line numbers: `conventions/scripts/added-lines.sh` prints every added line with its source line number, and gates cite from it. Measured before it existed, gates read positions out of the saved diff file and cited lines that did not exist in the source.
 
 Orchestration steps are scripts too, tested against a stub `gh`: `kc-init` runs `kc-conventions/scripts/install-rules.sh`, `kc-code-review` gathers its diff, scope facts and reply threads with `kc-gates/scripts/`, and `kc-post-review` validates comment anchors and builds payloads with `build-comment-payloads.sh`.
+
+### Checks sit on the action, never at the end of the turn
+
+A Stop or SubagentStop hook runs after the person has read the reply, so a reminder or block there only adds "Stop hook reported a problem" and a box-ticking line, and never improves the work. Put a check where it can still change what Claude does: a PreToolUse hook that denies the action it prevents, or UserPromptSubmit or PostToolUse `additionalContext` that reaches Claude before its next action (invisible to the person). An end-of-turn hook stays only for work that has to happen at the end of a turn and neither reminds nor blocks (recording state silently for the next turn). `scripts/check-stop-hooks.sh` holds it in CI: every Stop or SubagentStop hook must be in `.claude/stop-hooks-allowed.txt` with that reason, and a listed script that blocks or reminds fails. `kc-gates` once had five blocking Stop hooks; three moved to the action and two record silently.
 
 ### Posting is user-invoked and enforced
 

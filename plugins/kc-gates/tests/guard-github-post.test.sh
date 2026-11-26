@@ -482,6 +482,37 @@ check deny "head: no reviewed commits to compare keeps the denial" "$walk_token 
 expect_last_reason "head: the no-commits denial says to fetch" "fetch the pull request's base branch"
 unset KC_STUB_HEAD KC_STUB_FILES KC_STUB_BASE
 
+# --- review report: a posted verdict report keeps §G6 and §G7, and the walk is never offered ---
+write_review docs/notes.md
+rm -f "$review_folder/walk-receipt.tsv"
+# shellcheck disable=SC2016 # backticks in the fixture text are literal
+works_body='**Does it work / what can it break**\n- Measured: checkout query before 420 ms -> after 38 ms.\n- Uses: 4 traced, 3 run, 1 read.\n'
+# shellcheck disable=SC2016 # backticks in the fixture text are literal
+ok_report='### Review: Add free shipping\n'"$works_body"'\n`abc1234` `cart.ts`: follows existing conventions and naming. No changes.'
+# shellcheck disable=SC2016 # backticks in the fixture text are literal
+bare_report='### Review: Add free shipping\n**Verdict:** FAILED (1 gate failing)\n\n**Naming:**\n- 🟡 `cart.ts:L4`: `tmp` is opaque. Rename `total`.'
+check allow "report: a verdict report that leads with the does-it-work section posts" "$walk_token gh pr comment 12 -b '$ok_report'"
+check deny "report: a verdict report with no does-it-work section is denied" "$walk_token gh pr comment 12 -b '$bare_report'"
+expect_last_reason "report: the denial says what to add" "Does it work / what can it break"
+check deny "report: a verdict report in a review is denied too" "$walk_token gh pr review 12 --comment -b '$bare_report'"
+check allow "report: a comment that gives no verdict is not checked" "$walk_token gh pr comment 12 -b 'Thanks, fixed in the next commit.'"
+check deny "report: asking whether to QA the change in the app is denied" "$walk_token gh pr comment 12 -b 'Should I QA this change in the running app first?'"
+expect_last_reason "report: the denial says the walk is never a choice" "never offered as a choice"
+check allow "report: saying the walk will happen, with no question, posts" "$walk_token gh pr comment 12 -b 'I will walk it in the running app now.'"
+check allow "report: an unrelated question posts" "$walk_token gh pr comment 12 -b 'Which gate do you want first?'"
+check deny "report: no token still denies a verdict report first" "gh pr comment 12 -b '$ok_report'"
+# Findings the gates confirmed stay in the report: with a verdicts/ folder in the review.
+mkdir -p "$review_folder/verdicts"
+# shellcheck disable=SC2016 # backticks in the fixture text are literal
+printf 'STATUS: FAIL\nFINDINGS:\n- 🟠 src/orders/refund.ts:42@abc1234: skips archived orders.\n' > "$review_folder/verdicts/naming.txt"
+check deny "report: a verdict report that leaves out a confirmed finding is denied" "$walk_token gh pr comment 12 -b '$ok_report'"
+expect_last_reason "report: the denial names the missing finding" "refund.ts:42"
+check allow "report: naming the finding posts" "$walk_token gh pr comment 12 -b '$ok_report\n- 🟠 refund.ts:42: skips archived orders. (non-blocking)'"
+check allow "report: a Dropped: line with a reason posts" "$walk_token gh pr comment 12 -b '$ok_report\nDropped: refund.ts:42 (the author already fixed it)'"
+check allow "report: a comment with no verdict is not held to the findings" "$walk_token gh pr comment 12 -b 'Thanks.'"
+rm -rf "$review_folder/verdicts"
+check allow "report: no verdicts folder, nothing to check" "$walk_token gh pr comment 12 -b '$ok_report'"
+
 cd "$tests_dir"
 rm -rf "$rb_repo"
 TMPDIR=$base_tmp

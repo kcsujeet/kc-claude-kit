@@ -1,5 +1,5 @@
 {
-  "description": "Reminds every session to run kc-ready-for-review before a PR goes to a reviewer, and the kit's maintainer to ship lessons; keeps its marketplace's plugins updated during a session and says when the session runs an older kc-gates than is installed; blocks GitHub review writes (PR and issue comments, reviews) that lack the KC_REVIEW_POST_APPROVED=1 approval token or that post a body the user was not shown before their latest message, a branch's first git push, any gh pr create, a git commit or gh pr create that edits lines an already-handed-off fix wrote (the loop-stop rule), a git commit that adds rule lines to an instruction file with no check file beside them, a gh pr merge of the user's own pull request whose head has no clean review receipt (its last gate round found nothing, nothing left open), and PR hand-offs to review (gh pr ready, adding a reviewer) whose commit has no kc-ready-for-review receipt or whose hand-off checklist has an unmet box; blocks a tracker issue's move to a review status the same way; after a command that approves or merges a pull request, when a command's output shows one merged or approved, or when the person says one was, reminds Claude that the look-back is due, and after a merge installs what it brought to this marketplace at once, stating the reload; after a reply posted on a pull request (a PR comment, a reply to a review comment) reminds Claude of the steps still owed (CI, re-request the reviewer, the ticket back to review, the look-back); and starts every turn with the reply rules (a question gets its own answer first), naming what the last reply missed: a claim about what instructions require with nothing read that turn, an account CLI's command handed over unchecked, or more than 180 words of prose (noted at Stop, never blocked, so no reply is shown twice); adds a line when the prompt asks where work stands (read the ticket and PR state before stating it); denies the first tool call of a turn whose prompt is a question until text has answered it; blocks a push whose changed files fail the repo's lint; refuses a receipt while the PR has unanswered comments; notes edits made after a question; holds a review's verdict, and its verification gate's dispatch, while its walk receipt fails; blocks a Bash or REPL call that waits on two CI watches together or on one with a timeout over 10 minutes; blocks a reply that proposes a cause and a fix for a reported problem before anything ran the product the way the reporter met it",
+  "description": "Reminds every session to run kc-ready-for-review before a PR goes to a reviewer, and the kit's maintainer to ship lessons; keeps its marketplace's plugins updated during a session and says when the session runs an older kc-gates than is installed; blocks GitHub review writes (PR and issue comments, reviews) that lack the KC_REVIEW_POST_APPROVED=1 approval token or that post a body the user was not shown before their latest message, a branch's first git push, any gh pr create, a git commit or gh pr create that edits lines an already-handed-off fix wrote (the loop-stop rule), a git commit that adds rule lines to an instruction file with no check file beside them, a gh pr merge of the user's own pull request whose head has no clean review receipt (its last gate round found nothing, nothing left open), and PR hand-offs to review (gh pr ready, adding a reviewer) whose commit has no kc-ready-for-review receipt or whose hand-off checklist has an unmet box; blocks a tracker issue's move to a review status the same way; after a command that approves or merges a pull request, when a command's output shows one merged or approved, or when the person says one was, reminds Claude that the look-back is due, and after a merge installs what it brought to this marketplace at once, stating the reload; after a reply posted on a pull request (a PR comment, a reply to a review comment) reminds Claude of the steps still owed (CI, re-request the reviewer, the ticket back to review, the look-back); and starts every turn with the reply rules (a question gets its own answer first), naming what the last reply missed: a claim about what instructions require with nothing read that turn, an account CLI's command handed over unchecked, or more than 180 words of prose (noted silently at Stop, never blocked, so no reply is shown twice; no Stop hook reminds or blocks, since it would run after the person read the reply); adds a line when the prompt asks where work stands (read the ticket and PR state before stating it); denies the first tool call of a turn whose prompt is a question until text has answered it; blocks a push whose changed files fail the repo's lint; refuses a receipt while the PR has unanswered comments; notes edits made after a question; holds a review's verification gate's dispatch while its walk receipt fails; blocks a Bash or REPL call that waits on two CI watches together or on one with a timeout over 10 minutes; denies the first file change made for a reported problem before anything ran the product the way the reporter met it (or a Not reproduced: line with a reason was written); on the first work call of a turn adds a line, invisible to the person, to measure the work and look for a better way",
   "hooks": {
     "SessionStart": [
       {
@@ -87,7 +87,7 @@
             "type": "command",
             "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/guard-lesson-ledger.sh\"",
             "shell": "bash",
-            "timeout": 30
+            "timeout": 120
           },
           {
             "type": "command",
@@ -122,6 +122,17 @@
             "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/guard-tracker-transition.sh\"",
             "shell": "bash",
             "timeout": 30
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|Write|MultiEdit|NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/guard-unreproduced-cause.sh\"",
+            "shell": "bash",
+            "timeout": 10
           }
         ]
       }
@@ -188,6 +199,17 @@
             "timeout": 120
           }
         ]
+      },
+      {
+        "matcher": "Bash|REPL|Edit|Write|MultiEdit|NotebookEdit|Agent",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/remind-better-line.sh\"",
+            "shell": "bash",
+            "timeout": 10
+          }
+        ]
       }
     ],
     "Stop": [
@@ -204,24 +226,6 @@
             "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/check-reply-length.sh\"",
             "shell": "bash",
             "timeout": 10
-          },
-          {
-            "type": "command",
-            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/guard-unreproduced-cause.sh\"",
-            "shell": "bash",
-            "timeout": 10
-          },
-          {
-            "type": "command",
-            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/guard-better-line.sh\"",
-            "shell": "bash",
-            "timeout": 10
-          },
-          {
-            "type": "command",
-            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/guard-review-walk.sh\"",
-            "shell": "bash",
-            "timeout": 30
           }
         ]
       }
