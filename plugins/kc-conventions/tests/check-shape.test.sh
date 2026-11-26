@@ -32,8 +32,8 @@ expect_verdict() {
   fi
 }
 
-# variant <name> <sed expression>: the passing file with one edit.
-variant() { sed -E "$2" "$work_dir/passing.md" > "$work_dir/$1.md"; }
+# make_variant <name> <sed expression>: the passing file with one edit.
+make_variant() { sed -E "$2" "$work_dir/passing.md" > "$work_dir/$1.md"; }
 
 expect_verdict pass "§SH1-§SH8 filled: the skill's template passes" "$work_dir/passing.md"
 
@@ -41,48 +41,58 @@ for n in 1 2 3 4 5 6 7 8; do
   grep -v "§SH$n " "$work_dir/passing.md" > "$work_dir/missing$n.md"
   expect_verdict fail "§SH$n removed is reported" "$work_dir/missing$n.md" "§SH$n: missing"
 done
-variant unticked 's/^- \[x\] §SH3/- [ ] §SH3/'
+make_variant unticked 's/^- \[x\] §SH3/- [ ] §SH3/'
 expect_verdict fail "an unticked box fails" "$work_dir/unticked.md" "§SH3: the box is not ticked"
-variant short 's/^(- \[x\] §SH1 requirement:).*/\1 reports./'
+make_variant short 's/^(- \[x\] §SH1 requirement:).*/\1 reports./'
 expect_verdict fail "a one-word answer fails" "$work_dir/short.md" "§SH1: the answer is under 4 words"
-variant short-facts 's/^(- \[x\] §SH2 facts:).*/\1 stored./'
+make_variant short-facts 's/^(- \[x\] §SH2 facts:).*/\1 stored./'
 expect_verdict fail "§SH2 with a one-word answer fails" "$work_dir/short-facts.md" "§SH2: the answer is under 4 words"
-variant tbd 's/^(- \[x\] §SH5 .*)$/\1 TBD/'
+make_variant fill-in 's/^(- \[x\] §SH5 .*)$/\1 fill in later/'
+expect_verdict fail "a fill in fails" "$work_dir/fill-in.md" "§SH5: unfinished"
+awk '{ print } /§SH3 owners/ { print }' "$work_dir/passing.md" > "$work_dir/twice.md"
+expect_verdict fail "a box listed twice fails" "$work_dir/twice.md" "§SH3: listed 2 times"
+make_variant tbd 's/^(- \[x\] §SH5 .*)$/\1 TBD/'
 expect_verdict fail "a TBD fails" "$work_dir/tbd.md" "§SH5: unfinished"
 
 grep -v 'shape B:' "$work_dir/passing.md" > "$work_dir/one-shape.md"
 expect_verdict fail "§SH4 with one shape fails" "$work_dir/one-shape.md" "compare at least 2 shapes"
 grep -v '  - pick:' "$work_dir/passing.md" > "$work_dir/no-pick.md"
 expect_verdict fail "§SH4 with no pick fails" "$work_dir/no-pick.md" "no \"- pick:"
-variant bad-pick 's/- pick: B,/- pick: Z,/'
+make_variant bad-pick 's/- pick: B,/- pick: Z,/'
 expect_verdict fail "a pick naming no shape fails" "$work_dir/bad-pick.md" "the pick must start with the label of a shape"
-variant no-reason 's/- pick: B,.*/- pick: B/'
+make_variant no-reason 's/- pick: B,.*/- pick: B/'
 expect_verdict fail "a pick with no reason fails" "$work_dir/no-reason.md" "the pick needs its reason"
 
 grep -v '  - flag:' "$work_dir/passing.md" > "$work_dir/no-flag.md"
 expect_verdict fail "§SH6 with no flag line fails" "$work_dir/no-flag.md" "no flag line"
-variant flag-fields 's/ \| decided-by: shop owner$//'
+make_variant flag-fields 's/ \| decided-by: shop owner$//'
 expect_verdict fail "a flag line missing decided-by fails" "$work_dir/flag-fields.md" "flag line must read"
-variant flag-agent 's/decided-by: shop owner/decided-by: claude/'
+make_variant flag-agent 's/decided-by: shop owner/decided-by: claude/'
 expect_verdict fail "a flag decided by the agent fails" "$work_dir/flag-agent.md" "not the agent"
-variant flag-nobody 's/decided-by: shop owner/decided-by:/'
+make_variant flag-nobody 's/decided-by: shop owner/decided-by:/'
 expect_verdict fail "a flag with an empty decided-by fails" "$work_dir/flag-nobody.md" "not the agent"
-variant flag-gap 's/\| no \| reason: readers tolerate empty rows, so there is no data gap to hide/| yes | reason: the readers wait for the backfill to finish before they are used/'
+make_variant flag-production 's/\| no \| reason: readers tolerate empty rows, so there is no data gap to hide/| yes | reason: backfill of production rows is not finished yet/'
+expect_verdict fail "a yes flag naming production is still a data gap" "$work_dir/flag-production.md" "data or deploy gap only"
+make_variant flag-product 's/\| yes \| reason: customers get it gradually, starting with one pilot storefront/| yes | reason: a product rollout decision for the owner, after the backfill/'
+expect_verdict pass "a flag naming a product rollout passes" "$work_dir/flag-product.md"
+make_variant flag-short-reason 's/\| no \| reason: readers tolerate empty rows, so there is no data gap to hide/| no | reason: all safe/'
+expect_verdict fail "a flag with a two-word reason fails" "$work_dir/flag-short-reason.md" "no reason of at least 3 words"
+make_variant flag-gap 's/\| no \| reason: readers tolerate empty rows, so there is no data gap to hide/| yes | reason: the readers wait for the backfill to finish before they are used/'
 expect_verdict fail "a yes flag covering only a data gap fails" "$work_dir/flag-gap.md" "data or deploy gap only"
-variant flag-deploy 's/\| yes \| reason: customers get it gradually, starting with one pilot storefront/| yes | reason: the code has to deploy before the migration runs/'
+make_variant flag-deploy 's/\| yes \| reason: customers get it gradually, starting with one pilot storefront/| yes | reason: the code has to deploy before the migration runs/'
 expect_verdict fail "a yes flag covering only a deploy order fails" "$work_dir/flag-deploy.md" "data or deploy gap only"
-variant flag-both 's/\| yes \| reason: customers get it gradually, starting with one pilot storefront/| yes | reason: customers get it gradually while the backfill runs behind a pilot/'
+make_variant flag-both 's/\| yes \| reason: customers get it gradually, starting with one pilot storefront/| yes | reason: customers get it gradually while the backfill runs behind a pilot/'
 expect_verdict pass "a flag with a product rollout reason passes" "$work_dir/flag-both.md"
-variant flag-no-gap 's/\| no \| reason: readers tolerate empty rows, so there is no data gap to hide/| no | reason: the backfill is safe to run while the old readers stay live/'
+make_variant flag-no-gap 's/\| no \| reason: readers tolerate empty rows, so there is no data gap to hide/| no | reason: the backfill is safe to run while the old readers stay live/'
 expect_verdict pass "a no flag naming a backfill passes" "$work_dir/flag-no-gap.md"
 
 grep -v '  - failure:' "$work_dir/passing.md" > "$work_dir/no-failure.md"
 expect_verdict fail "§SH7 with no failure line fails" "$work_dir/no-failure.md" "no failure line"
-variant no-signal 's/ \| noticed-by: .*$//'
+make_variant no-signal 's/ \| noticed-by: .*$//'
 expect_verdict fail "a failure with no signal fails" "$work_dir/no-signal.md" "failure line must read"
-variant no-quote 's/^(- \[x\] §SH8 approval:).*/\1 the owner agreed in chat/'
+make_variant no-quote 's/^(- \[x\] §SH8 approval:).*/\1 the owner agreed in chat/'
 expect_verdict fail "an approval without quoted words fails" "$work_dir/no-quote.md" "quote the approval words"
-variant one-word-quote 's/^(- \[x\] §SH8 approval:).*/\1 "ok" said the shop owner in chat/'
+make_variant one-word-quote 's/^(- \[x\] §SH8 approval:).*/\1 "ok" said the shop owner in chat/'
 expect_verdict fail "a one-word quote fails" "$work_dir/one-word-quote.md" "at least 2 words"
 
 printf 'trivial: no new storage, no new unit, no behaviour move: fixes the rounding of one displayed total\n' > "$work_dir/trivial.md"

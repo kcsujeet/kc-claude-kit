@@ -71,7 +71,7 @@ expect_hook_verdict allow "no shape file: a shell script passes" "$(build_tool_p
 expect_hook_verdict allow "no shape file: a path outside any checkout passes" "$(build_tool_payload Write "$work_dir/scratch.ts")"
 expect_hook_verdict allow "no shape file: another tool passes" "$(build_tool_payload Read "$source_file")"
 expect_hook_verdict deny "no shape file: the denial names the shape file" "$(build_tool_payload Edit "$source_file")"
-if printf '%s' "$last_output" | jq -r '.hookSpecificOutput.permissionDecisionReason' | grep -qF 'no shape file for branch feature/fulfilment-mode'; then
+if printf '%s' "$last_output" | jq -r '.hookSpecificOutput.permissionDecisionReason' | grep -qF 'no shape file at'; then
   echo "ok   the reason names the problem"; passes=$((passes + 1))
 else
   echo "FAIL the reason does not name the problem: $last_output"; failures=$((failures + 1))
@@ -88,6 +88,19 @@ expect_hook_verdict deny "cp onto a source file is denied" "$(build_bash_payload
 expect_hook_verdict deny "mv onto a source file is denied" "$(build_bash_payload 'mv /tmp/draft.js app/orders/fulfilment.js')"
 expect_hook_verdict deny "a chained write is denied" "$(build_bash_payload 'git status && echo x > app/orders/fulfilment.ts')"
 expect_hook_verdict deny "a leading cd names the checkout" "$(build_bash_payload "cd $repo && echo x > app/orders/fulfilment.ts" "$work_dir")"
+expect_hook_verdict deny "install onto a source file is denied" "$(build_bash_payload 'install -m 644 /tmp/draft app/orders/fulfilment.ts')"
+expect_hook_verdict deny "rsync onto a source file is denied" "$(build_bash_payload 'rsync /tmp/draft app/orders/fulfilment.ts')"
+expect_hook_verdict deny "sudo tee into a source file is denied" "$(build_bash_payload 'sudo tee app/orders/fulfilment.ts')"
+expect_hook_verdict deny "cp with a stderr redirect after the destination is denied" "$(build_bash_payload 'cp /tmp/draft app/orders/fulfilment.ts 2>&1')"
+expect_hook_verdict deny "cp followed by another command is denied" "$(build_bash_payload 'cp /tmp/draft app/orders/fulfilment.ts; ls')"
+expect_hook_verdict deny "a redirect ended by a semicolon is denied" "$(build_bash_payload 'echo hi >app/orders/fulfilment.ts;')"
+saved_home=$HOME
+HOME=$work_dir
+expect_hook_verdict deny "a home-relative path inside a checkout is denied" "$(build_bash_payload 'echo x > ~/shop/app/orders/fulfilment.ts')"
+HOME=$saved_home
+expect_hook_verdict allow "a quoted > argument (a read) passes" "$(build_bash_payload "grep '>' app/orders/fulfilment.ts")"
+expect_hook_verdict allow "a > inside a commit message passes" "$(build_bash_payload 'git commit -m "orders > fulfilment.ts"')"
+expect_hook_verdict allow "perl with a -M option and no in-place flag passes" "$(build_bash_payload 'perl -Mwarnings -e 1 app/orders/fulfilment.ts')"
 expect_hook_verdict allow "a redirect into a test file passes" "$(build_bash_payload 'echo x > app/orders/fulfilment.test.ts')"
 expect_hook_verdict allow "a redirect into a log passes" "$(build_bash_payload 'npm test > out.log 2>&1')"
 expect_hook_verdict allow "sed -n on a source file (a read) passes" "$(build_bash_payload "sed -n '1,5p' app/orders/fulfilment.ts")"
@@ -129,6 +142,25 @@ git -C "$repo" checkout -q main
 expect_hook_verdict allow "the default branch is never blocked" "$(build_tool_payload Edit "$source_file")"
 git -C "$repo" checkout -q --detach
 expect_hook_verdict allow "a detached head is never blocked" "$(build_tool_payload Edit "$source_file")"
+
+# The default branch named by origin/HEAD is never blocked, whatever its name.
+git -C "$repo" update-ref refs/remotes/origin/release HEAD
+git -C "$repo" symbolic-ref refs/remotes/origin/HEAD refs/remotes/origin/release
+git -C "$repo" checkout -q -b release
+expect_hook_verdict allow "a default branch named by origin/HEAD is never blocked" "$(build_tool_payload Edit "$source_file")"
+git -C "$repo" symbolic-ref --delete refs/remotes/origin/HEAD
+expect_hook_verdict deny "the same branch is blocked once origin/HEAD no longer names it" "$(build_tool_payload Edit "$source_file")"
+
+# The registration: every tool the guard reads must match the hook's matcher.
+hooks_json="$plugin_dir/hooks/hooks.json"
+matcher=$(jq -r '.hooks.PreToolUse[] | select(any(.hooks[]; .command | endswith("guard-shape.sh\""))) | .matcher' "$hooks_json")
+for tool in Edit Write MultiEdit Bash REPL; do
+  if [[ "$tool" =~ ^($matcher)$ ]]; then
+    echo "ok   hooks.json registers guard-shape.sh for $tool"; passes=$((passes + 1))
+  else
+    echo "FAIL hooks.json does not register guard-shape.sh for $tool (matcher: $matcher)"; failures=$((failures + 1))
+  fi
+done
 
 echo "$passes passed, $failures failed"
 [ "$failures" -eq 0 ]
