@@ -1,4 +1,5 @@
 # shellcheck shell=bash
+# shellcheck disable=SC2034 # the globals set here are read by the guards that source this file
 # Reads a Bash hook's payload (PreToolUse or PostToolUse) and the command it carries, for the
 # kit's hooks. Sourced, never executed.
 #
@@ -134,15 +135,136 @@ is_commit_staging_all() {
   return 1
 }
 
+# The default branch of the repository in $1 as a ref that exists, or nothing.
+get_default_branch_ref() {
+  local dir=$1 remote_default candidate
+  remote_default=$(git -C "$dir" symbolic-ref -q --short refs/remotes/origin/HEAD 2>/dev/null) || remote_default=""
+  for candidate in $remote_default origin/main origin/master main master; do
+    git -C "$dir" rev-parse -q --verify "$candidate^{commit}" >/dev/null 2>&1 && { printf '%s' "$candidate"; return; }
+  done
+}
+
+# True when the repository in $1 is concluding a merge (MERGE_HEAD) of a commit the default branch
+# already has: its staged diff carries the default branch's own changes, not this branch's.
+is_default_branch_merge() {
+  local dir=$1 merge_head default_branch_ref
+  merge_head=$(git -C "$dir" rev-parse -q --verify MERGE_HEAD 2>/dev/null) || return 1
+  default_branch_ref=$(get_default_branch_ref "$dir")
+  # With no default branch the ref is empty and merge-base fails, so nothing is skipped.
+  git -C "$dir" merge-base --is-ancestor "$merge_head" "$default_branch_ref" 2>/dev/null
+}
+
+# State a command's earlier segments leave for the guard of a later one. A guard runs before the whole
+# command, so it sees the index, HEAD and the working tree as they are now, not as the command's own
+# `git add`, `git commit` or other steps leave them. note_chain_segment records those steps for the
+# guards; get_commit_diff replays the staging.
+CHAIN_STAGING=()
+CHAIN_PENDING_COMMAND=false
+CHAIN_RAN_COMMAND_BEFORE_STAGING=false
+CHAIN_MOVED_HEAD=false
+readonly UNJUDGEABLE_COMMIT_REASON='this one command runs other commands before it stages or commits, so what it commits cannot be known before it runs. Stage in one command, then commit in the next.'
+readonly MOVED_HEAD_REASON='this one command commits, merges, switches branch or otherwise moves HEAD and then publishes, so the guard would judge the branch from before it. Commit in one command, then run this one.'
+
+# note_chain_segment <segment> <dir>: call for each segment, in order, before judging it. Records a
+# `git add` in CHAIN_STAGING; a commit, switch or other HEAD move in CHAIN_MOVED_HEAD; and any command
+# other than a git subcommand that leaves the index and working tree alone in CHAIN_PENDING_COMMAND,
+# which becomes CHAIN_RAN_COMMAND_BEFORE_STAGING when staging follows it. A git subcommand that
+# rewrites the index or working tree some other way (rm, checkout, merge --squash, stash pop...) is
+# recorded as `add -A` that ran after a command, so a commit after it is unjudgeable.
+note_chain_segment() {
+  local segment=$1 dir=$2 words_text words=()
+  words_text=$(git_words "$segment")
+  if [ -n "$words_text" ]; then
+    read -ra words <<< "$words_text"
+    parse_git_command "$dir" "${words[@]}"
+    case "${GIT_ARGS[0]:-}" in
+      commit | merge | cherry-pick | rebase | am | pull | revert | reset | checkout | switch) CHAIN_MOVED_HEAD=true ;;
+    esac
+    case "${GIT_ARGS[0]:-}" in
+      add)
+        CHAIN_STAGING+=("$GIT_DIR"$'\t'"${GIT_ARGS[*]}")
+        if $CHAIN_PENDING_COMMAND; then CHAIN_RAN_COMMAND_BEFORE_STAGING=true; fi
+        CHAIN_PENDING_COMMAND=false
+        return ;;
+      rm | mv | apply | stash | restore | merge | cherry-pick | revert | am | pull | reset | checkout | switch | rebase)
+        CHAIN_STAGING+=("$GIT_DIR"$'\t'"add -A")
+        CHAIN_RAN_COMMAND_BEFORE_STAGING=true
+        return ;;
+      commit | status | diff | log | show | rev-parse | fetch | branch | remote | config | ls-files | describe | worktree) return ;;
+    esac
+  fi
+  printf '%s' "$segment" | grep -q '[^[:space:]]' || return 0
+  CHAIN_PENDING_COMMAND=true
+}
+
+# is_commit_unjudgeable <dir> <word>...: true when the words after `git commit` commit something an
+# earlier command of this one command may still change: what it stages (a command ran before the
+# staging), or the working tree it reads (-a, or paths).
+is_commit_unjudgeable() {
+  local dir=$1
+  shift
+  if $CHAIN_RAN_COMMAND_BEFORE_STAGING; then return 0; fi
+  if $CHAIN_PENDING_COMMAND; then
+    is_commit_staging_all "$@" || [ -n "$(get_commit_paths "$dir" "$@")" ]
+    return
+  fi
+  return 1
+}
+
+# get_commit_paths <dir> <word>...: the paths named on a `git commit` (words after `commit`), which it
+# commits as the working tree has them, ignoring the index. Option values are skipped; a word that
+# isn't an existing path is not one.
+get_commit_paths() {
+  local dir=$1 word skip=false after_dashes=false
+  shift
+  for word in "$@"; do
+    if $skip; then skip=false; continue; fi
+    if ! $after_dashes; then
+      case "$word" in
+        --) after_dashes=true; continue ;;
+        --message | --file | --author | --date | --reuse-message | --reedit-message | --template | --cleanup | --fixup | --squash) skip=true; continue ;;
+        --*) continue ;;
+        -*[mFCct]) skip=true; continue ;;
+        -*) continue ;;
+      esac
+    fi
+    [ -e "$dir/$word" ] && printf '%s\n' "$word"
+  done
+}
+
 # get_commit_diff <dir> "<diff options>" <word>...: the diff a `git commit` with these words after
-# `commit` would record: the staged diff, or with -a/--all the working tree against HEAD. A
-# repository with no commit yet is diffed against the empty tree.
+# `commit` would record. The staged diff; with -a/--all, the working tree against HEAD; with paths,
+# those paths in the working tree; after a `git add` earlier in the same command, the index (and the
+# paths, and -a) with that add replayed on a copy. A repository with no commit yet is diffed against
+# the empty tree.
 get_commit_diff() {
-  local dir=$1 options=$2 base=HEAD
+  local dir=$1 options=$2 base=HEAD commit_path commit_paths=() staging_record staging_record_dir staging_record_words staging_words=() scratch_dir temp_index index_file
   shift 2
-  git -C "$dir" rev-parse -q --verify HEAD >/dev/null 2>&1 || base=4b825dc642cb6eb9a060e54bf8d69288fbee4904
+  git -C "$dir" rev-parse -q --verify HEAD >/dev/null 2>&1 || base=$(git -C "$dir" hash-object -t tree /dev/null)
+  while IFS= read -r commit_path; do commit_paths+=("$commit_path"); done < <(get_commit_paths "$dir" "$@")
   # shellcheck disable=SC2086 # $options is a list of diff options
-  if is_commit_staging_all "$@"; then
+  if [ "${#CHAIN_STAGING[@]}" -gt 0 ]; then
+    scratch_dir=$(mktemp -d)
+    temp_index="$scratch_dir/index"
+    index_file=$(git -C "$dir" rev-parse --git-path index)
+    case "$index_file" in /*) ;; *) index_file="$dir/$index_file" ;; esac
+    cp "$index_file" "$temp_index" 2>/dev/null || true
+    for staging_record in "${CHAIN_STAGING[@]}"; do
+      staging_record_dir=${staging_record%%$'\t'*}
+      staging_record_words=${staging_record#*$'\t'}
+      [ "$staging_record_dir" = "$dir" ] || continue
+      read -ra staging_words <<< "$staging_record_words"
+      # A replay git rejects is treated as add -A, so the diff errs toward more than the commit will hold.
+      GIT_INDEX_FILE=$temp_index git -C "$dir" "${staging_words[@]}" >/dev/null 2>&1 \
+        || GIT_INDEX_FILE=$temp_index git -C "$dir" add -A >/dev/null 2>&1
+    done
+    if is_commit_staging_all "$@"; then GIT_INDEX_FILE=$temp_index git -C "$dir" add -u >/dev/null 2>&1; fi
+    if [ "${#commit_paths[@]}" -gt 0 ]; then GIT_INDEX_FILE=$temp_index git -C "$dir" add -- "${commit_paths[@]}" >/dev/null 2>&1; fi
+    GIT_INDEX_FILE=$temp_index git -C "$dir" diff --cached $options --no-color --no-ext-diff --no-renames "$base" -- ${commit_paths[@]+"${commit_paths[@]}"}
+    rm -rf "$scratch_dir"
+  elif [ "${#commit_paths[@]}" -gt 0 ]; then
+    git -C "$dir" diff $options --no-color --no-ext-diff --no-renames "$base" -- "${commit_paths[@]}"
+  elif is_commit_staging_all "$@"; then
     git -C "$dir" diff $options --no-color --no-ext-diff --no-renames "$base"
   else
     git -C "$dir" diff --cached $options --no-color --no-ext-diff --no-renames "$base"

@@ -11,6 +11,10 @@
 # (https://code.claude.com/docs/en/plugins/host-marketplace#share-files-within-a-marketplace-with-symlinks).
 # It says so once per session and installed version, reading the hook payload's session_id from
 # stdin. Without jq it stays quiet. Always exits 0.
+#
+# With --print-stale it only prints the installed versions (comma separated) when this session's
+# loaded copy is not among them, and nothing otherwise: guard-lesson-ledger.sh uses it to refuse a
+# commit, push or merge from a stale session.
 
 set -u
 
@@ -18,10 +22,7 @@ command -v jq >/dev/null 2>&1 || exit 0
 loaded_root=${CLAUDE_PLUGIN_ROOT:-}
 plugin_data_dir=${CLAUDE_PLUGIN_DATA:-}
 [ -n "$loaded_root" ] || exit 0
-[ -n "$plugin_data_dir" ] || exit 0
 config_dir=${CLAUDE_CONFIG_DIR:-$HOME/.claude}
-session_id=$(jq -r '.session_id // empty' 2>/dev/null)
-[ -n "$session_id" ] || exit 0
 
 # Every install of this plugin, at any scope, sits beside the loaded copy in
 # cache/<marketplace>/<plugin>/<version>. A copy loaded from a clone or with --plugin-dir has none.
@@ -34,6 +35,13 @@ is_loaded_copy_installed=$(printf '%s' "$installs" | jq --arg root "$loaded_root
 [ "$is_loaded_copy_installed" = false ] || exit 0
 
 installed_versions=$(printf '%s' "$installs" | jq -r 'map(.version) | unique | join(", ")')
+if [ "${1:-}" = --print-stale ]; then
+  printf '%s\n' "$installed_versions"
+  exit 0
+fi
+[ -n "$plugin_data_dir" ] || exit 0
+session_id=$(jq -r '.session_id // empty' 2>/dev/null)
+[ -n "$session_id" ] || exit 0
 told_file="$plugin_data_dir/told-loaded-version/$session_id"
 [ "$(cat "$told_file" 2>/dev/null)" != "$installed_versions" ] || exit 0
 mkdir -p "$(dirname "$told_file")"

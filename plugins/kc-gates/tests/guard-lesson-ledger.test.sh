@@ -10,6 +10,8 @@ tests_dir=$(cd "$(dirname "$0")" && pwd)
 . "$tests_dir/lib/harness.sh"
 scripts="$(dirname "$tests_dir")/scripts"
 require_jq
+# The stale-session cases at the end set these themselves; the others must not depend on the session running the test.
+unset CLAUDE_PLUGIN_ROOT CLAUDE_CONFIG_DIR
 
 run_git_in() { local repo=$1; shift; git -C "$repo" -c user.name=t -c user.email=t@example.test "$@"; }
 make_repo() {
@@ -71,5 +73,24 @@ check_verdict allow "allowed: a complete ledger in a repo with no base branch" "
 unclosed_repo="$work_dir/unclosed"
 make_repo "$unclosed_repo" $'---\nledger: true'
 check_verdict allow "allowed: a checklist whose front matter never closes" "git push -u origin lesson-branch" "$unclosed_repo"
+
+# A session that runs an older kc-gates than the installed one is refused commit, push, PR and merge
+# in a ledger repo until it reloads.
+config_dir="$work_dir/config"
+cache_dir="$config_dir/plugins/cache/shop/kc-gates"
+mkdir -p "$cache_dir/1.0.0" "$cache_dir/1.1.0"
+write_installs() { printf '{"plugins":{"kc-gates@shop":[{"scope":"user","installPath":"%s/%s","version":"%s"}]}}\n' "$cache_dir" "$1" "$1" > "$config_dir/plugins/installed_plugins.json"; }
+export CLAUDE_CONFIG_DIR="$config_dir" CLAUDE_PLUGIN_ROOT="$cache_dir/1.0.0"
+write_installs 1.1.0
+check_verdict deny "blocked: a stale session commits in a ledger repo" "git commit -m x"
+expect_contains "the block says to reload" "/reload-plugins" "$last_hook_output"
+check_verdict deny "blocked: a stale session pushes in a ledger repo" "git push -u origin lesson-branch"
+expect_contains "the push block names the installed version" "older kc-gates than the installed 1.1.0" "$last_hook_output"
+check_verdict deny "blocked: a stale session opens a PR" "gh pr create --fill"
+check_verdict deny "blocked: a stale session merges" "gh pr merge 5 --squash"
+check_verdict allow "allowed: a stale session in a repo with no ledger" "git commit -m x" "$plain_repo"
+write_installs 1.0.0
+check_verdict allow "allowed: a current session commits in a ledger repo" "git commit -m x"
+unset CLAUDE_PLUGIN_ROOT CLAUDE_CONFIG_DIR
 
 finish
