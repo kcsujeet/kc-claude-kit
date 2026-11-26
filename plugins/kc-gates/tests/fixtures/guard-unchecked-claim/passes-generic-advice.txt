@@ -1,0 +1,1 @@
+Retries with backoff are the usual way to handle a flaky payment API. Never commit secrets to the repo.

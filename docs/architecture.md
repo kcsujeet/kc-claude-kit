@@ -37,6 +37,7 @@ kc-claude-kit/
     │   ├── scripts/guard-github-post.sh, guard-hand-off.sh, guard-loop-stop.sh, guard-prose-rule.sh, guard-batched-wait.sh, guard-merge.sh, remind-look-back.sh, remind-look-back-prompt.sh, remind-after-replies.sh, check-reply-sources.sh, check-reply-length.sh, guard-late-answer.sh, remind-reply-rules.sh, update-after-merge.sh, lib/hook-input.sh, lib/reply-misses.sh, lib/typed-message.jq
     │   ├── scripts/change-class.sh, approvals-needed.sh  # a small change's lighter path through the guards; every typed phrase ahead in one block
     │   ├── scripts/guard-unreproduced-cause.sh  # holds a cause and fix proposed before the reported problem was run
+    │   ├── scripts/guard-unchecked-claim.sh     # PreToolUse: denies a commit message, PR or issue text or tracker write that states a fact about code, data or a tool that nothing in the turn read
     │   ├── scripts/guard-review-walk.sh, lib/review-dir.sh  # no review verdict, and no verification gate, while the walk receipt fails
     │   ├── scripts/update-marketplace.sh, check-loaded-version.sh  # plugin updates during a session; every plugin links the check
     │   ├── scripts/*.sh                    # gather-review, scope-facts, review-threads, build-comment-payloads, check-draft-names
