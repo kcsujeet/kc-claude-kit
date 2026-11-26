@@ -149,14 +149,14 @@ check_commit() {
   if is_default_branch_merge "$GIT_DIR" && ! is_commit_staging_all "${GIT_ARGS[@]:1}"; then
     return 0
   fi
-  if is_commit_unjudgeable; then
+  if is_commit_unjudgeable "$GIT_DIR" "${GIT_ARGS[@]:1}"; then
     print_pretooluse_deny "Blocked by the kc-gates plugin: $UNJUDGEABLE_COMMIT_REASON"
     return 1
   fi
   ! is_commit_staging_all "${GIT_ARGS[@]:1}" || stage_mode=--all
   change_class=$(read_change_class "$GIT_DIR" "$stage_mode")
-  # A commit staged by this same command: change-class.sh reads the index as it is now, so grade it in full.
-  [ "${#CHAIN_STAGING[@]}" -eq 0 ] || change_class=full
+  # The index as it is now is not what a commit staged by this command, or one that names paths, will record: grade it in full.
+  if [ "${#CHAIN_STAGING[@]}" -gt 0 ] || [ -n "$(get_commit_paths "$GIT_DIR" "${GIT_ARGS[@]:1}")" ]; then change_class=full; fi
   [ "$change_class" != prose_small ] || return 0
   handed_off_fix=$(get_commit_diff "$GIT_DIR" -U0 "${GIT_ARGS[@]:1}" | drop_version_bump_hunks | find_handed_off_fix "$GIT_DIR" HEAD "$change_class") || return 0
   deny_edit_of_handed_off_fix "$handed_off_fix" "$GIT_DIR"

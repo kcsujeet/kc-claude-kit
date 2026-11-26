@@ -11,13 +11,16 @@
 #   neither                nothing runs
 #
 # Usage: lint-changed-files.sh <repo-dir> <base> <head>
+#        lint-changed-files.sh --configured <repo-dir>   exits 0 when a lint command would run, 1 when not
 # Output: the lint command's output, when it fails. Exits 1 when the lint fails, 0 when it passes
 # or there is nothing to run.
 set -uo pipefail
 
+configured_only=false
+if [ "${1:-}" = --configured ] && [ "$#" -eq 2 ]; then configured_only=true; set -- "$2" _ _; fi
 [ "$#" -eq 3 ] || { echo "usage: lint-changed-files.sh <repo-dir> <base> <head>" >&2; exit 2; }
 repo=$1 base=$2 head=$3
-root=$(git -C "$repo" rev-parse --show-toplevel 2>/dev/null) || exit 0
+root=$(git -C "$repo" rev-parse --show-toplevel 2>/dev/null) || { $configured_only && exit 1; exit 0; }
 
 lint_command=""
 filter='.'
@@ -27,6 +30,7 @@ elif [ -f "$root/biome.json" ]; then
   lint_command="npx biome check"
   filter='\.(js|jsx|ts|tsx|mjs|cjs|json|jsonc|css)$'
 fi
+if $configured_only; then [ -n "$lint_command" ]; exit; fi
 [ -n "$lint_command" ] || exit 0
 
 files=()

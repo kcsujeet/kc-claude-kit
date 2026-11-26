@@ -197,18 +197,12 @@ check_lint() {
   return 1
 }
 
-# True when the repo has a lint command lint-changed-files.sh would run.
-has_lint_config() {
-  local root
-  root=$(git -C "$1" rev-parse --show-toplevel 2>/dev/null) || return 1
-  [ -r "$root/.claude/lint-command" ] || [ -f "$root/biome.json" ]
-}
-
 # Denies a `git push` that publishes a branch the remote doesn't have yet, from
 # a commit with no pass or --after receipt. $1 is the directory, the rest the
 # words after `git`. Prints the deny JSON and returns 1 when it blocks.
 check_push() {
   local dir=$1 word skip=false remote="" refs=() positional=() spec src dst sha cur default status change_class
+  local is_new_branch is_linted
   shift
   while [ "$#" -gt 0 ]; do
     case "$1" in
@@ -274,8 +268,13 @@ check_push() {
       || sha=$(git -C "$dir" rev-parse -q --verify HEAD 2>/dev/null) || continue
     status=0
     GIT_TERMINAL_PROMPT=0 git -C "$dir" ls-remote --exit-code --heads "$remote" "refs/heads/$dst" >/dev/null 2>&1 || status=$?
-    # This command commits before it pushes: the lint and the receipt below would read the old commit.
-    if $CHAIN_MOVED_HEAD && { [ "$status" = 2 ] || has_lint_config "$dir"; }; then
+    # This command commits before it pushes, so the lint (a lint config) and the receipt (a new branch)
+    # below would read the old commit.
+    is_new_branch=false
+    [ "$status" = 2 ] && is_new_branch=true
+    is_linted=false
+    bash "$scripts_dir/lint-changed-files.sh" --configured "$dir" && is_linted=true
+    if $CHAIN_MOVED_HEAD && { $is_new_branch || $is_linted; }; then
       print_deny_reason "$MOVED_HEAD_REASON"
       return 1
     fi

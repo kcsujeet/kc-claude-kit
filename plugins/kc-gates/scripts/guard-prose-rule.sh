@@ -113,7 +113,7 @@ check_segment() {
   read -ra git_words_list <<< "$git_args_text"
   parse_git_command "$dir" "${git_words_list[@]}"
   [ "${GIT_ARGS[0]:-}" = commit ] || return 0
-  if is_commit_unjudgeable; then
+  if is_commit_unjudgeable "$GIT_DIR" "${GIT_ARGS[@]:1}"; then
     print_pretooluse_deny "Blocked by the kc-gates plugin: $UNJUDGEABLE_COMMIT_REASON"
     return 1
   fi

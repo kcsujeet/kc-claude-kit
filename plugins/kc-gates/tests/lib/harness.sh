@@ -2,6 +2,9 @@
 # Shared assertions for the kc-gates script tests. Sourced, never executed.
 # The sourcing runner sets tests_dir before sourcing.
 
+# run_git_in <repo> <git args>...: runs git in the repo with a throwaway identity.
+run_git_in() { local repo=$1; shift; git -C "$repo" -c user.name=t -c user.email=t@example.test "$@"; }
+
 passes=0
 failures=0
 work_dir=$(mktemp -d)
