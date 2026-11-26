@@ -1,0 +1,15 @@
+diff --git a/src/checkout.test.ts b/src/checkout.test.ts
+new file mode 100644
+index 0000000..1111111
+--- /dev/null
++++ b/src/checkout.test.ts
+@@ -0,0 +1,2 @@
++const order = buildOrder().withItem(buildItem()).withItem(buildItem()).paid()
++expect(screen.getByRole('button', { name: format(money(total)) })).toBeVisible()
+diff --git a/spec/checkout_spec.rb b/spec/checkout_spec.rb
+new file mode 100644
+index 0000000..1111111
+--- /dev/null
++++ b/spec/checkout_spec.rb
+@@ -0,0 +1,1 @@
++order = create(:order, items: build_list(:item, 3, price: price_for(currency(:usd))))

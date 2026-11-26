@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Added (a dense expression is found by a script, not by eye)
+
+- `kc-conventions` 2.8.1: new sweep `kc-clarity/scripts/dense-expressions.sh` (§C13) lists added lines in non-test code files holding a call chain of 3+ links (2+ of them calls), calls nested 3+ deep, or 3+ non-trivial parts (call, `??`/`||` fallback, ternary, cast) in 70+ characters, in any language the conventions cover; a plain property path, comments, imports and test files are skipped. The §C13 box now names the sweep and its `grepped dense expressions: N hits` receipt. Held by the sweep fixtures `tests/sweeps/kc-clarity/dense-expressions{,.ruby,.python,.tests}`.
+- `kc-gates` 3.18.2: `verify-gate-blocks.sh` runs that sweep on the round's `review.diff` and fails when the receipt's count is not the script's, when a hit is not named `path:line` in the receipt's box, or when the diff has a hit and no receipt; the verification gate lists the receipt as a trigger group. Case `evals/general-boxes` gains a seeded chain and its grader. Held by `tests/verify-gate-blocks.test.sh`.
+
 ### Fixed (a merge of the default branch into a clean head stays clean)
 
 - `kc-gates` 3.18.1: `ready-receipt.sh check <sha> --clean` (and so `guard-merge.sh`, which now runs it in the pull request's repo) counts a merge of the default branch into a commit with a clean receipt as clean, with no new pass and no "approve merge", when the merge is what `git merge-tree` makes of its two parents (the second a commit the default branch has; git 2.38 or later): every other file must match git's own merge, so a stale copy of a file the default branch changed, reordered lines or an unresolved conflict keep it not clean. The only resolution allowed is in a `plugin.json` (its `"version"` lines) and a `CHANGELOG.md` (version numbers and entry order). `write <sha> --after <clean-sha>` says when it notices such a merge; `--after` on a fix commit still never makes the head clean. Same class as the prose-rule fix below (a guard blames a change for content it only carried in). Held by `tests/ready-receipt-merge.test.sh`.

@@ -20,6 +20,9 @@
 #     only a file's name is told where the file is);
 #   - a sweep receipt `grepped <what>: <n> hits` is followed, in its box, by at least n distinct
 #     `path:line` verdicts;
+#   - `grepped dense expressions: <n> hits` (clarity §C13): n must equal what kc-conventions'
+#     dense-expressions.sh finds in review.diff, each of those hits must be named `path:line` in the
+#     box, and a diff with a hit must carry the receipt;
 #   - a PASS or N/A box that states runtime or visual behaviour (how something renders, loads, fits or
 #     behaves) by reasoning ("estimated", "by calculation", "should render", "would fit", "in theory")
 #     with no screenshot or recording path, `measured <number>`, passed-test count, request line or
@@ -103,6 +106,7 @@ read_blocks() {
         next_sweep = match(after, "grepped ") ? RSTART : length(after) + 1
         segment = substr(after, 1, next_sweep - 1)
         printf "K\tsweep\n"
+        if (hit ~ /^grepped dense expressions:/) { flat = segment; gsub(/[\t\n]/, " ", flat); printf "D\t%s\t%d\t%s\n", file, count, flat }
         if (count > 0) {
           shown = count_locations(segment)
           if (shown < count) say(name ": " id ": \"" hit "\" has " shown " per-hit verdict(s) with a path:line; every hit gets its own, in the box")
@@ -195,6 +199,46 @@ for gate in ${gates//,/ }; do
     problem "verdicts/: no GATE: $gate block"
   fi
 done
+
+# The dense-expressions sweep (clarity §C13): the receipt's count is what dense-expressions.sh finds
+# in review.diff, and every hit it lists is named, as path:line, in the receipt's box. A receipt
+# is required once the script finds a hit; a repo whose kc-conventions has no such script is not
+# held to it.
+# kc-conventions is beside this plugin: next to it in a checkout, or under the highest version of its
+# own folder in the plugin cache.
+dense_script=""
+plugin_root=$(cd "$scripts_dir/.." && pwd)
+cached_root=$(find "$plugin_root/../../kc-conventions" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | sort -V | tail -n 1 || true)
+for conventions_root in "$plugin_root/../kc-conventions" "$cached_root"; do
+  if [ -f "$conventions_root/skills/kc-clarity/scripts/dense-expressions.sh" ]; then
+    dense_script=$conventions_root/skills/kc-clarity/scripts/dense-expressions.sh
+    break
+  fi
+done
+if [ -n "$dense_script" ]; then
+  dense_hits=$(bash "$dense_script" "$round_dir/review.diff")
+  dense_count=$(printf '%s' "$dense_hits" | grep -c . || true)
+  dense_receipts=0
+  if [ -f "$work/awk.txt" ]; then
+    while IFS=$'\t' read -r _ receipt_file receipt_count receipt_text; do
+      dense_receipts=$((dense_receipts + 1))
+      if [ "$receipt_count" -ne "$dense_count" ]; then
+        problem "$receipt_file: \"grepped dense expressions: $receipt_count hits\" but dense-expressions.sh finds $dense_count in review.diff; every hit gets its own verdict"
+        continue
+      fi
+      while IFS= read -r hit_line; do
+        [ -n "$hit_line" ] || continue
+        hit_location=$(printf '%s' "$hit_line" | sed -E 's/^([^:]+:[0-9]+): .*$/\1/')
+        hit_pattern=$(printf '%s' "$hit_location" | sed -E 's/[.[\*^$]/\\&/g; s/:([0-9]+)$/:L?\1/')
+        printf '%s\n' "$receipt_text" | grep -Eq "$hit_pattern([^0-9]|\$)" \
+          || problem "$receipt_file: dense expression $hit_location has no verdict of its own (path:line) in the receipt's box"
+      done <<< "$dense_hits"
+    done < <(grep '^D	' "$work/awk.txt" || true)
+  fi
+  if [ "$dense_count" -gt 0 ] && [ "$dense_receipts" -eq 0 ]; then
+    problem "verdicts/: dense-expressions.sh finds $dense_count hit(s) in review.diff but no \"grepped dense expressions: $dense_count hits\" receipt with a verdict per hit (clarity §C13)"
+  fi
+fi
 
 # Citations resolve at the head. A path that is only a file's name is told where the file is.
 citation_count=0
