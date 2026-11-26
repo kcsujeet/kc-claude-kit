@@ -3,3 +3,4 @@ src/checkout.ts:4: const price = formatMoney(roundCents(convert(amount, rate)))
 src/checkout.ts:8: return `${flagA ?? fallbackA()} ${format({ value: predicateB() ?? defaultB(), mode: MODE })}`
 src/checkout.ts:10: const rows = Number(read(cell)) ? parse(read(cell), { strict: true }) : fallbackRows(cell)
 src/checkout.ts:17: const config = JSON.parse(readFileSync(resolve(root, 'shop.json'), 'utf8'))
+src/checkout.ts:24: const widget = parseWidget(body) as Widget ?? findWidgetDefaultsForTheShop

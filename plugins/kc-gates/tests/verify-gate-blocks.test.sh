@@ -199,28 +199,48 @@ build_dense_round() {
   build_round
   printf 'diff --git a/shop/total.sh b/shop/total.sh\n--- a/shop/total.sh\n+++ b/shop/total.sh\n@@ -5,0 +6,3 @@\n+names=items.filter(isPaid).map(toName).join(",")\n+price=formatMoney(roundCents(convert(amount, rate)))\n+total=sum(items)\n' > "$round/review.diff"
 }
-dense_clarity() { set_gate clarity "GATE: clarity\nSTATUS: PASS\nBOXES:\n- [PASS] §C13: $1\nFINDINGS:\n- none\n"; }
+set_dense_clarity_gate() { set_gate clarity "GATE: clarity\nSTATUS: PASS\nBOXES:\n- [PASS] §C13: $1\nFINDINGS:\n- none\n"; }
 build_dense_round
-dense_clarity "grepped dense expressions: 2 hits: shop/total.sh:6 chain kept, shop/total.sh:7 nested kept"
+set_dense_clarity_gate "grepped dense expressions: 2 hits: shop/total.sh:6 chain kept, shop/total.sh:7 nested kept"
 expect_clean "dense expressions: a verdict for each hit passes"
-dense_clarity "grepped dense expressions: 2 hits: shop/total.sh:L6 chain kept, shop/total.sh:L7 nested kept"
+set_dense_clarity_gate "grepped dense expressions: 2 hits: shop/total.sh:L6 chain kept, shop/total.sh:L7 nested kept"
 expect_clean "dense expressions: an L-prefixed line number counts"
 set_gate clarity "GATE: clarity\nSTATUS: PASS\nBOXES:\n- [PASS] §C13: no dense expression\nFINDINGS:\n- none\n"
 expect_problem "dense expressions: hits in the diff and no receipt" "dense-expressions.sh finds 2 hit(s) in review.diff but no \"grepped dense expressions: 2 hits\" receipt"
-dense_clarity "grepped dense expressions: 0 hits"
+set_dense_clarity_gate "grepped dense expressions: 0 hits"
 expect_problem "dense expressions: a receipt that says 0 when the script finds 2" "\"grepped dense expressions: 0 hits\" but dense-expressions.sh finds 2 in review.diff"
-dense_clarity "grepped dense expressions: 1 hit: shop/total.sh:6 chain kept"
+set_dense_clarity_gate "grepped dense expressions: 1 hit: shop/total.sh:6 chain kept"
 expect_problem "dense expressions: a receipt that counts one of two" "but dense-expressions.sh finds 2 in review.diff"
-dense_clarity "grepped dense expressions: 3 hits: shop/total.sh:6 a, shop/total.sh:7 b, shop/total.sh:8 c"
+set_dense_clarity_gate "grepped dense expressions: 3 hits: shop/total.sh:6 a, shop/total.sh:7 b, shop/total.sh:8 c"
 expect_problem "dense expressions: a receipt that counts the plain line too" "but dense-expressions.sh finds 2 in review.diff"
-dense_clarity "grepped dense expressions: 2 hits: shop/total.sh:6 chain kept, shop/total.sh:8 plain"
+set_dense_clarity_gate "grepped dense expressions: 2 hits: shop/total.sh:6 chain kept, shop/total.sh:8 plain"
 expect_problem "dense expressions: two verdicts, one on a line that is not a hit" "dense expression shop/total.sh:7 has no verdict of its own"
-dense_clarity "grepped dense expressions: 2 hits: shop/total.sh:6 chain kept, shop/total.sh:70 other"
+set_dense_clarity_gate "grepped dense expressions: 2 hits: shop/total.sh:6 chain kept, shop/total.sh:70 other"
 expect_problem "dense expressions: line 70 is not line 7" "dense expression shop/total.sh:7 has no verdict of its own"
+# A path with regex characters is matched as written, and only as a whole token.
 build_round
-dense_clarity "grepped dense expressions: 0 hits"
+printf 'diff --git a/app/(portal)/page.ts b/app/(portal)/page.ts\n--- a/app/(portal)/page.ts\n+++ b/app/(portal)/page.ts\n@@ -0,0 +1,1 @@\n+const names = items.filter(isPaid).map(toName).join(",")\n' > "$round/review.diff"
+set_dense_clarity_gate "grepped dense expressions: 1 hit: app/(portal)/page.ts:1 chain kept"
+expect_clean "dense expressions: a path with parentheses is matched as written"
+set_dense_clarity_gate "grepped dense expressions: 1 hit: lib/app/(portal)/page.ts:1 chain kept"
+expect_problem "dense expressions: another file's path ending in the hit's path is not the hit" "dense expression app/(portal)/page.ts:1 has no verdict of its own"
+
+# A kc-conventions without the sweep (an older install) is not held to the receipt.
+old_install="$work_dir/old-install"
+mkdir -p "$old_install"
+cp -R "$(dirname "$scripts")" "$old_install/kc-gates"
+cp -R "$(dirname "$scripts")/../kc-conventions" "$old_install/kc-conventions"
+rm "$old_install/kc-conventions/skills/kc-clarity/scripts/dense-expressions.sh"
+build_dense_round
+set_gate clarity "GATE: clarity\nSTATUS: PASS\nBOXES:\n- [PASS] §C13: no dense expression\nFINDINGS:\n- none\n"
+last_status=0
+last_output=$(bash "$old_install/kc-gates/scripts/verify-gate-blocks.sh" "$round" "$repo" 2>&1) || last_status=$?
+expect_eq "dense expressions: an install without the sweep passes a round with hits and no receipt" 0 "$last_status"
+
+build_round
+set_dense_clarity_gate "grepped dense expressions: 0 hits"
 expect_clean "dense expressions: 0 hits and a diff with none passes"
-dense_clarity "grepped dense expressions: 1 hit: shop/total.sh:7 chain kept"
+set_dense_clarity_gate "grepped dense expressions: 1 hit: shop/total.sh:7 chain kept"
 expect_problem "dense expressions: a hit counted where the script finds none" "but dense-expressions.sh finds 0 in review.diff"
 build_round
 expect_clean "dense expressions: no receipt and no hit passes"

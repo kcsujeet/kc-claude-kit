@@ -200,6 +200,27 @@ for gate in ${gates//,/ }; do
   fi
 done
 
+# True when <text> names <path>:<line> or <path>:L<line> as a whole token: no name character
+# before the path and no digit after the line, and every character of the path taken literally.
+names_location() {
+  KC_TEXT=$1 awk -v path="$2" -v line="$3" '
+    BEGIN {
+      text = ENVIRON["KC_TEXT"]
+      for (use_marker = 0; use_marker <= 1; use_marker++) {
+        needle = path ":" (use_marker ? "L" : "") line
+        offset = 0
+        while ((at = index(substr(text, offset + 1), needle)) > 0) {
+          start = offset + at
+          before = (start > 1) ? substr(text, start - 1, 1) : " "
+          after = substr(text, start + length(needle), 1)
+          if (before !~ /[A-Za-z0-9_.\/-]/ && after !~ /[0-9]/) exit 0
+          offset = start
+        }
+      }
+      exit 1
+    }'
+}
+
 # The dense-expressions sweep (clarity §C13): the receipt's count is what dense-expressions.sh finds
 # in review.diff, and every hit it lists is named, as path:line, in the receipt's box. A receipt
 # is required once the script finds a hit; a repo whose kc-conventions has no such script is not
@@ -229,13 +250,14 @@ if [ -n "$dense_script" ]; then
       while IFS= read -r hit_line; do
         [ -n "$hit_line" ] || continue
         hit_location=$(printf '%s' "$hit_line" | sed -E 's/^([^:]+:[0-9]+): .*$/\1/')
-        hit_pattern=$(printf '%s' "$hit_location" | sed -E 's/[.[\*^$]/\\&/g; s/:([0-9]+)$/:L?\1/')
-        printf '%s\n' "$receipt_text" | grep -Eq "$hit_pattern([^0-9]|\$)" \
+        names_location "$receipt_text" "${hit_location%:*}" "${hit_location##*:}" \
           || problem "$receipt_file: dense expression $hit_location has no verdict of its own (path:line) in the receipt's box"
       done <<< "$dense_hits"
     done < <(grep '^D	' "$work/awk.txt" || true)
   fi
-  if [ "$dense_count" -gt 0 ] && [ "$dense_receipts" -eq 0 ]; then
+  has_dense_hits=$((dense_count > 0))
+  has_no_dense_receipt=$((dense_receipts == 0))
+  if [ "$has_dense_hits" -eq 1 ] && [ "$has_no_dense_receipt" -eq 1 ]; then
     problem "verdicts/: dense-expressions.sh finds $dense_count hit(s) in review.diff but no \"grepped dense expressions: $dense_count hits\" receipt with a verdict per hit (clarity §C13)"
   fi
 fi

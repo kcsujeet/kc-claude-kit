@@ -3,7 +3,7 @@ new file mode 100644
 index 0000000..1111111
 --- /dev/null
 +++ b/app/checkout.rb
-@@ -0,0 +1,12 @@
+@@ -0,0 +1,13 @@
 +total = order.shop.owner.name
 +names = items.select(&:paid?).map(&:name).join(', ')
 +label = format_money(round_cents(convert(amount, rate)))
@@ -16,3 +16,4 @@ index 0000000..1111111
 +if paid?(order) && stock?(item)
 +require 'json'
 +total = items.sum { |item| item.price * item.quantity }
++@widgets_by_shop[shop.id] ||= load_widgets(shop, archived: false, sort_by: sort_key(shop))
