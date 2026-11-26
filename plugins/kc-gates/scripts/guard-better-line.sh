@@ -46,8 +46,8 @@ better_lines_file="${CLAUDE_PLUGIN_DATA:-}/better-lines/$session_id"
 # writes no file (> or >> to anything but /dev/null or a stream, or --output) or runs a nested command.
 is_read_only_command() {
   local command_text=$1 command_without_safe_redirects segment
-  command_without_safe_redirects=$(printf '%s' "$command_text" | sed -E 's#[0-9]*>&[0-9]##g; s#[0-9]*>>?[[:space:]]*/dev/null##g')
-  printf '%s' "$command_without_safe_redirects" | grep -Eq '>|--output|\$\(|`' && return 1
+  command_without_safe_redirects=$(printf '%s' "$command_text" | sed -E 's#[0-9]*>&[0-9]##g; s#[0-9]*>>?[[:space:]]*/dev/null##g; s#&&# #g')
+  printf '%s' "$command_without_safe_redirects" | grep -Eq '>|&|--output|\$\(|`' && return 1
   while IFS= read -r segment; do
     printf '%s' "$segment" | grep -Eq "^$READ_ONLY_WORDS([[:space:]]|\$)" || return 1
   done < <(printf '%s\n' "$command_text" | list_stripped_commands)
@@ -76,8 +76,14 @@ has_record_since() {
   awk -F'\t' -v turn_start="$1" '
     ($1 "") < (turn_start "") { next }
     tolower($2) == "none" { if (split($3, words, " ") >= 2) found = 1; next }
-    NF >= 4 && $2 != "" && $3 != "" && $4 != "" && $3 != $4 \
-      && tolower($2) !~ /^(posted|fixed|merged|confirmed|pushed|committed|created|added|updated|ran|opened|wrote|sent|done|deleted|removed|renamed|applied|checked|verified|reviewed)([^[:alnum:]]|$)/ { found = 1 }
+    {
+      has_thing = $2 != ""
+      has_before = $3 != ""
+      has_after = $4 != ""
+      has_change = $3 != $4
+      is_action_only = tolower($2) ~ /^(posted|fixed|merged|confirmed|pushed|committed|created|ran|opened|wrote|sent|done|checked|verified|reviewed)([^[:alnum:]]|$)/
+      if (has_thing && has_before && has_after && has_change && !is_action_only) found = 1
+    }
     END { exit !found }' "$better_lines_file" 2>/dev/null
 }
 

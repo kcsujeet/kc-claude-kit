@@ -44,10 +44,10 @@ write_record() { printf '%s\n' "$1" > "$better_lines_file"; }
 expect_record() { write_record "$2"; write_work_turn Edit file_path "src/orders.rb"; expect_eq "$1" "$3" "$(run_stop "$done_text")"; }
 
 done_text="The order total is fixed."
-no_record() { rm -f "$better_lines_file"; }
+remove_record() { rm -f "$better_lines_file"; }
 
 # Turns of reads, or with no tool calls, pass.
-no_record
+remove_record
 { emit_typed_message "how do orders work?"; emit_tool_call Read file_path "src/orders.rb"; emit_tool_result; emit_tool_call Bash command "grep -rn total src | head -5 && git log -3 --oneline"; emit_tool_result; emit_tool_call Grep pattern "total"; emit_tool_result; } > "$transcript"
 expect_eq "a turn of reads with no record goes out" out "$(run_stop "$done_text")"
 { emit_typed_message "how do orders work?"; emit_tool_call REPL code 'const t = await $`git status --short`.text(); t'; emit_tool_result; } > "$transcript"
@@ -77,6 +77,7 @@ expect_eq "a reply with no Better line passes when the file has the line" out "$
 expect_record "none with what was checked passes" "$t0"$'\tnone\tmeasured 3 runs, no faster alternative' out
 expect_record "none with nothing checked is held" "$t0"$'\tnone\t' held
 expect_record "none with one word is held" "$t0"$'\tnone\tfine' held
+expect_record "removing a thing is an improvement" "$t0"$'\tRemoved the per-order lookup\t40 s\t3 s' out
 expect_record "an action as the thing improved is held" "$t0"$'\tfixed the total\t44 s\t6 s' held
 expect_record "posted as the thing improved is held" "$t0"$'\tposted the reply\tdraft\tposted' held
 expect_record "merged as the thing improved is held" "$t0"$'\tMerged the PR\topen\tmerged' held
@@ -86,7 +87,7 @@ expect_record "a line with one field is held" "$t0"$'\torder export' held
 expect_record "a line from before this turn is held" "2026-01-01T09:00:00Z"$'\torder export\t44 s\t6 s' held
 
 # Each kind of work counts.
-no_record
+remove_record
 expect_work_held "a Write" Write file_path "src/orders.rb"
 expect_work_held "a NotebookEdit" NotebookEdit file_path "orders.ipynb"
 expect_work_held "an Agent" Agent prompt "check the orders"
@@ -96,13 +97,14 @@ expect_work_held "a redirect to a file" Bash command "echo x > orders.txt"
 expect_work_held "find -delete" Bash command "find . -delete"
 expect_work_held "a nested command" Bash command 'ls $(rm x)'
 expect_work_held "git diff --output" Bash command "git diff --output=out.txt"
+expect_work_held "a background job" Bash command "ls & rm x"
 expect_work_held "sed -i" Bash command "sed -i 's/a/b/' src/orders.rb"
 expect_work_held "awk running a command" Bash command "awk 'BEGIN{system(\"rm x\")}'"
 expect_work_held "a REPL edit()" REPL code "await edit('a.rb', 'a', 'b')"
 expect_work_held "a REPL bare-global Bash()" REPL code "await Bash({command: 'rm x'})"
 expect_work_held "a REPL \$(\"...\") shell string" REPL code 'await $("rm -rf x")'
 expect_work_held "a REPL \$(\"...\", ms) shell string" REPL code 'await $("rm -rf x", 5000)'
-{ emit_typed_message "fix the total"; emit_tool_call Bash command "ls src 2>/dev/null | wc -l"; emit_tool_result; } > "$transcript"
+write_work_turn Bash command "ls src 2>/dev/null | wc -l"
 expect_eq "a read-only command with a /dev/null redirect goes out" out "$(run_stop "$done_text")"
 
 # Only this turn counts.
