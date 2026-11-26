@@ -271,4 +271,105 @@ printf 'GATES=naming\nWALK=required\nwalk: x\nwalk-item: app/[locale]/page.tsx\n
 printf 'env\tbin/review-env up\tGET /health 200\napp/[locale]/page.tsx\tpage\tPOST /orders 201\tstates: screen; narrow screen\n' > "$receipt"
 expect_contains "a path with regex characters still gets its dimension checked" "varies along print" "$(run_walk_receipt_check)"
 
+# Consumers (§V11, §B8): a changed unit is walked from every consumer's side. uses.txt is
+# trace-uses.sh's output; each consumer file of an item needs an entry in the fifth field with an
+# omitted or partial input and its output before and after, or an only-state reason.
+printf 'GATES=naming\nWALK=required\nwalk: x\nwalk-item: app/models/order.rb surface: api\n' > "$select_output"
+uses_file=$work_dir/uses.txt
+cat > "$uses_file" <<'USES'
+name Order (definition, app/models/order.rb): 3 uses
+  app/services/checkout.rb:12: Order.create(params)
+  app/services/checkout.rb:40: Order.find(id)
+  app/jobs/export_job.rb:5: Order.all
+  docs/orders.md:2: Order is documented here
+  spec/models/order_spec.rb:3: Order.new
+  app/models/order.rb:9: Order.first
+name Other (definition, app/models/other.rb): 1 uses
+  app/views/other_view.rb:2: Other.x
+tests: 1
+  spec/models/order_spec.rb
+summary: 2 names, 5 uses, 1 test files
+USES
+write_consumer_receipt() {
+  printf 'env\tbin/review-env up\tGET /health 200\napp/models/order.rb\tsaved an order\tPOST /orders 201\tstates: full form; empty cart\t%s\n' "$1" > "$receipt"
+}
+run_consumer_check() {
+  local output status=0
+  output=$(bash "$walk_receipt_checker" "$select_output" "$receipt" "$uses_file") || status=$?
+  if [ "$status" -eq 0 ]; then echo clean; else printf '%s\n' "$output"; fi
+}
+full_entries='consumers: app/services/checkout.rb: omitted the discount field; before discount stayed on; after it reads off | app/jobs/export_job.rb: only state: it always passes every field'
+write_consumer_receipt "$full_entries"
+expect_eq "§V11: every consumer with an omitted state and before/after (or an only-state reason) passes" clean "$(run_consumer_check)"
+write_consumer_receipt ''
+missing_field=$(run_consumer_check)
+expect_contains "§V11: an item with consumers and no fifth field fails, naming a consumer" "consumer app/services/checkout.rb uses what this item changes and has no entry" "$missing_field"
+expect_contains "§V11: every consumer file is named" "consumer app/jobs/export_job.rb uses what this item changes" "$missing_field"
+expect_eq "a test file, the item itself and another item's consumer are not consumers" 2 "$(printf '%s\n' "$missing_field" | grep -c 'consumer app/')"
+write_consumer_receipt 'consumers: app/services/checkout.rb: omitted the discount field; before on; after off'
+expect_contains "§V11: a consumer left out of the field fails" "consumer app/jobs/export_job.rb uses what this item changes" "$(run_consumer_check)"
+write_consumer_receipt 'consumers: app/services/checkout.rb: saved with all fields; before on; after on | app/jobs/export_job.rb: only state: it always passes every field'
+expect_contains "§V11: an entry with no omitted or partial input fails" "consumer app/services/checkout.rb: walk it with an input left out or partial" "$(run_consumer_check)"
+write_consumer_receipt 'consumers: app/services/checkout.rb: omitted the discount field; after it reads off | app/jobs/export_job.rb: only state: it always passes every field'
+expect_contains "§V11: an entry with no before state fails" "consumer app/services/checkout.rb: give what it received before and after" "$(run_consumer_check)"
+write_consumer_receipt 'consumers: app/services/checkout.rb: omitted the discount field; before on; after off | app/jobs/export_job.rb: only state: n/a'
+expect_contains "§V11: an only-state reason under three words fails" "consumer app/jobs/export_job.rb: walk it with an input left out or partial" "$(run_consumer_check)"
+# A prose mention is not a consumer (the fixture's docs/orders.md). Neither is a comment, quoted text,
+# or a plain variable of the changed name when the name is only the hunk's enclosing context.
+reader_count=20
+other_use_count=3
+generic_use_count=$((reader_count + other_use_count))
+{
+  printf 'name script_name (enclosing, app/models/order.rb): %s uses\n' "$generic_use_count"
+  # shellcheck disable=SC2016 # $script_name is fixture text, not an expansion
+  for fixture_index in $(seq 1 "$reader_count"); do printf '  lib/generic_%s.rb:1: echo "usage: $script_name"\n' "$fixture_index"; done
+  # shellcheck disable=SC2016 # fixture text, not an expansion
+  printf '  lib/assigned.rb:1: script_name=$(basename "$0")\n  lib/commented.rb:1: # script_name is the basename\n  lib/passed.rb:1: render(script_name, other)\n'
+  printf 'tests: 0\nsummary: 1 names, %s uses, 0 test files\n' "$generic_use_count"
+} > "$uses_file"
+write_consumer_receipt ''
+expect_eq "§V11: variable reads, assignments and an uncalled bare use of an enclosing name are not consumers" clean "$(run_consumer_check)"
+# The same bare use is a consumer when the name is a definition, and a comment, a `$name` read, quoted
+# text and a spaced assignment of it are not.
+{
+  # shellcheck disable=SC2016 # fixture text, not an expansion
+  printf 'name script_name (definition, app/models/order.rb): 6 uses\n  lib/passed.rb:1: render(script_name, other)\n  lib/read.rb:1: echo "usage: $script_name"\n  lib/commented.rb:1: # script_name is the basename\n  lib/quoted.rb:1: log("script_name is a word here")\n  lib/spaced.rb:1: script_name = other\n  lib/subst.sh:1: result="$(script_name arg)"\n'
+  printf 'tests: 0\nsummary: 1 names, 6 uses, 0 test files\n'
+} > "$uses_file"
+definition_uses=$(run_consumer_check)
+expect_contains "§V11: a bare use of a definition name is a consumer" "consumer lib/passed.rb uses what this item changes" "$definition_uses"
+expect_not_contains "§V11: a \$name read of a definition name is not" "consumer lib/read.rb" "$definition_uses"
+expect_not_contains "§V11: a comment mentioning a definition name is not" "consumer lib/commented.rb" "$definition_uses"
+expect_not_contains "§V11: quoted text holding a definition name is not" "consumer lib/quoted.rb" "$definition_uses"
+expect_contains "§V11: a call inside a double-quoted command substitution is a consumer" "consumer lib/subst.sh uses what this item changes" "$definition_uses"
+expect_not_contains "§V11: a spaced assignment of a definition name is not" "consumer lib/spaced.rb" "$definition_uses"
+# A name with regex characters (a `$` prefix) still finds its consumers.
+{
+  # shellcheck disable=SC2016 # fixture text, not an expansion
+  printf 'name $fetchUser (definition, app/models/order.rb): 1 uses\n  src/b.js:1: const user = $fetchUser(id)\ntests: 0\nsummary: 1 names, 1 uses, 0 test files\n'
+} > "$uses_file"
+expect_contains "§V11: a name starting with a regex character still lists its consumer" "consumer src/b.js uses what this item changes" "$(run_consumer_check)"
+# A changed function with thirty code callers still lists every one: there is no cap on code consumers.
+caller_count=30
+{
+  printf 'name Order (definition, app/models/order.rb): %s uses\n' "$caller_count"
+  for fixture_index in $(seq 1 "$caller_count"); do printf '  lib/caller_%s.rb:1: Order.create(params)\n' "$fixture_index"; done
+  printf 'tests: 0\nsummary: 1 names, %s uses, 0 test files\n' "$caller_count"
+} > "$uses_file"
+many_callers=$(run_consumer_check)
+expect_eq "§V11: a function with $caller_count code callers needs $caller_count consumer entries" "$caller_count" "$(printf '%s\n' "$many_callers" | grep -c 'consumer lib/caller_')"
+{
+  printf 'name Order (enclosing, app/models/order.rb): 2 uses\n  lib/caller_a.rb:1: result = Order.create(params)\n  lib/caller_b.rb:1: Order.create(params)\n'
+  printf 'tests: 0\nsummary: 1 names, 2 uses, 0 test files\n'
+} > "$uses_file"
+enclosing_callers=$(run_consumer_check)
+expect_contains "§V11: an enclosing name used at command position is a consumer" "consumer lib/caller_b.rb uses what this item changes" "$enclosing_callers"
+expect_contains "§V11: an enclosing name used as a member call after other text is a consumer" "consumer lib/caller_a.rb uses what this item changes" "$enclosing_callers"
+write_consumer_receipt "$full_entries"
+printf 'name Order (definition, app/models/order.rb): 1 uses\n  app/models/order.rb:9: Order.first\ntests: 0\nsummary: 1 names, 1 uses, 0 test files\n' > "$uses_file"
+printf 'env\tbin/review-env up\tGET /health 200\napp/models/order.rb\tsaved an order\tPOST /orders 201\tstates: full form; empty cart\n' > "$receipt"
+expect_eq "§V11: an item with no consumer outside itself and its tests needs no fifth field" clean "$(run_consumer_check)"
+status=0
+bash "$walk_receipt_checker" "$select_output" "$receipt" "$work_dir/no-such-uses.txt" > /dev/null 2>&1 || status=$?
+expect_eq "an unreadable uses file exits 2" 2 "$status"
 finish

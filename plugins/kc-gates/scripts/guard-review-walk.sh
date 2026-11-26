@@ -48,13 +48,15 @@ is_walk_offer() {
 
 # Prints check-walk-receipt.sh's problems for the saved review; nothing when it passes or can't run.
 get_walk_problems() {
-  local scripts_dir review_dir selected
+  local scripts_dir review_dir selected uses_file
   scripts_dir=$(dirname "$0")
   review_dir=$(session_review_dir)
   has_review_files "$review_dir" || return 0
   selected=$(mktemp)
   if bash "$scripts_dir/select-gates.sh" "$review_dir/review.diff" "$review_dir/changed-files.txt" . > "$selected" 2>/dev/null; then
-    bash "$scripts_dir/check-walk-receipt.sh" "$selected" "$review_dir/walk-receipt.tsv" 2>&1 | tr '\n' ' ' | cut -c1-600
+    uses_file=$review_dir/uses.txt
+    [ -r "$uses_file" ] || uses_file=""
+    bash "$scripts_dir/check-walk-receipt.sh" "$selected" "$review_dir/walk-receipt.tsv" "$uses_file" 2>&1 | tr '\n' ' ' | cut -c1-600
   fi
   rm -f "$selected"
 }

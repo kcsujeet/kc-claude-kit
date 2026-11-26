@@ -459,7 +459,7 @@ EOF
 # Prints the deny JSON when the saved review has walk-items without a full receipt line; nothing
 # otherwise, and nothing when no review folder or no select-gates.sh can be found.
 get_unwalked_review_verdict() {
-  local scripts_dir review_dir selected problems reason problem_text
+  local scripts_dir review_dir selected uses_file problems reason problem_text
   # The reason is shown as a hook message, so the problem list is cut to a short length.
   local max_problem_chars=600
   scripts_dir=$(dirname "$0")
@@ -470,7 +470,9 @@ get_unwalked_review_verdict() {
     rm -f "$selected"
     return 0
   fi
-  problems=$(bash "$scripts_dir/check-walk-receipt.sh" "$selected" "$review_dir/walk-receipt.tsv" 2>&1) && { rm -f "$selected"; return 0; }
+  uses_file=$review_dir/uses.txt
+  [ -r "$uses_file" ] || uses_file=""
+  problems=$(bash "$scripts_dir/check-walk-receipt.sh" "$selected" "$review_dir/walk-receipt.tsv" "$uses_file" 2>&1) && { rm -f "$selected"; return 0; }
   rm -f "$selected"
   problem_text=$(printf '%s' "$problems" | tr '\n' ' ' | sed 's/["\\]//g' | cut -c1-"$max_problem_chars")
   reason="Blocked by the kc-gates plugin: this review changed behaviour it has no walk receipt for, so it cannot be posted or approved yet. Walk each item on its QA surface (browser, API, terminal, unit) and write one line per item to $review_dir/walk-receipt.tsv (path, what was seen, evidence of that surface: browser a screenshot or recording, api a curl request and its saved response, terminal or unit a run transcript, exit 0: run.txt). $problem_text"

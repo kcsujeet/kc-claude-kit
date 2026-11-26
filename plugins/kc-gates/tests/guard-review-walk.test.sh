@@ -86,6 +86,15 @@ printf 'env\tbin/review-env up\tGET /health 200\napp/models/order.rb\tcreated an
 expect_eq "full receipt: the verdict goes out" out "$(run_stop "$verdict_reply")"
 expect_eq "full receipt: the verification gate dispatches" allow "$(run_dispatch kc-gates:verification-gate)"
 
+# §V11: with the review's uses.txt, an item whose consumers the receipt does not walk holds the verdict.
+printf 'name Order (definition, app/models/order.rb): 1 uses\n  app/services/checkout.rb:12: Order.create(params)\ntests: 0\nsummary: 1 names, 1 uses, 0 test files\n' > "$review/uses.txt"
+expect_eq "§V11 consumers: a consumer with no entry holds the verdict" held "$(run_stop "$verdict_reply")"
+expect_contains "§V11 consumers: the block names the consumer" "consumer app/services/checkout.rb" "$(cat "$work_dir/last-output")"
+expect_eq "§V11 consumers: the verification gate's dispatch is denied" deny "$(run_dispatch kc-gates:verification-gate)"
+printf 'env\tbin/review-env up\tGET /health 200\napp/models/order.rb\tcreated an order with a free item, total 0\tPOST /orders 201\tstates: empty cart; two items\tconsumers: app/services/checkout.rb: omitted the discount; before on; after off\n' > "$review/walk-receipt.tsv"
+expect_eq "§V11 consumers: an entry for the consumer lets the verdict out" out "$(run_stop "$verdict_reply")"
+rm -f "$review/uses.txt"
+
 write_review docs/notes.md
 rm -f "$review/walk-receipt.tsv"
 expect_eq "nothing to walk: the verdict goes out with no receipt" out "$(run_stop "$verdict_reply")"
