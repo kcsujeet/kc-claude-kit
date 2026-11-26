@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-# Holds kc-ready-for-review §H5: a merge of the default branch into a clean head stays clean.
 # Tests the merge handling of scripts/ready-receipt.sh and guard-merge.sh (kc-ready-for-review §H5):
 # a head that merges the default branch into a commit with a clean receipt is clean with no new pass
 # when the merge is what git makes of the two parents on its own (a conflict in a plugin manifest's
@@ -74,7 +73,7 @@ merge_main() {
 
 build_repo
 merge_head=$(merge_main)
-expect_eq "a merge of main into a clean head, version and CHANGELOG conflicts renumbered, is clean" clean "$(check_clean "$merge_head")"
+expect_eq "§H5: a merge of main into a clean head, version and CHANGELOG conflicts renumbered, is clean" clean "$(check_clean "$merge_head")"
 (cd "$repo" && bash "$scripts/ready-receipt.sh" write "$merge_head" --after "$clean_head") > "$work_dir/after.out" 2>&1 || true
 expect_contains "--after notices the merge and says it counts as clean" "counts as clean" "$(cat "$work_dir/after.out")"
 
