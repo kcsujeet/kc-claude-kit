@@ -109,6 +109,14 @@ write_hooks storefront Stop remind-carts.sh
 expect_verdict fail "a second plugin's unlisted Stop hook fails"
 expect_output "the failure names the second plugin" "storefront: Stop hook 'remind-carts.sh'"
 
+# A hooks.json that cannot be read fails the check instead of passing it.
+printf '{not json' > "$repo/plugins/storefront/hooks/hooks.json"
+write_hooks shop Stop remind-orders.sh
+expect_verdict fail "a malformed hooks.json fails"
+expect_output "the failure says it cannot be read" "storefront: hooks.json cannot be read"
+printf '{"hooks": {"Stop": [{"matcher": "x"}]}}' > "$repo/plugins/storefront/hooks/hooks.json"
+expect_verdict pass "a Stop group with no hooks list has nothing to list"
+
 echo
 echo "$passes passed, $failures failed"
 [ "$failures" -eq 0 ]

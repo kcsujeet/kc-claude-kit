@@ -12,7 +12,7 @@
 # Allowlist, one line per hook: `<plugin> <event> <command name> <reason>`, the command name being
 # the last path part of the hook's command (quotes stripped), the reason at least six words saying
 # why it must run at the end of the turn and that it neither reminds nor blocks. A listed script
-# inside its plugin is also read: a block decision, exit 2, additionalContext, systemMessage or a
+# inside its plugin is also read (its own text only, not the files it sources): a block decision, exit 2, additionalContext, systemMessage or a
 # permission decision in it fails the check.
 #
 # Usage: check-stop-hooks.sh [repo-root]   (default: the current directory; CI runs it at the root)
@@ -39,6 +39,10 @@ for hooks_file in "$root"/plugins/*/hooks/hooks.json; do
   [ -f "$hooks_file" ] || continue
   plugin_dir=$(dirname "$(dirname "$hooks_file")")
   plugin=$(basename "$plugin_dir")
+  hook_rows=$(jq -r '.hooks | to_entries[] | select(.key == "Stop" or .key == "SubagentStop") | .key as $event | .value[].hooks[]? | [$event, (.command // .prompt // .type)] | @tsv' "$hooks_file" 2>/dev/null) || {
+    note_problem "$plugin: hooks.json cannot be read, so its end-of-turn hooks cannot be checked."
+    continue
+  }
   while IFS=$'\t' read -r event command; do
     [ -n "$event" ] || continue
     name=${command%\"}
@@ -64,7 +68,7 @@ for hooks_file in "$root"/plugins/*/hooks/hooks.json; do
         fi
         ;;
     esac
-  done < <(jq -r '.hooks | to_entries[] | select(.key == "Stop" or .key == "SubagentStop") | .key as $event | .value[].hooks[] | [$event, (.command // .prompt // .type)] | @tsv' "$hooks_file")
+  done <<< "$hook_rows"
 done
 
 [ "$problems" -eq 0 ] || exit 1

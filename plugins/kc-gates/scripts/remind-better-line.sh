@@ -28,7 +28,7 @@ tool_name=$(printf '%s' "$payload" | jq -r '.tool_name // empty' 2>/dev/null)
 tool_input=$(printf '%s' "$payload" | jq -r '.tool_input | (.command // .code // "") | tostring' 2>/dev/null)
 is_work_call "$tool_name" "$tool_input" || exit 0
 
-mkdir -p "$(dirname "$marker_file")" && : > "$marker_file"
+mkdir -p "$(dirname "$marker_file")" && : > "$marker_file" || exit 0
 printf '%s' "Before you hand this over: measure what you did and look for a better, simpler way (kc-conventions:kc-raise-the-bar). Apply it or note what you tried. Keep this out of the reply." \
   | jq -Rsc '{hookSpecificOutput: {hookEventName: "PostToolUse", additionalContext: .}}'
 exit 0

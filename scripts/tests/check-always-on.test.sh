@@ -75,6 +75,9 @@ check "tool hooks: a once-per-turn reminder is silent on ordinary calls" 0 "0 p/
 check "once-per-turn: the first work call's bytes are reported" 0 "33 p/once.sh (PostToolUse)"
 check "once-per-turn: a hook silent on the first call is not listed" 0 "Once-per-turn tool-hook output (first work call of a turn, bytes printed; report only):
   33"
+check "once-per-turn: a silent hook is not listed under the reminder's name" 0 "Once-per-turn tool-hook output (first work call of a turn, bytes printed; report only):
+  33 p/once.sh (PostToolUse)
+"
 check "tool hooks budget met" 0 "Per-tool-call" --budget-tool-hooks 40
 check "tool hooks budget exceeded names the hook" 1 "p/chatty.sh (PreToolUse) prints 40 bytes on an ordinary tool call, budget 39, over by 1" --budget-tool-hooks 39
 check "tool hooks budget of 0 fails a hook that prints" 1 "p/stderr.sh (PostToolUse) prints 25 bytes" --budget-tool-hooks 0

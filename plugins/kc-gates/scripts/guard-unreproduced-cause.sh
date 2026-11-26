@@ -47,6 +47,7 @@ payload=$(cat)
 transcript=$(printf '%s' "$payload" | jq -r '.transcript_path // empty' 2>/dev/null)
 repo_dir=$(printf '%s' "$payload" | jq -r '.cwd // empty' 2>/dev/null)
 edited_path=$(printf '%s' "$payload" | jq -r '.tool_input.file_path // .tool_input.notebook_path // empty' 2>/dev/null)
+[ "$(printf '%s' "$payload" | jq -r '.hook_event_name // empty' 2>/dev/null)" = PreToolUse ] || exit 0
 [ -r "$transcript" ] || exit 0
 [ -n "$repo_dir" ] || repo_dir=$PWD
 
@@ -106,6 +107,6 @@ EOF
 }
 
 did_run_product && exit 0
-printf '%s' "Blocked by the kc-gates plugin: this change is for a reported problem, but nothing since the report ran the product, its tests or a browser (reading code does not count). Reproduce the problem the way the reporter met it first: their entry point, renderer or runtime and version, environment and real-shaped data (a copy of one layer, such as a template rendered alone, another browser version or a fixture, is not a reproduction). Then edit again. When it cannot be run here or needs no run, write a Not reproduced: <why> line (at least three words) in your text first (kc-conventions:kc-assess step 3)." \
+printf '%s' "Blocked by the kc-gates plugin: this change is for a reported problem, but nothing since the report ran the product, its tests or a browser (reading code does not count). Reproduce the problem the way the reporter met it first: their entry point, renderer or runtime and version, environment and real-shaped data (a copy of one layer, such as a template rendered alone, another browser version or a fixture, is not a reproduction). Then edit again. When it cannot be run here or needs no run, write a Not reproduced: <why> line (at least three words) in a message before the edit, since a line in the same message may not be seen yet (kc-conventions:kc-assess step 3)." \
   | jq -Rsc '{hookSpecificOutput: {hookEventName: "PreToolUse", permissionDecision: "deny", permissionDecisionReason: .}}'
 exit 0

@@ -90,6 +90,7 @@ expect_eq "a Not reproduced line from before the report does not count" denied "
 for path in spec/export_spec.rb src/export.test.ts test/export_test.rb src/__tests__/export.ts tests/export.py; do
   expect_eq "writing $path is allowed" allowed "$(run_edit "$path")"
 done
+expect_eq "a _spec file outside a spec folder is allowed" allowed "$(run_edit src/export_spec.rb)"
 expect_eq "a source file whose name only contains test is denied" denied "$(run_edit src/contest.rb)"
 
 # A repo's own run commands.
@@ -115,6 +116,7 @@ expect_eq "no transcript: allowed" allowed "$(run_edit)"
 expect_eq "empty input: nothing printed" "" "$(printf '' | bash "$guard")"
 
 # It is a PreToolUse guard, never a Stop hook.
-expect_eq "a Stop payload with a cause and a fix is never blocked" "" "$(jq -cn --arg reply "The cause is a null. The fix is a guard." '{hook_event_name: "Stop", last_assistant_message: $reply}' | bash "$guard")"
+{ emit_typed_message "$report"; } > "$transcript"
+expect_eq "a Stop payload on a transcript that would deny an edit prints nothing" "" "$(jq -cn --arg path "$transcript" --arg cwd "$repo" '{hook_event_name: "Stop", transcript_path: $path, cwd: $cwd, last_assistant_message: "The cause is a null. The fix is a guard."}' | bash "$guard")"
 
 finish

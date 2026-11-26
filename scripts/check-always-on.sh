@@ -216,8 +216,8 @@ for hooks_file in "$root"/plugins/*/hooks/hooks.json; do
           CLAUDE_PLUGIN_ROOT="$plugin_dir" CLAUDE_PROJECT_DIR="$work_dir" CLAUDE_PLUGIN_DATA="$(mktemp -d "$scratch/data.XXXXXX")" \
           "$bin_dir/bash" -c "$command" 2>&1 | wc -c | tr -d ' '
     ) || size=0
-    [ "$size" -eq 0 ] || name=${command##*/}
-    echo "  $size $(basename "$plugin_dir")/${name%\"} (PostToolUse)"
+    name=${command##*/}
+    [ "$size" -eq 0 ] || echo "  $size $(basename "$plugin_dir")/${name%\"} (PostToolUse)"
   done <<< "$commands"
 done
 

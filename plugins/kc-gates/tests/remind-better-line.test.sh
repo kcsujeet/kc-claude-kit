@@ -54,6 +54,12 @@ expect_work "git diff --output" Bash command "git diff --output=out.txt"
 expect_work "a redirect after an escaped single quote" Bash command "echo \\' > f; echo 'x'"
 expect_work "a redirect after a quoted string" Bash command "echo 'a' > out.txt"
 expect_work "a nested command inside double quotes" Bash command 'ls "$(rm x)"'
+expect_work "a redirect after a quote inside a double-quoted string" Bash command "echo \"\$x'\" > f; echo 'y'"
+expect_work "a redirect after an escaped double quote" Bash command 'echo \" > f; echo "x"'
+expect_work "a redirect after a double-quoted string" Bash command 'echo "a" > out.txt'
+expect_work "awk running a command" Bash command "awk 'BEGIN{system(\"rm x\")}'"
+expect_work "a REPL \$(\"...\", ms) shell string" REPL code 'await $("rm -rf x", 5000)'
+expect_eq "a double-quoted variable is data, not work" silent "$(fresh_call Bash command 'echo "$HOME"')"
 expect_work "a background job" Bash command "ls & rm x"
 expect_work "sed -i" Bash command "sed -i 's/a/b/' src/orders.rb"
 expect_work "a REPL edit()" REPL code "await edit('a.rb', 'a', 'b')"
@@ -81,6 +87,7 @@ expect_contains "a read does not use up the turn's reminder" "raise-the-bar" "$(
 # What it cannot read it does not remind.
 expect_eq "no plugin data folder: nothing printed" "" "$(jq -cn '{session_id: "s", tool_name: "Edit", tool_input: {file_path: "a"}}' | env -u CLAUDE_PLUGIN_DATA bash "$hook")"
 expect_eq "no session id: nothing printed" "" "$(jq -cn '{tool_name: "Edit", tool_input: {file_path: "a"}}' | CLAUDE_PLUGIN_DATA="$data_dir" bash "$hook")"
+expect_eq "a data folder that cannot be written: nothing printed, not a reminder on every call" "" "$(jq -cn '{session_id: "s", tool_name: "Edit", tool_input: {file_path: "a"}}' | CLAUDE_PLUGIN_DATA=/dev/null/none bash "$hook")"
 expect_eq "empty input: nothing printed" "" "$(printf '' | CLAUDE_PLUGIN_DATA="$data_dir" bash "$hook")"
 
 finish
