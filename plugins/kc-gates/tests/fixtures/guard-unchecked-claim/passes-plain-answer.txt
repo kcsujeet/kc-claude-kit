@@ -1,0 +1,1 @@
+Yes, that works. Run the tests with `bundle exec rspec` and they should pass.

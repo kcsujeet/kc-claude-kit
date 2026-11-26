@@ -1,0 +1,1 @@
+The storefront cache is cleared on deploy, so the stale price you saw must come from the CDN.

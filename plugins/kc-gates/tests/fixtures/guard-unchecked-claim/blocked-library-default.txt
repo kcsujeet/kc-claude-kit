@@ -1,0 +1,1 @@
+The `shopkit` client retries failed requests by default, which explains the duplicate charge.

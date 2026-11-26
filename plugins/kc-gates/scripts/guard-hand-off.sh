@@ -27,9 +27,9 @@
 #
 # The change from the default branch to that commit is classed first
 # (change-class.sh): prose_small (a few prose lines, nothing else) needs no
-# pass receipt, only the checklist below; code_small still needs the pass,
-# and its block says to run it now at the small size rather than ask the user
-# to skip it; full is checked as above.
+# pass receipt, only the checklist below; code_small (small, and no risk: line from
+# pass-size.sh, so no sensitive or public path, deletion or migration) needs none either;
+# full, and any change with a risk line, is checked as above.
 #
 # When the repo has .claude/hand-off-checklist.md at that commit, the commit
 # also needs checklist verdicts (ready-receipt.sh write <sha> --verdicts
@@ -155,16 +155,14 @@ resolve_head() {
   esac
 }
 
-# $1 is the reason; $2 the change's class (change-class.sh). A code_small change gets the small pass
-# run at once, so its block offers no skip to ask the user about.
+# $1 is the reason.
 print_deny_reason() {
   local skip_hint=" Only when the user has said in their latest message to skip it for this PR, prefix the command with KC_READY_SKIP=1; never add it on your own."
-  [ "${2:-full}" != code_small ] || skip_hint=" This change is small with no risk line (change-class.sh: code_small): run the pass now at the small size (round 1 only) without asking the user, and do not offer to skip it."
   printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Blocked by the kc-gates plugin: %s%s"}}\n' "$1" "$skip_hint"
 }
 
 print_deny() {
-  print_deny_reason "$1 Run /kc-gates:kc-ready-for-review on the committed branch before its first push: one pass of review and QA, ending in a receipt for the commit the PR will show." "${2:-full}"
+  print_deny_reason "$1 Run /kc-gates:kc-ready-for-review on the committed branch before its first push: one pass of review and QA, ending in a receipt for the commit the PR will show."
 }
 
 # Denies when the commit's hand-off checklist has unmet boxes (see the header).
@@ -283,8 +281,8 @@ check_push() {
         ;;
     esac
     change_class=$(read_change_class "$dir" --head "$sha")
-    if [ "$change_class" != prose_small ] && ! bash "$scripts_dir/ready-receipt.sh" check "$sha" --pass >/dev/null 2>&1; then
-      print_deny_reason "this is the first push of branch '$dst', and its commit $sha has no kc-ready-for-review receipt. Run /kc-gates:kc-ready-for-review on the committed branch before its first push (and before the PR): one pass of review and QA, ending in a receipt for that commit." "$change_class"
+    if ! is_small_class "$change_class" && ! bash "$scripts_dir/ready-receipt.sh" check "$sha" --pass >/dev/null 2>&1; then
+      print_deny_reason "this is the first push of branch '$dst', and its commit $sha has no kc-ready-for-review receipt. Run /kc-gates:kc-ready-for-review on the committed branch before its first push (and before the PR): one pass of review and QA, ending in a receipt for that commit."
       return 1
     fi
     check_checklist "$sha" "$dir" || return 1
@@ -339,8 +337,8 @@ main() {
       exit 0
     fi
     change_class=$(read_change_class "$dir" --head "$head")
-    if [ "$change_class" != prose_small ] && ! bash "$scripts_dir/ready-receipt.sh" check "$head" --pass >/dev/null 2>&1; then
-      print_deny "this command opens or hands over a PR, and its head commit $head has no kc-ready-for-review receipt." "$change_class"
+    if ! is_small_class "$change_class" && ! bash "$scripts_dir/ready-receipt.sh" check "$head" --pass >/dev/null 2>&1; then
+      print_deny "this command opens or hands over a PR, and its head commit $head has no kc-ready-for-review receipt."
       exit 0
     fi
     check_checklist "$head" "$dir" || exit 0
