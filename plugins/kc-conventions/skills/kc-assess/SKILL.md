@@ -20,7 +20,7 @@ Step 1 of the working agreement's "Order of work on a task". Do this before any 
 9. **List every reader of the broken value or input** (a grep for the field or call): what each does with the bad case and whether the fix covers it, so review confirms the list instead of finding the rest.
 10. **For each reader a person reaches, state the state they are in** when the bad case gets there (which options are picked, what is shown and hidden), read from the conditions that show or hide each part or walked in the app. Check the fix against what they see in that state: a fix that blocks an action or reports an error works only if that error shows in that state.
 11. **When the fix changes how something looks or reads** and people already hold it up against a reference (an official form or template, a standard symbol, the layout a trade uses), open that reference first and show the person a picture of the change on a real case beside it before building it out. A look judged wrong at first sight costs a sketch to learn from, or a finished change.
-12. **Stop for approval** when the fix makes a call that is the person's (see "Ask before assuming") or they asked to see it first. Otherwise state the cause and the fix in a few lines and build.
+12. **Stop for approval** when the fix makes a call that is the person's (see "Ask before assuming") or they asked to see it first. Otherwise state the cause and the fix in a few lines. A change that stores something new, adds a unit or moves behaviour or data gets its shape written and approved first (`kc-conventions:kc-shape-the-change`); then build.
 
 ## Examples
 

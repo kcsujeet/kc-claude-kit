@@ -70,7 +70,7 @@ The clarity gate agent ticks every box against the diff. A box is FAIL if any ma
 - [ ] §C10 Multi-fallback `||`/`??` chains with 3+ operands extracted to a named helper. (N/A: no such chain in diff)
 - [ ] §C11 Unhappy-path complexity not tangled into the happy path. (N/A: no error branch with 3+ inline statements)
 - [ ] §C12 No thin-wrapper helper whose name only restates a one-line body (over-extraction); a second caller does not rescue a plain one-expression helper (simplicity §P11). (N/A: no new single-purpose helper in diff)
-- [ ] §C13 An expression (template literal, call argument, JSX prop, or return) that inlines 2+ non-trivial sub-expressions (each a `??`/optional-chain fallback, call, ternary, or cast) extracts them to named locals first. (N/A: no such multi-part expression in diff)
+- [ ] §C13 An expression (template literal, call argument, JSX prop, assignment, or return) that inlines 2+ non-trivial sub-expressions (each a `??`/optional-chain fallback, call, ternary, or cast), a call chain of 3+ links, or calls nested 3+ deep extracts them to named locals first. **Enumerate with the `dense-expressions.sh` sweep, do not eyeball**: one verdict per hit, and `verify-gate-blocks.sh` fails the round when the receipt's count is not the script's or a hit has no `path:line` verdict. (N/A: only when `dense-expressions.sh` returns 0 hits, stated as `grepped dense expressions: 0 hits`)
 - [ ] §C14 No circular imports introduced (soft). A cycle through a module that does work at definition time is correctness §B6, which fails. (N/A: no cross-module import change)
 - [ ] §C15 Ternaries: none nested/chained (2+ `?`), long, multi-line once formatted, or with a non-trivial branch (more than a short value/identifier). Applies to value/assignment/returned/arg ternaries too, not just JSX — the branch content is irrelevant, only the shape. Walk every ternary in the diff. A proposed fix respects the remedy limits in §C15 (no `flagA && value` for a value-or-absent prop, no conditionally spread options object). **Enumerate with the `ternaries.sh` sweep, do not eyeball**, labelling every hit single-line or MULTI-LINE; see §C15. (N/A: only when `ternaries.sh` returns 0 hits, stated as `grepped ternaries: 0 hits`)
 - [ ] §C16 Bare numeric literals for dimensions/thresholds/timeouts are named constants with a one-line why, or a design token when the project has a token system; a magic value repeated 2+ times is also a DRY finding. **Enumerate with the `numeric-literals.sh` sweep**, one verdict per hit. (N/A: only when `numeric-literals.sh` returns 0 hits, stated as `grepped numeric literals: 0 hits`)
@@ -311,6 +311,10 @@ return `${labelA} ${format({ value: valueB, mode: MODE })}`
 
 This is the general form of §C10 (a single 3+-operand fallback chain) and the compound-boolean rule (see the `naming` skill, §N2): the fix is always to name the parts before composing.
 
+The same goes for a line that does several things in a row: a value read, converted, merged with another converted value and assigned in one chain (`items.filter(isPaid).map(toName).join(', ')`), or calls nested three deep (`format(round(convert(amount)))`). A plain property path (`order.customer.name`) or one call on a path is not a chain.
+
+**Enumerate by script, do not eyeball.** The `dense-expressions.sh` sweep (see Sweeps) lists added lines with a call chain of 3+ links, calls nested 3+ deep, or 3+ non-trivial parts in a line of 70+ characters; it skips comments, imports and test files, and reads a line broken across several lines one line at a time. Each hit gets its own verdict: extracted to named locals, or dismissed with the reason it reads plainly. State `grepped dense expressions: N hits` (`0 hits` when none) and name each hit as `path:line` in the box.
+
 ### §C14. Circular imports (soft)
 
 Be alert to circular imports while reading. They are not a hard blocker (TypeScript and bundlers usually tolerate them), but they signal coupling problems and occasionally cause runtime `undefined` issues at module init.
@@ -430,6 +434,12 @@ Save the diff under review to a file (`gh pr diff <num> > /tmp/review.diff`, or 
 
   ```bash
   bash "${CLAUDE_PLUGIN_ROOT}/skills/kc-clarity/scripts/non-null-assertions.sh" <diff-file>
+  ```
+
+- `dense-expressions.sh` (§C13): added lines in non-test code files holding a call chain of 3+ links (2+ of them calls), calls nested 3+ deep, or 3+ non-trivial parts (call, `??`/`||` fallback, ternary, cast) in 70+ characters. Receipt: `grepped dense expressions: N hits`; `verify-gate-blocks.sh` checks N against the script's own count and that each hit is named `path:line`.
+
+  ```bash
+  bash "${CLAUDE_PLUGIN_ROOT}/skills/kc-clarity/scripts/dense-expressions.sh" <diff-file>
   ```
 
 - `numeric-literals.sh` (§C16): added code lines holding a bare number other than 0 or 1, skipping comments, a declaration that names its number, and an exact expected value in an assertion. Test files are included, since a delay or a date offset in a test is as magic as one in code. Receipt: `grepped numeric literals: N hits`.

@@ -1,0 +1,1 @@
+There are 14 callers of `Order#total` across the app, so renaming it is a larger change than it looks.

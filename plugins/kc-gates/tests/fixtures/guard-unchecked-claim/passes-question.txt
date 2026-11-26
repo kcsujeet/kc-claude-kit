@@ -1,0 +1,1 @@
+Does every order have a currency set in the `orders` table?

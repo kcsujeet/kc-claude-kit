@@ -1,0 +1,1 @@
+If every order had a currency set we could drop the fallback, but that would need a backfill first.

@@ -90,7 +90,10 @@ expect_hook_verdict "$scripts/guard-merge.sh" allow "allowed: gh pr merge of the
 
 build_repo
 resolved_code='echo main\necho one\necho two\necho lesson\necho sneaked-in\n'
-merge_head=$(merge_main)
+# The stray line also lands on a risk path (auth-token.sh), so the change is not small: a small change
+# needs no receipt at all (change-class.sh), which would let this merge through guard-merge.sh.
+# shellcheck disable=SC2016 # merge_main evals the command, so $repo expands there
+merge_head=$(merge_main 'printf "echo sneaked-in\n" > "$repo/auth-token.sh"')
 expect_eq "a merge whose resolution adds a code line neither parent had is not clean" not-clean "$(check_clean "$merge_head")"
 route_pull_request_head "$merge_head"
 expect_hook_verdict "$scripts/guard-merge.sh" deny "blocked: gh pr merge of a merge that adds a code line of its own" "gh pr merge 7 --squash" "$repo"

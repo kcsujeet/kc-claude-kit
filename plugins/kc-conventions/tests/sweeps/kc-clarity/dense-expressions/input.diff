@@ -1,0 +1,38 @@
+diff --git a/src/checkout.ts b/src/checkout.ts
+new file mode 100644
+index 0000000..1111111
+--- /dev/null
++++ b/src/checkout.ts
+@@ -0,0 +1,25 @@
++const total = order.shop.owner.name
++const label = order.items.length
++const names = items.filter(isPaid).map(toName).join(', ')
++const price = formatMoney(roundCents(convert(amount, rate)))
++const city = order.shop.address.city
++const total = sum(items)
++const user = await loadUser(id)
++return `${flagA ?? fallbackA()} ${format({ value: predicateB() ?? defaultB(), mode: MODE })}`
++if (isPaid(order) && hasStock(item)) ship(order)
++const rows = Number(read(cell)) ? parse(read(cell), { strict: true }) : fallbackRows(cell)
++// items.filter(isPaid).map(toName).join(', ')
++const note = 'a.b().c().d()'
++const first = orders.find(isOpen)?.items
++const response = await client.get(url)
++export function formatTotal(order: Order, currency: string): string {
++import { formatMoney } from './money'
++const config = JSON.parse(readFileSync(resolve(root, 'shop.json'), 'utf8'))
++const x = a?.b?.c ?? 'none'
++const path = `${base}/${shop.id}/orders`
++const price = formatMoney(roundCents(amount))
++if (order.paid || order.shipped || order.refunded || order.cancelled || order.voided) return
++ * Use items.filter(a).map(b).join(c) to build it
++/* rows.filter(a).map(b).join(c) */
++const widget = parseWidget(body) as Widget ?? findWidgetDefaultsForTheShop
++/* c */ names = items.filter(a).map(b).join(c)
+diff --git a/README.md b/README.md
+new file mode 100644
+index 0000000..1111111
+--- /dev/null
++++ b/README.md
+@@ -0,0 +1,1 @@
++Use items.filter(a).map(b).join(c) to build it, then format(round(convert(x)))

@@ -3,7 +3,12 @@
 # review that changed behaviour nobody ran cannot be posted or approved on the strength of "I
 # looked at the code" (verification-gate §V11).
 #
-# Usage: check-walk-receipt.sh <select-gates-output> <walk-receipt.tsv>
+# Usage: check-walk-receipt.sh <select-gates-output> <walk-receipt.tsv> [<uses.txt>]
+#
+#   <uses.txt>             trace-uses.sh's output for the same diff (kc-code-review saves it beside
+#                          review.diff). With it, a walk-item whose changed names have uses in other
+#                          non-test files also needs a fifth field naming each of those consumers
+#                          (see "Consumers" below). Without it that check is skipped.
 #
 #   <select-gates-output>  select-gates.sh's output saved to a file; only its `walk-item: <path>`
 #                          lines are read. None means nothing to walk: the check passes.
@@ -36,6 +41,15 @@
 # and a large one), exits (each way out of a form or dialog: a submit or confirm, a cancel or
 # close, and a failed save, walked for each set of fields that leads to a different exit).
 #
+# Consumers: a changed unit is checked from every consumer's side, not only for the values it
+# stores. A walk-item with consumers in <uses.txt> (the files, other than tests and the item itself,
+# that use a name the item changes) needs a fifth field, `consumers: <a>; <b>` entries joined by
+# ` | `, one per consumer file, each `<consumer path>: omitted <the input left out or partial>;
+# before <what it received>; after <what it receives>` (an input left out reads as a default, a
+# return or event loses a key, a cache entry or preloaded record a caller holds is gone), or
+# `<consumer path>: only state: <why>` (three or more words) when it can reach the unit one way
+# only. An input left out or partial is its own state, never covered by "the full form saved fine".
+#
 # The environment the walk ran in is one line too, `env<TAB><command><TAB><evidence>`: the one command
 # that brought the app up (never a chain of steps done by hand: no `&&`, `;`, `||` or `then`), and
 # evidence of the kinds the items' surfaces take, joined (a browser-only diff: a capture; api: a curl
@@ -52,14 +66,18 @@ set -euo pipefail
 
 # shellcheck source=lib/capture-paths.sh
 . "$(dirname "$0")/lib/capture-paths.sh"
+# shellcheck source=lib/risk-paths.sh
+. "$(dirname "$0")/lib/risk-paths.sh"
 # shellcheck source=lib/qa-surface.sh
 . "$(dirname "$0")/lib/qa-surface.sh"
 
 script_name=$(basename "$0")
-[ "$#" -eq 2 ] || { echo "usage: $script_name <select-gates-output> <walk-receipt.tsv>" >&2; exit 2; }
+[ "$#" -eq 2 ] || [ "$#" -eq 3 ] || { echo "usage: $script_name <select-gates-output> <walk-receipt.tsv> [<uses.txt>]" >&2; exit 2; }
 [ -r "$1" ] || { echo "$script_name: cannot read $1" >&2; exit 2; }
 select_output=$1
 receipt=$2
+uses_file=${3:-}
+if [ -n "$uses_file" ] && [ ! -r "$uses_file" ]; then echo "$script_name: cannot read $uses_file" >&2; exit 2; fi
 receipt_dir=$(dirname "$receipt")
 
 items=$(sed -n 's/^walk-item: //p' "$select_output")
@@ -185,6 +203,66 @@ get_uncovered_dimension() {
   return 0
 }
 
+# Prints the files, other than tests and the item itself, that use a name the item changes, one per
+# line. Every code use counts, with no cap. Prose and config files, comments, quoted words, plain
+# `$name` reads and `name=` assignments, and an enclosing name that is never called do not.
+get_consumers() {
+  KC_TEST_PATHS=$KC_RISK_TEST_PATHS KC_SOURCE_PATHS=$KC_RISK_SOURCE_PATHS awk -v item="$1" '
+    /^name / {
+      in_item = (index($0, ", " item "): ") > 0)
+      name_text = $2; gsub(/[?!]/, "", name_text)
+      name_pattern = ""
+      for (position = 1; position <= length(name_text); position++) {
+        character = substr(name_text, position, 1)
+        name_pattern = name_pattern (index("\\^$.[]|()*+?{}", character) ? "\\" : "") character
+      }
+      is_enclosing_name = ($3 == "(enclosing,")
+      next
+    }
+    in_item && /^  [^ ]/ {
+      consumer = $1; sub(/:[0-9]+:.*$/, "", consumer)
+      use_text = $0; sub(/^  [^ ]*:[0-9]+: /, "", use_text)
+      is_comment = (use_text ~ /^[ \t]*(#|\/\/|\*|\/\*)/)
+      gsub(/"[^"$#]*"/, "", use_text); gsub(/\x27[^\x27]*\x27/, "", use_text); sub(/[ \t]+(#|\/\/).*$/, "", use_text)
+      is_item_itself = (consumer == item)
+      is_test_file = (consumer ~ ENVIRON["KC_TEST_PATHS"])
+      is_code_file = (consumer ~ ENVIRON["KC_SOURCE_PATHS"])
+      is_named = (use_text ~ ("(^|[^A-Za-z0-9_$\\{])" name_pattern "([^A-Za-z0-9_=]|=[=~]|$)"))
+      is_assignment = (use_text ~ ("^[ \t]*((local|const|let|var|export) +)?" name_pattern "[ \t]*=([^=~]|$)"))
+      is_command_position_call = (use_text ~ ("(^[ \t]*|[$][(]|[|&;(][ \t]*|then |do )" name_pattern "([( \t.]|$)"))
+      is_member_or_argument_call = (use_text ~ ("[^A-Za-z0-9_$.{]" name_pattern "[(.]"))
+      is_call = (is_command_position_call || is_member_or_argument_call)
+      is_uncalled_enclosing_name = (is_enclosing_name && !is_call)
+      if (is_item_itself || is_test_file || !is_code_file || is_comment || !is_named || is_assignment || is_uncalled_enclosing_name) next
+      if (!(consumer in seen)) { seen[consumer] = 1; print consumer }
+    }
+    /^tests:/ { in_item = 0 }
+  ' "$uses_file"
+}
+
+# Prints what is wrong with the entry for one consumer in a receipt's fifth field, or nothing.
+get_consumer_problem() {
+  local consumer=$1 consumers_field=$2 consumer_entry="" entry_line entry_text has_before has_after
+  while IFS= read -r entry_line || [ -n "$entry_line" ]; do
+    entry_line=${entry_line#"${entry_line%%[![:space:]]*}"}
+    if [[ $entry_line == "$consumer":* ]]; then consumer_entry=$entry_line; break; fi
+  done < <(printf '%s' "$consumers_field" | sed -E 's/^[[:space:]]*consumers:[[:space:]]*//' | tr '|' '\n')
+  if [ -z "$consumer_entry" ]; then
+    printf 'consumer %s uses what this item changes and has no entry: add "consumers: %s: omitted <the input left out or partial>; before <x>; after <y>" (entries joined by |) as the fifth field, or "%s: only state: <why>"' "$consumer" "$consumer" "$consumer"
+    return 0
+  fi
+  entry_text=$(printf '%s' "${consumer_entry#"$consumer":}" | tr '[:upper:]' '[:lower:]')
+  if printf '%s' "$entry_text" | grep -Eq '^[[:space:]]*only state:[[:space:]]*[^[:space:]]+([[:space:]]+[^[:space:]]+){2,}'; then return 0; fi
+  has_before=false; has_after=false
+  if printf '%s' "$entry_text" | grep -Eq 'before'; then has_before=true; fi
+  if printf '%s' "$entry_text" | grep -Eq 'after'; then has_after=true; fi
+  if ! printf '%s' "$entry_text" | grep -Eq 'omitted|partial|absent|missing|left out|not passed'; then
+    printf 'consumer %s: walk it with an input left out or partial (omitted <input>), or give only state: <why>' "$consumer"
+  elif ! $has_before || ! $has_after; then
+    printf 'consumer %s: give what it received before and after the change (before <x>; after <y>), or only state: <why>' "$consumer"
+  fi
+}
+
 dimension_lines=$(sed -n 's/^walk-dimension: //p' "$select_output")
 
 problems=0
@@ -226,6 +304,14 @@ while IFS= read -r item_line; do
   states=$(printf '%s' "$line" | awk -F'\t' '{ print $4 }')
   if ! has_walked_states "$states"; then
     record_walk_problem "$walk_item_path" "fewer than two states walked: list every shape the change's output can take (empty, one long row, many short rows, each option) and walk each; write states: <a>; <b> as the fourth field, or only state: <why, three or more words> when it has one"
+  fi
+  if [ -n "$uses_file" ]; then
+    consumers_field=$(printf '%s' "$line" | awk -F'\t' '{ print $5 }')
+    while IFS= read -r consumer; do
+      [ -n "$consumer" ] || continue
+      consumer_problem=$(get_consumer_problem "$consumer" "$consumers_field")
+      if [ -n "$consumer_problem" ]; then record_walk_problem "$walk_item_path" "$consumer_problem"; fi
+    done < <(get_consumers "$walk_item_path")
   fi
   while IFS= read -r dimension; do
     [ -n "$dimension" ] || continue
