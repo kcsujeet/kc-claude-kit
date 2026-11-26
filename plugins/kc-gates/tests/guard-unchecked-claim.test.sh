@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # shellcheck disable=SC2016  # the replies hold Markdown backticks, not shell expansions
-# Tests scripts/guard-unchecked-claim.sh: text about to be published (a commit message, a pull request
+# Tests scripts/guard-unchecked-claim.sh (holds kc-claims §CL1): text about to be published (a commit message, a pull request
 # or issue body or comment, a tracker write) that states a fact about code, data or a tool
 # (a quantified statement, a count, what a named thing does or is) is denied unless a tool call
 # of the turn (not an edit, not a call that publishes text) was given or returned text naming what
