@@ -25,6 +25,17 @@
         ]
       },
       {
+        "matcher": "AskUserQuestion",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/guard-ask-product-only.sh\"",
+            "shell": "bash",
+            "timeout": 10
+          }
+        ]
+      },
+      {
         "matcher": "Bash|REPL",
         "hooks": [
           {
