@@ -71,6 +71,15 @@ expect_eq "no session id in the payload: says nothing" "" \
   "$(printf '{}' | CLAUDE_CONFIG_DIR="$config" CLAUDE_PLUGIN_DATA="$data" CLAUDE_PLUGIN_ROOT="$cache/3.0.0" bash "$script")"
 expect_eq "no plugin data directory: says nothing" "" "$(run_check s5 "$cache/3.0.0" CLAUDE_PLUGIN_DATA=)"
 
+# --print-stale prints the installed versions when the loaded copy is not installed, and nothing otherwise.
+print_stale() { CLAUDE_CONFIG_DIR="$config" CLAUDE_PLUGIN_ROOT="$1" bash "$script" --print-stale < /dev/null; }
+write_installed_plugins 3.1.2
+expect_eq "--print-stale: an older loaded copy prints the installed version" "3.1.2" "$(print_stale "$cache/3.1.0")"
+expect_eq "--print-stale: the installed copy prints nothing" "" "$(print_stale "$cache/3.1.2")"
+expect_eq "--print-stale: a copy loaded from a clone prints nothing" "" "$(print_stale "$work_dir/clone/plugins/kc-gates")"
+write_installed_plugins 3.1.2 3.1.0
+expect_eq "--print-stale: installed at two scopes, one the loaded copy, prints nothing" "" "$(print_stale "$cache/3.1.0")"
+
 # Every plugin in the kit registers the hook, and its copy of the script is kc-gates' file.
 for plugin_dir in "$repo_root"/plugins/*/; do
   plugin=$(basename "$plugin_dir")

@@ -267,6 +267,12 @@ check_push() {
       || sha=$(git -C "$dir" rev-parse -q --verify HEAD 2>/dev/null) || continue
     status=0
     GIT_TERMINAL_PROMPT=0 git -C "$dir" ls-remote --exit-code --heads "$remote" "refs/heads/$dst" >/dev/null 2>&1 || status=$?
+    # This command commits before it pushes, so the lint (a lint config) and the receipt (a new branch)
+    # below would read the old commit.
+    if $CHAIN_MOVED_HEAD && { [ "$status" = 2 ] || bash "$scripts_dir/lint-changed-files.sh" --configured "$dir"; }; then
+      print_deny_reason "$MOVED_HEAD_REASON"
+      return 1
+    fi
     check_lint "$dir" "$remote" "$dst" "${default:-main}" "$sha" || return 1
     case "$status" in
       0) continue ;;
@@ -309,6 +315,7 @@ main() {
       dir=$target
       continue
     fi
+    note_chain_segment "$segment" "$dir"
     rest=$(git_words "$segment")
     if [ -n "$rest" ]; then
       read -ra words <<< "$rest"
@@ -321,6 +328,10 @@ main() {
     fi
     if ! is_hand_off "$rest"; then
       continue
+    fi
+    if $CHAIN_MOVED_HEAD; then
+      print_deny_reason "$MOVED_HEAD_REASON"
+      exit 0
     fi
     head=$(resolve_head "$rest" "$dir")
     if [ -z "$head" ]; then
