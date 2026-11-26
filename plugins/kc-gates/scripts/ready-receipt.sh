@@ -694,78 +694,77 @@ readonly CONFLICT_MARKER_LINE='^(<<<<<<<|=======|>>>>>>>)'
 readonly VERSION_FIELD_LINE='^[[:space:]]*"version"[[:space:]]*:'
 readonly SEMVER_PATTERN='[0-9]+\.[0-9]+\.[0-9]+'
 
-# Succeeds when merge commit $1 is what git itself makes by merging its parent $3 (a commit the default
-# branch has) into its parent $2 (the one with the clean receipt), so it brings nothing of its own: its
-# tree equals `git merge-tree` of the two parents. The one resolution allowed on top is a conflict in
-# a plugin.json or marketplace.json (its "version" field only) or in CHANGELOG.md (a line either parent
-# or git's merge had, up to its version numbers: entries reordered or renumbered); any other file that
-# differs from git's merge, or any other line in those two, is a change of the branch's own.
+mask_versions() { sed -E "s/$SEMVER_PATTERN/V/g"; }
+
+# Succeeds when file $3 is the same in merge commit $1 and in git's own merge tree $2, except for what a
+# resolution may change: the "version" lines of a plugin.json, and the version numbers and order of the
+# entries of a CHANGELOG.md. Any other file fails.
+is_resolution_only() {
+  local merge_sha=$1 auto_merge_tree=$2 changed_path=$3
+  case "$(basename "$changed_path")" in
+    plugin.json)
+      diff -q <(show_file_at "$auto_merge_tree" "$changed_path" | grep -Ev "$VERSION_FIELD_LINE|$CONFLICT_MARKER_LINE") \
+        <(show_file_at "$merge_sha" "$changed_path" | grep -Ev "$VERSION_FIELD_LINE") > /dev/null ;;
+    CHANGELOG.md)
+      diff -q <(show_file_at "$auto_merge_tree" "$changed_path" | grep -Ev "$CONFLICT_MARKER_LINE" | mask_versions | sort) \
+        <(show_file_at "$merge_sha" "$changed_path" | mask_versions | sort) > /dev/null ;;
+    *) return 1 ;;
+  esac
+}
+
+# Succeeds when merge commit $1 is what git makes of its parent $2 (with the clean receipt) and its parent
+# $3 (a commit the default branch has), so it brings nothing of its own: its tree equals `git merge-tree`
+# of the two (git 2.38 or later; with an older git nothing is trivial), except for what is_resolution_only allows.
 is_trivial_default_merge() {
-  local merge_sha=$1 clean_parent=$2 default_parent=$3 default_ref auto_merge_tree scratch changed_path file_name has_stray_lines=false
+  local merge_sha=$1 clean_parent=$2 default_parent=$3 default_ref merge_tree_output auto_merge_tree changed_path
   default_ref=$(get_default_branch_ref .)
   [ -n "$default_ref" ] && git merge-base --is-ancestor "$default_parent" "$default_ref" 2>/dev/null || return 1
-  # Exit 1 is a merge with conflicts: its tree, markers in the files, is still the first line.
-  auto_merge_tree=$(git merge-tree --write-tree --no-messages "$clean_parent" "$default_parent" 2>/dev/null | head -n 1) || true
+  # Exit 1 is a merge with conflicts: its tree (markers in the files) is still the first line, then the conflicted paths.
+  merge_tree_output=$(git merge-tree --write-tree --name-only --no-messages "$clean_parent" "$default_parent" 2>/dev/null) || true
+  auto_merge_tree=$(head -n 1 <<< "$merge_tree_output")
   is_full_sha "$auto_merge_tree" || return 1
-  scratch=$(mktemp -d)
-  while IFS= read -r -d '' changed_path; do
-    file_name=$(basename "$changed_path")
-    show_file_at "$auto_merge_tree" "$changed_path" > "$scratch/auto"
-    show_file_at "$merge_sha" "$changed_path" > "$scratch/merged"
-    grep -vxFf "$scratch/auto" "$scratch/merged" > "$scratch/added" || true
-    grep -vxFf "$scratch/merged" "$scratch/auto" > "$scratch/dropped" || true
-    case "$file_name" in
-      plugin.json | marketplace.json)
-        grep -Ev "$VERSION_FIELD_LINE" "$scratch/added" > "$scratch/added-left" || true
-        grep -Ev "$VERSION_FIELD_LINE|$CONFLICT_MARKER_LINE" "$scratch/dropped" > "$scratch/dropped-left" || true ;;
-      CHANGELOG.md)
-        { cat "$scratch/auto"; show_file_at "$clean_parent" "$changed_path"; show_file_at "$default_parent" "$changed_path"; } | sed -E "s/$SEMVER_PATTERN/V/g" > "$scratch/known"
-        sed -E "s/$SEMVER_PATTERN/V/g" "$scratch/added" | grep -vxFf "$scratch/known" > "$scratch/added-left" || true
-        sed -E "s/$SEMVER_PATTERN/V/g" "$scratch/merged" > "$scratch/merged-normalized"
-        grep -Ev "$CONFLICT_MARKER_LINE" "$scratch/dropped" | sed -E "s/$SEMVER_PATTERN/V/g" | grep -vxFf "$scratch/merged-normalized" > "$scratch/dropped-left" || true ;;
-      *) has_stray_lines=true; break ;;
-    esac
-    if [ -s "$scratch/added-left" ] || [ -s "$scratch/dropped-left" ]; then has_stray_lines=true; break; fi
-  done < <(git diff -z --name-only "$auto_merge_tree" "$merge_sha" 2>/dev/null)
-  rm -rf "$scratch"
-  ! $has_stray_lines
+  # A conflicted path counts even when the merge committed git's own markers, so it never matches by accident.
+  while IFS= read -r changed_path; do
+    is_resolution_only "$merge_sha" "$auto_merge_tree" "$changed_path" || return 1
+  done < <({ sed -n '2,/^$/p' <<< "$merge_tree_output"; git -c core.quotepath=off diff --name-only "$auto_merge_tree" "$merge_sha"; } | grep -v '^$' | sort -u)
 }
 
 merge_depth=0
 # Succeeds when <sha> is a merge of the default branch into a commit with a clean receipt (or into
 # such a merge) that adds nothing of its own: the review of the clean parent still covers it.
 is_clean_default_merge() {
-  local sha=$1 parents parent_index clean_parent default_parent is_clean=false
+  local sha=$1 parents parent_pair clean_parent default_parent found_clean_parent=false
   [ "$merge_depth" -lt "$MAX_MERGE_DEPTH" ] || return 1
   # shellcheck disable=SC2207 # a line of full SHAs
   parents=($(git rev-list --parents -n 1 "$sha" 2>/dev/null)) || return 1
   [ "${#parents[@]}" -eq "$MERGE_COMMIT_FIELDS" ] || return 1
   merge_depth=$((merge_depth + 1))
-  for parent_index in 1 2; do
-    clean_parent=${parents[parent_index]}
-    default_parent=${parents[3 - parent_index]}
+  for parent_pair in "${parents[1]} ${parents[2]}" "${parents[2]} ${parents[1]}"; do
+    read -r clean_parent default_parent <<< "$parent_pair"
     if check_receipt "$clean_parent" --clean > /dev/null 2>&1 && is_trivial_default_merge "$sha" "$clean_parent" "$default_parent"; then
-      is_clean=true
+      found_clean_parent=true
       break
     fi
   done
   merge_depth=$((merge_depth - 1))
-  $is_clean
+  $found_clean_parent
 }
+
+# Succeeds when <sha> has a receipt that is clean.
+has_clean_receipt() { [ -f "$receipts_dir/$1" ] && grep -qx 'clean=yes' "$receipts_dir/$1"; }
 
 # Prints <sha>'s receipt, or fails when it has none or, with --pass, when it
 # is for the checklist alone. With --clean, a merge of the default branch that
 # adds nothing to a clean head is clean with no receipt of its own.
 check_receipt() {
-  local receipt=$receipts_dir/$1 pass_only=false clean_only=false has_clean_receipt=false
+  local receipt=$receipts_dir/$1 pass_only=false clean_only=false
   case "${*:2}" in
     '') ;;
     --pass) pass_only=true ;;
     --clean) clean_only=true ;;
     *) usage ;;
   esac
-  if $clean_only; then has_clean_receipt=false; [ -f "$receipt" ] && grep -qx 'clean=yes' "$receipt" && has_clean_receipt=true; fi
-  if $clean_only && ! $has_clean_receipt; then
+  if $clean_only && ! has_clean_receipt "$1"; then
     is_clean_default_merge "$1" || return 1
     printf 'sha=%s\nclean=yes\nmerged=default-branch\n' "$1"
     return 0

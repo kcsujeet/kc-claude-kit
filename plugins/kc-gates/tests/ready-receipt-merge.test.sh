@@ -23,7 +23,7 @@ manifest=plugins/shop/.claude-plugin/plugin.json
 check_clean() { (cd "$repo" && bash "$scripts/ready-receipt.sh" check "$1" --clean > /dev/null 2>&1) && echo clean || echo not-clean; }
 write_clean_receipt() { printf 'sha=%s\nrounds=2\nopen=0\nclean=yes\n' "$1" > "$KC_READY_DIR/$1"; }
 # Builds a repo whose lesson branch is at a clean head, and whose main has moved: both sides bumped
-# the manifest version and added a CHANGELOG entry, and main also changed code.sh and other.sh.
+# the manifest version (to different numbers, so it conflicts) and added a CHANGELOG entry, and main also changed code.sh and other.sh.
 build_repo() {
   rm -rf "${repo:?}" "${KC_READY_DIR:?}"/*
   git init -q -b main "$repo"
@@ -44,7 +44,7 @@ build_repo() {
   clean_head=$(git -C "$repo" rev-parse HEAD)
   write_clean_receipt "$clean_head"
   run_git_in "$repo" checkout -q main
-  sed -i.bak 's/1.0.0/1.0.1/' "$repo/$manifest" && rm "$repo/$manifest.bak"
+  sed -i.bak 's/1.0.0/1.0.3/' "$repo/$manifest" && rm "$repo/$manifest.bak"
   printf '# Changelog\n\n## [Unreleased]\n\n- shop 1.0.1: other\n- shop 1.0.0: first\n' > "$repo/CHANGELOG.md"
   printf 'echo main\necho one\necho two\n' > "$repo/code.sh"
   printf 'echo other-main\n' > "$repo/other.sh"
@@ -103,6 +103,33 @@ build_repo
 resolved_manifest='{\n  "name": "shop",\n  "version": "1.0.2",\n  "extra": 1\n}\n'
 merge_head=$(merge_main)
 expect_eq "a merge whose resolution adds a manifest line that is not the version is not clean" not-clean "$(check_clean "$merge_head")"
+
+build_repo
+resolved_manifest='{\n  "version": "1.0.2"\n}\n'
+merge_head=$(merge_main)
+expect_eq "a merge whose resolution drops a non-version manifest line is not clean" not-clean "$(check_clean "$merge_head")"
+
+build_repo
+resolved_manifest='{\n  "name": "shop",\n  "name": "shop",\n  "version": "1.0.2"\n}\n'
+merge_head=$(merge_main)
+expect_eq "a merge whose resolution duplicates a manifest line is not clean" not-clean "$(check_clean "$merge_head")"
+
+build_repo
+merge_head=$(merge_main "grep -v 'first' \"$repo/CHANGELOG.md\" > \"$work_dir/changelog\" && cp \"$work_dir/changelog\" \"$repo/CHANGELOG.md\"")
+expect_eq "a merge whose resolution drops a CHANGELOG entry is not clean" not-clean "$(check_clean "$merge_head")"
+
+build_repo
+printf 'echo other-lesson\n' > "$repo/other.sh"
+run_git_in "$repo" commit -q -am "lesson edits other.sh too"
+write_clean_receipt "$(git -C "$repo" rev-parse HEAD)"
+run_git_in "$repo" merge --no-commit --no-ff main > /dev/null 2>&1 || true
+printf 'echo other-lesson\n' > "$repo/other.sh"
+merge_head=$(conclude_merge)
+expect_eq "a merge that resolves a conflict in a code file is not clean" not-clean "$(check_clean "$merge_head")"
+run_git_in "$repo" reset -q --hard HEAD^1
+run_git_in "$repo" merge --no-commit --no-ff main > /dev/null 2>&1 || true
+merge_head=$(conclude_merge "git -C \"$repo\" checkout \"\$(git -C \"$repo\" merge-tree --write-tree --no-messages \"\$(git -C \"$repo\" rev-parse HEAD)\" \"\$(git -C \"$repo\" rev-parse main)\" | head -n 1)\" -- other.sh")
+expect_eq "a merge that commits git's own conflict markers in a code file is not clean" not-clean "$(check_clean "$merge_head")"
 
 build_repo
 resolved_code='echo main\necho one\necho two\n'
