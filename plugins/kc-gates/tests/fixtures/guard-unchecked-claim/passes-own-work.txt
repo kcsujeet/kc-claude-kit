@@ -1,0 +1,1 @@
+I added the currency column in `db/migrate/20260101_add_currency.rb` and renamed the helper. Three files changed.

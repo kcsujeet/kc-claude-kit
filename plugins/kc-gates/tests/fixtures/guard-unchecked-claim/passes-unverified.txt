@@ -1,0 +1,1 @@
+Every order has a currency set, I think. Unverified: I have not opened the schema.

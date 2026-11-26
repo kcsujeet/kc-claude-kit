@@ -1,0 +1,6 @@
+Add this comment above the column:
+
+```ruby
+# every order has a currency set
+add_column :orders, :currency, :string
+```

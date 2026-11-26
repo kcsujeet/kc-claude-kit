@@ -35,3 +35,7 @@ Applies to whoever made the claim: you, a review agent or a subagent. Check the 
 - A recommendation changed three times to match the person's last remark, until they asked whether it was being made to please them.
 - Live payment commands handed over three times, failing on a missing live login, then a key to renew, then a missing write permission, when the CLI's config already showed it had no live key.
 - "A lesson is only text, nothing checks it" said of a kit whose checklist asks every lesson for a check that fails without it.
+
+## Review checklist
+
+- [ ] §CL1 Text about to be published (a commit message, a pull request or issue body or comment, a tracker comment) states no fact about code, data, a setting or a tool that nothing in the turn read a source for: each such fact was checked in this turn or the text says plainly that it is unverified. Held by `kc-gates` `guard-unchecked-claim.sh`. (N/A: the text states no such fact)

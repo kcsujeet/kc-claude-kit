@@ -11,7 +11,8 @@
 # transcript, or a session with no typed message (a subagent) stays blocked.
 #
 # A pull request whose change from its base is prose_small (change-class.sh: a few prose lines and
-# nothing else, its head and base read in this clone) needs no receipt: it merges once every check
+# nothing else) or code_small (small, no risk: line), its head and base read in this clone, needs
+# no receipt: it merges once every check
 # GitHub lists for it has passed (or with --auto, which waits for them). A head this clone doesn't
 # have is classed full.
 #
@@ -97,10 +98,10 @@ check_segment() {
   $has_head && $is_by_me && is_own_pull_request=true
   $is_own_pull_request || return 0
   change_class=$(read_pull_request_class "$dir" "$head" "${base_branch:-}")
-  if [ "$change_class" = prose_small ]; then
+  if is_small_class "$change_class"; then
     [ "${unpassed_checks:-0}" = 0 ] && return 0
     printf '%s\n' "${gh_words_list[@]}" | grep -qx -- '--auto' && return 0
-    print_pretooluse_deny "Blocked by the kc-gates plugin: this pull request changes only a few prose lines (change-class.sh: prose_small), so it merges with no review receipt, but only once its checks pass: $unpassed_checks of them have not passed yet. Wait for them (gh pr checks), fix a failure, then merge; or merge with --auto, which waits for them. No user approval is needed."
+    print_pretooluse_deny "Blocked by the kc-gates plugin: this pull request is small with no risk line (change-class.sh: $change_class), so it merges with no review receipt, but only once its checks pass: $unpassed_checks of them have not passed yet. Wait for them (gh pr checks), fix a failure, then merge; or merge with --auto, which waits for them. No user approval is needed."
     return 1
   fi
   # In the pull request's repo: a merge of the default branch into a clean head counts as clean.
