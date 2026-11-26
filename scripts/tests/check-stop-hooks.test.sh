@@ -79,6 +79,9 @@ expect_output "the failure asks for the reason" "fewer than 6 words"
 write_allowed "shop Stop remind-orders.sh"
 expect_verdict fail "a listing with no reason fails"
 
+write_allowed "shop Stop remind-orders.sh *"
+expect_verdict fail "a reason of * is one word, not a glob that expands to many"
+
 # A listed script may not remind or block.
 write_allowed "shop Stop remind-orders.sh $reason"
 for text in "echo '{\"decision\": \"block\"}'" "jq -Rsc '{decision: \"block\", reason: .}'" 'exit 2' "echo '{\"additionalContext\": \"x\"}'" "echo '{\"systemMessage\": \"x\"}'" "echo '{\"permissionDecision\": \"deny\"}'"; do
@@ -116,6 +119,9 @@ expect_verdict fail "a malformed hooks.json fails"
 expect_output "the failure says it cannot be read" "storefront: hooks.json cannot be read"
 printf '{"hooks": {"Stop": [{"matcher": "x"}]}}' > "$repo/plugins/storefront/hooks/hooks.json"
 expect_verdict pass "a Stop group with no hooks list has nothing to list"
+
+printf '{"description": "no hooks here"}' > "$repo/plugins/storefront/hooks/hooks.json"
+expect_verdict pass "a readable hooks.json with no hooks key has nothing to list"
 
 echo
 echo "$passes passed, $failures failed"

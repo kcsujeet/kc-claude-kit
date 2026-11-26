@@ -39,7 +39,7 @@ for hooks_file in "$root"/plugins/*/hooks/hooks.json; do
   [ -f "$hooks_file" ] || continue
   plugin_dir=$(dirname "$(dirname "$hooks_file")")
   plugin=$(basename "$plugin_dir")
-  hook_rows=$(jq -r '.hooks | to_entries[] | select(.key == "Stop" or .key == "SubagentStop") | .key as $event | .value[].hooks[]? | [$event, (.command // .prompt // .type)] | @tsv' "$hooks_file" 2>/dev/null) || {
+  hook_rows=$(jq -r '(.hooks // {}) | to_entries[] | select(.key == "Stop" or .key == "SubagentStop") | .key as $event | .value[].hooks[]? | [$event, (.command // .prompt // .type)] | @tsv' "$hooks_file" 2>/dev/null) || {
     note_problem "$plugin: hooks.json cannot be read, so its end-of-turn hooks cannot be checked."
     continue
   }
@@ -53,9 +53,8 @@ for hooks_file in "$root"/plugins/*/hooks/hooks.json; do
       continue
     fi
     reason=${allowed_line#"$plugin $event $name "}
-    # shellcheck disable=SC2086 # word count of the reason
-    set -- $reason
-    if [ "$#" -lt "$min_reason_words" ]; then
+    reason_word_count=$(printf '%s' "$reason" | wc -w)
+    if [ "$reason_word_count" -lt "$min_reason_words" ]; then
       note_problem "$plugin: $event hook '$name' is listed with a reason of fewer than $min_reason_words words; say why it must run at the end of the turn and that it neither reminds nor blocks."
     fi
     # shellcheck disable=SC2016 # the literal variable name as hooks.json writes it
