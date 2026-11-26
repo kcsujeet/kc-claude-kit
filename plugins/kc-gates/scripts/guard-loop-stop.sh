@@ -149,8 +149,14 @@ check_commit() {
   if is_default_branch_merge "$GIT_DIR" && ! is_commit_staging_all "${GIT_ARGS[@]:1}"; then
     return 0
   fi
+  if is_commit_unjudgeable; then
+    print_pretooluse_deny "Blocked by the kc-gates plugin: $UNJUDGEABLE_COMMIT_REASON"
+    return 1
+  fi
   ! is_commit_staging_all "${GIT_ARGS[@]:1}" || stage_mode=--all
   change_class=$(read_change_class "$GIT_DIR" "$stage_mode")
+  # A commit staged by this same command: change-class.sh reads the index as it is now, so grade it in full.
+  [ "${#CHAIN_STAGING[@]}" -eq 0 ] || change_class=full
   [ "$change_class" != prose_small ] || return 0
   handed_off_fix=$(get_commit_diff "$GIT_DIR" -U0 "${GIT_ARGS[@]:1}" | drop_version_bump_hunks | find_handed_off_fix "$GIT_DIR" HEAD "$change_class") || return 0
   deny_edit_of_handed_off_fix "$handed_off_fix" "$GIT_DIR"
@@ -186,6 +192,7 @@ check_pr_create() {
 # Checks one shell segment of the command, run in directory $2.
 check_segment() {
   local segment=$1 dir=$2 git_args_text gh_args_text git_words_list=() gh_words_list=()
+  note_chain_segment "$segment" "$dir"
   git_args_text=$(git_words "$segment")
   if [ -n "$git_args_text" ]; then
     read -ra git_words_list <<< "$git_args_text"

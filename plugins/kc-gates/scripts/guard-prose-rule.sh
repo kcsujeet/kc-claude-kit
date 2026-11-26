@@ -12,6 +12,9 @@
 #   - Deletions and rewording pass: the count is added minus removed non-blank lines, over every
 #     instruction file in the commit, and it must be above 0 to block.
 #
+# A commit staged by the same command (`git add -A && git commit`, `git commit <paths>`) is judged on
+# what it will commit (get_commit_diff in lib/hook-input.sh), not on the index as it is now.
+#
 # While concluding a merge, added lines the default branch already has are not counted: only lines
 # this branch itself introduces (drop_carried_in_lines).
 #
@@ -104,11 +107,16 @@ is_prose_only_rule() {
 # Checks one shell segment of the command, run in directory $2.
 check_segment() {
   local segment=$1 dir=$2 git_args_text git_words_list=()
+  note_chain_segment "$segment" "$dir"
   git_args_text=$(git_words "$segment")
   [ -n "$git_args_text" ] || return 0
   read -ra git_words_list <<< "$git_args_text"
   parse_git_command "$dir" "${git_words_list[@]}"
   [ "${GIT_ARGS[0]:-}" = commit ] || return 0
+  if is_commit_unjudgeable; then
+    print_pretooluse_deny "Blocked by the kc-gates plugin: $UNJUDGEABLE_COMMIT_REASON"
+    return 1
+  fi
   if get_commit_diff "$GIT_DIR" -U0 "${GIT_ARGS[@]:1}" | drop_carried_in_lines "$GIT_DIR" | is_prose_only_rule; then
     deny_prose_only_rule "$GIT_DIR"
     return 1

@@ -10,6 +10,10 @@
 # plugin installed beside this one; with none found, checklist.md must hold a ticked box and no
 # unticked one. The block names each missing file, unticked box or ledger problem.
 #
+# A session whose loaded kc-gates is older than the installed one (check-loaded-version.sh --print-stale)
+# is refused `git commit`, `git push`, `gh pr create` and `gh pr merge` in such a repo until it reloads,
+# and one command that commits then pushes is refused, since this guard reads HEAD before it runs.
+#
 # Output: the PreToolUse deny JSON on a blocked command, nothing otherwise. Always exits 0.
 # KC_GUARD_NO_JQ=1 forces the sed fallback for reading the payload (used by the tests).
 
@@ -81,21 +85,34 @@ get_ledger_problems() {
 
 # Checks one shell segment of the command, run in directory $2.
 check_segment() {
-  local segment=$1 dir=$2 git_args_text git_words_list=() is_target=false repo_dir branch ledger_dir problems problem_summary
+  local segment=$1 dir=$2 git_args_text git_words_list=() is_target=false is_commit=false repo_dir branch ledger_dir problems problem_summary stale_versions
+  note_chain_segment "$segment" "$dir"
   git_args_text=$(git_words "$segment")
   if [ -n "$git_args_text" ]; then
     read -ra git_words_list <<< "$git_args_text"
     parse_git_command "$dir" "${git_words_list[@]}"
     [ "${GIT_ARGS[0]:-}" = push ] && is_target=true
+    [ "${GIT_ARGS[0]:-}" = commit ] && is_commit=true
     repo_dir=$GIT_DIR
   else
     repo_dir=$dir
   fi
   if printf '%s' "$segment" | grep -Eq "${GH_COMMAND_START}pr[[:space:]]+create([[:space:]]|$)" || is_merge_segment "$segment"; then is_target=true; fi
-  $is_target || return 0
+  $is_target || $is_commit || return 0
   is_lesson_repo "$repo_dir" || return 0
+  # A session that never reloaded runs older guards than the repo's rules need.
+  stale_versions=$(bash "$scripts_dir/check-loaded-version.sh" --print-stale 2>/dev/null)
+  if [ -n "$stale_versions" ]; then
+    print_pretooluse_deny "Blocked by the kc-gates plugin: this session runs an older kc-gates than the installed $stale_versions, so its guards lack the newer rules, and this repo ships lessons (ledger: true). Ask the person to type /reload-plugins (or start a new session) before committing, pushing or merging here."
+    return 1
+  fi
+  $is_target || return 0
   branch=$(git -C "$repo_dir" rev-parse --abbrev-ref HEAD 2>/dev/null) || return 0
   case "$branch" in main | master | HEAD) return 0 ;; esac
+  if $CHAIN_MOVED_HEAD; then
+    print_pretooluse_deny "Blocked by the kc-gates plugin: $MOVED_HEAD_REASON"
+    return 1
+  fi
   ledger_dir=${KC_LEDGER_DIR:-$(git -C "$repo_dir" rev-parse --absolute-git-dir)/kc-ledger/${branch//\//-}}
   problems=$(get_ledger_problems "$repo_dir" "$ledger_dir")
   [ -n "$problems" ] || return 0

@@ -197,6 +197,13 @@ check_lint() {
   return 1
 }
 
+# True when the repo has a lint command lint-changed-files.sh would run.
+has_lint_config() {
+  local root
+  root=$(git -C "$1" rev-parse --show-toplevel 2>/dev/null) || return 1
+  [ -r "$root/.claude/lint-command" ] || [ -f "$root/biome.json" ]
+}
+
 # Denies a `git push` that publishes a branch the remote doesn't have yet, from
 # a commit with no pass or --after receipt. $1 is the directory, the rest the
 # words after `git`. Prints the deny JSON and returns 1 when it blocks.
@@ -267,6 +274,11 @@ check_push() {
       || sha=$(git -C "$dir" rev-parse -q --verify HEAD 2>/dev/null) || continue
     status=0
     GIT_TERMINAL_PROMPT=0 git -C "$dir" ls-remote --exit-code --heads "$remote" "refs/heads/$dst" >/dev/null 2>&1 || status=$?
+    # This command commits before it pushes: the lint and the receipt below would read the old commit.
+    if $CHAIN_MOVED_HEAD && { [ "$status" = 2 ] || has_lint_config "$dir"; }; then
+      print_deny_reason "$MOVED_HEAD_REASON"
+      return 1
+    fi
     check_lint "$dir" "$remote" "$dst" "${default:-main}" "$sha" || return 1
     case "$status" in
       0) continue ;;
@@ -309,6 +321,7 @@ main() {
       dir=$target
       continue
     fi
+    note_chain_segment "$segment" "$dir"
     rest=$(git_words "$segment")
     if [ -n "$rest" ]; then
       read -ra words <<< "$rest"
@@ -321,6 +334,10 @@ main() {
     fi
     if ! is_hand_off "$rest"; then
       continue
+    fi
+    if $CHAIN_MOVED_HEAD; then
+      print_deny_reason "$MOVED_HEAD_REASON"
+      exit 0
     fi
     head=$(resolve_head "$rest" "$dir")
     if [ -z "$head" ]; then

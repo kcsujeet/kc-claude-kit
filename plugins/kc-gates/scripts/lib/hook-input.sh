@@ -1,4 +1,5 @@
 # shellcheck shell=bash
+# shellcheck disable=SC2034 # the globals set here are read by the guards that source this file
 # Reads a Bash hook's payload (PreToolUse or PostToolUse) and the command it carries, for the
 # kit's hooks. Sourced, never executed.
 #
@@ -153,15 +154,93 @@ is_default_branch_merge() {
   git -C "$dir" merge-base --is-ancestor "$merge_head" "$default_branch_ref" 2>/dev/null
 }
 
+# State a command's earlier segments leave for the guard of a later one. A guard runs before the whole
+# command, so it sees the index and HEAD as they are now, not as the command's own `git add` or
+# `git commit` leaves them. note_chain_segment records those steps; get_commit_diff replays them.
+CHAIN_STAGING=()
+CHAIN_UNKNOWN_SEEN=false
+CHAIN_MOVED_HEAD=false
+readonly UNJUDGEABLE_COMMIT_REASON='this one command runs other commands, then stages, then commits, so what it commits cannot be known before it runs. Stage in one command, then commit in the next.'
+readonly MOVED_HEAD_REASON='this one command commits (or merges, rebases, pulls) and then publishes, so the guard would judge the commit from before it. Commit in one command, then run this one.'
+
+# note_chain_segment <segment> <dir>: call for each segment, in order, before judging it. Records a
+# `git add`/`rm`/`mv` in CHAIN_STAGING, a commit or other HEAD move in CHAIN_MOVED_HEAD, and any other
+# command that runs before staging in CHAIN_UNKNOWN_SEEN.
+note_chain_segment() {
+  local segment=$1 dir=$2 words_text words=()
+  words_text=$(git_words "$segment")
+  if [ -n "$words_text" ]; then
+    read -ra words <<< "$words_text"
+    parse_git_command "$dir" "${words[@]}"
+    case "${GIT_ARGS[0]:-}" in
+      add | rm | mv) CHAIN_STAGING+=("$GIT_DIR"$'\t'"${GIT_ARGS[*]}"); return ;;
+      commit | merge | cherry-pick | rebase | am | pull | revert | reset) CHAIN_MOVED_HEAD=true; return ;;
+      status | diff | log | show | rev-parse | fetch | branch | remote | config | ls-files | describe | worktree) return ;;
+    esac
+  fi
+  printf '%s' "$segment" | grep -q '[^[:space:]]' || return 0
+  [ "${#CHAIN_STAGING[@]}" -gt 0 ] || CHAIN_UNKNOWN_SEEN=true
+}
+
+# is_commit_unjudgeable: true when this command stages after running something else, so the commit's
+# content can't be known beforehand.
+is_commit_unjudgeable() {
+  [ "${#CHAIN_STAGING[@]}" -gt 0 ] && $CHAIN_UNKNOWN_SEEN
+}
+
+# get_commit_paths <dir> <word>...: the paths named on a `git commit` (words after `commit`), which it
+# commits as the working tree has them, ignoring the index. Option values are skipped; a word that
+# isn't an existing path is not one.
+get_commit_paths() {
+  local dir=$1 word skip=false after_dashes=false
+  shift
+  for word in "$@"; do
+    if $skip; then skip=false; continue; fi
+    if ! $after_dashes; then
+      case "$word" in
+        --) after_dashes=true; continue ;;
+        --message | --file | --author | --date | --reuse-message | --reedit-message | --template | --cleanup | --fixup | --squash) skip=true; continue ;;
+        --*) continue ;;
+        -*[mFCct]) skip=true; continue ;;
+        -*) continue ;;
+      esac
+    fi
+    [ -e "$dir/$word" ] && printf '%s\n' "$word"
+  done
+}
+
 # get_commit_diff <dir> "<diff options>" <word>...: the diff a `git commit` with these words after
-# `commit` would record: the staged diff, or with -a/--all the working tree against HEAD. A
-# repository with no commit yet is diffed against the empty tree.
+# `commit` would record: the staged diff, with -a/--all the working tree against HEAD, with paths
+# those paths in the working tree, and after a `git add` earlier in the same command the index with
+# that add replayed on a copy. A repository with no commit yet is diffed against the empty tree.
 get_commit_diff() {
-  local dir=$1 options=$2 base=HEAD
+  local dir=$1 options=$2 base=HEAD commit_paths=() entry entry_dir entry_words staging_words=() temp_index index_file
   shift 2
   git -C "$dir" rev-parse -q --verify HEAD >/dev/null 2>&1 || base=4b825dc642cb6eb9a060e54bf8d69288fbee4904
+  while IFS= read -r entry; do commit_paths+=("$entry"); done < <(get_commit_paths "$dir" "$@")
   # shellcheck disable=SC2086 # $options is a list of diff options
-  if is_commit_staging_all "$@"; then
+  if [ "${#commit_paths[@]}" -gt 0 ]; then
+    git -C "$dir" diff $options --no-color --no-ext-diff --no-renames "$base" -- "${commit_paths[@]}"
+  elif [ "${#CHAIN_STAGING[@]}" -gt 0 ]; then
+    temp_index=$(mktemp -u)
+    index_file=$(git -C "$dir" rev-parse --git-path index)
+    case "$index_file" in /*) ;; *) index_file="$dir/$index_file" ;; esac
+    cp "$index_file" "$temp_index" 2>/dev/null \
+      || GIT_INDEX_FILE=$temp_index git -C "$dir" read-tree "$base" 2>/dev/null
+    for entry in "${CHAIN_STAGING[@]}"; do
+      entry_dir=${entry%%$'\t'*}
+      entry_words=${entry#*$'\t'}
+      [ "$entry_dir" = "$dir" ] || continue
+      read -ra staging_words <<< "$entry_words"
+      # rm and mv also touch the working tree, so they are replayed as add -A, which stages the same result
+      case "${staging_words[0]}" in rm | mv) staging_words=(add -A) ;; esac
+      GIT_INDEX_FILE=$temp_index git -C "$dir" "${staging_words[@]}" >/dev/null 2>&1 \
+        || GIT_INDEX_FILE=$temp_index git -C "$dir" add -A >/dev/null 2>&1
+    done
+    if is_commit_staging_all "$@"; then GIT_INDEX_FILE=$temp_index git -C "$dir" add -u >/dev/null 2>&1; fi
+    GIT_INDEX_FILE=$temp_index git -C "$dir" diff --cached $options --no-color --no-ext-diff --no-renames "$base"
+    rm -f "$temp_index"
+  elif is_commit_staging_all "$@"; then
     git -C "$dir" diff $options --no-color --no-ext-diff --no-renames "$base"
   else
     git -C "$dir" diff --cached $options --no-color --no-ext-diff --no-renames "$base"
