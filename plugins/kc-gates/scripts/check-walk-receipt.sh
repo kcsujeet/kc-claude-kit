@@ -84,7 +84,6 @@ items=$(sed -n 's/^walk-item: //p' "$select_output")
 
 request_pattern='^(GET|HEAD|POST|PUT|PATCH|DELETE)[[:space:]]+[^[:space:]]+.*[[:space:]][1-5][0-9][0-9]([^0-9]|$)'
 readonly MIN_STATES=2
-readonly MAX_USES_PER_NAME=20
 transcript_pattern='^exit [0-9]+:[[:space:]]*[^[:space:]].*$'
 
 curl_pattern='^curl[[:space:]].*:[[:space:]]+[^[:space:]]+$'
@@ -205,22 +204,31 @@ get_uncovered_dimension() {
 }
 
 # Prints the files, other than tests and the item itself, that use a name the item changes, one per
-# line. Only code files count (a prose or config mention is not a consumer), and a name with more
-# than $MAX_USES_PER_NAME uses is too generic to be one unit's consumers (a local variable or common
-# word the trace matched everywhere): the correctness gate still judges each of its uses (§B8).
+# line. Every code use of the name counts, however many there are (a changed function with thirty
+# callers has thirty consumers). What does not count is a mention that is not a use: a line in a
+# prose or config file, a comment, and a plain variable of that name (`$name`, `${name}` or `name=`
+# in shell and the like). A name that is only the hunk's enclosing context (it may be a local
+# variable, not a function) counts only where it is called. The correctness gate still judges every
+# listed use (§B8).
 get_consumers() {
-  KC_TEST_PATHS=$KC_RISK_TEST_PATHS KC_SOURCE_PATHS=$KC_RISK_SOURCE_PATHS awk -v item="$1" -v max_uses="$MAX_USES_PER_NAME" '
+  KC_TEST_PATHS=$KC_RISK_TEST_PATHS KC_SOURCE_PATHS=$KC_RISK_SOURCE_PATHS awk -v item="$1" '
     /^name / {
-      use_count = $0; sub(/^.*: /, "", use_count); sub(/ uses$/, "", use_count)
-      in_item = (index($0, ", " item "): ") > 0 && use_count + 0 <= max_uses)
+      in_item = (index($0, ", " item "): ") > 0)
+      name_pattern = $2; gsub(/[?!]/, "", name_pattern)
+      is_enclosing_name = ($3 == "(enclosing,")
       next
     }
     in_item && /^  [^ ]/ {
       consumer = $1; sub(/:[0-9]+:.*$/, "", consumer)
+      use_text = $0; sub(/^  [^ ]*:[0-9]+: /, "", use_text)
       is_item_itself = (consumer == item)
       is_test_file = (consumer ~ ENVIRON["KC_TEST_PATHS"])
       is_code_file = (consumer ~ ENVIRON["KC_SOURCE_PATHS"])
-      if (is_item_itself || is_test_file || !is_code_file) next
+      is_comment = (use_text ~ /^[ \t]*(#|\/\/|\*|\/\*)/)
+      is_plain_variable = (use_text !~ ("(^|[^A-Za-z0-9_$\\{])" name_pattern "([^A-Za-z0-9_=]|=[=~]|$)"))
+      is_call = (use_text ~ ("(^[ \t]*|[$][(]|[|&;(][ \t]*|then |do )" name_pattern "([( \t.]|$)") || use_text ~ ("[^A-Za-z0-9_$.{]" name_pattern "[(.]"))
+      if (is_enclosing_name) is_plain_variable = is_plain_variable || !is_call
+      if (is_item_itself || is_test_file || !is_code_file || is_comment || is_plain_variable) next
       if (!(consumer in seen)) { seen[consumer] = 1; print consumer }
     }
     /^tests:/ { in_item = 0 }

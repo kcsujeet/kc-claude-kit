@@ -315,22 +315,38 @@ write_consumer_receipt 'consumers: app/services/checkout.rb: omitted the discoun
 expect_contains "§V11: an entry with no before state fails" "consumer app/services/checkout.rb: give what it received before and after" "$(run_consumer_check)"
 write_consumer_receipt 'consumers: app/services/checkout.rb: omitted the discount field; before on; after off | app/jobs/export_job.rb: only state: n/a'
 expect_contains "§V11: an only-state reason under three words fails" "consumer app/jobs/export_job.rb: walk it with an input left out or partial" "$(run_consumer_check)"
-# A prose mention is not a consumer (the fixture's docs/orders.md), and a name with more than 20 uses is too generic to be one.
+# A prose mention is not a consumer (the fixture's docs/orders.md). Neither is a comment, or a plain
+# variable of the changed name when the name is only the hunk's enclosing context.
 {
-  printf 'name script_name (enclosing, app/models/order.rb): 21 uses\n'
-  for number in $(seq 1 21); do printf '  lib/generic_%s.rb:1: script_name\n' "$number"; done
-  printf 'tests: 0\nsummary: 1 names, 21 uses, 0 test files\n'
+  printf 'name script_name (enclosing, app/models/order.rb): 22 uses\n'
+  # shellcheck disable=SC2016 # $script_name is fixture text, not an expansion
+  for fixture_index in $(seq 1 20); do printf '  lib/generic_%s.rb:1: echo "usage: $script_name"\n' "$fixture_index"; done
+  printf '  lib/assigned.rb:1: script_name=$(basename "$0")\n  lib/commented.rb:1: # script_name is the basename\n  lib/passed.rb:1: render(script_name, other)\n'
+  printf 'tests: 0\nsummary: 1 names, 22 uses, 0 test files\n'
 } > "$uses_file"
 write_consumer_receipt ''
-expect_eq "§V11: a name with more than 20 uses lists no consumers, so none is required" clean "$(run_consumer_check)"
-# Exactly 20 uses is still under the cap: its consumer is required.
+expect_eq "§V11: variable reads, assignments and comments of an enclosing name are not consumers" clean "$(run_consumer_check)"
+# The same use line is a consumer when the name is a definition, not only the hunk's context; a `$name` read is not.
 {
-  printf 'name script_name (enclosing, app/models/order.rb): 20 uses\n'
-  for number in $(seq 1 20); do printf '  lib/generic_%s.rb:1: script_name\n' "$number"; done
-  printf 'tests: 0\nsummary: 1 names, 20 uses, 0 test files\n'
+  printf 'name script_name (definition, app/models/order.rb): 2 uses\n  lib/passed.rb:1: render(script_name, other)\n  lib/read.rb:1: echo "usage: $script_name"\n'
+  printf 'tests: 0\nsummary: 1 names, 2 uses, 0 test files\n'
 } > "$uses_file"
-write_consumer_receipt ''
-expect_contains "§V11: a name with exactly 20 uses still lists its consumers" "consumer lib/generic_1.rb uses what this item changes" "$(run_consumer_check)"
+definition_uses=$(run_consumer_check)
+expect_contains "§V11: a bare use of a definition name is a consumer" "consumer lib/passed.rb uses what this item changes" "$definition_uses"
+expect_not_contains "§V11: a \$name read of a definition name is not" "consumer lib/read.rb" "$definition_uses"
+# A changed function with thirty code callers still lists every one: there is no cap on code consumers.
+{
+  printf 'name Order (definition, app/models/order.rb): 30 uses\n'
+  for fixture_index in $(seq 1 30); do printf '  lib/caller_%s.rb:1: Order.create(params)\n' "$fixture_index"; done
+  printf 'tests: 0\nsummary: 1 names, 30 uses, 0 test files\n'
+} > "$uses_file"
+many_callers=$(run_consumer_check)
+expect_eq "§V11: a function with 30 code callers needs 30 consumer entries" 30 "$(printf '%s\n' "$many_callers" | grep -c 'consumer lib/caller_')"
+{
+  printf 'name Order (enclosing, app/models/order.rb): 2 uses\n  lib/caller_a.rb:1: result = Order.create(params)\n  lib/caller_b.rb:1: Order.create(params)\n'
+  printf 'tests: 0\nsummary: 1 names, 2 uses, 0 test files\n'
+} > "$uses_file"
+expect_contains "§V11: an enclosing name used at command position is a consumer" "consumer lib/caller_b.rb uses what this item changes" "$(run_consumer_check)"
 write_consumer_receipt "$full_entries"
 printf 'name Order (definition, app/models/order.rb): 1 uses\n  app/models/order.rb:9: Order.first\ntests: 0\nsummary: 1 names, 1 uses, 0 test files\n' > "$uses_file"
 printf 'env\tbin/review-env up\tGET /health 200\napp/models/order.rb\tsaved an order\tPOST /orders 201\tstates: full form; empty cart\n' > "$receipt"
