@@ -287,6 +287,14 @@ write_review docs/notes.md
 rm -f "$review_folder/walk-receipt.tsv"
 check allow "walk: WALK=not-required needs no receipt" "$walk_token gh pr review 12 --approve"
 write_review app/models/order.rb
+# §V11: with the review's uses.txt, a consumer the receipt does not walk denies the post; an entry allows it.
+printf 'name Order (definition, app/models/order.rb): 1 uses\n  app/services/checkout.rb:12: Order.create(params)\ntests: 0\nsummary: 1 names, 1 uses, 0 test files\n' > "$review_folder/uses.txt"
+printf 'env\tbin/review-env up\tGET /health 200\napp/models/order.rb\tcreated an order with a free item\tPOST /orders 201\tstates: empty cart; two items\n' > "$review_folder/walk-receipt.tsv"
+check deny  "walk: a consumer with no entry denies the approval" "$walk_token gh pr review 12 --approve"
+expect_last_reason "walk: the denial names the consumer" "consumer app/services/checkout.rb"
+printf 'env\tbin/review-env up\tGET /health 200\napp/models/order.rb\tcreated an order with a free item\tPOST /orders 201\tstates: empty cart; two items\tconsumers: app/services/checkout.rb: omitted the discount; before on; after off\n' > "$review_folder/walk-receipt.tsv"
+check allow "walk: an entry for the consumer allows the approval" "$walk_token gh pr review 12 --approve"
+rm -f "$review_folder/uses.txt" "$review_folder/walk-receipt.tsv"
 check deny  "walk: the denial returns when a source change is back" "$walk_token gh pr review 12 --approve"
 check deny  "walk: no token is still the old deny" "gh pr review 12 --approve"
 expect_last_reason "walk: no token gives the approval-token deny, not the receipt one" "without the approval token"

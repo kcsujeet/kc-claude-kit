@@ -277,12 +277,13 @@ finish
 # trace-uses.sh's output; each consumer file of an item needs an entry in the fifth field with an
 # omitted or partial input and its output before and after, or an only-state reason.
 printf 'GATES=naming\nWALK=required\nwalk: x\nwalk-item: app/models/order.rb surface: api\n' > "$select_output"
-uses=$work_dir/uses.txt
-cat > "$uses" <<'USES'
+uses_file=$work_dir/uses.txt
+cat > "$uses_file" <<'USES'
 name Order (definition, app/models/order.rb): 3 uses
   app/services/checkout.rb:12: Order.create(params)
   app/services/checkout.rb:40: Order.find(id)
   app/jobs/export_job.rb:5: Order.all
+  docs/orders.md:2: Order is documented here
   spec/models/order_spec.rb:3: Order.new
   app/models/order.rb:9: Order.first
 name Other (definition, app/models/other.rb): 1 uses
@@ -296,7 +297,7 @@ write_consumer_receipt() {
 }
 run_consumer_check() {
   local output status=0
-  output=$(bash "$walk_receipt_checker" "$select_output" "$receipt" "$uses") || status=$?
+  output=$(bash "$walk_receipt_checker" "$select_output" "$receipt" "$uses_file") || status=$?
   if [ "$status" -eq 0 ]; then echo clean; else printf '%s\n' "$output"; fi
 }
 full_entries='consumers: app/services/checkout.rb: omitted the discount field; before discount stayed on; after it reads off | app/jobs/export_job.rb: only state: it always passes every field'
@@ -315,8 +316,16 @@ write_consumer_receipt 'consumers: app/services/checkout.rb: omitted the discoun
 expect_contains "§V11: an entry with no before state fails" "consumer app/services/checkout.rb: give what it received before and after" "$(run_consumer_check)"
 write_consumer_receipt 'consumers: app/services/checkout.rb: omitted the discount field; before on; after off | app/jobs/export_job.rb: only state: n/a'
 expect_contains "§V11: an only-state reason under three words fails" "consumer app/jobs/export_job.rb: walk it with an input left out or partial" "$(run_consumer_check)"
+# A prose mention is not a consumer (the fixture's docs/orders.md), and a name with more than 20 uses is too generic to be one.
+{
+  printf 'name script_name (enclosing, app/models/order.rb): 21 uses\n'
+  for number in $(seq 1 21); do printf '  lib/generic_%s.rb:1: script_name\n' "$number"; done
+  printf 'tests: 0\nsummary: 1 names, 21 uses, 0 test files\n'
+} > "$uses_file"
+write_consumer_receipt ''
+expect_eq "§V11: a name with more than 20 uses lists no consumers, so none is required" clean "$(run_consumer_check)"
 write_consumer_receipt "$full_entries"
-printf 'name Order (definition, app/models/order.rb): 1 uses\n  app/models/order.rb:9: Order.first\ntests: 0\nsummary: 1 names, 1 uses, 0 test files\n' > "$uses"
+printf 'name Order (definition, app/models/order.rb): 1 uses\n  app/models/order.rb:9: Order.first\ntests: 0\nsummary: 1 names, 1 uses, 0 test files\n' > "$uses_file"
 printf 'env\tbin/review-env up\tGET /health 200\napp/models/order.rb\tsaved an order\tPOST /orders 201\tstates: full form; empty cart\n' > "$receipt"
 expect_eq "§V11: an item with no consumer outside itself and its tests needs no fifth field" clean "$(run_consumer_check)"
 status=0

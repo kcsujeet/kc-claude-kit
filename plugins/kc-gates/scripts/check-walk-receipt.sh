@@ -66,6 +66,8 @@ set -euo pipefail
 
 # shellcheck source=lib/capture-paths.sh
 . "$(dirname "$0")/lib/capture-paths.sh"
+# shellcheck source=lib/risk-paths.sh
+. "$(dirname "$0")/lib/risk-paths.sh"
 # shellcheck source=lib/qa-surface.sh
 . "$(dirname "$0")/lib/qa-surface.sh"
 
@@ -82,6 +84,7 @@ items=$(sed -n 's/^walk-item: //p' "$select_output")
 
 request_pattern='^(GET|HEAD|POST|PUT|PATCH|DELETE)[[:space:]]+[^[:space:]]+.*[[:space:]][1-5][0-9][0-9]([^0-9]|$)'
 readonly MIN_STATES=2
+readonly MAX_USES_PER_NAME=20
 transcript_pattern='^exit [0-9]+:[[:space:]]*[^[:space:]].*$'
 
 curl_pattern='^curl[[:space:]].*:[[:space:]]+[^[:space:]]+$'
@@ -201,13 +204,23 @@ get_uncovered_dimension() {
   return 0
 }
 
-# Prints the files, other than tests and the item itself, that use a name the item changes, one per line.
+# Prints the files, other than tests and the item itself, that use a name the item changes, one per
+# line. Only code files count (a prose or config mention is not a consumer), and a name with more
+# than $MAX_USES_PER_NAME uses is too generic to be one unit's consumers (a local variable or common
+# word the trace matched everywhere): the correctness gate still judges each of its uses (§B8).
 get_consumers() {
-  awk -v item="$1" '
-    /^name / { in_item = (index($0, ", " item "): ") > 0); next }
+  KC_TEST_PATHS=$KC_RISK_TEST_PATHS KC_SOURCE_PATHS=$KC_RISK_SOURCE_PATHS awk -v item="$1" -v max_uses="$MAX_USES_PER_NAME" '
+    /^name / {
+      use_count = $0; sub(/^.*: /, "", use_count); sub(/ uses$/, "", use_count)
+      in_item = (index($0, ", " item "): ") > 0 && use_count + 0 <= max_uses)
+      next
+    }
     in_item && /^  [^ ]/ {
       consumer = $1; sub(/:[0-9]+:.*$/, "", consumer)
-      if (consumer == item || consumer ~ /(\.(test|spec)\.[A-Za-z0-9]+$|_(test|spec)\.[A-Za-z0-9]+$|(^|\/)test_[^\/]*\.py$|(^|\/)(test|tests|spec|__tests__|e2e)\/)/) next
+      is_item_itself = (consumer == item)
+      is_test_file = (consumer ~ ENVIRON["KC_TEST_PATHS"])
+      is_code_file = (consumer ~ ENVIRON["KC_SOURCE_PATHS"])
+      if (is_item_itself || is_test_file || !is_code_file) next
       if (!(consumer in seen)) { seen[consumer] = 1; print consumer }
     }
     /^tests:/ { in_item = 0 }
@@ -216,20 +229,23 @@ get_consumers() {
 
 # Prints what is wrong with the entry for one consumer in a receipt's fifth field, or nothing.
 get_consumer_problem() {
-  local consumer=$1 field=$2 entry="" candidate text
-  while IFS= read -r candidate || [ -n "$candidate" ]; do
-    candidate=${candidate#"${candidate%%[![:space:]]*}"}
-    if [[ $candidate == "$consumer":* ]]; then entry=$candidate; break; fi
-  done < <(printf '%s' "$field" | sed -E 's/^[[:space:]]*consumers:[[:space:]]*//' | tr '|' '\n')
-  if [ -z "$entry" ]; then
+  local consumer=$1 consumers_field=$2 consumer_entry="" entry_line entry_text has_before has_after
+  while IFS= read -r entry_line || [ -n "$entry_line" ]; do
+    entry_line=${entry_line#"${entry_line%%[![:space:]]*}"}
+    if [[ $entry_line == "$consumer":* ]]; then consumer_entry=$entry_line; break; fi
+  done < <(printf '%s' "$consumers_field" | sed -E 's/^[[:space:]]*consumers:[[:space:]]*//' | tr '|' '\n')
+  if [ -z "$consumer_entry" ]; then
     printf 'consumer %s uses what this item changes and has no entry: add "consumers: %s: omitted <the input left out or partial>; before <x>; after <y>" (entries joined by |) as the fifth field, or "%s: only state: <why>"' "$consumer" "$consumer" "$consumer"
     return 0
   fi
-  text=$(printf '%s' "${entry#"$consumer":}" | tr '[:upper:]' '[:lower:]')
-  if printf '%s' "$text" | grep -Eq '^[[:space:]]*only state:[[:space:]]*[^[:space:]]+([[:space:]]+[^[:space:]]+){2,}'; then return 0; fi
-  if ! printf '%s' "$text" | grep -Eq 'omitted|partial|absent|missing|left out|not passed'; then
+  entry_text=$(printf '%s' "${consumer_entry#"$consumer":}" | tr '[:upper:]' '[:lower:]')
+  if printf '%s' "$entry_text" | grep -Eq '^[[:space:]]*only state:[[:space:]]*[^[:space:]]+([[:space:]]+[^[:space:]]+){2,}'; then return 0; fi
+  has_before=false; has_after=false
+  if printf '%s' "$entry_text" | grep -Eq 'before'; then has_before=true; fi
+  if printf '%s' "$entry_text" | grep -Eq 'after'; then has_after=true; fi
+  if ! printf '%s' "$entry_text" | grep -Eq 'omitted|partial|absent|missing|left out|not passed'; then
     printf 'consumer %s: walk it with an input left out or partial (omitted <input>), or give only state: <why>' "$consumer"
-  elif ! printf '%s' "$text" | grep -Eq 'before' || ! printf '%s' "$text" | grep -Eq 'after'; then
+  elif ! $has_before || ! $has_after; then
     printf 'consumer %s: give what it received before and after the change (before <x>; after <y>), or only state: <why>' "$consumer"
   fi
 }
