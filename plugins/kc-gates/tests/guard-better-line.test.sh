@@ -35,6 +35,10 @@ done_text="The order total is fixed."
 reply_with_numeric_better_line=$'The order total is fixed.\nBetter: order export check 44s -> 6s by a 10-case test of the totals.'
 reply_with_tried_better_line=$'The order total is fixed.\nBetter: none, tried a cached total, 3 runs, no faster.'
 
+# Writes a transcript of one turn: a fix request and one tool call.
+work_turn() { { emit_typed_message "fix the total"; emit_tool_call "$1" "$2" "$3"; emit_tool_result; } > "$transcript"; }
+expect_work_held() { work_turn "$2" "$3" "$4"; expect_eq "$1 is work, held" held "$(run_stop "$done_text")"; }
+
 # Turns of reads, or with no tool calls, pass.
 { emit_typed_message "how do orders work?"; emit_tool_call Read file_path "src/orders.rb"; emit_tool_result; emit_tool_call Bash command "grep -rn total src | head -5 && git log -3 --oneline"; emit_tool_result; emit_tool_call Grep pattern "total"; emit_tool_result; } > "$transcript"
 expect_eq "a turn of reads with no Better line goes out" out "$(run_stop "$done_text")"
@@ -44,14 +48,13 @@ expect_eq "a REPL that only runs a read-only command goes out" out "$(run_stop "
 expect_eq "a turn with no tool call goes out" out "$(run_stop "$done_text")"
 
 # A turn that did work needs the line.
-{ emit_typed_message "fix the total"; emit_tool_call Edit file_path "src/orders.rb"; emit_tool_result; } > "$transcript"
+work_turn Edit file_path "src/orders.rb"
 expect_eq "work with no Better line is held" held "$(run_stop "$done_text")"
 expect_contains "the block tells Claude to measure what it did" "measure what you just did" "$(cat "$work_dir/last-output")"
 expect_contains "the block points to the raise-the-bar skill" "kc-conventions:kc-raise-the-bar" "$(cat "$work_dir/last-output")"
 expect_eq "an empty reply goes out" out "$(run_stop "")"
-{ emit_typed_message "fix the total"; emit_tool_call REPL code 'const t = await $`bundle exec rspec`.text(); t'; emit_tool_result; } > "$transcript"
-expect_eq "a REPL that runs a non-read command is work, held" held "$(run_stop "$done_text")"
-{ emit_typed_message "fix the total"; emit_tool_call Edit file_path "src/orders.rb"; emit_tool_result; } > "$transcript"
+expect_work_held "a REPL that runs a non-read command" REPL code 'const t = await $`bundle exec rspec`.text(); t'
+work_turn Edit file_path "src/orders.rb"
 expect_contains "the block names both line forms" "Better: none, tried" "$(cat "$work_dir/last-output")"
 expect_eq "a bare Better: none is held" held "$(run_stop $'Done.\nBetter: none')"
 expect_eq "Better: looks fine is held" held "$(run_stop $'Done.\nBetter: looks fine')"
@@ -65,17 +68,23 @@ expect_eq "work held on the first try goes out on the second (stop_hook_active)"
 expect_eq "an arrow with no number is held" held "$(run_stop $'Done.\nBetter: slow loop -> one query.')"
 
 # Each kind of work counts.
-for call in "Write file_path src/orders.rb" "NotebookEdit file_path orders.ipynb" "Agent prompt check-the-orders" "Bash command bundle-exec-rspec" "Bash command git-commit-m-done" "Bash command echo-x->orders.txt" "REPL code await-edit('a.rb','a','b')" "REPL code await-Bash({command:'rm-x'})" "REPL code await-tools.mcp__shop__save_order({})" "Bash command find-.--delete" "Bash command git-branch--D-x" "Bash command ls-\$(rm-x)"; do
-  # shellcheck disable=SC2086 # the call is three words
-  set -- $call
-  { emit_typed_message "fix the total"; emit_tool_call "$1" "$2" "${3//-/ }"; emit_tool_result; } > "$transcript"
-  expect_eq "$1 '${3//-/ }' with no Better line is held" held "$(run_stop "$done_text")"
-done
+expect_work_held "a Write" Write file_path "src/orders.rb"
+expect_work_held "a NotebookEdit" NotebookEdit file_path "orders.ipynb"
+expect_work_held "an Agent" Agent prompt "check the orders"
+expect_work_held "a test run" Bash command "bundle exec rspec"
+expect_work_held "a commit" Bash command "git commit -m done"
+expect_work_held "a redirect to a file" Bash command "echo x > orders.txt"
+expect_work_held "find -delete" Bash command "find . -delete"
+expect_work_held "a nested command" Bash command 'ls $(rm x)'
+expect_work_held "git diff --output" Bash command "git diff --output=out.txt"
+expect_work_held "sed -i" Bash command "sed -i 's/a/b/' src/orders.rb"
+expect_work_held "awk running a command" Bash command "awk 'BEGIN{system(\"rm x\")}'"
+expect_work_held "a REPL edit()" REPL code "await edit('a.rb', 'a', 'b')"
+expect_work_held "a REPL bare-global Bash()" REPL code "await Bash({command: 'rm x'})"
+expect_work_held "a REPL \$(\"...\") shell string" REPL code 'await $("rm -rf x")'
+expect_work_held "a REPL \$(\"...\", ms) shell string" REPL code 'await $("rm -rf x", 5000)'
 { emit_typed_message "fix the total"; emit_tool_call Bash command "ls src 2>/dev/null | wc -l"; emit_tool_result; } > "$transcript"
 expect_eq "a read-only command with a /dev/null redirect goes out" out "$(run_stop "$done_text")"
-
-{ emit_typed_message "fix the total"; emit_tool_call Bash command "sed -i 's/a/b/' src/orders.rb"; emit_tool_result; } > "$transcript"
-expect_eq "sed -i is work, held" held "$(run_stop "$done_text")"
 
 # Only this turn counts.
 { emit_typed_message "fix the total"; emit_tool_call Edit file_path "src/orders.rb"; emit_tool_result; emit_typed_message "what did you change?"; emit_tool_call Read file_path "src/orders.rb"; emit_tool_result; } > "$transcript"

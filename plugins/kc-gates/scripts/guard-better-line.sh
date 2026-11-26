@@ -19,12 +19,16 @@ set -u
 # shellcheck source=lib/reply-misses.sh
 . "$(dirname "$0")/lib/reply-misses.sh"
 
-# First words of commands that normally only read. A command in this list is still work when it
-# holds a redirect to a file, `$(` or a backtick (is_read_only_command).
-readonly READ_ONLY_WORDS='(ls|cat|head|tail|grep|egrep|fgrep|rg|wc|echo|printf|pwd|cd|jq|stat|file|which|type|date|uniq|diff|cmp|test|\[|true|false|sleep|tree|du|df|basename|dirname|realpath|readlink|nl|cut|tr|awk|column|sha256sum|shasum|md5|md5sum|git (status|log|diff|show|rev-parse|rev-list|ls-files|ls-tree|blame|describe|config --get|worktree list|cat-file|grep|merge-base|shortlog)|gh (pr|issue|run|repo|release) (view|list|checks|diff|status))'
-# A REPL script that calls a tool other than Read, Grep or Glob (through its global or `tools.`), an
-# MCP tool, or edit() or write().
-readonly REPL_WORK_CALLS='(^|[^[:alnum:]_.])(tools\.)?(Agent|Edit|Write|MultiEdit|NotebookEdit|Bash)\(|tools\.mcp__|(^|[^[:alnum:]_.])(edit|write)\('
+# First words of commands that normally only read. The list is short on purpose: a read it lacks
+# (sed, find, sort, curl, git -C) counts as work and asks for a Better: line once. A command in it is
+# still work when it holds a redirect to a file, `$(` or a backtick (is_read_only_command).
+readonly READ_ONLY_WORDS='(ls|cat|head|tail|grep|egrep|fgrep|rg|wc|echo|printf|pwd|cd|jq|stat|file|which|type|date|uniq|diff|cmp|test|\[|true|false|sleep|tree|du|df|basename|dirname|realpath|readlink|nl|cut|tr|column|sha256sum|shasum|md5|md5sum|git (status|log|diff|show|rev-parse|rev-list|ls-files|ls-tree|blame|describe|config --get|worktree list|cat-file|grep|merge-base|shortlog)|gh (pr|issue|run|repo|release) (view|list|checks|diff|status))'
+# A REPL script that calls Agent, Edit, Write, MultiEdit, NotebookEdit or Bash (through its global or
+# `tools.`), or edit() or write(). MCP tools are not counted, in a REPL or called directly.
+readonly REPL_WORK_CALLS='(^|[^[:alnum:]_.])(tools\.)?(Agent|Edit|Write|MultiEdit|NotebookEdit|Bash)\(|(^|[^[:alnum:]_.])(edit|write)\('
+# The shell a REPL script runs: a `$\`...\`` template, or `$("...")` with an optional timeout.
+# shellcheck disable=SC2016 # the pattern holds JavaScript backticks and `$(`, not shell expansions
+readonly REPL_SHELL_CALLS='\$`[^`]*`|\$\(["'"'"'][^"'"'"']*["'"'"'](, *[0-9]+)?\)'
 
 payload=$(cat)
 reply=$(printf '%s' "$payload" | jq -r '.last_assistant_message // empty' 2>/dev/null)
@@ -34,10 +38,11 @@ stop_hook_active=$(printf '%s' "$payload" | jq -r '.stop_hook_active // false' 2
 [ "$stop_hook_active" = true ] && exit 0
 
 # True when every command in the text (see list_stripped_commands) starts with a read-only word and
-# writes no file (> or >> to anything but /dev/null or a stream) or runs a nested command.
+# writes no file (> or >> to anything but /dev/null or a stream, or --output) or runs a nested command.
 is_read_only_command() {
-  local command_text=$1 segment
-  printf '%s' "$command_text" | sed -E 's#[0-9]*>&[0-9]##g; s#[0-9]*>>?[[:space:]]*/dev/null##g' | grep -Eq '>|\$\(|`' && return 1
+  local command_text=$1 command_without_safe_redirects segment
+  command_without_safe_redirects=$(printf '%s' "$command_text" | sed -E 's#[0-9]*>&[0-9]##g; s#[0-9]*>>?[[:space:]]*/dev/null##g')
+  printf '%s' "$command_without_safe_redirects" | grep -Eq '>|--output|\$\(|`' && return 1
   while IFS= read -r segment; do
     printf '%s' "$segment" | grep -Eq "^$READ_ONLY_WORDS([[:space:]]|\$)" || return 1
   done < <(printf '%s\n' "$command_text" | list_stripped_commands)
@@ -53,8 +58,7 @@ is_work_call() {
     Bash) ! is_read_only_command "$tool_input"; return ;;
     REPL)
       printf '%s' "$tool_input" | grep -Eq "$REPL_WORK_CALLS" && return 0
-      # shellcheck disable=SC2016 # the pattern holds JavaScript backticks, not a shell expansion
-      shell_text=$(printf '%s' "$tool_input" | grep -oE '\$`[^`]*`|\$\(["'"'"'][^"'"'"']*["'"'"']\)' | sed -E 's/^\$[`(]//; s/[`)]$//')
+      shell_text=$(printf '%s' "$tool_input" | grep -oE "$REPL_SHELL_CALLS" | sed -E 's/^\$[`(]["'"'"']?//; s/["'"'"']?(, *[0-9]+)?[`)]$//')
       ! is_read_only_command "$shell_text"; return ;;
   esac
   return 1
