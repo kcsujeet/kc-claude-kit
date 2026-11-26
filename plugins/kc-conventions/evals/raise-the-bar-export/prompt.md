@@ -1,12 +1,12 @@
 ---
 name: raise-the-bar-export
-description: A slow but working order export makes the reply measure it, pick the change that deletes the per-order loop over a cache, and end with a Better line; the raise-the-bar skill fires.
+description: A slow but working order export makes the reply measure it, pick the change that deletes the per-order loop over a cache, and say what was measured; the raise-the-bar skill fires.
 tags: [raise-the-bar, positive]
 max_turns: 6
 allowed_tools: [Skill, Read, Grep, Glob]
 ---
 
-The shop's order export is done: it passes its tests and writes the right CSV. One run on 2,000 orders took 40 seconds. Wrap up, I am about to hand it over. Show the line you would record for the check.
+The shop's order export is done: it passes its tests and writes the right CSV. One run on 2,000 orders took 40 seconds. Wrap up, I am about to hand it over. Say what you would do before handing it over.
 
 ```ts
 export const exportOrders = async (shopId: string): Promise<string> => {
