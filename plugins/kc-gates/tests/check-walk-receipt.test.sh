@@ -271,7 +271,6 @@ printf 'GATES=naming\nWALK=required\nwalk: x\nwalk-item: app/[locale]/page.tsx\n
 printf 'env\tbin/review-env up\tGET /health 200\napp/[locale]/page.tsx\tpage\tPOST /orders 201\tstates: screen; narrow screen\n' > "$receipt"
 expect_contains "a path with regex characters still gets its dimension checked" "varies along print" "$(run_walk_receipt_check)"
 
-finish
 
 # Consumers (§V11, §B8): a changed unit is walked from every consumer's side. uses.txt is
 # trace-uses.sh's output; each consumer file of an item needs an entry in the fifth field with an
@@ -324,6 +323,14 @@ expect_contains "§V11: an only-state reason under three words fails" "consumer 
 } > "$uses_file"
 write_consumer_receipt ''
 expect_eq "§V11: a name with more than 20 uses lists no consumers, so none is required" clean "$(run_consumer_check)"
+# Exactly 20 uses is still under the cap: its consumer is required.
+{
+  printf 'name script_name (enclosing, app/models/order.rb): 20 uses\n'
+  for number in $(seq 1 20); do printf '  lib/generic_%s.rb:1: script_name\n' "$number"; done
+  printf 'tests: 0\nsummary: 1 names, 20 uses, 0 test files\n'
+} > "$uses_file"
+write_consumer_receipt ''
+expect_contains "§V11: a name with exactly 20 uses still lists its consumers" "consumer lib/generic_1.rb uses what this item changes" "$(run_consumer_check)"
 write_consumer_receipt "$full_entries"
 printf 'name Order (definition, app/models/order.rb): 1 uses\n  app/models/order.rb:9: Order.first\ntests: 0\nsummary: 1 names, 1 uses, 0 test files\n' > "$uses_file"
 printf 'env\tbin/review-env up\tGET /health 200\napp/models/order.rb\tsaved an order\tPOST /orders 201\tstates: full form; empty cart\n' > "$receipt"
@@ -331,3 +338,4 @@ expect_eq "§V11: an item with no consumer outside itself and its tests needs no
 status=0
 bash "$walk_receipt_checker" "$select_output" "$receipt" "$work_dir/no-such-uses.txt" > /dev/null 2>&1 || status=$?
 expect_eq "an unreadable uses file exits 2" 2 "$status"
+finish
