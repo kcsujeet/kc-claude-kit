@@ -51,7 +51,7 @@ run_stop() {
 # Texts as fixture files: blocked-* are held with nothing read, passes-* go out.
 emit_typed_message "what is going on with the orders?" > "$transcript"
 for fixture in "$fixtures"/blocked-*.txt; do
-  expect_eq "held with nothing read: $(basename "$fixture" .txt)" held "$(run_stop "$(cat "$fixture")")"
+  expect_eq "§CL1: held with nothing read: $(basename "$fixture" .txt)" held "$(run_stop "$(cat "$fixture")")"
 done
 for fixture in "$fixtures"/passes-*.txt; do
   expect_eq "out with nothing read: $(basename "$fixture" .txt)" out "$(run_stop "$(cat "$fixture")")"
@@ -63,7 +63,7 @@ expect_contains "the block is the guard's own" "Blocked by the kc-gates plugin" 
 
 # Every action that publishes text, with the same claim; the actions that don't, with it too.
 claim="Every order has a currency set, so the totals add up."
-expect_eq "git commit -m is held" held "$(run_bash "git commit -m \"$claim\"")"
+expect_eq "§CL1: git commit -m is held" held "$(run_bash "git commit -m \"$claim\"")"
 expect_eq "git -C dir commit is held" held "$(run_bash "git -C /repo commit -m \"$claim\"")"
 expect_eq "git add then commit is held" held "$(run_bash "git add -A && git commit -m \"$claim\"")"
 expect_eq "gh pr create is held" held "$(run_bash "gh pr create --title t --body \"$claim\"")"
