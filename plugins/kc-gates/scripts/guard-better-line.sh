@@ -8,7 +8,7 @@
 # plainly read-only (is_read_only_command). A turn of reads, or with no tool calls, passes.
 #
 # The final reply then needs a line starting "Better:" that carries evidence, either
-#   Better: <change> with a number (a digit, or before -> after), or
+#   Better: <change> with a number (a digit), or
 #   Better: none, then what was tried or measured (a digit, or the word "tried").
 # A bare "Better: none" or "Better: looks fine" blocks. On the second try (stop_hook_active) it passes.
 #
@@ -19,8 +19,12 @@ set -u
 # shellcheck source=lib/reply-misses.sh
 . "$(dirname "$0")/lib/reply-misses.sh"
 
-# First words of commands that only look: no file, network write or state change.
-readonly READ_ONLY_WORDS='(ls|cat|head|tail|grep|egrep|fgrep|rg|find|wc|echo|printf|pwd|cd|jq|stat|file|which|type|date|sort|uniq|diff|cmp|test|\[|true|false|sleep|tree|du|df|env|basename|dirname|realpath|readlink|nl|cut|tr|awk|column|sha256sum|shasum|md5|md5sum|git (status|log|diff|show|branch|rev-parse|rev-list|ls-files|ls-tree|blame|describe|remote|fetch|config --get|worktree list|cat-file|grep|merge-base|shortlog)|gh (pr|issue|run|repo|release) (view|list|checks|diff|status)|gh api)'
+# First words of commands that normally only read. A command in this list is still work when it
+# holds a redirect to a file, `$(` or a backtick (is_read_only_command).
+readonly READ_ONLY_WORDS='(ls|cat|head|tail|grep|egrep|fgrep|rg|wc|echo|printf|pwd|cd|jq|stat|file|which|type|date|uniq|diff|cmp|test|\[|true|false|sleep|tree|du|df|basename|dirname|realpath|readlink|nl|cut|tr|awk|column|sha256sum|shasum|md5|md5sum|git (status|log|diff|show|rev-parse|rev-list|ls-files|ls-tree|blame|describe|config --get|worktree list|cat-file|grep|merge-base|shortlog)|gh (pr|issue|run|repo|release) (view|list|checks|diff|status))'
+# A REPL script that calls a tool other than Read, Grep or Glob (through its global or `tools.`), an
+# MCP tool, or edit() or write().
+readonly REPL_WORK_CALLS='(^|[^[:alnum:]_.])(tools\.)?(Agent|Edit|Write|MultiEdit|NotebookEdit|Bash)\(|tools\.mcp__|(^|[^[:alnum:]_.])(edit|write)\('
 
 payload=$(cat)
 reply=$(printf '%s' "$payload" | jq -r '.last_assistant_message // empty' 2>/dev/null)
@@ -29,42 +33,42 @@ stop_hook_active=$(printf '%s' "$payload" | jq -r '.stop_hook_active // false' 2
 [ -n "$reply" ] || exit 0
 [ "$stop_hook_active" = true ] && exit 0
 
-# True when every command in the text (see list_stripped_commands) is plainly read-only: it starts
-# with a read-only word and writes no file (> or >> to anything but /dev/null or a stream).
+# True when every command in the text (see list_stripped_commands) starts with a read-only word and
+# writes no file (> or >> to anything but /dev/null or a stream) or runs a nested command.
 is_read_only_command() {
-  local text=$1 segment
-  printf '%s' "$text" | sed -E 's#[0-9]*>&[0-9]##g; s#[0-9]*>>?[[:space:]]*/dev/null##g' | grep -q '>' && return 1
+  local command_text=$1 segment
+  printf '%s' "$command_text" | sed -E 's#[0-9]*>&[0-9]##g; s#[0-9]*>>?[[:space:]]*/dev/null##g' | grep -Eq '>|\$\(|`' && return 1
   while IFS= read -r segment; do
     printf '%s' "$segment" | grep -Eq "^$READ_ONLY_WORDS([[:space:]]|\$)" || return 1
-  done < <(printf '%s\n' "$text" | list_stripped_commands)
+  done < <(printf '%s\n' "$command_text" | list_stripped_commands)
   return 0
 }
 
-# True when the tool call (name, then its target) is more than a read.
+# True when the tool call (name, then its input) is more than a read.
 is_work_call() {
-  local tool_name=$1 target=$2 shell_text
+  local tool_name=$1 tool_input=$2 shell_text
+  printf '%s\t' "$tool_name" | grep -Eq "$EDIT_CALLS" && return 0
   case "$tool_name" in
-    Edit | Write | MultiEdit | NotebookEdit | Agent) return 0 ;;
-    Bash) is_read_only_command "$target" && return 1 || return 0 ;;
+    Agent) return 0 ;;
+    Bash) ! is_read_only_command "$tool_input"; return ;;
     REPL)
-      printf '%s' "$target" | grep -Eq '(^|[^[:alnum:]_.])(edit|write)\(|tools\.(Agent|Edit|Write|NotebookEdit|Bash)\(' && return 0
+      printf '%s' "$tool_input" | grep -Eq "$REPL_WORK_CALLS" && return 0
       # shellcheck disable=SC2016 # the pattern holds JavaScript backticks, not a shell expansion
-      shell_text=$(printf '%s' "$target" | grep -oE '\$`[^`]*`' | sed -E 's/^\$`//; s/`$//')
-      is_read_only_command "$shell_text" && return 1
-      return 0 ;;
+      shell_text=$(printf '%s' "$tool_input" | grep -oE '\$`[^`]*`|\$\(["'"'"'][^"'"'"']*["'"'"']\)' | sed -E 's/^\$[`(]//; s/[`)]$//')
+      ! is_read_only_command "$shell_text"; return ;;
   esac
   return 1
 }
 
 did_work=false
-while IFS=$'\t' read -r tool_name target; do
-  if is_work_call "$tool_name" "$target"; then did_work=true; break; fi
+while IFS=$'\t' read -r tool_name tool_input; do
+  if is_work_call "$tool_name" "$tool_input"; then did_work=true; break; fi
 done < <(jq -L "$(dirname "$0")/lib" -rs 'include "typed-message"; turn_entries[] | get_tool_call_lines' "$transcript" 2>/dev/null)
 [ "$did_work" = true ] || exit 0
 
 # A "Better:" line (any Markdown emphasis around the label) with a number or the word tried in it.
 better_text=$(printf '%s\n' "$reply" | sed -nE 's/^[[:space:]>*_-]*[Bb]etter[*_]*:[*_]*[[:space:]]*(.*)$/\1/p')
-if printf '%s\n' "$better_text" | grep -Eiq '[0-9]|->|→|(^|[^[:alnum:]])tried([^[:alnum:]]|$)'; then
+if printf '%s\n' "$better_text" | grep -Eiq '[0-9]|(^|[^[:alnum:]])tried([^[:alnum:]]|$)'; then
   exit 0
 fi
 

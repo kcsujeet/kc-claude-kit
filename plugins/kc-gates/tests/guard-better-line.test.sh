@@ -2,7 +2,7 @@
 # shellcheck disable=SC2016  # the REPL code holds JavaScript backticks, not shell expansions
 # Tests scripts/guard-better-line.sh: a turn that presented work (an edit, a write, an agent, or a
 # command that is not plainly read-only) is blocked unless its reply has a Better: line with a number
-# or a named alternative tried; a turn of reads passes. Holds the Better: line rule (kc-ready-for-review).
+# or a named alternative tried; a turn of reads passes. Holds step 5 of kc-raise-the-bar.
 set -euo pipefail
 
 tests_dir=$(cd "$(dirname "$0")" && pwd)
@@ -32,8 +32,8 @@ run_stop() {
 }
 
 done_text="The order total is fixed."
-improved=$'The order total is fixed.\nBetter: order export check 44s -> 6s by a 10-case test of the totals.'
-tried=$'The order total is fixed.\nBetter: none, tried a cached total, 3 runs, no faster.'
+reply_with_numeric_better_line=$'The order total is fixed.\nBetter: order export check 44s -> 6s by a 10-case test of the totals.'
+reply_with_tried_better_line=$'The order total is fixed.\nBetter: none, tried a cached total, 3 runs, no faster.'
 
 # Turns of reads, or with no tool calls, pass.
 { emit_typed_message "how do orders work?"; emit_tool_call Read file_path "src/orders.rb"; emit_tool_result; emit_tool_call Bash command "grep -rn total src | head -5 && git log -3 --oneline"; emit_tool_result; emit_tool_call Grep pattern "total"; emit_tool_result; } > "$transcript"
@@ -55,15 +55,17 @@ expect_eq "a REPL that runs a non-read command is work, held" held "$(run_stop "
 expect_contains "the block names both line forms" "Better: none, tried" "$(cat "$work_dir/last-output")"
 expect_eq "a bare Better: none is held" held "$(run_stop $'Done.\nBetter: none')"
 expect_eq "Better: looks fine is held" held "$(run_stop $'Done.\nBetter: looks fine')"
-expect_eq "a numeric improvement goes out" out "$(run_stop "$improved")"
-expect_eq "none with a number and what was tried goes out" out "$(run_stop "$tried")"
+expect_eq "a numeric improvement goes out" out "$(run_stop "$reply_with_numeric_better_line")"
+expect_eq "none with a number and what was tried goes out" out "$(run_stop "$reply_with_tried_better_line")"
 expect_eq "none with a named alternative tried goes out" out "$(run_stop $'Done.\nBetter: none, tried a batch query instead of a loop.')"
 expect_eq "a bold Better label with a number goes out" out "$(run_stop $'Done.\n**Better:** 12 steps -> 4 by one script.')"
 expect_eq "the word better in prose is not the line" held "$(run_stop "A better way took 5 runs to find.")"
 expect_eq "work held on the first try goes out on the second (stop_hook_active)" out "$(run_stop "$done_text" true)"
 
+expect_eq "an arrow with no number is held" held "$(run_stop $'Done.\nBetter: slow loop -> one query.')"
+
 # Each kind of work counts.
-for call in "Write file_path src/orders.rb" "NotebookEdit file_path orders.ipynb" "Agent prompt check-the-orders" "Bash command bundle-exec-rspec" "Bash command git-commit-m-done" "Bash command echo-x->orders.txt" "REPL code await-edit('a.rb','a','b')"; do
+for call in "Write file_path src/orders.rb" "NotebookEdit file_path orders.ipynb" "Agent prompt check-the-orders" "Bash command bundle-exec-rspec" "Bash command git-commit-m-done" "Bash command echo-x->orders.txt" "REPL code await-edit('a.rb','a','b')" "REPL code await-Bash({command:'rm-x'})" "REPL code await-tools.mcp__shop__save_order({})" "Bash command find-.--delete" "Bash command git-branch--D-x" "Bash command ls-\$(rm-x)"; do
   # shellcheck disable=SC2086 # the call is three words
   set -- $call
   { emit_typed_message "fix the total"; emit_tool_call "$1" "$2" "${3//-/ }"; emit_tool_result; } > "$transcript"
