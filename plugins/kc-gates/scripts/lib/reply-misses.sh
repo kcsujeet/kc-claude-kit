@@ -34,12 +34,15 @@ is_question() {
 }
 
 # True when the prompt asks where work stands or what is left: "are we done", "what's next",
-# "what's left", "status", "where are we", "is it merged/deployed/tested/approved/released".
+# "what's left", "status", "where are we", "is it merged/deployed/tested/approved/released", "can
+# it be merged", "is it ready to merge", "check if the PR can merge", "has QA been done", "i think
+# QA is done?", "any update", "what's going on", "did the reviewer approve", "passed the ticket back?".
 asks_status() {
   local text
   text=$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]' | sed -E 's/^[[:space:]]+//; s/[[:space:]]+$//')
   case "$text" in status|status[?.!]*) return 0 ;; esac
-  printf '%s' "$text" | grep -Eq "(^|[^[:alnum:]])(are we (done|finished)|what.s (next|left|remaining)|what (is|else is) (next|left)|what now|where are we|(current|any|your|the latest) status|status (of|on|update|check)|is (it|that|this|the (pr|ticket)) (merged|deployed|tested|approved|released|live|done))([^[:alnum:]]|$)"
+  printf '%s' "$text" | grep -Eq "(^|[^[:alnum:]])(are we (done|finished)|what.s (next|left|remaining)|what (is|else is) (next|left)|what now|what next|where are we|(current|any|your|the latest) status|status (of|on|update|check)|is (it|that|this|the (pr|ticket)|[a-z]+-[0-9]+|#?[0-9]+) (merged|deployed|tested|approved|released|live|done))([^[:alnum:]]|$)" && return 0
+  printf '%s' "$text" | grep -Eq "(^|[^[:alnum:]])(can (it|this|that|the pr|pr|we) (be )?merge(d)?|ready to merge|(be|been|is|was|got) (merged|approved|reviewed|deployed|released)|any updates?|what.s (going on|happening|the status)|(has|is|was) qa (been )?(done|passed|finished|complete)|qa (has been|is|was) (done|passed|finished)|(did|has) (the )?(reviewer|qa|ci|pr|ticket|it) [a-z]+|(passed|handed|moved|sent) (the )?(ticket|pr) (back|on|to))([^[:alnum:]]|$)"
 }
 
 # True when the prompt asks to fix something reported: a fix or debug verb, or a word that reports a

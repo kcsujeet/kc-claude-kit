@@ -473,7 +473,7 @@ get_unwalked_review_verdict() {
   problems=$(bash "$scripts_dir/check-walk-receipt.sh" "$selected" "$review_dir/walk-receipt.tsv" 2>&1) && { rm -f "$selected"; return 0; }
   rm -f "$selected"
   problem_text=$(printf '%s' "$problems" | tr '\n' ' ' | sed 's/["\\]//g' | cut -c1-"$max_problem_chars")
-  reason="Blocked by the kc-gates plugin: this review changed behaviour it has no walk receipt for, so it cannot be posted or approved yet. Walk each item in the running app or at the API and write one line per item to $review_dir/walk-receipt.tsv (path, what was seen, evidence: a screenshot or a request line with its status). $problem_text"
+  reason="Blocked by the kc-gates plugin: this review changed behaviour it has no walk receipt for, so it cannot be posted or approved yet. Walk each item on its QA surface (browser, API, terminal, unit) and write one line per item to $review_dir/walk-receipt.tsv (path, what was seen, evidence of that surface: browser a screenshot or recording, api a curl request and its saved response, terminal or unit a run transcript, exit 0: run.txt). $problem_text"
   printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"%s"}}' "$reason"
 }
 
