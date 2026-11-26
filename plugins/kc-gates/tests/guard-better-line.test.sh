@@ -96,6 +96,10 @@ expect_work_held "a redirect to a file" Bash command "echo x > orders.txt"
 expect_work_held "find -delete" Bash command "find . -delete"
 expect_work_held "a nested command" Bash command 'ls $(rm x)'
 expect_work_held "git diff --output" Bash command "git diff --output=out.txt"
+expect_eq "a quoted | or ; or > is data, not work" out "$(for command in "rg 'foo|bar' src" "jq '.a | .b' f.json" "rg '=>' src" 'grep "a;b" f'; do write_work_turn Bash command "$command"; run_stop "$done_text"; done | sort -u)"
+expect_work_held "a redirect after a quoted string" Bash command "echo 'a' > out.txt"
+expect_work_held "a redirect after a double-quoted string" Bash command 'echo "a" > out.txt'
+expect_work_held "a nested command inside double quotes" Bash command 'ls "$(rm x)"'
 expect_work_held "a background job" Bash command "ls & rm x"
 expect_work_held "sed -i" Bash command "sed -i 's/a/b/' src/orders.rb"
 expect_work_held "awk running a command" Bash command "awk 'BEGIN{system(\"rm x\")}'"

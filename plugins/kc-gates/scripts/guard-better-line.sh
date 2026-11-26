@@ -46,7 +46,9 @@ better_lines_file="${CLAUDE_PLUGIN_DATA:-}/better-lines/$session_id"
 # writes no file (> or >> to anything but /dev/null or a stream, or --output), and starts no background
 # job (`&`) or nested command.
 is_read_only_command() {
-  local command_text=$1 command_without_safe_operators segment
+  local command_text command_without_safe_operators segment
+  # Quoted text is data: drop single-quoted strings and double-quoted ones with no expansion in them.
+  command_text=$(printf '%s' "$1" | sed -E "s/'[^']*'|\"[^\"\$\`\\\\]*\"//g")
   command_without_safe_operators=$(printf '%s' "$command_text" | sed -E 's#[0-9]*>&[0-9]##g; s#[0-9]*>>?[[:space:]]*/dev/null##g; s#&&# #g')
   printf '%s' "$command_without_safe_operators" | grep -Eq '>|&|--output|\$\(|`' && return 1
   while IFS= read -r segment; do
