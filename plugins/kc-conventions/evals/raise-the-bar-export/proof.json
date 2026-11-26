@@ -1,0 +1,57 @@
+{
+  "case": "plugins/kc-conventions/evals/raise-the-bar-export",
+  "commit": "d322f73675abaab252282022f7cec54b64b74cd8",
+  "case_hash": "5670d487fd839e361550ddd5d37ddaf3cb866ec5",
+  "plugins_hash": "46eddf411cf4022728e62166eac678f62ce13129",
+  "claude": "2.1.332 (Claude Code)",
+  "model": "sonnet",
+  "verdict": "ok",
+  "runs": {
+    "with": [
+      {
+        "error": null,
+        "graders": [
+          {
+            "name": "better-line-deletes",
+            "passed": true,
+            "scored": true
+          },
+          {
+            "name": "raise-the-bar-skill-fired",
+            "passed": true,
+            "scored": false
+          }
+        ]
+      }
+    ],
+    "without": [
+      {
+        "error": null,
+        "graders": [
+          {
+            "name": "better-line-deletes",
+            "passed": false,
+            "scored": true
+          }
+        ]
+      }
+    ],
+    "base_rules": [
+      {
+        "error": null,
+        "graders": [
+          {
+            "name": "better-line-deletes",
+            "passed": false,
+            "scored": true
+          },
+          {
+            "name": "raise-the-bar-skill-fired",
+            "passed": false,
+            "scored": true
+          }
+        ]
+      }
+    ]
+  }
+}
