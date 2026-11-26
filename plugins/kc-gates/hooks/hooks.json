@@ -115,6 +115,12 @@
           },
           {
             "type": "command",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/fetch-status.sh\"",
+            "shell": "bash",
+            "timeout": 25
+          },
+          {
+            "type": "command",
             "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/remind-look-back-prompt.sh\"",
             "shell": "bash",
             "timeout": 10

@@ -64,4 +64,12 @@ write_typed_message "why did the build fail?" > "$transcript"
 expect_eq "with no transcript it allows" "" "$(jq -cn '{tool_use_id: "t"}' | bash "$hook")"
 expect_eq "with an unreadable transcript it allows" "" "$(jq -cn '{transcript_path: "/nonexistent", tool_use_id: "t"}' | bash "$hook")"
 
+
+# A question about where work stands is answered by a lookup (fetch-status.sh already fetched the
+# pull requests): its first call is the read, so it is allowed.
+for question in "i think QA has been done?" "can the pr be merged?" "what next?"; do
+  { write_typed_message "$question"; } > "$transcript"
+  expect_eq "a status question's first call, a lookup, is allowed: $question" allowed "$(run_hook)"
+done
+
 finish

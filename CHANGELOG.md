@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Changed (a status answer starts from fetched state, a renamed term is renamed everywhere, a review's walk guard holds only its own repo)
+
+- `kc-gates` 3.17.7: new UserPromptSubmit hook `fetch-status.sh`: when the prompt asks where work stands (`asks_status`, now also "can it be merged", "has QA been done", "what next", "any update", "passed the ticket back?"), it reads the branch's pull request and the ones the transcript names most recently with `gh pr view` (state, review and pending reviewers, merge state, head, checks) and hands that to Claude before the reply, so the answer comes from what is true now, not from memory of an earlier turn; no hook runs between a reply being written and being shown, so a check after the reply can only show a second copy. `guard-late-answer.sh` lets a status question's first call (the lookup) through. `guard-review-walk.sh` now holds a reply only to a saved review whose head commit is in the session's own checkout, so another session's unwalked review in another repo no longer blocks unrelated replies. Held by `tests/fetch-status.test.sh`, `tests/guard-late-answer.test.sh` and `tests/guard-review-walk.test.sh`.
+- `kc-conventions` 2.7.3: `kc-i18n` §I10, one term, one spelling, on every screen: a term renamed or respelled is changed in every message that shows it. New lookup `term-spellings.sh` reads the whole source-locale tree (the stale spelling sits in lines a diff never touched) and lists each word written in more than one spelling once case and hyphens are set aside, with every place of the less used spellings. Held by `tests/run-lookups.sh` fixtures `kc-i18n/term-spellings` and `tests/label-and-test-rules-text.test.sh`.
+
 ### Changed (a form or dialog is walked through every way out)
 
 - `kc-gates` 3.17.6 and `kc-verify` 2.2.13: `select-gates.sh` marks a new walk dimension, `exits`, on a UI file whose added lines submit a form or open a dialog, drawer or confirmation, or await a save; `check-walk-receipt.sh` then wants the walk-item's states to name a submit or confirm, a cancel or close, and a failed save. `kc-ui` lists the dimension beside viewport, data size, locale and print. Held by `tests/check-walk-receipt.test.sh` and `tests/select-gates.test.sh`.
