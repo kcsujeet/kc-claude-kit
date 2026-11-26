@@ -6,6 +6,6 @@
     "name": "Sujeet Kc"
   },
   "dependencies": [
-    { "name": "kc-conventions", "version": "^2.6.1" }
+    { "name": "kc-conventions", "version": "^2.8.0" }
   ]
 }

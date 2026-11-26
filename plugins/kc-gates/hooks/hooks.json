@@ -187,7 +187,7 @@
             "type": "command",
             "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/guard-better-line.sh\"",
             "shell": "bash",
-            "timeout": 5
+            "timeout": 10
           },
           {
             "type": "command",

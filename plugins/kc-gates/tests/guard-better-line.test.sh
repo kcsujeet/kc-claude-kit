@@ -8,7 +8,7 @@ set -euo pipefail
 tests_dir=$(cd "$(dirname "$0")" && pwd)
 # shellcheck source=lib/harness.sh
 . "$tests_dir/lib/harness.sh"
-guard="$(dirname "$tests_dir")/scripts/guard-better-line.sh"
+guard_script="$(dirname "$tests_dir")/scripts/guard-better-line.sh"
 require_jq
 
 transcript=$work_dir/transcript.jsonl
@@ -26,7 +26,7 @@ emit_tool_result() { jq -cn '{type: "user", message: {role: "user", content: [{t
 run_stop() {
   local active=${2:-false} output
   output=$(jq -cn --arg reply "$1" --arg path "$transcript" --arg cwd "$repo" --argjson active "$active" \
-    '{session_id: "s", transcript_path: $path, cwd: $cwd, hook_event_name: "Stop", stop_hook_active: $active, last_assistant_message: $reply}' | bash "$guard")
+    '{session_id: "s", transcript_path: $path, cwd: $cwd, hook_event_name: "Stop", stop_hook_active: $active, last_assistant_message: $reply}' | bash "$guard_script")
   printf '%s' "$output" > "$work_dir/last-output"
   if printf '%s' "$output" | grep -q '"decision":"block"'; then echo held; else echo out; fi
 }
@@ -36,8 +36,8 @@ reply_with_numeric_better_line=$'The order total is fixed.\nBetter: order export
 reply_with_tried_better_line=$'The order total is fixed.\nBetter: none, tried a cached total, 3 runs, no faster.'
 
 # Writes a transcript of one turn: a fix request and one tool call.
-work_turn() { { emit_typed_message "fix the total"; emit_tool_call "$1" "$2" "$3"; emit_tool_result; } > "$transcript"; }
-expect_work_held() { work_turn "$2" "$3" "$4"; expect_eq "$1 is work, held" held "$(run_stop "$done_text")"; }
+write_work_turn() { { emit_typed_message "fix the total"; emit_tool_call "$1" "$2" "$3"; emit_tool_result; } > "$transcript"; }
+expect_work_held() { write_work_turn "$2" "$3" "$4"; expect_eq "$1 is work, held" held "$(run_stop "$done_text")"; }
 
 # Turns of reads, or with no tool calls, pass.
 { emit_typed_message "how do orders work?"; emit_tool_call Read file_path "src/orders.rb"; emit_tool_result; emit_tool_call Bash command "grep -rn total src | head -5 && git log -3 --oneline"; emit_tool_result; emit_tool_call Grep pattern "total"; emit_tool_result; } > "$transcript"
@@ -48,13 +48,13 @@ expect_eq "a REPL that only runs a read-only command goes out" out "$(run_stop "
 expect_eq "a turn with no tool call goes out" out "$(run_stop "$done_text")"
 
 # A turn that did work needs the line.
-work_turn Edit file_path "src/orders.rb"
+write_work_turn Edit file_path "src/orders.rb"
 expect_eq "work with no Better line is held" held "$(run_stop "$done_text")"
 expect_contains "the block tells Claude to measure what it did" "measure what you just did" "$(cat "$work_dir/last-output")"
 expect_contains "the block points to the raise-the-bar skill" "kc-conventions:kc-raise-the-bar" "$(cat "$work_dir/last-output")"
 expect_eq "an empty reply goes out" out "$(run_stop "")"
 expect_work_held "a REPL that runs a non-read command" REPL code 'const t = await $`bundle exec rspec`.text(); t'
-work_turn Edit file_path "src/orders.rb"
+write_work_turn Edit file_path "src/orders.rb"
 expect_contains "the block names both line forms" "Better: none, tried" "$(cat "$work_dir/last-output")"
 expect_eq "a bare Better: none is held" held "$(run_stop $'Done.\nBetter: none')"
 expect_eq "Better: looks fine is held" held "$(run_stop $'Done.\nBetter: looks fine')"

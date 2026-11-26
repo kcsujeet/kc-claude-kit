@@ -66,6 +66,7 @@ is_work_call() {
 
 did_work=false
 while IFS=$'\t' read -r tool_name tool_input; do
+  case "$tool_name" in Read | Grep | Glob) continue ;; esac # a read: skipped without a fork, a long turn has thousands
   if is_work_call "$tool_name" "$tool_input"; then did_work=true; break; fi
 done < <(jq -L "$(dirname "$0")/lib" -rs 'include "typed-message"; turn_entries[] | get_tool_call_lines' "$transcript" 2>/dev/null)
 [ "$did_work" = true ] || exit 0
