@@ -1,0 +1,5 @@
+Findings:
+
+- The report job is scheduled nightly.
+- Nothing else writes to `orders.currency`, so the backfill is safe.
+- The export is fast.

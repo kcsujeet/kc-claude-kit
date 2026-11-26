@@ -1,0 +1,1 @@
+Every order has a currency set, so the totals can be summed without a conversion step.
