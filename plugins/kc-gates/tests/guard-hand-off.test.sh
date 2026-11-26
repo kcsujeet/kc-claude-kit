@@ -311,4 +311,26 @@ check deny  "blocked: a small change in a security path, no receipt" \
   "git push -u origin security-fix" "$prose_repo"
 expect_contains "a risk line keeps the usual block" "KC_READY_SKIP=1" "$(build_payload 'git push -u origin risky' "$prose_repo" | bash "$scripts/guard-hand-off.sh" 2>/dev/null)"
 
+# A small code change needs no pass receipt but still needs the hand-off checklist's verdicts.
+small_checklist_repo="$work_dir/small-checklist-repo"
+git init -q -b main "$small_checklist_repo"
+git init -q --bare "$work_dir/small-checklist-remote.git"
+git -C "$small_checklist_repo" remote add origin "$work_dir/small-checklist-remote.git"
+mkdir "$small_checklist_repo/.claude"
+printf '# Hand-off checklist\n\n- [ ] The shop total is documented in the README for readers.\n' > "$small_checklist_repo/.claude/hand-off-checklist.md"
+git -C "$small_checklist_repo" add .claude
+git -C "$small_checklist_repo" -c user.name=t -c user.email=t@example.test commit -q -m checklist
+git -C "$small_checklist_repo" push -q origin main
+git -C "$small_checklist_repo" checkout -q -b small-tool
+printf 'echo ship\n' > "$small_checklist_repo/tool.sh"
+git -C "$small_checklist_repo" add tool.sh
+git -C "$small_checklist_repo" -c user.name=t -c user.email=t@example.test commit -q -m tool
+check deny  "blocked: a small code branch with the checklist unmet, no receipt needed" \
+  "git push -u origin small-tool" "$small_checklist_repo"
+small_checklist_head=$(git -C "$small_checklist_repo" rev-parse HEAD)
+printf '%b' '- [PASS] The shop total is documented in the README for readers.\n' > "$work_dir/small-graded.md"
+(cd "$small_checklist_repo" && bash "$scripts/ready-receipt.sh" write "$small_checklist_head" --verdicts "$work_dir/small-graded.md" >/dev/null 2>&1)
+check allow "allowed: a small code branch with every checklist box PASS, no pass receipt" \
+  "git push -u origin small-tool" "$small_checklist_repo"
+
 finish
