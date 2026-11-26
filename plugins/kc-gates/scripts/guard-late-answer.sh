@@ -6,8 +6,10 @@
 # once the turn holds any assistant text or an earlier tool call (a denied call is kept in the
 # transcript, so a retry is never denied twice), every call passes.
 #
-# Accepted false positive: a question that really needs a lookup to answer. The first sentence can
-# still say what it will check, which is the answer's honest start.
+# A question about where work stands (asks_status: "can it be merged", "is QA done?") is let
+# through: its answer is a lookup, and making Claude answer before reading pushes it to answer from
+# memory, which is the miss fetch-status.sh exists to stop. Other questions that need a lookup are
+# an accepted false positive: the first sentence can still say what it will check.
 #
 # Input: the PreToolUse payload on stdin. Output: the deny JSON, nothing otherwise. Always exits 0,
 # and allows without jq or a readable transcript.
@@ -26,6 +28,7 @@ lib_dir="$(dirname "$0")/lib"
 
 prompt=$(jq -L "$lib_dir" -rs 'include "typed-message"; [.[] | select(is_typed_message)] | last | [typed_texts] | join("\n")' "$transcript" 2>/dev/null) || exit 0
 is_question "$prompt" || exit 0
+asks_status "$prompt" && exit 0
 
 # Assistant text blocks, and tool calls other than this one, already in the turn.
 started=$(jq -L "$lib_dir" -rs --arg id "$tool_use_id" '

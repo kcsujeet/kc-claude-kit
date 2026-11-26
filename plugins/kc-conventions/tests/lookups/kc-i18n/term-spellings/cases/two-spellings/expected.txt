@@ -1,0 +1,3 @@
+addons: add-ons x4 (first locales/en/shared.json:2); addons (locales/en/feature.json:2, locales/en/shared.json:4)
+email: email x1 (first locales/en/feature.json:4); e-mail (locales/en/feature.json:5)
+setup: setup x1 (first locales/en/feature.json:6); set-up (locales/en/feature.json:7)
