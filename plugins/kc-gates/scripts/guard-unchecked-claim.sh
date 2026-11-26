@@ -27,8 +27,8 @@
 # secrets"), a statement of what the turn itself changed ("I renamed"), and any text that says
 # plainly it is unverified (unverified, haven't checked, from memory, I assume).
 #
-# A claim is checked when a tool call of the current turn that is not an edit (Read, Grep, a
-# command, a query, a fetch, an agent) was given or returned text holding a distinctive word of the
+# A claim is checked when a tool call of the current turn that is not an edit and not a call that
+# publishes text (Read, Grep, a command, a query, a fetch, an agent) was given or returned text holding a distinctive word of the
 # sentence (words of four letters or more, without stop words and generic code nouns; when none is
 # left, any word of it). A sentence with no usable word is checked by any such call. Reads in
 # earlier turns do not count: the source is read again, or the text says it is from earlier.
@@ -50,7 +50,7 @@ command -v jq >/dev/null 2>&1 || exit 0
 
 readonly MIN_SENTENCE_CHARS=15   # a shorter fragment is a heading or a label, not a claim
 readonly MIN_WORD_CHARS=4        # a shorter word names nothing a source would hold
-readonly EVIDENCE_CHARS_PER_CALL=60000
+readonly EVIDENCE_CHARS_PER_CALL=60000 # a huge result is cut so it cannot dominate the evidence
 readonly MAX_QUOTED_CLAIMS=2
 readonly QUOTE_WIDTH=110
 
@@ -64,6 +64,8 @@ readonly COUNTED_THING='(^|[^[:alnum:]])([0-9]+|one|two|three|four|five|six|seve
 readonly OWN_EDIT='(changed|edited|added|updated|touched|modified|created|deleted|renamed)'
 # shellcheck disable=SC2016  # the backticks are Markdown code spans to match, not a command substitution
 readonly TOKEN='`[^`]+`|[A-Za-z0-9_-]+\.(rb|js|jsx|ts|tsx|py|json|ya?ml|md|sh|sql|go|rs|toml|erb|env|lock|cfg|ini|php|java)([^[:alnum:]]|$)|[a-z0-9]+_[a-z0-9_]+|[a-z]+[A-Z][a-z]+|[A-Za-z_]+\(\)'
+readonly DOES_PATTERN="(^|[^[:alnum:]])${CLAIM_VERB}([^[:alnum:]]|\$)"
+readonly IS_STATE_PATTERN="(^|[^[:alnum:]])(is|are|was|were|gets|got) ${STATE_WORD}([^[:alnum:]]|\$)"
 readonly NOT_A_FACT='(^|[^[:alnum:]])(would|could|might|may|should|probably|likely|perhaps|maybe|whether|let me|i.ll|i will|we can|we could|going to|plan to|want to|need to|unless|suppose|if)([^[:alnum:]]|$)|(^|[^[:alnum:]])i (added|changed|renamed|removed|updated|fixed|created|wrote|moved|deleted|edited|replaced|made)|(^|[^[:alnum:]])(you|your|user) (said|asked|wrote|mentioned|told|reported)|per your|according to you|^(always|never) (add|use|run|commit|call|set|put|write|check|keep|include|pass|store|log|expose|trust|rely|do|forget|hardcode|mutate|skip|ignore|return|rescue|read|test|wrap|prefer|avoid|ship|push)'
 readonly UNVERIFIED='unverified|not verified|unconfirmed|not checked|haven.t (checked|verified|looked|confirmed)|have not (checked|verified|looked|confirmed)|didn.t (check|verify)|did not (check|verify)|from memory|i assume|i.m assuming|untested'
 readonly STOP_WORDS=' that this with from have been were will they them then than into when what which where also does did can use used uses using one per via out off now yet too new old two here still just about over under after before while because since there their these those some more most other another such like make made makes need needs only never always every each none nothing nowhere everywhere sets reads writes runs loads logs says happens retries retry returns return raises throws clears cleared ignores skips default defaults true false not and the for are was has but all any its '
@@ -72,11 +74,11 @@ readonly BOOKKEEPING_CALLS=$'^(TodoWrite|TaskCreate|TaskUpdate|AskUserQuestion|S
 
 # What each publishing action carries as text.
 readonly GIT_COMMIT='(^|[^[:alnum:]_.-])git[[:space:]]+(-[Cc][[:space:]]+[^[:space:]]+[[:space:]]+)*commit([[:space:]]|$)'
-readonly GH_PUBLISH='(^|[^[:alnum:]_.-])gh[[:space:]]+((pr[[:space:]]+(create|edit|comment|review)|issue[[:space:]]+(create|edit|comment))([[:space:]]|$)|api[[:space:]].*body)'
+readonly GH_PUBLISH="${GH_COMMAND_START}((pr[[:space:]]+(create|edit|comment|review)|issue[[:space:]]+(create|edit|comment))([[:space:]]|\$)|api[[:space:]].*(-f|-F|--field|--raw-field)[[:space:]=]*.?body)"
 readonly TRACKER_WRITE='mcp__.*((save|update|edit|create|add|post).*(comment|issue)|(comment|issue).*(save|update|edit|create|add|post))'
 
-# matches <text> <extended regex>
-matches() { printf '%s' "$1" | grep -Eq "$2"; }
+# is_text_matching <text> <extended regex>
+is_text_matching() { printf '%s' "$1" | grep -Eq "$2"; }
 
 payload=$(cat)
 tool=$(printf '%s' "$payload" | jq -r '.tool_name // empty' 2>/dev/null)
@@ -86,7 +88,7 @@ published_text=""
 case "$tool" in
   Bash)
     command_text=$(printf '%s' "$payload" | jq -r '.tool_input.command // empty' 2>/dev/null)
-    if matches "$command_text" "$GIT_COMMIT|$GH_PUBLISH"; then published_text=$command_text; fi ;;
+    if is_text_matching "$command_text" "$GIT_COMMIT|$GH_PUBLISH"; then published_text=$command_text; fi ;;
   mcp__*)
     if printf '%s' "$tool" | grep -Eiq "$TRACKER_WRITE"; then
       published_text=$(printf '%s' "$payload" | jq -r '[.tool_input | .. | strings] | join("\n")' 2>/dev/null)
@@ -94,7 +96,7 @@ case "$tool" in
 esac
 [ -n "$published_text" ] || exit 0
 
-matches "$(printf '%s' "$published_text" | tr '\n' ' ' | tr '[:upper:]' '[:lower:]')" "$UNVERIFIED" && exit 0
+is_text_matching "$(printf '%s' "$published_text" | tr '\n' ' ' | tr '[:upper:]' '[:lower:]')" "$UNVERIFIED" && exit 0
 
 # Sentences of the text, one per line: fenced code and blockquotes taken out,
 # list and heading markers dropped, split after . ! ? followed by a space (a dot inside a file name stays).
@@ -109,22 +111,22 @@ while IFS= read -r sentence; do
   [ "${#sentence}" -ge "$MIN_SENTENCE_CHARS" ] || continue
   sentence_lower=$(printf '%s' "$sentence" | tr '[:upper:]' '[:lower:]')
   case "$sentence_lower" in *'?') continue ;; esac
-  matches "$sentence_lower" "$NOT_A_FACT" && continue
+  is_text_matching "$sentence_lower" "$NOT_A_FACT" && continue
   has_code_subject=false
-  matches "$sentence" "$TOKEN" && has_code_subject=true
-  matches "$sentence_lower" "$DET_NOUN" && has_code_subject=true
+  is_text_matching "$sentence" "$TOKEN" && has_code_subject=true
+  is_text_matching "$sentence_lower" "$DET_NOUN" && has_code_subject=true
   has_noun=false
-  matches "$sentence_lower" "(^|[^[:alnum:]])${CODE_NOUN}s?([^[:alnum:]]|\$)" && has_noun=true
+  is_text_matching "$sentence_lower" "(^|[^[:alnum:]])${CODE_NOUN}s?([^[:alnum:]]|\$)" && has_noun=true
   has_state_word=false
-  matches "$sentence_lower" "(^|[^[:alnum:]])${STATE_WORD}([^[:alnum:]]|\$)" && has_state_word=true
+  is_text_matching "$sentence_lower" "(^|[^[:alnum:]])${STATE_WORD}([^[:alnum:]]|\$)" && has_state_word=true
   has_anchor=false
   if [ "$has_code_subject" = true ] || [ "$has_noun" = true ] || [ "$has_state_word" = true ]; then has_anchor=true; fi
   states_quantifier=false
-  matches "$sentence_lower" "$QUANT" && states_quantifier=true
+  is_text_matching "$sentence_lower" "$QUANT" && states_quantifier=true
   states_count=false
-  matches "$sentence_lower" "$COUNTED_THING" && ! matches "$sentence_lower" "$OWN_EDIT" && states_count=true
+  is_text_matching "$sentence_lower" "$COUNTED_THING" && ! is_text_matching "$sentence_lower" "$OWN_EDIT" && states_count=true
   says_what_it_does=false
-  matches "$sentence_lower" "(^|[^[:alnum:]])${CLAIM_VERB}([^[:alnum:]]|\$)|(^|[^[:alnum:]])(is|are|was|were|gets|got) ${STATE_WORD}([^[:alnum:]]|\$)" && says_what_it_does=true
+  is_text_matching "$sentence_lower" "$DOES_PATTERN|$IS_STATE_PATTERN" && says_what_it_does=true
   if [ "$states_quantifier" = true ] && [ "$has_anchor" = true ]; then claims+=("$sentence")
   elif [ "$states_count" = true ]; then claims+=("$sentence")
   elif [ "$has_code_subject" = true ] && [ "$says_what_it_does" = true ]; then claims+=("$sentence")
@@ -134,20 +136,25 @@ done <<< "$sentences"
 
 # What the turn looked at, one line per call: its input and what it returned, lowercased. Left out: edits,
 # bookkeeping, and every call that publishes text, the one being judged included (a denied first try
-# carries the claim's own words, so it can't be the read that backs the retry).
+# carries the claim's own words, so it can't be the read that backs the retry). A call publishes by its
+# name and input only: a read whose output mentions a commit or an issue update still counts.
 evidence_file=$(mktemp) || exit 0
 trap 'rm -f "$evidence_file"' EXIT
-jq -L "$(dirname "$0")/lib" -rs --argjson cap "$EVIDENCE_CHARS_PER_CALL" '
+jq -L "$(dirname "$0")/lib" -rs --argjson cap "$EVIDENCE_CHARS_PER_CALL" --arg git_commit "$GIT_COMMIT" --arg gh_publish "$GH_PUBLISH" --arg tracker_write "$TRACKER_WRITE" '
   include "typed-message";
   def joined_text: [.[]? | (.text? // empty)] | join(" ");
   def result_text: if type == "string" then . else joined_text end;
+  def evidence_line($result): ((.input | tostring) + " " + $result) | .[0:$cap] | ascii_downcase | gsub("[\n\t\r]"; " ");
+  def publishes:
+    (.name | test("^" + $tracker_write; "i"))
+    or (.name == "Bash" and ((.input.command // "") | test($git_commit + "|" + $gh_publish; "i")));
   turn_entries as $entries
   | ([$entries[] | select(.type == "user") | .message.content? | arrays | .[] | select(type == "object" and .type == "tool_result")
       | {key: .tool_use_id, value: (.content | result_text)}] | from_entries) as $results
-  | $entries[] | select(.type == "assistant") | .message.content[]? | select(.type == "tool_use")  | .name + "\t" + (((.input | tostring) + " " + ($results[.id] // "")) | .[0:$cap] | ascii_downcase | gsub("[\n\t\r]"; " "))
+  | $entries[] | select(.type == "assistant") | .message.content[]? | select(.type == "tool_use") | select(publishes | not)
+  | .name + "\t" + evidence_line($results[.id] // "")
 ' "$transcript" 2>/dev/null \
-  | grep -Ev "$EDIT_CALLS" | grep -Ev "$BOOKKEEPING_CALLS" \
-  | grep -Eiv "^Bash"$'\t'".*($GIT_COMMIT|$GH_PUBLISH)" | grep -Eiv "^$TRACKER_WRITE" > "$evidence_file" || true
+  | grep -Ev "$EDIT_CALLS" | grep -Ev "$BOOKKEEPING_CALLS" > "$evidence_file" || true
 
 unchecked=()
 for sentence in "${claims[@]}"; do
@@ -160,8 +167,8 @@ for sentence in "${claims[@]}"; do
     stem=$word
     case "$stem" in *ss) ;; *s) stem=${stem%s} ;; esac
     fallback="$fallback $stem"
-    matches "$word" "$NOUN_WORD" && continue
-    matches "$word" "^${STATE_WORD}$" && continue
+    is_text_matching "$word" "$NOUN_WORD" && continue
+    is_text_matching "$word" "^${STATE_WORD}$" && continue
     distinctive="$distinctive $stem"
   done
   [ -n "$distinctive" ] || distinctive=$fallback

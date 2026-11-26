@@ -3,7 +3,7 @@
 # Tests scripts/guard-unchecked-claim.sh: text about to be published (a commit message, a pull request
 # or issue body or comment, a tracker write) that states a fact about code, data or a tool
 # (a quantified statement, a count, what a named thing does or is) is denied unless a tool
-# call of the turn, other than an edit, was given or returned text naming what the fact is about, or
+# call of the turn, other than an edit or a call that publishes text, was given or returned text naming what the fact is about, or
 # the text says plainly it is unverified; plain text, quoted text, hedges, questions and the
 # turn's own changes go out. Text fixtures are in fixtures/guard-unchecked-claim/.
 set -euo pipefail
@@ -129,10 +129,18 @@ start_turn "what now?" a Read file_path "/repo/README.md" "hello"
 expect_eq "the same claim after any read goes out" out "$(run_stop "It is never set.")"
 expect_eq "a claim with a subject the read does not name is held" held "$(run_stop "The cache is never used.")"
 
+# A call is a publishing call by its name and input, not its output: reads that only mention one still count.
+start_turn "ship it" a Bash command "cat docs/orders.md" "orders currency set. Run git commit afterwards"
+expect_eq "a read whose output mentions git commit still backs the claim" out "$(run_bash "git commit -m \"$claim\"")"
+start_turn "ship it" a Bash command "gh api repos/o/r/issues/3 --jq .body" "orders currency"
+expect_eq "a gh api read with --jq .body still backs the claim" out "$(run_bash "git commit -m \"$claim\"")"
+start_turn "ship it" a mcp__claude_ai_Linear__get_issue id "ABC-1" '{"title": "orders currency", "updatedAt": "2026"}'
+expect_eq "a tracker read whose result mentions an update still backs the claim" out "$(run_bash "git commit -m \"$claim\"")"
+
 # A denied first try is no read for its retry: earlier publishing calls carry the claim's own words.
-{ emit_typed_message "ship it"; emit_call a Bash command "git commit -m \"$claim\"" "denied"; } > "$transcript"
+start_turn "ship it" a Bash command "git commit -m \"$claim\"" "denied"
 expect_eq "a denied commit earlier in the turn does not back the same commit" held "$(run_bash "git commit -m \"$claim\"")"
-{ emit_typed_message "ship it"; emit_call a mcp__claude_ai_Linear__save_comment body "$claim" "denied"; } > "$transcript"
+start_turn "ship it" a mcp__claude_ai_Linear__save_comment body "$claim" "denied"
 expect_eq "a denied tracker comment earlier in the turn does not back a commit" held "$(run_bash "git commit -m \"$claim\"")"
 expect_eq "gh pr view is not publishing" out "$(run_bash "gh pr view 7 --json title,body \"$claim\"")"
 expect_eq "gh api without a body is not publishing" out "$(run_bash "gh api repos/o/r/issues/3 --jq .title \"$claim\"")"
@@ -141,8 +149,8 @@ expect_eq "gh api without a body is not publishing" out "$(run_bash "gh api repo
 hooks_json="$(dirname "$tests_dir")/hooks/hooks.json"
 expect_eq "the Bash PreToolUse group runs the guard" 1 "$(jq '[.hooks.PreToolUse[] | select(.matcher == "Bash") | .hooks[] | select(.command | contains("guard-unchecked-claim.sh"))] | length' "$hooks_json")"
 tracker_matcher=$(jq -r '[.hooks.PreToolUse[] | select(.hooks[].command | contains("guard-unchecked-claim.sh")) | select(.matcher | startswith("mcp__")) | .matcher] | first' "$hooks_json")
-for covered in mcp__claude_ai_Linear__save_comment mcp__atlassian__addCommentToJiraIssue mcp__claude_ai_Linear__save_issue; do
-  expect_eq "the matcher covers $covered" yes "$(printf '%s' "$covered" | grep -Eq "^($tracker_matcher)" && echo yes || echo no)"
+for tracker_tool_name in mcp__claude_ai_Linear__save_comment mcp__atlassian__addCommentToJiraIssue mcp__claude_ai_Linear__save_issue; do
+  expect_eq "the matcher covers $tracker_tool_name" yes "$(printf '%s' "$tracker_tool_name" | grep -Eq "^($tracker_matcher)" && echo yes || echo no)"
 done
 expect_eq "the matcher leaves a Slack message out" no "$(printf '%s' mcp__claude_ai_Slack__slack_send_message_draft | grep -Eq "^($tracker_matcher)" && echo yes || echo no)"
 expect_eq "no Stop hook runs the guard" 0 "$(jq '[.hooks.Stop[]?.hooks[] | select(.command | contains("guard-unchecked-claim.sh"))] | length' "$hooks_json")"
