@@ -175,16 +175,6 @@ export function renderCustomerCard(props: CustomerCardProps): string {
 }
 TS
 
-# clarity §C13: a dense chain, a value read, filtered, converted and joined in one line.
-cat > src/orders/openTotals.ts <<'TS'
-import { formatMoney } from '../money/formatMoney'
-import type { Order } from './types'
-
-export function listOpenTotals(orders: Order[]): string {
-  return orders.filter((order) => order.status === 'open').map((order) => formatMoney(order.totalCents)).join(', ')
-}
-TS
-
 # Clean: a lookup object keyed by the domain type, exported by name and read directly.
 cat > src/orders/orderStatusLabel.ts <<'TS'
 import type { OrderStatus } from './types'
