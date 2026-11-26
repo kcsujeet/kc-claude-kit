@@ -24,7 +24,7 @@ kc-claude-kit/
     │   ├── scripts/build-rules.sh          # regenerates rules/, --check fails on drift
     │   ├── scripts/install-rules.sh        # what kc-init and the first-prompt hook run: copies rules/ and writes the version stamp
     │   ├── tests/                          # sweep and lookup fixtures, their runners, install-rules and mutation-sweep tests
-    │   ├── hooks/                          # first prompt: installs or refreshes ~/.claude/rules, reports a stale project copy
+    │   ├── hooks/                          # first prompt: installs or refreshes ~/.claude/rules, reports a stale project copy; PreToolUse guards (source reads through the shell, forks of a large context, investigation write-ups, source writes with no shape file)
     │   └── evals/
     ├── kc-gates/
     │   ├── .claude-plugin/plugin.json      # depends on kc-conventions
