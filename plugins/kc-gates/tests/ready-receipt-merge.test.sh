@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Holds kc-ready-for-review §H5: a merge of the default branch into a clean head stays clean.
 # Tests the merge handling of scripts/ready-receipt.sh and guard-merge.sh (kc-ready-for-review §H5):
 # a head that merges the default branch into a commit with a clean receipt is clean with no new pass
 # when the merge is what git makes of the two parents on its own (a conflict in a plugin manifest's
