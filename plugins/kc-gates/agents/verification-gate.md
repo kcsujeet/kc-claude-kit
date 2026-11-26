@@ -141,9 +141,9 @@ N/A: the sweep found no hit.
 
 ### Dense expressions added
 
-Owning gate: **clarity** (§C13). Required receipt: `grepped dense expressions: N hits`, `0 hits` stated when true, each hit named `path:line` with its verdict (extracted to named locals, or dismissed with why it reads plainly). `verify-gate-blocks.sh` already compares N with `dense-expressions.sh` and each hit with its verdict, so a round that reaches this gate has the counts right; judge the verdicts.
+Owning gate: **clarity** (§C13). `verify-gate-blocks.sh` already checks the counts; judge each hit's verdict.
 
-N/A: `dense-expressions.sh` found no hit, stated as `grepped dense expressions: 0 hits`.
+N/A: 0 hits, stated.
 
 ### Test files touched or behavior changed
 
