@@ -162,6 +162,23 @@ expect_contains "data-size: no empty state and no large state fails" "an empty s
 write_dimension_states 'states: empty cart; 500 rows'
 expect_eq "data-size: empty and 500 rows pass" clean "$(run_walk_receipt_check)"
 
+# Exits: a form or dialog is walked through each way out, a failed save included.
+printf 'GATES=naming\nWALK=required\nwalk: x\nwalk-item: src/cart/total.tsx\nwalk-dimension: src/cart/total.tsx: exits\n' > "$select_output"
+write_dimension_states 'states: fill the address and save; empty address shows required'
+exits_missing=$(run_walk_receipt_check)
+expect_contains "exits: only the happy path names the cancel that is missing" "a cancel or close" "$exits_missing"
+expect_contains "exits: only the happy path names the failed save that is missing" "a failed save" "$exits_missing"
+write_dimension_states 'states: change name, confirm, saves; change name, cancel, asks again; save fails with 500, stays open'
+expect_eq "exits: confirm, cancel and a failed save cover it" clean "$(run_walk_receipt_check)"
+write_dimension_states 'states: apply in the drawer; close the drawer'
+expect_contains "exits: no failed save fails" "a failed save" "$(run_walk_receipt_check)"
+write_dimension_states 'states: book the slot; dismiss the dialog; request rejected with 500'
+expect_contains "exits: no submit or confirm fails (book is not ok)" "a submit or confirm" "$(run_walk_receipt_check)"
+write_dimension_states 'states: save; cancel; 1440px; 500px'
+expect_contains "exits: a width is not a failed save" "a failed save" "$(run_walk_receipt_check)"
+write_dimension_states 'states: save; cancel; answered 422'
+expect_eq "exits: a 4xx status on its own is a failed save" clean "$(run_walk_receipt_check)"
+
 printf 'GATES=naming\nWALK=required\nwalk: x\nwalk-item: src/cart/total.tsx\nwalk-dimension: src/cart/total.tsx: viewport\nwalk-dimension: src/cart/total.tsx: print\n' > "$select_output"
 write_dimension_states 'states: 1920px; 1280px; 390px'
 expect_contains "two dimensions: the one left uncovered is named" "varies along print" "$(run_walk_receipt_check)"

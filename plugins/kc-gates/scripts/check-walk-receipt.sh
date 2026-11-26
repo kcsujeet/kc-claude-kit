@@ -22,7 +22,8 @@
 # to cover that dimension (the walk of the states the author picked can miss the one the change
 # varies along): viewport (widths in px: 1920 or more, 1024 to 1919, 600 or less), locale (two
 # codes such as de-DE, or one and rtl), print (the word print or pdf), data-size (an empty state
-# and a large one).
+# and a large one), exits (each way out of a form or dialog: a submit or confirm, a cancel or
+# close, and a failed save, walked for each set of fields that leads to a different exit).
 #
 # The environment the walk ran in is one line too, `env<TAB><command><TAB><evidence>`: the one command
 # that brought the app up (never a chain of steps done by hand: no `&&`, `;`, `||` or `then`), and
@@ -103,6 +104,10 @@ get_uncovered_dimension() {
       if $has_two_locales || $has_rtl_locale; then return 0; fi
       printf 'two locales such as de-DE and ar-SA, or one and rtl' ;;
     print) printf '%s' "$states_text" | grep -Eq 'print|pdf' || printf 'a print or pdf state' ;;
+    exits)
+      printf '%s' "$states_text" | grep -Eq 'submit|save|confirm|apply|send|(^|[^a-z])ok([^a-z]|$)' || printf 'a submit or confirm; '
+      printf '%s' "$states_text" | grep -Eq 'cancel|close|dismiss|escape|discard' || printf 'a cancel or close; '
+      printf '%s' "$states_text" | grep -Eq 'fail|error|reject|offline|timeout|(^|[^0-9a-z])[45][0-9][0-9]([^0-9a-z]|$)' || printf 'a failed save' ;;
     data-size)
       printf '%s' "$states_text" | grep -Eq 'empty|zero|no rows|no items' || printf 'an empty state; '
       printf '%s' "$states_text" | grep -Eq 'many|long|large|overflow|truncat|paginat|[0-9]{2,} (rows|items|results|records)' || printf 'a large state' ;;
