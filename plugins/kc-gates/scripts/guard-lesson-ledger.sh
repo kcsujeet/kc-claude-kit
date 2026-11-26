@@ -107,7 +107,10 @@ check_segment() {
     return 1
   fi
   # The branch and HEAD read below would be those from before this command's own commit or switch.
-  ! { $is_target && $CHAIN_MOVED_HEAD; } || { print_pretooluse_deny "Blocked by the kc-gates plugin: $MOVED_HEAD_REASON"; return 1; }
+  if $is_target && $CHAIN_MOVED_HEAD; then
+    print_pretooluse_deny "Blocked by the kc-gates plugin: $MOVED_HEAD_REASON"
+    return 1
+  fi
   # A commit is subject to the stale-session check above only.
   $is_target || return 0
   branch=$(git -C "$repo_dir" rev-parse --abbrev-ref HEAD 2>/dev/null) || return 0

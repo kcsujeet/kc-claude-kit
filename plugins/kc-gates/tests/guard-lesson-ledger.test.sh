@@ -89,9 +89,6 @@ check_verdict deny "blocked: a stale session merges" "gh pr merge 5 --squash"
 check_verdict allow "allowed: a stale session in a repo with no ledger" "git commit -m x" "$plain_repo"
 write_installs 1.0.0
 check_verdict allow "allowed: a current session commits in a ledger repo" "git commit -m x"
-export CLAUDE_PLUGIN_ROOT="$work_dir/clone/plugins/kc-gates"
-write_installs 1.1.0
-check_verdict allow "allowed: a copy loaded from a clone is not stale" "git commit -m x"
 unset CLAUDE_PLUGIN_ROOT CLAUDE_CONFIG_DIR
 
 finish

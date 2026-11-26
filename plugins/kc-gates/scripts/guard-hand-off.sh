@@ -202,7 +202,6 @@ check_lint() {
 # words after `git`. Prints the deny JSON and returns 1 when it blocks.
 check_push() {
   local dir=$1 word skip=false remote="" refs=() positional=() spec src dst sha cur default status change_class
-  local is_new_branch is_linted
   shift
   while [ "$#" -gt 0 ]; do
     case "$1" in
@@ -270,11 +269,7 @@ check_push() {
     GIT_TERMINAL_PROMPT=0 git -C "$dir" ls-remote --exit-code --heads "$remote" "refs/heads/$dst" >/dev/null 2>&1 || status=$?
     # This command commits before it pushes, so the lint (a lint config) and the receipt (a new branch)
     # below would read the old commit.
-    is_new_branch=false
-    [ "$status" = 2 ] && is_new_branch=true
-    is_linted=false
-    bash "$scripts_dir/lint-changed-files.sh" --configured "$dir" && is_linted=true
-    if $CHAIN_MOVED_HEAD && { $is_new_branch || $is_linted; }; then
+    if $CHAIN_MOVED_HEAD && { [ "$status" = 2 ] || bash "$scripts_dir/lint-changed-files.sh" --configured "$dir"; }; then
       print_deny_reason "$MOVED_HEAD_REASON"
       return 1
     fi

@@ -162,32 +162,35 @@ CHAIN_STAGING=()
 CHAIN_PENDING_COMMAND=false
 CHAIN_RAN_COMMAND_BEFORE_STAGING=false
 CHAIN_MOVED_HEAD=false
-readonly EMPTY_TREE_HASH=4b825dc642cb6eb9a060e54bf8d69288fbee4904
 readonly UNJUDGEABLE_COMMIT_REASON='this one command runs other commands before it stages or commits, so what it commits cannot be known before it runs. Stage in one command, then commit in the next.'
 readonly MOVED_HEAD_REASON='this one command commits, merges, switches branch or otherwise moves HEAD and then publishes, so the guard would judge the branch from before it. Commit in one command, then run this one.'
 
 # note_chain_segment <segment> <dir>: call for each segment, in order, before judging it. Records a
-# `git add`, `rm` or `mv` in CHAIN_STAGING; a commit, switch or other HEAD move in CHAIN_MOVED_HEAD;
-# and any command that is not a read-only git subcommand in CHAIN_PENDING_COMMAND, which becomes
-# CHAIN_RAN_COMMAND_BEFORE_STAGING when staging follows it (rm and mv change the working tree, so
-# they count as such a command too).
+# `git add` in CHAIN_STAGING; a commit, switch or other HEAD move in CHAIN_MOVED_HEAD; and any command
+# other than a git subcommand that leaves the index and working tree alone in CHAIN_PENDING_COMMAND,
+# which becomes CHAIN_RAN_COMMAND_BEFORE_STAGING when staging follows it. A git subcommand that
+# rewrites the index or working tree some other way (rm, checkout, merge --squash, stash pop...) is
+# recorded as `add -A` that ran after a command, so a commit after it is unjudgeable.
 note_chain_segment() {
-  local segment=$1 dir=$2 words_text words=() staged_words
+  local segment=$1 dir=$2 words_text words=()
   words_text=$(git_words "$segment")
   if [ -n "$words_text" ]; then
     read -ra words <<< "$words_text"
     parse_git_command "$dir" "${words[@]}"
     case "${GIT_ARGS[0]:-}" in
-      add | rm | mv)
-        # rm and mv change the working tree, so they are replayed as add -A and make the commit unjudgeable
-        staged_words=${GIT_ARGS[*]}
-        [ "${GIT_ARGS[0]}" = add ] || staged_words="add -A"
-        CHAIN_STAGING+=("$GIT_DIR"$'\t'"$staged_words")
-        if $CHAIN_PENDING_COMMAND || [ "${GIT_ARGS[0]}" != add ]; then CHAIN_RAN_COMMAND_BEFORE_STAGING=true; fi
+      commit | merge | cherry-pick | rebase | am | pull | revert | reset | checkout | switch) CHAIN_MOVED_HEAD=true ;;
+    esac
+    case "${GIT_ARGS[0]:-}" in
+      add)
+        CHAIN_STAGING+=("$GIT_DIR"$'\t'"${GIT_ARGS[*]}")
+        if $CHAIN_PENDING_COMMAND; then CHAIN_RAN_COMMAND_BEFORE_STAGING=true; fi
         CHAIN_PENDING_COMMAND=false
         return ;;
-      commit | merge | cherry-pick | rebase | am | pull | revert | reset | checkout | switch) CHAIN_MOVED_HEAD=true; return ;;
-      status | diff | log | show | rev-parse | fetch | branch | remote | config | ls-files | describe | worktree) return ;;
+      rm | mv | apply | stash | restore | merge | cherry-pick | revert | am | pull | reset | checkout | switch | rebase)
+        CHAIN_STAGING+=("$GIT_DIR"$'\t'"add -A")
+        CHAIN_RAN_COMMAND_BEFORE_STAGING=true
+        return ;;
+      commit | status | diff | log | show | rev-parse | fetch | branch | remote | config | ls-files | describe | worktree) return ;;
     esac
   fi
   printf '%s' "$segment" | grep -q '[^[:space:]]' || return 0
@@ -200,8 +203,8 @@ note_chain_segment() {
 is_commit_unjudgeable() {
   local dir=$1
   shift
-  if [ "${#CHAIN_STAGING[@]}" -gt 0 ] && $CHAIN_RAN_COMMAND_BEFORE_STAGING; then return 0; fi
-  if $CHAIN_PENDING_COMMAND || $CHAIN_RAN_COMMAND_BEFORE_STAGING; then
+  if $CHAIN_RAN_COMMAND_BEFORE_STAGING; then return 0; fi
+  if $CHAIN_PENDING_COMMAND; then
     is_commit_staging_all "$@" || [ -n "$(get_commit_paths "$dir" "$@")" ]
     return
   fi
@@ -231,17 +234,16 @@ get_commit_paths() {
 
 # get_commit_diff <dir> "<diff options>" <word>...: the diff a `git commit` with these words after
 # `commit` would record. The staged diff; with -a/--all, the working tree against HEAD; with paths,
-# those paths in the working tree; after a `git add` earlier in the same command, the index with that
-# add replayed on a copy. A repository with no commit yet is diffed against the empty tree.
+# those paths in the working tree; after a `git add` earlier in the same command, the index (and the
+# paths, and -a) with that add replayed on a copy. A repository with no commit yet is diffed against
+# the empty tree.
 get_commit_diff() {
   local dir=$1 options=$2 base=HEAD commit_path commit_paths=() staging_record staging_record_dir staging_record_words staging_words=() scratch_dir temp_index index_file
   shift 2
-  git -C "$dir" rev-parse -q --verify HEAD >/dev/null 2>&1 || base=$EMPTY_TREE_HASH
+  git -C "$dir" rev-parse -q --verify HEAD >/dev/null 2>&1 || base=$(git -C "$dir" hash-object -t tree /dev/null)
   while IFS= read -r commit_path; do commit_paths+=("$commit_path"); done < <(get_commit_paths "$dir" "$@")
   # shellcheck disable=SC2086 # $options is a list of diff options
-  if [ "${#commit_paths[@]}" -gt 0 ]; then
-    git -C "$dir" diff $options --no-color --no-ext-diff --no-renames "$base" -- "${commit_paths[@]}"
-  elif [ "${#CHAIN_STAGING[@]}" -gt 0 ]; then
+  if [ "${#CHAIN_STAGING[@]}" -gt 0 ]; then
     scratch_dir=$(mktemp -d)
     temp_index="$scratch_dir/index"
     index_file=$(git -C "$dir" rev-parse --git-path index)
@@ -257,8 +259,11 @@ get_commit_diff() {
         || GIT_INDEX_FILE=$temp_index git -C "$dir" add -A >/dev/null 2>&1
     done
     if is_commit_staging_all "$@"; then GIT_INDEX_FILE=$temp_index git -C "$dir" add -u >/dev/null 2>&1; fi
-    GIT_INDEX_FILE=$temp_index git -C "$dir" diff --cached $options --no-color --no-ext-diff --no-renames "$base"
+    if [ "${#commit_paths[@]}" -gt 0 ]; then GIT_INDEX_FILE=$temp_index git -C "$dir" add -- "${commit_paths[@]}" >/dev/null 2>&1; fi
+    GIT_INDEX_FILE=$temp_index git -C "$dir" diff --cached $options --no-color --no-ext-diff --no-renames "$base" -- ${commit_paths[@]+"${commit_paths[@]}"}
     rm -rf "$scratch_dir"
+  elif [ "${#commit_paths[@]}" -gt 0 ]; then
+    git -C "$dir" diff $options --no-color --no-ext-diff --no-renames "$base" -- "${commit_paths[@]}"
   elif is_commit_staging_all "$@"; then
     git -C "$dir" diff $options --no-color --no-ext-diff --no-renames "$base"
   else

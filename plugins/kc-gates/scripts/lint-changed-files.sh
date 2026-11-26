@@ -17,6 +17,7 @@
 set -uo pipefail
 
 configured_only=false
+# --configured needs only the repo: fill the base and head the argument count below expects.
 if [ "${1:-}" = --configured ] && [ "$#" -eq 2 ]; then configured_only=true; set -- "$2" _ _; fi
 [ "$#" -eq 3 ] || { echo "usage: lint-changed-files.sh <repo-dir> <base> <head>" >&2; exit 2; }
 repo=$1 base=$2 head=$3
