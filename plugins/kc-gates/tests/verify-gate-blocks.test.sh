@@ -225,6 +225,10 @@ expect_clean "dense expressions: a path with parentheses is matched as written"
 set_dense_clarity_gate "grepped dense expressions: 1 hit: lib/app/(portal)/page.ts:1 chain kept"
 expect_problem "dense expressions: another file's path ending in the hit's path is not the hit" "dense expression app/(portal)/page.ts:1 has no verdict of its own"
 
+build_dense_round
+set_dense_clarity_gate "grepped dense expressions: 2 hits: lib/shop/total.sh:6 first, then shop/total.sh:6 chain kept, shop/total.sh:7 nested kept"
+expect_clean "dense expressions: a text whose first candidate fails the whole-token check still finds a later one"
+
 # A kc-conventions without the sweep (an older install) is not held to the receipt.
 old_install="$work_dir/old-install"
 mkdir -p "$old_install"

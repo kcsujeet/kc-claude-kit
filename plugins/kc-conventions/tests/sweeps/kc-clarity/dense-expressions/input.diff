@@ -3,7 +3,7 @@ new file mode 100644
 index 0000000..1111111
 --- /dev/null
 +++ b/src/checkout.ts
-@@ -0,0 +1,24 @@
+@@ -0,0 +1,25 @@
 +const total = order.shop.owner.name
 +const label = order.items.length
 +const names = items.filter(isPaid).map(toName).join(', ')
@@ -28,6 +28,7 @@ index 0000000..1111111
 + * Use items.filter(a).map(b).join(c) to build it
 +/* rows.filter(a).map(b).join(c) */
 +const widget = parseWidget(body) as Widget ?? findWidgetDefaultsForTheShop
++/* c */ names = items.filter(a).map(b).join(c)
 diff --git a/README.md b/README.md
 new file mode 100644
 index 0000000..1111111

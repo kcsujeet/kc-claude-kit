@@ -29,13 +29,14 @@ kc_added_lines "$1" |
   KC_CODE_PATHS=$KC_CODE_PATHS KC_TEST_PATHS=$KC_TEST_PATHS awk -F '\t' '
     BEGIN {
       BACKTICK = "\140"; SINGLE_QUOTE = "\047"; DOUBLE_QUOTE = "\""
-      MIN_CHAIN_LINKS = 3    # a.b().c().d(): three links
+      MIN_CHAIN_LINKS = 3
       MIN_CHAIN_CALLS = 2    # two of them calls, so a plain path never counts
-      MIN_CALL_DEPTH = 3     # f(g(h(x)))
+      MIN_CALL_DEPTH = 3
       MIN_LONG_LINE = 70     # characters of code before several parts are too many
       MIN_PARTS = 3          # calls, fallbacks, ternaries and casts in one line
-      KEYWORDS = "^(if|while|for|foreach|switch|catch|return|elsif|elif|unless|until|when|in|and|or|not|await|yield|function|def|fn|func|fun|with|except|assert|print|lambda|case|match|else)$"
-      KEYWORD_CALL = "(^|[^A-Za-z0-9_$])(if|while|for|foreach|switch|catch|return|elsif|elif|unless|until|when|and|or|not|await|yield|function|def|fn|func|fun|with|except|assert|print|lambda|case|match|else)[ \t]*[(]"
+      KEYWORD_LIST = "if|while|for|foreach|switch|catch|return|elsif|elif|unless|until|when|and|or|not|await|yield|function|def|fn|func|fun|with|except|assert|print|lambda|case|match|else"
+      KEYWORDS = "^(" KEYWORD_LIST "|in)$"
+      KEYWORD_CALL = "(^|[^A-Za-z0-9_$])(" KEYWORD_LIST ")[ \t]*[(]"
     }
     # Blanks string contents (keeping the quotes), keeps the expressions inside a template
     # literal, and drops a trailing comment.
@@ -128,7 +129,9 @@ kc_added_lines "$1" |
       is_skipped_path = (path !~ ENVIRON["KC_CODE_PATHS"] || path ~ ENVIRON["KC_TEST_PATHS"])
       if (is_skipped_path) next
       text = $0; sub(/^[^\t]*\t[^\t]*\t/, "", text)
-      is_block_comment = (text ~ /^[ \t]*(\*|\/\*)/)
+      is_comment_star_line = (text ~ /^[ \t]*\*([ \t\/]|$)/)
+      is_comment_open_line = (text ~ /^[ \t]*\/\*/ && text !~ /\*\/[ \t]*[^ \t]/)
+      is_block_comment = (is_comment_star_line || is_comment_open_line)
       if (is_block_comment) next
       code = blank_strings_and_comments(text, path ~ /\.(rb|py|sh|bash)$/)
       if (code ~ /^[ \t]*$/) next

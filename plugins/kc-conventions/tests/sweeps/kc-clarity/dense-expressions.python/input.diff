@@ -3,7 +3,7 @@ new file mode 100644
 index 0000000..1111111
 --- /dev/null
 +++ b/shop/checkout.py
-@@ -0,0 +1,12 @@
+@@ -0,0 +1,13 @@
 +total = order.shop.owner.name
 +names = ", ".join(item.name for item in items)
 +frame = df.groupby("shop").agg("total").reset_index()
@@ -16,3 +16,4 @@ index 0000000..1111111
 +total = sum(item.price for item in items if item.paid)
 +text = f"{order.shop.name}"
 +result = fetch(url) or load_cached(url) or build_default(url, retries=3) or error_value(url)
++*rest, last = parse(read(cell), strict(x), build(g(h(y))))

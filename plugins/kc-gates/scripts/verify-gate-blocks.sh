@@ -202,7 +202,7 @@ done
 
 # True when <text> names <path>:<line> or <path>:L<line> as a whole token: no name character
 # before the path and no digit after the line, and every character of the path taken literally.
-names_location() {
+is_location_named() {
   KC_TEXT=$1 awk -v path="$2" -v line="$3" '
     BEGIN {
       text = ENVIRON["KC_TEXT"]
@@ -250,7 +250,7 @@ if [ -n "$dense_script" ]; then
       while IFS= read -r hit_line; do
         [ -n "$hit_line" ] || continue
         hit_location=$(printf '%s' "$hit_line" | sed -E 's/^([^:]+:[0-9]+): .*$/\1/')
-        names_location "$receipt_text" "${hit_location%:*}" "${hit_location##*:}" \
+        is_location_named "$receipt_text" "${hit_location%:*}" "${hit_location##*:}" \
           || problem "$receipt_file: dense expression $hit_location has no verdict of its own (path:line) in the receipt's box"
       done <<< "$dense_hits"
     done < <(grep '^D	' "$work/awk.txt" || true)
