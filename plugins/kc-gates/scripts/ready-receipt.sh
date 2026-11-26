@@ -17,7 +17,11 @@
 #       stay in review but never makes the head clean: to merge, review those
 #       fixes as the pass's next round and write --rounds <k> for the new
 #       head. Refused unless <pass-sha> has a pass or --after receipt and
-#       <sha> descends from it. Run it from the repo root.
+#       <sha> descends from it. Run it from the repo root. A <sha> that is a
+#       merge of the default branch into a clean head, adding nothing the
+#       default branch did not have (only a plugin manifest's version field or
+#       CHANGELOG entry order resolved), is clean with no new pass: the write
+#       says so, and check --clean accepts it (guard-merge.sh merges it).
 #   ready-receipt.sh write <sha> --checklist [--ledger <dir>]
 #       After walking the repo's hand-off checklist alone, before opening a
 #       draft PR in a repo whose checklist applies to drafts. A checklist whose
@@ -54,7 +58,8 @@
 #       Exits 0 and prints the receipt when there is one, 1 otherwise. With
 #       --pass, a receipt for the checklist alone doesn't count: handing a PR
 #       to review needs the pass. With --clean, only a pass whose last round
-#       found nothing counts (clean=yes): what guard-merge.sh needs.
+#       found nothing counts (clean=yes): what guard-merge.sh needs. A merge of
+#       the default branch into a clean head that adds nothing of its own counts.
 #   ready-receipt.sh write <sha> --preflight --rounds <1-3> --open <n> --pass <dir>
 #       The same checks of the pass folder's records, shape only and fast: it
 #       reads the saved review.diff and changed-files.txt of each round instead
@@ -116,6 +121,8 @@ set -euo pipefail
 preflight=false
 receipts_dir=${KC_READY_DIR:-$HOME/.claude/kc-ready-for-review}
 scripts_dir=$(cd "$(dirname "$0")" && pwd)
+# shellcheck source=lib/hook-input.sh
+. "$scripts_dir/lib/hook-input.sh"
 
 # The exact line formats of the pass folder's files; a TAB is a literal tab character.
 print_formats() {
@@ -678,8 +685,79 @@ refuse_unanswered_comments() {
   exit 1
 }
 
+# Prints the file $2 has at commit or tree $1, or nothing when it has none.
+show_file_at() { git show "$1:$2" 2>/dev/null || true; }
+
+readonly MAX_MERGE_DEPTH=5 # a chain of default-branch merges is checked link by link, this many deep
+readonly MERGE_COMMIT_FIELDS=3 # `rev-list --parents` prints a merge as its sha and its two parents
+readonly CONFLICT_MARKER_LINE='^(<<<<<<<|=======|>>>>>>>)'
+readonly VERSION_FIELD_LINE='^[[:space:]]*"version"[[:space:]]*:'
+readonly SEMVER_PATTERN='[0-9]+\.[0-9]+\.[0-9]+'
+
+mask_versions() { sed -E "s/$SEMVER_PATTERN/V/g"; }
+
+# Succeeds when file $3 is the same in merge commit $1 and in git's own merge tree $2, except for what a
+# resolution may change: the "version" lines of a plugin.json, and the version numbers and order of the
+# entries of a CHANGELOG.md. Any other file fails.
+is_resolution_only() {
+  local merge_sha=$1 auto_merge_tree=$2 changed_path=$3
+  case "$(basename "$changed_path")" in
+    plugin.json)
+      diff -q <(show_file_at "$auto_merge_tree" "$changed_path" | grep -Ev "$VERSION_FIELD_LINE|$CONFLICT_MARKER_LINE") \
+        <(show_file_at "$merge_sha" "$changed_path" | grep -Ev "$VERSION_FIELD_LINE") > /dev/null ;;
+    CHANGELOG.md)
+      diff -q <(show_file_at "$auto_merge_tree" "$changed_path" | grep -Ev "$CONFLICT_MARKER_LINE" | mask_versions | sort) \
+        <(show_file_at "$merge_sha" "$changed_path" | mask_versions | sort) > /dev/null ;;
+    *) return 1 ;;
+  esac
+}
+
+# Succeeds when merge commit $1 is what git makes of its parent $2 (with the clean receipt) and its parent
+# $3 (a commit the default branch has), so it brings nothing of its own: its tree equals `git merge-tree`
+# of the two (git 2.38 or later; with an older git nothing is trivial), except for what is_resolution_only allows.
+is_trivial_default_merge() {
+  local merge_sha=$1 clean_parent=$2 default_parent=$3 default_ref merge_tree_output auto_merge_tree conflicted_paths drifted_paths changed_path
+  default_ref=$(get_default_branch_ref .)
+  [ -n "$default_ref" ] && git merge-base --is-ancestor "$default_parent" "$default_ref" 2>/dev/null || return 1
+  # Exit 1 is a merge with conflicts: its tree (markers in the files) is still the first line, then the conflicted paths.
+  merge_tree_output=$(git merge-tree --write-tree --name-only --no-messages "$clean_parent" "$default_parent" 2>/dev/null) || true
+  auto_merge_tree=$(head -n 1 <<< "$merge_tree_output")
+  is_full_sha "$auto_merge_tree" || return 1
+  # A conflicted path counts even when the merge committed git's own markers, so it never matches by accident.
+  conflicted_paths=$(sed -n '2,/^$/p' <<< "$merge_tree_output")
+  drifted_paths=$(git -c core.quotepath=off diff --name-only "$auto_merge_tree" "$merge_sha")
+  while IFS= read -r changed_path; do
+    is_resolution_only "$merge_sha" "$auto_merge_tree" "$changed_path" || return 1
+  done < <(printf '%s\n%s\n' "$conflicted_paths" "$drifted_paths" | grep -v '^$' | sort -u)
+}
+
+merge_depth=0
+# Succeeds when <sha> is a merge of the default branch into a commit with a clean receipt (or into
+# such a merge) that adds nothing of its own: the review of the clean parent still covers it.
+is_clean_default_merge() {
+  local sha=$1 parents parent_pair clean_parent default_parent found_clean_parent=false
+  [ "$merge_depth" -lt "$MAX_MERGE_DEPTH" ] || return 1
+  # shellcheck disable=SC2207 # a line of full SHAs
+  parents=($(git rev-list --parents -n 1 "$sha" 2>/dev/null)) || return 1
+  [ "${#parents[@]}" -eq "$MERGE_COMMIT_FIELDS" ] || return 1
+  merge_depth=$((merge_depth + 1))
+  for parent_pair in "${parents[1]} ${parents[2]}" "${parents[2]} ${parents[1]}"; do
+    read -r clean_parent default_parent <<< "$parent_pair"
+    if check_receipt "$clean_parent" --clean > /dev/null 2>&1 && is_trivial_default_merge "$sha" "$clean_parent" "$default_parent"; then
+      found_clean_parent=true
+      break
+    fi
+  done
+  merge_depth=$((merge_depth - 1))
+  $found_clean_parent
+}
+
+# Succeeds when <sha> has a receipt that is clean.
+has_clean_receipt() { [ -f "$receipts_dir/$1" ] && grep -qx 'clean=yes' "$receipts_dir/$1"; }
+
 # Prints <sha>'s receipt, or fails when it has none or, with --pass, when it
-# is for the checklist alone.
+# is for the checklist alone. With --clean, a merge of the default branch that
+# adds nothing to a clean head is clean with no receipt of its own.
 check_receipt() {
   local receipt=$receipts_dir/$1 pass_only=false clean_only=false
   case "${*:2}" in
@@ -688,11 +766,13 @@ check_receipt() {
     --clean) clean_only=true ;;
     *) usage ;;
   esac
+  if $clean_only && ! has_clean_receipt "$1"; then
+    is_clean_default_merge "$1" || return 1
+    printf 'sha=%s\nclean=yes\nmerged=default-branch\n' "$1"
+    return 0
+  fi
   [ -f "$receipt" ] || return 1
   if $pass_only && grep -qx 'checklist=walked' "$receipt"; then
-    return 1
-  fi
-  if $clean_only && ! grep -qx 'clean=yes' "$receipt"; then
     return 1
   fi
   cat "$receipt"
@@ -923,6 +1003,7 @@ write_receipt() {
       exit 1
     fi
     refuse_unanswered_comments
+    ! is_clean_default_merge "$sha" || echo "ready-receipt: $sha only merges the default branch into a clean head, so it counts as clean: guard-merge.sh merges it with no new pass"
     printf 'sha=%s\ndate=%s\nafter=%s\n' "$sha" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$after" > "$receipts_dir/$sha"
     [ -n "$verdicts$task" ] || inherit_verdicts "$after" "$sha"
   else

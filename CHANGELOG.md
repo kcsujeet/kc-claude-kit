@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Fixed (a merge of the default branch into a clean head stays clean)
+
+- `kc-gates` 3.18.1: `ready-receipt.sh check <sha> --clean` (and so `guard-merge.sh`, which now runs it in the pull request's repo) counts a merge of the default branch into a commit with a clean receipt as clean, with no new pass and no "approve merge", when the merge is what `git merge-tree` makes of its two parents (the second a commit the default branch has; git 2.38 or later): every other file must match git's own merge, so a stale copy of a file the default branch changed, reordered lines or an unresolved conflict keep it not clean. The only resolution allowed is in a `plugin.json` (its `"version"` lines) and a `CHANGELOG.md` (version numbers and entry order). `write <sha> --after <clean-sha>` says when it notices such a merge; `--after` on a fix commit still never makes the head clean. Same class as the prose-rule fix below (a guard blames a change for content it only carried in). Held by `tests/ready-receipt-merge.test.sh`.
+
 ### Added (a turn that did work leaves an improvement record)
 
 - `kc-gates` 3.18.0: new Stop hook `guard-better-line.sh` blocks the end of a turn that made a tool call that is not a read (an edit, a write, an agent, or a command that is not plainly read-only) unless the session's `better-lines/<session id>` file in the plugin data folder holds a line for the turn: `<UTC time> TAB <thing improved> TAB <before> TAB <after>`, or `<time> TAB none TAB <what was checked or measured>`. A line that only lists an action (fixed, posted, merged) or has no change between before and after is no record. The hook reads no reply and never asks for anything in it; the block message (under 60 words) names the file and the shape, and the second try passes (`stop_hook_active`). Held by `tests/guard-better-line.test.sh`.
