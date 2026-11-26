@@ -1,0 +1,19 @@
+diff --git a/app/checkout.rb b/app/checkout.rb
+new file mode 100644
+index 0000000..1111111
+--- /dev/null
++++ b/app/checkout.rb
+@@ -0,0 +1,13 @@
++total = order.shop.owner.name
++names = items.select(&:paid?).map(&:name).join(', ')
++label = format_money(round_cents(convert(amount, rate)))
++total = order.items.sum(&:price)
++ids = orders.map { |o| o.id }.uniq
++# items.select(&:paid?).map(&:name).join(', ')
++label = "#{item.name.strip.downcase}"
++city = order.shop.address&.city || default_city(order, shop, fallback_shop_lookup(order))
++def total(order, currency = default_currency(shop))
++if paid?(order) && stock?(item)
++require 'json'
++total = items.sum { |item| item.price * item.quantity }
++@widgets_by_shop[shop.id] ||= load_widgets(shop, archived: false, sort_by: sort_key(shop))

@@ -1,0 +1,3 @@
+app/checkout.rb:2: names = items.select(&:paid?).map(&:name).join(', ')
+app/checkout.rb:3: label = format_money(round_cents(convert(amount, rate)))
+app/checkout.rb:8: city = order.shop.address&.city || default_city(order, shop, fallback_shop_lookup(order))
