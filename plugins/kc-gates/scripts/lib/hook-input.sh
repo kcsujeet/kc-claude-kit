@@ -294,6 +294,15 @@ read_change_class() {
   printf '%s' "${class:-full}"
 }
 
+# is_small_class <class>: succeeds for a class that needs no review pass receipt: prose_small, or
+# code_small (pass-size.sh small with no risk: line). full, and anything unreadable, fails.
+is_small_class() {
+  case "${1:-}" in
+    prose_small | code_small) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
 # needed_phrases_sentence <dir> <this guard's phrase>: the sentence a block that needs the user's typed
 # words ends with: every phrase the remaining steps need (approvals-needed.sh, this guard's first),
 # so the user types one message. Prints nothing in check-only mode (KC_CHECK_ONLY=1), where

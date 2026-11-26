@@ -52,8 +52,8 @@ check_verdict allow "allowed: someone else's pull request" "gh pr merge 7 --squa
 check_verdict allow "allowed: a lookup that fails is not blocked" "gh pr merge 7 --squash" "$work_dir/repo"
 check_verdict allow "allowed: a command that is not a merge" "gh pr view 7" "$work_dir/repo"
 
-# A pull request whose change is a few prose lines (change-class.sh: prose_small) merges with no
-# receipt once its checks pass; the same plus a script, or a small change on a risk path, does not.
+# A pull request whose change is small with no risk line (change-class.sh: prose_small or code_small)
+# merges with no receipt once its checks pass; a small change on a risk path, or a full-size one, does not.
 run_git_in() { local repo=$1; shift; git -C "$repo" -c user.name=t -c user.email=t@example.test "$@"; }
 small_repo="$work_dir/small-repo"
 git init -q -b main "$small_repo"
@@ -83,10 +83,17 @@ expect_not_contains "the block asks for no phrase" "approve merge" "$last_hook_o
 check_verdict allow "allowed: a small prose pull request merged with --auto, which waits for its checks" "gh pr merge 7 --squash --auto" "$small_repo"
 route_pull_request me "$prose_head" '[{"conclusion":"FAILURE"}]'
 check_verdict deny "blocked: a small prose pull request whose check failed" "gh pr merge 7 --squash" "$small_repo"
-route_pull_request me "$(commit_branch wording-and-tool rules.md tool.sh)"
-check_verdict deny "blocked: the same pull request plus one script, no receipt" "gh pr merge 7 --squash" "$small_repo"
-expect_contains "the block lists every phrase the remaining steps need" 'types one message: \"approve merge\".' "$last_hook_output"
+code_head=$(commit_branch wording-and-tool rules.md tool.sh)
+route_pull_request me "$code_head"
+check_verdict allow "allowed: a small code pull request with no risk line, checks passed, no receipt" "gh pr merge 7 --squash" "$small_repo"
+route_pull_request me "$code_head" '[{"status":"IN_PROGRESS","conclusion":null}]'
+check_verdict deny "blocked: a small code pull request whose checks still run" "gh pr merge 7 --squash" "$small_repo"
 route_pull_request me "$(commit_branch risky auth-rules.md tool.sh)"
 check_verdict deny "blocked: a small change with a risk line, no receipt" "gh pr merge 7 --squash" "$small_repo"
+expect_contains "the block lists every phrase the remaining steps need" 'types one message: \"approve merge\".' "$last_hook_output"
+route_pull_request me "$(commit_branch security-fix tool.sh session-timeout.sh)"
+check_verdict deny "blocked: a small change in a security path, no receipt" "gh pr merge 7 --squash" "$small_repo"
+route_pull_request me "$(commit_branch big rules.md a.sh b.sh c.sh d.sh e.sh)"
+check_verdict deny "blocked: a full-size pull request, no receipt" "gh pr merge 7 --squash" "$small_repo"
 
 finish

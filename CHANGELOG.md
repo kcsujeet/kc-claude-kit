@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Changed (a small change with no risk line needs no review pass)
+
+- `kc-gates` 3.18.3: `guard-hand-off.sh` (first push, `gh pr create`, ready, reviewer request) and `guard-merge.sh` no longer require a review receipt for a change `change-class.sh` classes `code_small` (`pass-size.sh` small with no `risk:` line, which reuses `lib/risk-paths.sh` and `.claude/sensitive-paths.txt`), as they already did for `prose_small`: the hand-off still needs the checklist verdicts, and a merge waits for its checks. Any risk line (auth, security, permissions, payments, deletion, migration, public API, a public page) or a full-size change keeps today's block. The "run the small pass now, do not offer to skip it" hint is gone, since that class no longer reaches the block. `kc-ready-for-review` says so in "When it runs". Held by `tests/guard-hand-off.test.sh` and `tests/guard-merge.test.sh`.
+
 ### Fixed (a question to the person is a product, scope or irreversible call, in plain words)
 
 - `kc-gates` 3.18.2: new PreToolUse hook `guard-ask-product-only.sh` (matcher `AskUserQuestion`) denies a question whose text, header or options hold code or review words (a backtick, a file path or name, a section id, `kc-...`, "gate", "finding", "round 2", "verdict", "checklist") or whose question does not begin `Product:`, `Scope:`, `Irreversible:` or `Intent:`; the reason says to settle a code-level choice with the fewest moving parts and go on. `kc-code-review`'s contested-call rule and `kc-ready-for-review` step 6 no longer route code-style conflicts to the user: only product, scope and irreversible calls are asked, and the rest is settled by the agent and recorded, as the working agreement already said. Held by `tests/guard-ask-product-only.test.sh`.
