@@ -128,7 +128,8 @@ merge_head=$(conclude_merge)
 expect_eq "a merge that resolves a conflict in a code file is not clean" not-clean "$(check_clean "$merge_head")"
 run_git_in "$repo" reset -q --hard HEAD^1
 run_git_in "$repo" merge --no-commit --no-ff main > /dev/null 2>&1 || true
-merge_head=$(conclude_merge "git -C \"$repo\" checkout \"\$(git -C \"$repo\" merge-tree --write-tree --no-messages \"\$(git -C \"$repo\" rev-parse HEAD)\" \"\$(git -C \"$repo\" rev-parse main)\" | head -n 1)\" -- other.sh")
+conflicted_tree=$(git -C "$repo" merge-tree --write-tree --no-messages "$(git -C "$repo" rev-parse HEAD)" "$(git -C "$repo" rev-parse main)" | head -n 1) || true
+merge_head=$(conclude_merge "git -C \"$repo\" checkout $conflicted_tree -- other.sh")
 expect_eq "a merge that commits git's own conflict markers in a code file is not clean" not-clean "$(check_clean "$merge_head")"
 
 build_repo

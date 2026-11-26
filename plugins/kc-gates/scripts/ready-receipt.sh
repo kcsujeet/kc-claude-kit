@@ -716,7 +716,7 @@ is_resolution_only() {
 # $3 (a commit the default branch has), so it brings nothing of its own: its tree equals `git merge-tree`
 # of the two (git 2.38 or later; with an older git nothing is trivial), except for what is_resolution_only allows.
 is_trivial_default_merge() {
-  local merge_sha=$1 clean_parent=$2 default_parent=$3 default_ref merge_tree_output auto_merge_tree changed_path
+  local merge_sha=$1 clean_parent=$2 default_parent=$3 default_ref merge_tree_output auto_merge_tree conflicted_paths drifted_paths changed_path
   default_ref=$(get_default_branch_ref .)
   [ -n "$default_ref" ] && git merge-base --is-ancestor "$default_parent" "$default_ref" 2>/dev/null || return 1
   # Exit 1 is a merge with conflicts: its tree (markers in the files) is still the first line, then the conflicted paths.
@@ -724,9 +724,11 @@ is_trivial_default_merge() {
   auto_merge_tree=$(head -n 1 <<< "$merge_tree_output")
   is_full_sha "$auto_merge_tree" || return 1
   # A conflicted path counts even when the merge committed git's own markers, so it never matches by accident.
+  conflicted_paths=$(sed -n '2,/^$/p' <<< "$merge_tree_output")
+  drifted_paths=$(git -c core.quotepath=off diff --name-only "$auto_merge_tree" "$merge_sha")
   while IFS= read -r changed_path; do
     is_resolution_only "$merge_sha" "$auto_merge_tree" "$changed_path" || return 1
-  done < <({ sed -n '2,/^$/p' <<< "$merge_tree_output"; git -c core.quotepath=off diff --name-only "$auto_merge_tree" "$merge_sha"; } | grep -v '^$' | sort -u)
+  done < <(printf '%s\n%s\n' "$conflicted_paths" "$drifted_paths" | grep -v '^$' | sort -u)
 }
 
 merge_depth=0
