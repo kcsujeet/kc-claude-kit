@@ -9,7 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ### Added (a dense expression is found by a script, not by eye)
 
 - `kc-conventions` 2.8.1: new sweep `kc-clarity/scripts/dense-expressions.sh` (§C13) lists added lines in non-test code files holding a call chain of 3+ links (2+ of them calls), calls nested 3+ deep, or 3+ non-trivial parts (call, `??`/`||` fallback, ternary, cast) in 70+ characters, in any language the conventions cover; a plain property path, comments, imports and test files are skipped. The §C13 box now names the sweep and its `grepped dense expressions: N hits` receipt. Held by the sweep fixtures `tests/sweeps/kc-clarity/dense-expressions{,.ruby,.python,.tests}`.
-- `kc-gates` 3.18.2: `verify-gate-blocks.sh` runs that sweep on the round's `review.diff` and fails when the receipt's count is not the script's, when a hit is not named `path:line` in the receipt's box, or when the diff has a hit and no receipt; the verification gate lists the receipt as a trigger group. Case `evals/general-boxes` gains a seeded chain and its grader. Held by `tests/verify-gate-blocks.test.sh`.
+- `kc-gates` 3.18.2: `verify-gate-blocks.sh` runs that sweep on the round's `review.diff` and fails when the receipt's count is not the script's, when a hit is not named `path:line` in the receipt's box, or when the diff has a hit and no receipt; the verification gate lists the receipt as a trigger group. Held by `tests/verify-gate-blocks.test.sh` (no eval case changed).
 
 ### Fixed (a merge of the default branch into a clean head stays clean)
 
