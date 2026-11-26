@@ -313,13 +313,10 @@ expect_contains "a risk line keeps the usual block" "KC_READY_SKIP=1" "$(build_p
 
 # A small code change needs no pass receipt but still needs the hand-off checklist's verdicts.
 small_checklist_repo="$work_dir/small-checklist-repo"
-git init -q -b main "$small_checklist_repo"
+make_checklist_repo "$small_checklist_repo" '# Hand-off checklist\n\n- [ ] The shop total is documented in the README for readers.\n'
+git -C "$small_checklist_repo" branch -q -m main
 git init -q --bare "$work_dir/small-checklist-remote.git"
 git -C "$small_checklist_repo" remote add origin "$work_dir/small-checklist-remote.git"
-mkdir "$small_checklist_repo/.claude"
-printf '# Hand-off checklist\n\n- [ ] The shop total is documented in the README for readers.\n' > "$small_checklist_repo/.claude/hand-off-checklist.md"
-git -C "$small_checklist_repo" add .claude
-git -C "$small_checklist_repo" -c user.name=t -c user.email=t@example.test commit -q -m checklist
 git -C "$small_checklist_repo" push -q origin main
 git -C "$small_checklist_repo" checkout -q -b small-tool
 printf 'echo ship\n' > "$small_checklist_repo/tool.sh"
