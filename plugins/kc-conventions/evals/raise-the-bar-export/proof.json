@@ -1,8 +1,8 @@
 {
   "case": "plugins/kc-conventions/evals/raise-the-bar-export",
-  "commit": "9f98ccd6c31a2d5b1989183bf3acf9c9a39ea549",
+  "commit": "09a9e71ba2339fe02ad3a0c818f7da44e2589b36",
   "case_hash": "5b9b4981df2723ab0e3c87e17b1345f73c0c2347",
-  "plugins_hash": "4df1c679baa55520dd95d259ae5620d81e57969e",
+  "plugins_hash": "e879d85f02cfca54370415683b54574b2f7c0512",
   "claude": "2.1.332 (Claude Code)",
   "model": "sonnet",
   "verdict": "ok",
