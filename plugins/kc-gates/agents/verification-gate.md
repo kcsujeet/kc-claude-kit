@@ -50,7 +50,6 @@ For §V2, list which trigger groups applied and cite each group's receipt, or it
   - boolean logic added/edited → `grepped &&/||: N hits` with per-hit verdicts (N/A: no boolean chain added/edited)
   - ternaries, casts, `any`, non-null assertions, or conditional spreads added/edited → `grepped ternaries: N hits` (each hit labelled single-line or MULTI-LINE) / `grepped as-casts: N hits` / `grepped any: N hits` / `grepped non-null assertions: N hits` / `grepped conditional spreads: N hits` (N/A: none of the five added/edited)
   - numeric literals added → `grepped numeric literals: N hits` with a verdict per hit (N/A: the sweep found 0 hits, stated)
-  - dense expressions added → `grepped dense expressions: N hits`, each hit named `path:line` with a verdict (N/A: the sweep found 0 hits, stated)
   - hooks/queries/mutations added/edited → named consumers per new hook, `mutateAsync` grep receipt (N/A: no hook/query/mutation added/edited)
   - state added/edited → lowest-common-ancestor placement stated, rationale comment confirmed for order-dependent mutations (N/A: no state added/edited)
   - dead wrappers kept anywhere in the diff → what each earns its place stated (N/A: no wrapper-shaped code in diff)
@@ -138,12 +137,6 @@ N/A: the diff adds no `switch` and no `if`/`else-if` chain.
 Owning gate: **clarity** (§C16). Required receipt: `grepped numeric literals: N hits`, `0 hits` stated when true, each hit with its verdict (named, a design token, plain on sight, or flagged).
 
 N/A: the sweep found no hit.
-
-### Dense expressions added
-
-Owning gate: **clarity** (§C13). `verify-gate-blocks.sh` already checks the counts; judge each hit's verdict.
-
-N/A: 0 hits, stated.
 
 ### Test files touched or behavior changed
 
