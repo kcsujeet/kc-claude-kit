@@ -321,6 +321,7 @@ expect_contains "§V11: an only-state reason under three words fails" "consumer 
   printf 'name script_name (enclosing, app/models/order.rb): 22 uses\n'
   # shellcheck disable=SC2016 # $script_name is fixture text, not an expansion
   for fixture_index in $(seq 1 20); do printf '  lib/generic_%s.rb:1: echo "usage: $script_name"\n' "$fixture_index"; done
+  # shellcheck disable=SC2016 # fixture text, not an expansion
   printf '  lib/assigned.rb:1: script_name=$(basename "$0")\n  lib/commented.rb:1: # script_name is the basename\n  lib/passed.rb:1: render(script_name, other)\n'
   printf 'tests: 0\nsummary: 1 names, 22 uses, 0 test files\n'
 } > "$uses_file"
