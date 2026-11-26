@@ -204,7 +204,7 @@ get_uncovered_dimension() {
 }
 
 # Prints the files, other than tests and the item itself, that use a name the item changes, one per
-# line. Every code use counts, with no cap. Prose and config files, comments, quoted text, plain
+# line. Every code use counts, with no cap. Prose and config files, comments, quoted words, plain
 # `$name` reads and `name=` assignments, and an enclosing name that is never called do not.
 get_consumers() {
   KC_TEST_PATHS=$KC_RISK_TEST_PATHS KC_SOURCE_PATHS=$KC_RISK_SOURCE_PATHS awk -v item="$1" '
@@ -223,7 +223,7 @@ get_consumers() {
       consumer = $1; sub(/:[0-9]+:.*$/, "", consumer)
       use_text = $0; sub(/^  [^ ]*:[0-9]+: /, "", use_text)
       is_comment = (use_text ~ /^[ \t]*(#|\/\/|\*|\/\*)/)
-      gsub(/"[^"]*"/, "", use_text); gsub(/\x27[^\x27]*\x27/, "", use_text); sub(/[ \t]+(#|\/\/).*$/, "", use_text)
+      gsub(/"[^"$#]*"/, "", use_text); gsub(/\x27[^\x27]*\x27/, "", use_text); sub(/[ \t]+(#|\/\/).*$/, "", use_text)
       is_item_itself = (consumer == item)
       is_test_file = (consumer ~ ENVIRON["KC_TEST_PATHS"])
       is_code_file = (consumer ~ ENVIRON["KC_SOURCE_PATHS"])

@@ -317,13 +317,15 @@ expect_contains "§V11: an only-state reason under three words fails" "consumer 
 # A prose mention is not a consumer (the fixture's docs/orders.md). Neither is a comment, quoted text,
 # or a plain variable of the changed name when the name is only the hunk's enclosing context.
 reader_count=20
+other_use_count=3
+generic_use_count=$((reader_count + other_use_count))
 {
-  printf 'name script_name (enclosing, app/models/order.rb): %s uses\n' "$((reader_count + 3))"
+  printf 'name script_name (enclosing, app/models/order.rb): %s uses\n' "$generic_use_count"
   # shellcheck disable=SC2016 # $script_name is fixture text, not an expansion
   for fixture_index in $(seq 1 "$reader_count"); do printf '  lib/generic_%s.rb:1: echo "usage: $script_name"\n' "$fixture_index"; done
   # shellcheck disable=SC2016 # fixture text, not an expansion
   printf '  lib/assigned.rb:1: script_name=$(basename "$0")\n  lib/commented.rb:1: # script_name is the basename\n  lib/passed.rb:1: render(script_name, other)\n'
-  printf 'tests: 0\nsummary: 1 names, %s uses, 0 test files\n' "$((reader_count + 3))"
+  printf 'tests: 0\nsummary: 1 names, %s uses, 0 test files\n' "$generic_use_count"
 } > "$uses_file"
 write_consumer_receipt ''
 expect_eq "§V11: variable reads, assignments and an uncalled bare use of an enclosing name are not consumers" clean "$(run_consumer_check)"
@@ -331,14 +333,15 @@ expect_eq "§V11: variable reads, assignments and an uncalled bare use of an enc
 # text and a spaced assignment of it are not.
 {
   # shellcheck disable=SC2016 # fixture text, not an expansion
-  printf 'name script_name (definition, app/models/order.rb): 5 uses\n  lib/passed.rb:1: render(script_name, other)\n  lib/read.rb:1: echo "usage: $script_name"\n  lib/commented.rb:1: # script_name is the basename\n  lib/quoted.rb:1: log("script_name is a word here")\n  lib/spaced.rb:1: script_name = other\n'
-  printf 'tests: 0\nsummary: 1 names, 5 uses, 0 test files\n'
+  printf 'name script_name (definition, app/models/order.rb): 6 uses\n  lib/passed.rb:1: render(script_name, other)\n  lib/read.rb:1: echo "usage: $script_name"\n  lib/commented.rb:1: # script_name is the basename\n  lib/quoted.rb:1: log("script_name is a word here")\n  lib/spaced.rb:1: script_name = other\n  lib/subst.sh:1: result="$(script_name arg)"\n'
+  printf 'tests: 0\nsummary: 1 names, 6 uses, 0 test files\n'
 } > "$uses_file"
 definition_uses=$(run_consumer_check)
 expect_contains "§V11: a bare use of a definition name is a consumer" "consumer lib/passed.rb uses what this item changes" "$definition_uses"
 expect_not_contains "§V11: a \$name read of a definition name is not" "consumer lib/read.rb" "$definition_uses"
 expect_not_contains "§V11: a comment mentioning a definition name is not" "consumer lib/commented.rb" "$definition_uses"
 expect_not_contains "§V11: quoted text holding a definition name is not" "consumer lib/quoted.rb" "$definition_uses"
+expect_contains "§V11: a call inside a double-quoted command substitution is a consumer" "consumer lib/subst.sh uses what this item changes" "$definition_uses"
 expect_not_contains "§V11: a spaced assignment of a definition name is not" "consumer lib/spaced.rb" "$definition_uses"
 # A name with regex characters (a `$` prefix) still finds its consumers.
 {
@@ -359,7 +362,9 @@ expect_eq "§V11: a function with $caller_count code callers needs $caller_count
   printf 'name Order (enclosing, app/models/order.rb): 2 uses\n  lib/caller_a.rb:1: result = Order.create(params)\n  lib/caller_b.rb:1: Order.create(params)\n'
   printf 'tests: 0\nsummary: 1 names, 2 uses, 0 test files\n'
 } > "$uses_file"
-expect_contains "§V11: an enclosing name used at command position is a consumer" "consumer lib/caller_b.rb uses what this item changes" "$(run_consumer_check)"
+enclosing_callers=$(run_consumer_check)
+expect_contains "§V11: an enclosing name used at command position is a consumer" "consumer lib/caller_b.rb uses what this item changes" "$enclosing_callers"
+expect_contains "§V11: an enclosing name used as a member call after other text is a consumer" "consumer lib/caller_a.rb uses what this item changes" "$enclosing_callers"
 write_consumer_receipt "$full_entries"
 printf 'name Order (definition, app/models/order.rb): 1 uses\n  app/models/order.rb:9: Order.first\ntests: 0\nsummary: 1 names, 1 uses, 0 test files\n' > "$uses_file"
 printf 'env\tbin/review-env up\tGET /health 200\napp/models/order.rb\tsaved an order\tPOST /orders 201\tstates: full form; empty cart\n' > "$receipt"
