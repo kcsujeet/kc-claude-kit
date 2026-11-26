@@ -25,6 +25,7 @@ paths:
   - §I7. Never concatenate translations
   - §I8. Text shown to people is never also an identifier
   - §I9. No grammar attached to a placeholder
+  - §I10. One term, one spelling, on every screen
 
 ## Rules
 
@@ -37,6 +38,7 @@ A key is added once and read by every translator afterwards. Two keys for one st
 - Generic nouns, labels and headings live in the shared namespace, not inside a feature file. `Total`, `Notes`, `Header` are not feature-specific just because you needed one there first.
 - A fixed label, heading, column or nav item is a plain string key, one per form the screen shows (`"addOn": "Add-on"`, `"addOns": "Add-ons"`). An ICU plural message is only for a real count: it uses `#` and is read with the actual number variable. Never pass a literal count (`count: 0`, `1`, `2`) to get a word form.
 - No grammar attached to a placeholder: `"{name}'s plan"` and `"{count}th"` can't be inflected by a translator. Write the sentence so the placeholder stands alone (`"The plan for {name}"`).
+- One term, one spelling: a term renamed or respelled is changed in every message that shows it, not only the ones the change was about. `Add Addons` on a button beside `Add-ons` on its card is the miss.
 - Never concatenate translations. `t('delete') + ' ' + t('booking')` has an order that is wrong in half the languages we ship. A verb plus a noun decomposes into an action template with the noun interpolated.
 - A label next to a runtime value **is** interpolation, and that is correct. Do not invent a composite key to avoid it.
 - Text shown to people is never also used as an identifier. A value kept in state, a link, a filter or a stored field holds a key (`other`), and the screen shows its translation; the moment the label is translated, a label used as a value either stays untranslated or breaks.
@@ -56,6 +58,7 @@ The i18n gate agent ticks every box against the diff. A box is FAIL if any key o
 - [ ] §I7 No translation concatenation: no `t(a) + t(b)` or template-joined translatable fragments; verb+noun values decompose into an action template plus a noun key; label+data is interpolation and is not flagged, and no redundant composite key was invented in its place. (N/A: no new key values or call sites in diff)
 - [ ] §I8 Text shown to people is never an identifier: every string the diff adds that a user sees and that is also stored, compared, put in a link or used as a key FAILS; the stored side holds a key and the screen renders its translation. **Enumerate** constants and literals that reach both a screen and a value. (N/A: none added)
 - [ ] §I9 No grammar attached to a placeholder: a message with `{name}'s`, `{count}th` or another suffix, article or agreement written against a placeholder FAILS; the placeholder stands alone (`The plan for {name}`), or an ordinal is a `selectordinal` message. **Enumerate with the `placeholder-grammar.sh` sweep** (see Sweeps). (N/A: no message value added in the diff, stated as `grepped placeholder grammar: 0 hits`)
+- [ ] §I10 One term, one spelling: when the diff adds, renames or respells a term in a message value, every other message in the source locale writes it the same way. A second spelling of it that differs only by a hyphen (`Addons` beside `Add-ons`, `e-mail` beside `email`) FAILS, whether or not the diff touched that line: a renamed term left in its old spelling on another screen is the miss. **Enumerate with the `term-spellings.sh` lookup** over the whole source-locale tree (see Sweeps), and give each listed word a verdict (respell, or two meanings such as `checkout` and `check-out`). (N/A: no message value added or changed in the diff, stated as `term spellings: N words` either way)
 
 ## Review detail
 
@@ -201,6 +204,10 @@ A filter offers "Other" for records with no category and uses the same string as
 
 A placeholder reaches the translator as `{name}`, a value they can't see or inflect. `"{name}'s plan"` assumes the English possessive, `"{count}th"` the English ordinal, `"a {thing}"` the English article: each is wrong in a language that marks the same idea another way (a case ending, a preposition, a different ordinal). Write the sentence so the placeholder stands alone: `"The plan for {name}"`, `"Position: {count}"`. An ordinal that has to be an ordinal is a `selectordinal` message, which carries the suffix in the message where the translator can change it. `placeholder-grammar.sh` lists added possessive and ordinal-suffix shapes in locale files; articles and agreement are judged by reading.
 
+### §I10. One term, one spelling, on every screen
+
+A term the product renames (`Addons` to `Add-ons`) is renamed everywhere people read it, not only in the strings the change was about: a button, a drawer title or an empty state left in the old spelling is what a tester finds next. Diff sweeps read only added lines, and the stale spelling sits in lines the diff never touched, so `term-spellings.sh` reads the whole source-locale tree and lists every word written in more than one spelling once case and hyphens are set aside, with each place of each spelling that is not the most used one. Two spellings with two meanings (`checkout` the purchase, `check-out` the departure) are a verdict, not a change. Spellings that differ by a space (`add ons`) are judged by reading.
+
 ## Sweeps
 
 Save the diff under review to a file and run `added-lines.sh` over it; `-` reads the diff from stdin. Two diff sweeps and the §I3 lookup. The diff sweeps print one `path:line: text` hit per line; give every hit its own verdict and state each receipt with its count, `0 hits` included.
@@ -209,6 +216,12 @@ Save the diff under review to a file and run `added-lines.sh` over it; `-` reads
 
   ```bash
   bash "${CLAUDE_PLUGIN_ROOT}/skills/kc-i18n/scripts/locale-duplicates.sh" <locale-dir> <value> <leaf-key>
+  ```
+
+- `term-spellings.sh` (§I10, a lookup over the whole tree, not a diff sweep): takes the source-locale directory and prints `<word>: <most used spelling> x<count> (first <path>:<line>); <other spelling> (<path>:<line>, ...)` for each word with more than one spelling. Run it once whenever the diff adds or changes a message value. Receipt: `term spellings: N words`.
+
+  ```bash
+  bash "${CLAUDE_PLUGIN_ROOT}/skills/kc-i18n/scripts/term-spellings.sh" <locale-dir>
   ```
 
 - `literal-plural-count.sh` (§I6): added lines in code files that pass a numeric literal as `count` to a translation call (`t('addOn', { count: 1 })`, `formatMessage(message, { count: 0 })`), across a call's lines. The fix is a plain label key. Receipt: `grepped literal plural counts: N hits`.

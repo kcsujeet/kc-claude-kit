@@ -251,7 +251,7 @@ if $is_later_round; then
     walk_count=$((walk_count + 1))
     printf '%s\n' "$receipt_text" | grep -F "$walk_path" | grep -q 'Walk:' \
       || problem "verdicts/: walk-item $walk_path has no \"Walk:\" line naming it"
-  done < <(printf '%s\n' "$gate_report" | sed -n 's/^walk-item: //p')
+  done < <(printf '%s\n' "$gate_report" | sed -n 's/^walk-item: //p' | sed -E 's/ surface: [a-z]+$//')
 fi
 
 if [ -s "$problems" ]; then

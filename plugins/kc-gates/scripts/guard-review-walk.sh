@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
 # Hook: no review verdict while the review's walk receipt fails. kc-code-review's walk rule says
-# every behaviour a diff changes is seen in the running app or at the API before the verdict;
+# every behaviour a diff changes is seen on its QA surface (browser, API, terminal, unit) before the verdict;
 # guard-github-post.sh already refuses to post or approve such a review, and this guard holds the
 # verdict itself, so a review is never called done in chat with its walk skipped.
 #
 # The review is the `$KC_REVIEW_DIR` folder, or else the newest saved `${TMPDIR:-/tmp}/kc-review-*`
-# folder from the last day (gather-review.sh; lib/review-dir.sh). select-gates.sh is run on its
+# folder from the last day (gather-review.sh; lib/review-dir.sh) whose head commit is in the git
+# checkout the session runs in (the payload's cwd), so another session's review in another repo
+# never holds this one's replies. select-gates.sh is run on its
 # diff, and check-walk-receipt.sh on its walk-receipt.tsv. While that check fails:
 #   - PreToolUse (Agent): a dispatch of the verification gate (`kc-gates:verification-gate`, the
 #     review's phase 2, which comes right before the verdict) is denied, so the walk comes first;
@@ -48,7 +50,7 @@ is_walk_offer() {
 get_walk_problems() {
   local scripts_dir review_dir selected
   scripts_dir=$(dirname "$0")
-  review_dir=${KC_REVIEW_DIR:-$(find_review_dir "" "")}
+  review_dir=$(session_review_dir)
   has_review_files "$review_dir" || return 0
   selected=$(mktemp)
   if bash "$scripts_dir/select-gates.sh" "$review_dir/review.diff" "$review_dir/changed-files.txt" . > "$selected" 2>/dev/null; then
@@ -57,8 +59,19 @@ get_walk_problems() {
   rm -f "$selected"
 }
 
+# Prints $KC_REVIEW_DIR, or the newest saved review gathered from the session's checkout.
+session_review_dir() {
+  local found
+  if [ -n "${KC_REVIEW_DIR:-}" ]; then printf '%s' "$KC_REVIEW_DIR"; return 0; fi
+  found=$(find_review_dir "" "")
+  [ -n "$found" ] && review_belongs_to "$found" "$session_cwd" && printf '%s' "$found"
+  return 0
+}
+
 command -v jq >/dev/null 2>&1 || exit 0
 payload=$(cat)
+session_cwd=$(printf '%s' "$payload" | jq -r '.cwd // empty' 2>/dev/null)
+[ -n "$session_cwd" ] || session_cwd=$PWD
 event=$(printf '%s' "$payload" | jq -r '.hook_event_name // empty' 2>/dev/null)
 case "$event" in
   PreToolUse)
@@ -86,7 +99,7 @@ if [ -z "$problems" ]; then
   is_verdict_reply=false
   [ "${stop_kind:-}" = verdict ] && is_verdict_reply=true
   if "$is_verdict_reply"; then
-    review_dir=${KC_REVIEW_DIR:-$(find_review_dir "" "")}
+    review_dir=$(session_review_dir)
     verdicts_dir=$review_dir/verdicts
     report_problems=$(printf '%s' "$reply" | bash "$(dirname "$0")/check-review-report.sh" - 2>&1 | tr '\n' ' ' | cut -c1-"$report_problems_max_chars")
     if has_review_files "$review_dir" && [ -d "$verdicts_dir" ]; then
@@ -107,7 +120,7 @@ if [ -z "$problems" ]; then
   fi
   exit 0
 fi
-walk_steps="Walk each changed behaviour in the running app or at the API, as every audience that can reach it (signed out too for a public path, replaying each write with another record's id and again with the same id), and write one line per walk-item to walk-receipt.tsv beside review.diff: path, what was seen, evidence (a screenshot or recording path, or a request line with its status)."
+walk_steps="Walk each changed behaviour on its QA surface (browser, API, terminal, unit), as every audience that can reach it (signed out too for a public path, replaying each write with another record's id and again with the same id), and write one line per walk-item to walk-receipt.tsv beside review.diff: path, what was seen, evidence (the surface's evidence: browser a screenshot or recording path, api a curl request and its saved response, terminal or unit a run transcript, exit 0: run.txt)."
 if [ "$event" = PreToolUse ]; then
   block_reason="Blocked by the kc-gates plugin: the review has items it has not walked, so the verification gate cannot run yet (it audits the walk receipt). $walk_steps Then dispatch it again. $problems"
   printf '%s' "$block_reason" | jq -Rsc '{hookSpecificOutput: {hookEventName: "PreToolUse", permissionDecision: "deny", permissionDecisionReason: .}}'

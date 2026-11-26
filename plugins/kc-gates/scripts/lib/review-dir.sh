@@ -7,6 +7,14 @@ has_review_files() {
   [ -n "$1" ] && [ -f "$1/review.diff" ] && [ -f "$1/changed-files.txt" ]
 }
 
+# True when the saved review <dir> was gathered from the git checkout at <cwd>: its meta.env
+# HEAD_SHA is a commit there. A review folder from another session's repo is not this one's.
+review_belongs_to() {
+  local head
+  head=$(sed -n 's/^HEAD_SHA=//p' "$1/meta.env" 2>/dev/null | head -n 1)
+  [ -n "$head" ] && git -C "$2" cat-file -e "$head^{commit}" 2>/dev/null
+}
+
 # Prints the saved review folder (gather-review.sh's kc-review-*, from the last day) with the
 # newest meta.env among those for this repo and, when given, this pull request; nothing if none.
 find_review_dir() {

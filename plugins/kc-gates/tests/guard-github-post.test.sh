@@ -278,7 +278,7 @@ for form in "${write_forms[@]}"; do
 done
 printf 'app/models/order.rb\tcreated an order with a free item\tno evidence\tstates: empty cart; two items\n' > "$review_folder/walk-receipt.tsv"
 check deny  "walk: a receipt line with bad evidence is denied" "$walk_token gh pr review 12 --approve"
-expect_last_reason "walk: the denial for bad evidence says what the evidence must be" "evidence is neither an existing screenshot or recording nor a request line"
+expect_last_reason "walk: the denial for bad evidence says what the evidence must be" "is a unit surface: give a run transcript"
 printf 'env\tbin/review-env up\tGET /health 200\napp/models/order.rb\tcreated an order with a free item\tPOST /orders 201\tstates: empty cart; two items\n' > "$review_folder/walk-receipt.tsv"
 for form in "${write_forms[@]}"; do
   check allow "walk: a full receipt allows: $form" "$walk_token $form"

@@ -1,0 +1,7 @@
+{
+  "addOns": "Add-ons",
+  "noAddOns": "No add-ons yet.",
+  "addAddOns": "Add Addons",
+  "summary": "{addons, plural, =0 {No add-ons} other {# Add-ons}}",
+  "greeting": "Hello {name}"
+}
