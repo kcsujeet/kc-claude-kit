@@ -42,6 +42,17 @@
         ]
       },
       {
+        "matcher": "Edit|Write|MultiEdit|Bash|REPL",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/hooks/guard-shape.sh\"",
+            "shell": "bash",
+            "timeout": 10
+          }
+        ]
+      },
+      {
         "matcher": "Bash|mcp__.*[Cc]omment.*",
         "hooks": [
           {
