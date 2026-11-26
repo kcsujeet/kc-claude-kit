@@ -17,7 +17,11 @@
 #       stay in review but never makes the head clean: to merge, review those
 #       fixes as the pass's next round and write --rounds <k> for the new
 #       head. Refused unless <pass-sha> has a pass or --after receipt and
-#       <sha> descends from it. Run it from the repo root.
+#       <sha> descends from it. Run it from the repo root. A <sha> that is a
+#       merge of the default branch into a clean head, adding nothing the
+#       default branch did not have (only a plugin manifest's version field or
+#       CHANGELOG entry order resolved), is clean with no new pass: the write
+#       says so, and check --clean accepts it (guard-merge.sh merges it).
 #   ready-receipt.sh write <sha> --checklist [--ledger <dir>]
 #       After walking the repo's hand-off checklist alone, before opening a
 #       draft PR in a repo whose checklist applies to drafts. A checklist whose
@@ -54,7 +58,8 @@
 #       Exits 0 and prints the receipt when there is one, 1 otherwise. With
 #       --pass, a receipt for the checklist alone doesn't count: handing a PR
 #       to review needs the pass. With --clean, only a pass whose last round
-#       found nothing counts (clean=yes): what guard-merge.sh needs.
+#       found nothing counts (clean=yes): what guard-merge.sh needs. A merge of
+#       the default branch into a clean head that adds nothing of its own counts.
 #   ready-receipt.sh write <sha> --preflight --rounds <1-3> --open <n> --pass <dir>
 #       The same checks of the pass folder's records, shape only and fast: it
 #       reads the saved review.diff and changed-files.txt of each round instead
@@ -116,6 +121,8 @@ set -euo pipefail
 preflight=false
 receipts_dir=${KC_READY_DIR:-$HOME/.claude/kc-ready-for-review}
 scripts_dir=$(cd "$(dirname "$0")" && pwd)
+# shellcheck source=lib/hook-input.sh
+. "$scripts_dir/lib/hook-input.sh"
 
 # The exact line formats of the pass folder's files; a TAB is a literal tab character.
 print_formats() {
@@ -678,8 +685,69 @@ refuse_unanswered_comments() {
   exit 1
 }
 
+# Prints the file $2 has at commit $1, or nothing when it has none.
+show_file_at() { git show "$1:$2" 2>/dev/null || true; }
+
+# Succeeds when merge commit $1 brings nothing into its parent $2 (the one with the clean receipt)
+# beyond what its other parent $3 has, a commit the default branch has: every line it adds is in $3's
+# file, and every line it drops was in the merge base and is gone from $3 (the default branch changed
+# it). The one resolution allowed on top: the "version" field of a plugin.json or marketplace.json,
+# and a CHANGELOG.md line that is a line either parent or the merge base had, up to its version
+# numbers (entries reordered or renumbered). Any other added or dropped line is the branch's own change.
+is_trivial_default_merge() {
+  local merge=$1 clean_parent=$2 default_parent=$3 default_ref base scratch path name stray_lines=""
+  default_ref=$(get_default_branch_ref .)
+  [ -n "$default_ref" ] && git merge-base --is-ancestor "$default_parent" "$default_ref" 2>/dev/null || return 1
+  base=$(git merge-base "$clean_parent" "$default_parent" 2>/dev/null) || return 1
+  scratch=$(mktemp -d)
+  while IFS= read -r -d '' path; do
+    show_file_at "$merge" "$path" > "$scratch/merged"
+    show_file_at "$clean_parent" "$path" > "$scratch/clean"
+    show_file_at "$default_parent" "$path" > "$scratch/default"
+    show_file_at "$base" "$path" > "$scratch/base"
+    grep -vxFf "$scratch/clean" "$scratch/merged" | grep -vxFf "$scratch/default" > "$scratch/stray" || true
+    grep -vxFf "$scratch/merged" "$scratch/clean" > "$scratch/dropped" || true
+    grep -xFf "$scratch/base" "$scratch/dropped" | grep -vxFf "$scratch/default" > "$scratch/dropped-by-default" || true
+    grep -vxFf "$scratch/dropped-by-default" "$scratch/dropped" >> "$scratch/stray" || true
+    name=$(basename "$path")
+    case "$name" in
+      plugin.json | marketplace.json) grep -Ev '^[[:space:]]*"version"[[:space:]]*:' "$scratch/stray" > "$scratch/left" || true; mv "$scratch/left" "$scratch/stray" ;;
+      CHANGELOG.md)
+        cat "$scratch/clean" "$scratch/default" "$scratch/base" | sed -E 's/[0-9]+\.[0-9]+\.[0-9]+/V/g' > "$scratch/known"
+        sed -E 's/[0-9]+\.[0-9]+\.[0-9]+/V/g' "$scratch/stray" | grep -vxFf "$scratch/known" > "$scratch/left" || true
+        mv "$scratch/left" "$scratch/stray" ;;
+    esac
+    [ -s "$scratch/stray" ] && stray_lines=yes && break
+  done < <(git diff -z --name-only "$clean_parent" "$merge" 2>/dev/null)
+  rm -rf "$scratch"
+  [ -z "$stray_lines" ]
+}
+
+merge_depth=0
+# Succeeds when <sha> is a merge of the default branch into a commit with a clean receipt (or into
+# such a merge) that adds nothing of its own: the review of the clean parent still covers it.
+is_clean_default_merge() {
+  local sha=$1 parents clean_parent default_parent pair
+  [ "$merge_depth" -lt 5 ] || return 1
+  # shellcheck disable=SC2207 # a line of full SHAs
+  parents=($(git rev-list --parents -n 1 "$sha" 2>/dev/null)) || return 1
+  [ "${#parents[@]}" -eq 3 ] || return 1
+  for pair in 1:2 2:1; do
+    clean_parent=${parents[${pair%:*}]}
+    default_parent=${parents[${pair#*:}]}
+    merge_depth=$((merge_depth + 1))
+    if check_receipt "$clean_parent" --clean > /dev/null 2>&1 && is_trivial_default_merge "$sha" "$clean_parent" "$default_parent"; then
+      merge_depth=$((merge_depth - 1))
+      return 0
+    fi
+    merge_depth=$((merge_depth - 1))
+  done
+  return 1
+}
+
 # Prints <sha>'s receipt, or fails when it has none or, with --pass, when it
-# is for the checklist alone.
+# is for the checklist alone. With --clean, a merge of the default branch that
+# adds nothing to a clean head is clean with no receipt of its own.
 check_receipt() {
   local receipt=$receipts_dir/$1 pass_only=false clean_only=false
   case "${*:2}" in
@@ -688,11 +756,13 @@ check_receipt() {
     --clean) clean_only=true ;;
     *) usage ;;
   esac
+  if $clean_only && ! { [ -f "$receipt" ] && grep -qx 'clean=yes' "$receipt"; }; then
+    is_clean_default_merge "$1" || return 1
+    printf 'sha=%s\nclean=yes\nmerged=default-branch\n' "$1"
+    return 0
+  fi
   [ -f "$receipt" ] || return 1
   if $pass_only && grep -qx 'checklist=walked' "$receipt"; then
-    return 1
-  fi
-  if $clean_only && ! grep -qx 'clean=yes' "$receipt"; then
     return 1
   fi
   cat "$receipt"
@@ -923,6 +993,7 @@ write_receipt() {
       exit 1
     fi
     refuse_unanswered_comments
+    ! is_clean_default_merge "$sha" || echo "ready-receipt: $sha only merges the default branch into a clean head, so it counts as clean: guard-merge.sh merges it with no new pass"
     printf 'sha=%s\ndate=%s\nafter=%s\n' "$sha" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$after" > "$receipts_dir/$sha"
     [ -n "$verdicts$task" ] || inherit_verdicts "$after" "$sha"
   else

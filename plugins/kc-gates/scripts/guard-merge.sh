@@ -103,7 +103,8 @@ check_segment() {
     print_pretooluse_deny "Blocked by the kc-gates plugin: this pull request changes only a few prose lines (change-class.sh: prose_small), so it merges with no review receipt, but only once its checks pass: $unpassed_checks of them have not passed yet. Wait for them (gh pr checks), fix a failure, then merge; or merge with --auto, which waits for them. No user approval is needed."
     return 1
   fi
-  bash "$scripts_dir/ready-receipt.sh" check "$head" --clean >/dev/null 2>&1 && return 0
+  # In the pull request's repo: a merge of the default branch into a clean head counts as clean.
+  (cd "$dir" && bash "$scripts_dir/ready-receipt.sh" check "$head" --clean >/dev/null 2>&1) && return 0
   print_pretooluse_deny "Blocked by the kc-gates plugin: this pull request's head (${head:0:$SHORT_SHA_LENGTH}) has no clean review receipt: a pull request merges only when its last gate round found nothing and nothing is left open. Fix what is open and review the fixes as the next round (kc-ready-for-review), or, when the rounds are used up, ask the user about the approach. Ask the user: only their typed words approve a merge with problems left. When their latest message says \"approve merge\", prefix the command with KC_MERGE_APPROVED=1; the token without those words stays blocked.$(needed_phrases_sentence "$dir" "$APPROVAL_PHRASE")"
   return 1
 }
