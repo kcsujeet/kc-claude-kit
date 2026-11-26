@@ -30,6 +30,9 @@ readonly READ_ONLY_WORDS='(ls|cat|head|tail|grep|egrep|fgrep|rg|wc|echo|printf|p
 # A REPL script that calls Agent, Edit, Write, MultiEdit, NotebookEdit or Bash (through its global or
 # `tools.`), or edit() or write(). MCP tools are not counted, in a REPL or called directly.
 readonly REPL_WORK_CALLS='(^|[^[:alnum:]_.])(tools\.)?(Agent|Edit|Write|MultiEdit|NotebookEdit|Bash)\(|(^|[^[:alnum:]_.])(edit|write)\('
+# Quoted text a read-only command may carry: a single-quoted string, or a double-quoted one with no backtick or backslash.
+# shellcheck disable=SC2016 # a sed program, not a shell expansion
+readonly QUOTED_TEXT='s/'"'"'[^'"'"']*'"'"'|"[^"`\\]*"//g'
 # The shell a REPL script runs: a `$\`...\`` template, or `$("...")` with an optional timeout.
 # shellcheck disable=SC2016 # the pattern holds JavaScript backticks and `$(`, not shell expansions
 readonly REPL_SHELL_CALLS='\$`[^`]*`|\$\(["'"'"'][^"'"'"']*["'"'"'](, *[0-9]+)?\)'
@@ -46,14 +49,17 @@ better_lines_file="${CLAUDE_PLUGIN_DATA:-}/better-lines/$session_id"
 # writes no file (> or >> to anything but /dev/null or a stream, or --output), and starts no background
 # job (`&`) or nested command.
 is_read_only_command() {
-  local command_text command_without_safe_operators segment
-  # Quoted text is data: drop single-quoted strings and double-quoted ones with no expansion in them.
-  command_text=$(printf '%s' "$1" | sed -E "s/'[^']*'|\"[^\"\$\`\\\\]*\"//g")
-  command_without_safe_operators=$(printf '%s' "$command_text" | sed -E 's#[0-9]*>&[0-9]##g; s#[0-9]*>>?[[:space:]]*/dev/null##g; s#&&# #g')
-  printf '%s' "$command_without_safe_operators" | grep -Eq '>|&|--output|\$\(|`' && return 1
+  local command_without_quoted_text command_without_safe_operators segment
+  printf '%s' "$1" | grep -Eq '\$\(|`' && return 1
+  # Quoted text is data: drop it. A quote or backslash left over (an escaped quote, or a quote inside a
+  # double-quoted string) is one the shell may pair differently from sed, so it counts as work.
+  command_without_quoted_text=$(printf '%s' "$1" | sed -E "$QUOTED_TEXT")
+  printf '%s' "$command_without_quoted_text" | grep -Eq "['\"\\\\]" && return 1
+  command_without_safe_operators=$(printf '%s' "$command_without_quoted_text" | sed -E 's#[0-9]*>&[0-9]##g; s#[0-9]*>>?[[:space:]]*/dev/null##g; s#&&# #g')
+  printf '%s' "$command_without_safe_operators" | grep -Eq '>|&|--output' && return 1
   while IFS= read -r segment; do
     printf '%s' "$segment" | grep -Eq "^$READ_ONLY_WORDS([[:space:]]|\$)" || return 1
-  done < <(printf '%s\n' "$command_text" | list_stripped_commands)
+  done < <(printf '%s\n' "$command_without_quoted_text" | list_stripped_commands)
   return 0
 }
 
