@@ -37,6 +37,12 @@
 # each `walk-item:` it prints needs a line in the receipt. No review folder, or no walk-item
 # (WALK=not-required), means no check.
 #
+# With the token present, a body that gives a review verdict (a `### Review:` heading or a
+# `Verdict: PASSED|FAILED` line) is also run through check-review-report.sh (the report leads with
+# the does-it-work section and labels style findings) and, when the saved review has a verdicts/
+# folder, check-report-findings.sh (every confirmed finding is in it or on a Dropped: line); a body
+# that asks whether to walk or try the change in the app is denied too, since the walk is required.
+#
 # With the token present, an approval (`gh pr review --approve`, or a reviews api write with event
 # APPROVE) is also compared with the head the review walked: the pull request's current head
 # (`gh pr view --json headRefOid`) against HEAD_SHA in the review folder's meta.env. When they
@@ -477,6 +483,43 @@ get_unwalked_review_verdict() {
   printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"%s"}}' "$reason"
 }
 
+# True when the text on stdin gives a review verdict, in kc-code-review's report shapes.
+is_review_verdict() {
+  grep -Eq '^#{2,4} Review:|Verdict:[^A-Za-z]*(PASSED|FAILED)'
+}
+
+# True when the text on stdin asks whether to walk, QA or try the change in the running app: the
+# review requires that walk, so it is never offered as a choice.
+is_walk_offer() {
+  grep -Eo '[^.!?]*\?' | grep -Eiq '(^|[^[:alnum:]])(walk(ing|ed)?|qa)([^[:alnum:]]|$)|(^|[^[:alnum:]])(try(ing)?|test(ing)?|run(ning)?|check(ing)?|open(ing)?|see(ing)?|verify(ing)?)([^[:alnum:]].*)?[^[:alnum:]](the (running )?app|in the browser|the browser|locally|dev server|in a browser|on staging)([^[:alnum:]]|$)'
+}
+
+# Prints the deny JSON when a body the command posts gives a review verdict whose report leaves out
+# what kc-code-review's Step 4 requires (check-review-report.sh, and check-report-findings.sh when
+# the saved review has a verdicts/ folder), or asks whether to walk the app; nothing otherwise.
+get_report_verdict() {
+  local command=$1 scripts_dir review_dir body problems="" reason
+  local max_problem_chars=900
+  scripts_dir=$(dirname "$0")
+  review_dir=$(find_command_review_dir "$command")
+  while IFS= read -r -d $'\036' body; do
+    if printf '%s' "$body" | is_walk_offer; then
+      problems="$problems The body asks whether to walk or try the change in the running app; the review requires that walk, so it is done and never offered as a choice."
+    fi
+    printf '%s' "$body" | is_review_verdict || continue
+    problems="$problems $(printf '%s' "$body" | bash "$scripts_dir/check-review-report.sh" - 2>&1 | tr '\n' ' ')"
+    if has_review_files "$review_dir" && [ -d "$review_dir/verdicts" ]; then
+      problems="$problems $(printf '%s' "$body" | bash "$scripts_dir/check-report-findings.sh" "$review_dir/verdicts" - 2>&1 | tr '\n' ' ')"
+    fi
+  done <<EOF
+$(extract_bodies "$command")
+EOF
+  problems=$(printf '%s' "$problems" | sed 's/["\\]//g; s/^ *//' | cut -c1-"$max_problem_chars")
+  [ -n "$problems" ] || return 0
+  reason="Blocked by the kc-gates plugin: this review body is not ready to post (kc-code-review §G6, §G7). A verdict report leads with a \"Does it work / what can it break\" section (before and after numbers or not measured, and a Uses: line), marks naming and clarity findings (non-blocking), and names every finding a gate confirmed or lists it on a Dropped: line. Fix the body, show it again, then post. $problems"
+  printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"%s"}}' "$reason"
+}
+
 print_deny() {
   cat <<'EOF'
 {"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Blocked by the kc-gates plugin: this command writes a PR or issue comment or review to GitHub without the approval token. Do not retry and do not add the token yourself. Show the user the full draft, the head SHA it anchors to and the posting shape, then stop and wait for an explicit, fresh post signal in their latest message. Only after that signal, prefix each write command with KC_REVIEW_POST_APPROVED=1 in the same command (see /kc-gates:kc-post-review)."}}
@@ -499,6 +542,11 @@ main() {
           exit 0
         fi
         verdict=$(get_unwalked_review_verdict "$command")
+        if [ -n "$verdict" ]; then
+          printf '%s' "$verdict"
+          exit 0
+        fi
+        verdict=$(get_report_verdict "$command")
         if [ -n "$verdict" ]; then
           printf '%s' "$verdict"
           exit 0

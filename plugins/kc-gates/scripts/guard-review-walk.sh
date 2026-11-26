@@ -11,9 +11,8 @@
 # checkout the session runs in (the payload's cwd), so another session's review in another repo
 # never holds this one's dispatches. select-gates.sh is run on its diff, and check-walk-receipt.sh
 # on its walk-receipt.tsv. While that check fails, a dispatch of `kc-gates:verification-gate` is
-# denied, so the walk comes first. The report's shape (§G6) and its confirmed findings (§G7) are
-# checked by kc-code-review's own step, which runs check-review-report.sh and
-# check-report-findings.sh on the drafted report before it is sent.
+# denied, so the walk comes first. The report's shape (§G6), its confirmed findings (§G7) and the
+# rule that the walk is never offered are checked where the report is posted (guard-github-post.sh).
 # Everything the guard can't read (no jq, no review folder, select-gates.sh failing) lets the
 # action through: it never blocks what it can't read. Always exits 0.
 # Hook schema: https://code.claude.com/docs/en/hooks

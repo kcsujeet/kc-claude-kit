@@ -87,7 +87,7 @@
             "type": "command",
             "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/guard-lesson-ledger.sh\"",
             "shell": "bash",
-            "timeout": 30
+            "timeout": 120
           },
           {
             "type": "command",
