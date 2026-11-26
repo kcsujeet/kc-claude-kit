@@ -9,6 +9,8 @@ tests_dir=$(cd "$(dirname "$0")" && pwd)
 . "$tests_dir/lib/harness.sh"
 scripts="$(dirname "$tests_dir")/scripts"
 require_jq
+# The guards compare the session's loaded plugin with the installed one; these cases are not about that.
+unset CLAUDE_PLUGIN_ROOT CLAUDE_CONFIG_DIR
 
 ledger_verdict() { expect_hook_verdict "$scripts/guard-lesson-ledger.sh" "$1" "$2" "$3" "${4:-$repo}"; }
 hand_off_verdict() { expect_hook_verdict "$scripts/guard-hand-off.sh" "$1" "$2" "$3" "$repo"; }

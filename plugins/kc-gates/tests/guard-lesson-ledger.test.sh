@@ -10,6 +10,8 @@ tests_dir=$(cd "$(dirname "$0")" && pwd)
 . "$tests_dir/lib/harness.sh"
 scripts="$(dirname "$tests_dir")/scripts"
 require_jq
+# The stale-session cases at the end set these themselves; the others must not depend on the session running the test.
+unset CLAUDE_PLUGIN_ROOT CLAUDE_CONFIG_DIR
 
 run_git_in() { local repo=$1; shift; git -C "$repo" -c user.name=t -c user.email=t@example.test "$@"; }
 make_repo() {
