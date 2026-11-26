@@ -204,31 +204,36 @@ get_uncovered_dimension() {
 }
 
 # Prints the files, other than tests and the item itself, that use a name the item changes, one per
-# line. Every code use of the name counts, however many there are (a changed function with thirty
-# callers has thirty consumers). What does not count is a mention that is not a use: a line in a
-# prose or config file, a comment, and a plain variable of that name (`$name`, `${name}` or `name=`
-# in shell and the like). A name that is only the hunk's enclosing context (it may be a local
-# variable, not a function) counts only where it is called. The correctness gate still judges every
-# listed use (§B8).
+# line. Every code use counts, with no cap. Prose and config files, comments, quoted text, plain
+# `$name` reads and `name=` assignments, and an enclosing name that is never called do not.
 get_consumers() {
   KC_TEST_PATHS=$KC_RISK_TEST_PATHS KC_SOURCE_PATHS=$KC_RISK_SOURCE_PATHS awk -v item="$1" '
     /^name / {
       in_item = (index($0, ", " item "): ") > 0)
-      name_pattern = $2; gsub(/[?!]/, "", name_pattern)
+      name_text = $2; gsub(/[?!]/, "", name_text)
+      name_pattern = ""
+      for (position = 1; position <= length(name_text); position++) {
+        character = substr(name_text, position, 1)
+        name_pattern = name_pattern (index("\\^$.[]|()*+?{}", character) ? "\\" : "") character
+      }
       is_enclosing_name = ($3 == "(enclosing,")
       next
     }
     in_item && /^  [^ ]/ {
       consumer = $1; sub(/:[0-9]+:.*$/, "", consumer)
       use_text = $0; sub(/^  [^ ]*:[0-9]+: /, "", use_text)
+      is_comment = (use_text ~ /^[ \t]*(#|\/\/|\*|\/\*)/)
+      gsub(/"[^"]*"/, "", use_text); gsub(/\x27[^\x27]*\x27/, "", use_text); sub(/[ \t]+(#|\/\/).*$/, "", use_text)
       is_item_itself = (consumer == item)
       is_test_file = (consumer ~ ENVIRON["KC_TEST_PATHS"])
       is_code_file = (consumer ~ ENVIRON["KC_SOURCE_PATHS"])
-      is_comment = (use_text ~ /^[ \t]*(#|\/\/|\*|\/\*)/)
-      is_plain_variable = (use_text !~ ("(^|[^A-Za-z0-9_$\\{])" name_pattern "([^A-Za-z0-9_=]|=[=~]|$)"))
-      is_call = (use_text ~ ("(^[ \t]*|[$][(]|[|&;(][ \t]*|then |do )" name_pattern "([( \t.]|$)") || use_text ~ ("[^A-Za-z0-9_$.{]" name_pattern "[(.]"))
-      if (is_enclosing_name) is_plain_variable = is_plain_variable || !is_call
-      if (is_item_itself || is_test_file || !is_code_file || is_comment || is_plain_variable) next
+      is_named = (use_text ~ ("(^|[^A-Za-z0-9_$\\{])" name_pattern "([^A-Za-z0-9_=]|=[=~]|$)"))
+      is_assignment = (use_text ~ ("^[ \t]*((local|const|let|var|export) +)?" name_pattern "[ \t]*=([^=~]|$)"))
+      is_command_position_call = (use_text ~ ("(^[ \t]*|[$][(]|[|&;(][ \t]*|then |do )" name_pattern "([( \t.]|$)"))
+      is_member_or_argument_call = (use_text ~ ("[^A-Za-z0-9_$.{]" name_pattern "[(.]"))
+      is_call = (is_command_position_call || is_member_or_argument_call)
+      is_uncalled_enclosing_name = (is_enclosing_name && !is_call)
+      if (is_item_itself || is_test_file || !is_code_file || is_comment || !is_named || is_assignment || is_uncalled_enclosing_name) next
       if (!(consumer in seen)) { seen[consumer] = 1; print consumer }
     }
     /^tests:/ { in_item = 0 }

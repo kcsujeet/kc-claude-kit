@@ -271,7 +271,6 @@ printf 'GATES=naming\nWALK=required\nwalk: x\nwalk-item: app/[locale]/page.tsx\n
 printf 'env\tbin/review-env up\tGET /health 200\napp/[locale]/page.tsx\tpage\tPOST /orders 201\tstates: screen; narrow screen\n' > "$receipt"
 expect_contains "a path with regex characters still gets its dimension checked" "varies along print" "$(run_walk_receipt_check)"
 
-
 # Consumers (§V11, §B8): a changed unit is walked from every consumer's side. uses.txt is
 # trace-uses.sh's output; each consumer file of an item needs an entry in the fifth field with an
 # omitted or partial input and its output before and after, or an only-state reason.
@@ -315,35 +314,47 @@ write_consumer_receipt 'consumers: app/services/checkout.rb: omitted the discoun
 expect_contains "§V11: an entry with no before state fails" "consumer app/services/checkout.rb: give what it received before and after" "$(run_consumer_check)"
 write_consumer_receipt 'consumers: app/services/checkout.rb: omitted the discount field; before on; after off | app/jobs/export_job.rb: only state: n/a'
 expect_contains "§V11: an only-state reason under three words fails" "consumer app/jobs/export_job.rb: walk it with an input left out or partial" "$(run_consumer_check)"
-# A prose mention is not a consumer (the fixture's docs/orders.md). Neither is a comment, or a plain
-# variable of the changed name when the name is only the hunk's enclosing context.
+# A prose mention is not a consumer (the fixture's docs/orders.md). Neither is a comment, quoted text,
+# or a plain variable of the changed name when the name is only the hunk's enclosing context.
+reader_count=20
 {
-  printf 'name script_name (enclosing, app/models/order.rb): 22 uses\n'
+  printf 'name script_name (enclosing, app/models/order.rb): %s uses\n' "$((reader_count + 3))"
   # shellcheck disable=SC2016 # $script_name is fixture text, not an expansion
-  for fixture_index in $(seq 1 20); do printf '  lib/generic_%s.rb:1: echo "usage: $script_name"\n' "$fixture_index"; done
+  for fixture_index in $(seq 1 "$reader_count"); do printf '  lib/generic_%s.rb:1: echo "usage: $script_name"\n' "$fixture_index"; done
   # shellcheck disable=SC2016 # fixture text, not an expansion
   printf '  lib/assigned.rb:1: script_name=$(basename "$0")\n  lib/commented.rb:1: # script_name is the basename\n  lib/passed.rb:1: render(script_name, other)\n'
-  printf 'tests: 0\nsummary: 1 names, 22 uses, 0 test files\n'
+  printf 'tests: 0\nsummary: 1 names, %s uses, 0 test files\n' "$((reader_count + 3))"
 } > "$uses_file"
 write_consumer_receipt ''
-expect_eq "§V11: variable reads, assignments and comments of an enclosing name are not consumers" clean "$(run_consumer_check)"
-# The same use line is a consumer when the name is a definition, not only the hunk's context; a `$name` read is not.
+expect_eq "§V11: variable reads, assignments and an uncalled bare use of an enclosing name are not consumers" clean "$(run_consumer_check)"
+# The same bare use is a consumer when the name is a definition, and a comment, a `$name` read, quoted
+# text and a spaced assignment of it are not.
 {
   # shellcheck disable=SC2016 # fixture text, not an expansion
-  printf 'name script_name (definition, app/models/order.rb): 2 uses\n  lib/passed.rb:1: render(script_name, other)\n  lib/read.rb:1: echo "usage: $script_name"\n'
-  printf 'tests: 0\nsummary: 1 names, 2 uses, 0 test files\n'
+  printf 'name script_name (definition, app/models/order.rb): 5 uses\n  lib/passed.rb:1: render(script_name, other)\n  lib/read.rb:1: echo "usage: $script_name"\n  lib/commented.rb:1: # script_name is the basename\n  lib/quoted.rb:1: log("script_name is a word here")\n  lib/spaced.rb:1: script_name = other\n'
+  printf 'tests: 0\nsummary: 1 names, 5 uses, 0 test files\n'
 } > "$uses_file"
 definition_uses=$(run_consumer_check)
 expect_contains "§V11: a bare use of a definition name is a consumer" "consumer lib/passed.rb uses what this item changes" "$definition_uses"
 expect_not_contains "§V11: a \$name read of a definition name is not" "consumer lib/read.rb" "$definition_uses"
-# A changed function with thirty code callers still lists every one: there is no cap on code consumers.
+expect_not_contains "§V11: a comment mentioning a definition name is not" "consumer lib/commented.rb" "$definition_uses"
+expect_not_contains "§V11: quoted text holding a definition name is not" "consumer lib/quoted.rb" "$definition_uses"
+expect_not_contains "§V11: a spaced assignment of a definition name is not" "consumer lib/spaced.rb" "$definition_uses"
+# A name with regex characters (a `$` prefix) still finds its consumers.
 {
-  printf 'name Order (definition, app/models/order.rb): 30 uses\n'
-  for fixture_index in $(seq 1 30); do printf '  lib/caller_%s.rb:1: Order.create(params)\n' "$fixture_index"; done
-  printf 'tests: 0\nsummary: 1 names, 30 uses, 0 test files\n'
+  # shellcheck disable=SC2016 # fixture text, not an expansion
+  printf 'name $fetchUser (definition, app/models/order.rb): 1 uses\n  src/b.js:1: const user = $fetchUser(id)\ntests: 0\nsummary: 1 names, 1 uses, 0 test files\n'
+} > "$uses_file"
+expect_contains "§V11: a name starting with a regex character still lists its consumer" "consumer src/b.js uses what this item changes" "$(run_consumer_check)"
+# A changed function with thirty code callers still lists every one: there is no cap on code consumers.
+caller_count=30
+{
+  printf 'name Order (definition, app/models/order.rb): %s uses\n' "$caller_count"
+  for fixture_index in $(seq 1 "$caller_count"); do printf '  lib/caller_%s.rb:1: Order.create(params)\n' "$fixture_index"; done
+  printf 'tests: 0\nsummary: 1 names, %s uses, 0 test files\n' "$caller_count"
 } > "$uses_file"
 many_callers=$(run_consumer_check)
-expect_eq "§V11: a function with 30 code callers needs 30 consumer entries" 30 "$(printf '%s\n' "$many_callers" | grep -c 'consumer lib/caller_')"
+expect_eq "§V11: a function with $caller_count code callers needs $caller_count consumer entries" "$caller_count" "$(printf '%s\n' "$many_callers" | grep -c 'consumer lib/caller_')"
 {
   printf 'name Order (enclosing, app/models/order.rb): 2 uses\n  lib/caller_a.rb:1: result = Order.create(params)\n  lib/caller_b.rb:1: Order.create(params)\n'
   printf 'tests: 0\nsummary: 1 names, 2 uses, 0 test files\n'
