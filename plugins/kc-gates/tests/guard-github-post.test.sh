@@ -487,7 +487,9 @@ write_review docs/notes.md
 rm -f "$review_folder/walk-receipt.tsv"
 # shellcheck disable=SC2016 # backticks in the fixture text are literal
 works_body='**Does it work / what can it break**\n- Measured: checkout query before 420 ms -> after 38 ms.\n- Uses: 4 traced, 3 run, 1 read.\n'
+# shellcheck disable=SC2016 # backticks in the fixture text are literal
 ok_report='### Review: Add free shipping\n'"$works_body"'\n`abc1234` `cart.ts`: follows existing conventions and naming. No changes.'
+# shellcheck disable=SC2016 # backticks in the fixture text are literal
 bare_report='### Review: Add free shipping\n**Verdict:** FAILED (1 gate failing)\n\n**Naming:**\n- 🟡 `cart.ts:L4`: `tmp` is opaque. Rename `total`.'
 check allow "report: a verdict report that leads with the does-it-work section posts" "$walk_token gh pr comment 12 -b '$ok_report'"
 check deny "report: a verdict report with no does-it-work section is denied" "$walk_token gh pr comment 12 -b '$bare_report'"
