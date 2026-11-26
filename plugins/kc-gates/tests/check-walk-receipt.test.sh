@@ -39,11 +39,11 @@ expect_contains "a blank seen fails" "walk-item src/cart/total.ts: nothing seen"
 
 printf 'env\tbin/review-env up\tGET /health 200\napp/models/order.rb\tcreated an order\tlooked fine\tstates: empty cart; two items\nsrc/cart/total.ts\tcart page\t%s\tstates: one item; many items\n' "$work_dir/gone.png" > "$receipt"
 bad_evidence=$(run_walk_receipt_check)
-expect_contains "evidence that is prose fails" "walk-item app/models/order.rb: evidence is neither" "$bad_evidence"
+expect_contains "evidence that is prose fails" "walk-item app/models/order.rb: evidence is none of" "$bad_evidence"
 expect_contains "a capture that does not exist fails" "walk-item src/cart/total.ts: evidence file does not exist" "$bad_evidence"
 
 printf 'env\tbin/review-env up\tGET /health 200\napp/models/order.rb\tcreated an order\tPOST /orders\tstates: empty cart; two items\nsrc/cart/total.ts\tcart page\t%s\tstates: one item; many items\n' "$work_dir/total.png" > "$receipt"
-expect_contains "a request line with no status fails" "walk-item app/models/order.rb: evidence is neither" "$(run_walk_receipt_check)"
+expect_contains "a request line with no status fails" "walk-item app/models/order.rb: evidence is none of" "$(run_walk_receipt_check)"
 
 printf 'env\tbin/review-env up\tGET /health 200\napp/models/order.rb\tcreated an order\tPOST /orders 201\tstates: empty cart; two items\nsrc/cart/total.ts\tcart page\ttotal.png\tstates: one item; many items\n' > "$receipt"
 expect_eq "a relative capture path is read from the receipt's folder" clean "$(run_walk_receipt_check)"
@@ -84,7 +84,7 @@ expect_contains "env: steps joined by a semicolon fail" "env: more than one step
 write_with_env '' 'GET /health 200'
 expect_contains "env: a blank command fails" "env: no command" "$(run_walk_receipt_check)"
 write_with_env 'bin/review-env up' 'it came up'
-expect_contains "env: evidence that is prose fails" "env: evidence is neither" "$(run_walk_receipt_check)"
+expect_contains "env: evidence that is prose fails" "env: evidence is none of" "$(run_walk_receipt_check)"
 printf 'env\tbin/review-env up\t%s\tstates: one item; many items\n' "$work_dir/gone.png" > "$receipt"
 printf '%b' "$items_only" >> "$receipt"
 expect_contains "env: a capture that does not exist fails" "env: evidence file does not exist" "$(run_walk_receipt_check)"
@@ -93,6 +93,87 @@ expect_eq "env: a capture beside the receipt is evidence" clean "$(run_walk_rece
 printf 'GATES=naming\nWALK=not-required\nwalk: none\n' > "$select_output"
 rm -f "$receipt"
 expect_eq "env: nothing to walk needs no env line" clean "$(run_walk_receipt_check)"
+
+# Run transcripts: a command-line change is walked by running it; `exit <N>: <path>` is its evidence.
+printf 'GATES=naming\nWALK=required\nwalk: x\nwalk-item: bin/sync-orders\n' > "$select_output"
+printf 'sync: 3 orders (dry run)\n' > "$work_dir/run.txt"
+: > "$work_dir/empty.txt"
+write_cli() { printf '%b' "env\t$1\t$2\nbin/sync-orders\tdry run listed 3 orders\t$3\tstates: dry run; --help\n" > "$receipt"; }
+write_cli 'bin/sync-orders --dry-run' 'exit 0: run.txt' 'exit 0: run.txt'
+expect_eq "§V11: a run transcript is evidence for an item and for the env line" clean "$(run_walk_receipt_check)"
+write_cli 'bin/sync-orders --dry-run' 'GET /health 200' "exit 2: $work_dir/run.txt"
+expect_eq "a transcript with an absolute path and a non-zero exit code passes" clean "$(run_walk_receipt_check)"
+write_cli 'bin/sync-orders --dry-run' 'exit 0: run.txt' 'exit 0: gone.txt'
+expect_contains "a transcript file that does not exist fails" "walk-item bin/sync-orders: transcript file does not exist: gone.txt" "$(run_walk_receipt_check)"
+write_cli 'bin/sync-orders --dry-run' 'exit 0: run.txt' 'exit 0: empty.txt'
+expect_contains "an empty transcript file fails" "walk-item bin/sync-orders: transcript file is empty: empty.txt" "$(run_walk_receipt_check)"
+write_cli 'bin/sync-orders --dry-run' 'exit 0: run.txt' 'run.txt'
+expect_contains "a transcript path with no exit code fails" "walk-item bin/sync-orders: evidence is none of" "$(run_walk_receipt_check)"
+write_cli 'bin/sync-orders --dry-run' 'exit 0: run.txt' 'exit: run.txt'
+expect_contains "an exit with no number fails" "walk-item bin/sync-orders: evidence is none of" "$(run_walk_receipt_check)"
+write_cli 'bin/sync-orders --dry-run' 'exit 0: gone.txt' 'exit 0: run.txt'
+expect_contains "env: a transcript file that does not exist fails" "env: transcript file does not exist: gone.txt" "$(run_walk_receipt_check)"
+write_cli 'bin/sync-orders --dry-run' 'exit 0: empty.txt' 'exit 0: run.txt'
+expect_contains "env: an empty transcript file fails" "env: transcript file is empty: empty.txt" "$(run_walk_receipt_check)"
+write_cli 'bin/sync-orders --dry-run' 'run.txt' 'exit 0: run.txt'
+expect_contains "env: a transcript with no exit code fails" "env: evidence is none of" "$(run_walk_receipt_check)"
+printf 'GATES=naming\nWALK=required\nwalk: x\nwalk-item: app/models/order.rb\n' > "$select_output"
+rm -f "$receipt"
+expect_contains "the no-receipt message names the surface to walk" "on its QA surface (browser, API, terminal, unit)" "$(run_walk_receipt_check)"
+
+# QA surfaces: select-gates.sh names a surface per walk-item, and only that surface's evidence passes.
+printf 'GATES=naming\nWALK=required\nwalk: x\nwalk-item: src/ui/Cart.tsx surface: browser\nwalk-item: app/controllers/orders_controller.rb surface: api\nwalk-item: scripts/sync.sh surface: terminal\nwalk-item: lib/pricing.rb surface: unit\n' > "$select_output"
+printf 'HTTP/1.1 200 OK\r\ncontent-type: application/json\r\n\r\n{"id":7}\n' > "$work_dir/resp.txt"
+printf '{"id":7}\n' > "$work_dir/body-only.txt"
+write_surfaces() {
+  {
+    printf 'env\tscripts/sync.sh --dry-run\t%s\n' "$1"
+    printf 'src/ui/Cart.tsx\tcart shows 2 items\t%s\tstates: one item; many items\n' "$2"
+    printf 'app/controllers/orders_controller.rb\torder 7 returned\t%s\tstates: found; missing\n' "$3"
+    printf 'scripts/sync.sh\tdry run listed 3 orders\t%s\tstates: dry run; --help\n' "$4"
+    printf 'lib/pricing.rb\ttotal of an empty cart is 0\t%s\tstates: empty; two items\n' "$5"
+  } > "$receipt"
+}
+write_surfaces 'exit 0: run.txt' 'total.png' 'curl -si https://shop.test/orders/7: resp.txt' 'exit 0: run.txt' 'exit 0: run.txt'
+expect_eq "surfaces: each surface's own evidence passes (capture, curl response, transcripts)" clean "$(run_walk_receipt_check)"
+write_surfaces 'exit 0: run.txt' 'total.png' 'GET /orders/7 200' 'exit 0: run.txt' 'GET /orders/7 200'
+expect_eq "surfaces: a bare request line passes for an api item and for a unit item" clean "$(run_walk_receipt_check)"
+write_surfaces 'exit 0: run.txt' 'total.png' 'curl -si https://shop.test/orders/7: resp.txt' 'exit 0: run.txt' 'total.png'
+expect_eq "surfaces: a capture passes for a unit item" clean "$(run_walk_receipt_check)"
+write_surfaces 'exit 0: run.txt' 'total.png' 'curl -si https://shop.test/orders/7: resp.txt' 'total.png' 'exit 0: run.txt'
+mismatch=$(run_walk_receipt_check)
+expect_contains "surfaces: a screenshot for a terminal item names the surface and the evidence" "walk-item scripts/sync.sh: scripts/sync.sh is a terminal surface: give a run transcript (exit 0: run.txt), not: total.png" "$mismatch"
+expect_eq "surfaces: only the mismatched item is listed" 1 "$(printf '%s\n' "$mismatch" | grep -c '^walk-item')"
+write_surfaces 'exit 0: run.txt' 'exit 0: run.txt' 'curl -si https://shop.test/orders/7: resp.txt' 'exit 0: run.txt' 'exit 0: run.txt'
+expect_contains "surfaces: a transcript for a browser item says to give a screenshot" "src/ui/Cart.tsx is a browser surface: give a screenshot or recording" "$(run_walk_receipt_check)"
+write_surfaces 'exit 0: run.txt' 'total.png' 'exit 0: run.txt' 'exit 0: run.txt' 'exit 0: run.txt'
+expect_contains "surfaces: a transcript for an api item says to give the curl request and its saved response" "is a api surface: give a curl request and its saved response (curl -si https://host/orders/7: resp.txt) or a request line with its status" "$(run_walk_receipt_check)"
+write_surfaces 'exit 0: run.txt' 'total.png' 'curl -si https://shop.test/orders/7: body-only.txt' 'exit 0: run.txt' 'exit 0: run.txt'
+expect_contains "curl: a response file with no HTTP status line fails" "walk-item app/controllers/orders_controller.rb: curl response file has no HTTP status line" "$(run_walk_receipt_check)"
+write_surfaces 'exit 0: run.txt' 'total.png' 'curl -si https://shop.test/orders/7: gone.txt' 'exit 0: run.txt' 'exit 0: run.txt'
+expect_contains "curl: a missing response file fails" "curl response file does not exist: gone.txt" "$(run_walk_receipt_check)"
+write_surfaces 'exit 0: run.txt' 'total.png' 'curl -si https://shop.test/orders/7: empty.txt' 'exit 0: run.txt' 'exit 0: run.txt'
+expect_contains "curl: an empty response file fails" "curl response file is empty: empty.txt" "$(run_walk_receipt_check)"
+write_surfaces 'exit 0: run.txt' 'total.png' 'curl -si https://shop.test/orders/7' 'exit 0: run.txt' 'exit 0: run.txt'
+expect_contains "curl: a curl line with no saved response fails" "is a api surface" "$(run_walk_receipt_check)"
+write_surfaces 'it came up' 'total.png' 'curl -si https://shop.test/orders/7: resp.txt' 'exit 0: run.txt' 'exit 0: run.txt'
+expect_contains "env: with all four surfaces it may use any of their kinds, prose fails" "env: evidence is none of" "$(run_walk_receipt_check)"
+cp "$work_dir/resp.txt" "$work_dir/out.png"
+write_surfaces 'exit 0: run.txt' 'total.png' 'curl -si https://shop.test/orders/7: out.png' 'exit 0: run.txt' 'exit 0: run.txt'
+expect_eq "surfaces: a curl line whose saved file is named like a capture is still a curl response" clean "$(run_walk_receipt_check)"
+printf 'GATES=naming\nWALK=required\nwalk: x\nwalk-item: src/ui/Cart.tsx surface: browser\n' > "$select_output"
+printf 'env\tbin/review-env up\tGET /health 200\nsrc/ui/Cart.tsx\tcart shows 2 items\ttotal.png\tstates: one item; many items\n' > "$receipt"
+expect_contains "env: a browser-only walk takes a capture for the env line, not a request line" "env: evidence is none of a screenshot or recording, after the command: GET /health 200" "$(run_walk_receipt_check)"
+printf 'env\tbin/review-env up\ttotal.png\nsrc/ui/Cart.tsx\tcart shows 2 items\ttotal.png\tstates: one item; many items\n' > "$receipt"
+expect_eq "env: a browser-only walk with a capture env line passes" clean "$(run_walk_receipt_check)"
+printf 'GATES=naming\nWALK=required\nwalk: x\nwalk-item: scripts/sync.sh surface: terminal\n' > "$select_output"
+printf 'env\tscripts/sync.sh --dry-run\tGET /health 200\nscripts/sync.sh\tdry run listed 3 orders\texit 0: run.txt\tstates: dry run; --help\n' > "$receipt"
+expect_contains "env: a terminal-only walk needs a transcript for the env line, not a request line" "env: evidence is none of a run transcript (exit 0: run.txt), after the command: GET /health 200" "$(run_walk_receipt_check)"
+printf 'GATES=naming\nWALK=required\nwalk: x\nwalk-item: scripts/sync.sh\n' > "$select_output"
+printf 'env\tscripts/sync.sh --dry-run\tGET /health 200\nscripts/sync.sh\tdry run listed 3 orders\ttotal.png\tstates: dry run; --help\n' > "$receipt"
+expect_eq "legacy: a walk-item line with no surface accepts any kind (capture here)" clean "$(run_walk_receipt_check)"
+printf 'env\tscripts/sync.sh --dry-run\tGET /health 200\nscripts/sync.sh\tdry run listed 3 orders\tcurl -si https://shop.test/x: resp.txt\tstates: dry run; --help\n' > "$receipt"
+expect_eq "legacy: a curl response is accepted with no surface" clean "$(run_walk_receipt_check)"
 
 # The states walked: one walk of one state is not QA.
 printf 'GATES=naming\nWALK=required\nwalk: x\nwalk-item: app/models/order.rb\n' > "$select_output"

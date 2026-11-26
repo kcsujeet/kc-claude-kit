@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Hook: no review verdict while the review's walk receipt fails. kc-code-review's walk rule says
-# every behaviour a diff changes is seen in the running app or at the API before the verdict;
+# every behaviour a diff changes is seen on its QA surface (browser, API, terminal, unit) before the verdict;
 # guard-github-post.sh already refuses to post or approve such a review, and this guard holds the
 # verdict itself, so a review is never called done in chat with its walk skipped.
 #
@@ -120,7 +120,7 @@ if [ -z "$problems" ]; then
   fi
   exit 0
 fi
-walk_steps="Walk each changed behaviour in the running app or at the API, as every audience that can reach it (signed out too for a public path, replaying each write with another record's id and again with the same id), and write one line per walk-item to walk-receipt.tsv beside review.diff: path, what was seen, evidence (a screenshot or recording path, or a request line with its status)."
+walk_steps="Walk each changed behaviour on its QA surface (browser, API, terminal, unit), as every audience that can reach it (signed out too for a public path, replaying each write with another record's id and again with the same id), and write one line per walk-item to walk-receipt.tsv beside review.diff: path, what was seen, evidence (the surface's evidence: browser a screenshot or recording path, api a curl request and its saved response, terminal or unit a run transcript, exit 0: run.txt)."
 if [ "$event" = PreToolUse ]; then
   block_reason="Blocked by the kc-gates plugin: the review has items it has not walked, so the verification gate cannot run yet (it audits the walk receipt). $walk_steps Then dispatch it again. $problems"
   printf '%s' "$block_reason" | jq -Rsc '{hookSpecificOutput: {hookEventName: "PreToolUse", permissionDecision: "deny", permissionDecisionReason: .}}'
