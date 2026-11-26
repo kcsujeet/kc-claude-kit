@@ -24,7 +24,7 @@ kc-claude-kit/
     │   ├── scripts/build-rules.sh          # regenerates rules/, --check fails on drift
     │   ├── scripts/install-rules.sh        # what kc-init and the first-prompt hook run: copies rules/ and writes the version stamp
     │   ├── tests/                          # sweep and lookup fixtures, their runners, install-rules and mutation-sweep tests
-    │   ├── hooks/                          # first prompt: installs or refreshes ~/.claude/rules, reports a stale project copy
+    │   ├── hooks/                          # first prompt: installs or refreshes ~/.claude/rules, reports a stale project copy; PreToolUse guards (source reads through the shell, forks of a large context, investigation write-ups, source writes with no shape file)
     │   └── evals/
     ├── kc-gates/
     │   ├── .claude-plugin/plugin.json      # depends on kc-conventions
@@ -38,6 +38,7 @@ kc-claude-kit/
     │   ├── scripts/change-class.sh, approvals-needed.sh  # a small change's lighter path through the guards; every typed phrase ahead in one block
     │   ├── scripts/guard-ask-product-only.sh  # denies a question to the person that holds code or review words or does not say its product, scope, irreversible or intent kind
     │   ├── scripts/guard-unreproduced-cause.sh  # holds a cause and fix proposed before the reported problem was run
+    │   ├── scripts/guard-unchecked-claim.sh     # PreToolUse: denies a commit message, PR or issue text or tracker write that states a fact about code, data or a tool that nothing in the turn read
     │   ├── scripts/guard-review-walk.sh, lib/review-dir.sh  # no review verdict, and no verification gate, while the walk receipt fails
     │   ├── scripts/update-marketplace.sh, check-loaded-version.sh  # plugin updates during a session; every plugin links the check
     │   ├── scripts/*.sh                    # gather-review, scope-facts, review-threads, build-comment-payloads, check-draft-names

@@ -1,0 +1,1 @@
+You wrote "every order has a currency set". That is the part I will check next.

@@ -1,0 +1,1 @@
+The kit says every lesson needs a check, so I will add a test.

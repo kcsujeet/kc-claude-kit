@@ -1,0 +1,4 @@
+shop/checkout.py:3: frame = df.groupby("shop").agg("total").reset_index()
+shop/checkout.py:4: label = format_money(round_cents(convert(amount, rate)))
+shop/checkout.py:12: result = fetch(url) or load_cached(url) or build_default(url, retries=3) or error_value(url)
+shop/checkout.py:13: *rest, last = parse(read(cell), strict(x), build(g(h(y))))

@@ -122,6 +122,7 @@ Most skills start on their own when the topic comes up. You can also type any of
 | `kc-dependencies` | Adding a library only when it earns its place. |
 | `kc-delegation` | Handing work to subagents or a workflow without the cost running away. |
 | `kc-assess` | Assessing a task before building: claims check, reproduce first, every reader of the broken value. |
+| `kc-shape-the-change` | Writing the design down before code that stores something new, adds a unit or moves behaviour: where each fact lives, two shapes compared, rollout and who decided it, failure modes, approval. A hook blocks source edits until the file passes. |
 | `kc-investigate` | Investigating a production problem from the records that already exist, hop by hop, before building a probe or a fix. |
 | `kc-look-back` | The look-back at hand-off: list the feedback, a verdict each, lessons as one batch, where a lesson belongs. |
 | `kc-raise-the-bar` | Working is the floor: measure what was done, look for a better way that deletes before it adds, apply it or record what was tried. |

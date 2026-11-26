@@ -1,0 +1,5 @@
+The ticket says:
+
+> Every order has a currency set and the cache is cleared on deploy.
+
+I will compare that with the code.
