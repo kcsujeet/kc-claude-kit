@@ -101,6 +101,8 @@ HOME=$work_dir
 expect_hook_verdict deny "a home-relative path inside a checkout is denied" "$(build_bash_payload 'echo x > ~/shop/app/orders/fulfilment.ts')"
 expect_hook_verdict deny "a leading cd to a home-relative checkout is denied" "$(build_bash_payload 'cd ~/shop && echo x > app/orders/fulfilment.ts' /)"
 expect_hook_verdict deny "a leading cd to a HOME-relative checkout is denied" "$(build_bash_payload "cd \$HOME/shop && echo x > app/orders/fulfilment.ts" /)"
+expect_hook_verdict deny "a leading cd to the home folder itself is denied" "$(build_bash_payload 'cd ~ && echo x > shop/app/orders/fulfilment.ts' /)"
+expect_hook_verdict deny "a leading cd to a braced HOME path is denied" "$(build_bash_payload "cd \${HOME}/shop && echo x > app/orders/fulfilment.ts" /)"
 HOME=$saved_home
 expect_hook_verdict allow "a quoted > argument (a read) passes" "$(build_bash_payload "grep '>' app/orders/fulfilment.ts")"
 expect_hook_verdict allow "a > inside a commit message passes" "$(build_bash_payload 'git commit -m "orders > fulfilment.ts"')"

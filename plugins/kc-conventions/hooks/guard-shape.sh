@@ -141,7 +141,10 @@ handle_shape_hook() {
       if [[ "$shell_command" =~ ^[[:space:]]*cd[[:space:]]+([^[:space:]\;\&]+)[[:space:]]*\&\& ]]; then
         dir=${BASH_REMATCH[1]}
         dir=${dir//[\'\"]/}
-        case "$dir" in \~/* | \$HOME/*) dir=$HOME/${dir#*/} ;; esac
+        case "$dir" in
+          '~' | "\$HOME" | "\${HOME}") dir=$HOME ;;
+          \~/* | \$HOME/* | \$\{HOME\}/*) dir=$HOME/${dir#*/} ;;
+        esac
       fi
       targets=$(get_shell_write_targets "$shell_command")
       ;;
