@@ -44,10 +44,9 @@ write_record() { printf '%s\n' "$1" > "$better_lines_file"; }
 expect_record() { write_record "$2"; write_work_turn Edit file_path "src/orders.rb"; expect_eq "$1" "$3" "$(run_stop "$done_text")"; }
 
 done_text="The order total is fixed."
-remove_record() { rm -f "$better_lines_file"; }
 
 # Turns of reads, or with no tool calls, pass.
-remove_record
+rm -f "$better_lines_file"
 { emit_typed_message "how do orders work?"; emit_tool_call Read file_path "src/orders.rb"; emit_tool_result; emit_tool_call Bash command "grep -rn total src | head -5 && git log -3 --oneline"; emit_tool_result; emit_tool_call Grep pattern "total"; emit_tool_result; } > "$transcript"
 expect_eq "a turn of reads with no record goes out" out "$(run_stop "$done_text")"
 { emit_typed_message "how do orders work?"; emit_tool_call REPL code 'const t = await $`git status --short`.text(); t'; emit_tool_result; } > "$transcript"
@@ -87,7 +86,7 @@ expect_record "a line with one field is held" "$t0"$'\torder export' held
 expect_record "a line from before this turn is held" "2026-01-01T09:00:00Z"$'\torder export\t44 s\t6 s' held
 
 # Each kind of work counts.
-remove_record
+rm -f "$better_lines_file"
 expect_work_held "a Write" Write file_path "src/orders.rb"
 expect_work_held "a NotebookEdit" NotebookEdit file_path "orders.ipynb"
 expect_work_held "an Agent" Agent prompt "check the orders"

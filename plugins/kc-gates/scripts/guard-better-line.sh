@@ -25,7 +25,7 @@ set -u
 
 # First words of commands that normally only read. The list is short on purpose: a read it lacks
 # (sed, find, sort, curl, git -C) counts as work and asks for a record once. A command in it is
-# still work when it holds a redirect to a file, `$(` or a backtick (is_read_only_command).
+# still work when it holds a redirect to a file, a lone `&`, `$(` or a backtick (is_read_only_command).
 readonly READ_ONLY_WORDS='(ls|cat|head|tail|grep|egrep|fgrep|rg|wc|echo|printf|pwd|cd|jq|stat|file|which|type|date|uniq|diff|cmp|test|\[|true|false|sleep|tree|du|df|basename|dirname|realpath|readlink|nl|cut|tr|column|sha256sum|shasum|md5|md5sum|git (status|log|diff|show|rev-parse|rev-list|ls-files|ls-tree|blame|describe|config --get|worktree list|cat-file|grep|merge-base|shortlog)|gh (pr|issue|run|repo|release) (view|list|checks|diff|status))'
 # A REPL script that calls Agent, Edit, Write, MultiEdit, NotebookEdit or Bash (through its global or
 # `tools.`), or edit() or write(). MCP tools are not counted, in a REPL or called directly.
@@ -43,11 +43,12 @@ better_lines_file="${CLAUDE_PLUGIN_DATA:-}/better-lines/$session_id"
 [ -n "${CLAUDE_PLUGIN_DATA:-}" ] && [ -n "$session_id" ] || exit 0
 
 # True when every command in the text (see list_stripped_commands) starts with a read-only word and
-# writes no file (> or >> to anything but /dev/null or a stream, or --output) or runs a nested command.
+# writes no file (> or >> to anything but /dev/null or a stream, or --output), and starts no background
+# job (`&`) or nested command.
 is_read_only_command() {
-  local command_text=$1 command_without_safe_redirects segment
-  command_without_safe_redirects=$(printf '%s' "$command_text" | sed -E 's#[0-9]*>&[0-9]##g; s#[0-9]*>>?[[:space:]]*/dev/null##g; s#&&# #g')
-  printf '%s' "$command_without_safe_redirects" | grep -Eq '>|&|--output|\$\(|`' && return 1
+  local command_text=$1 command_without_safe_operators segment
+  command_without_safe_operators=$(printf '%s' "$command_text" | sed -E 's#[0-9]*>&[0-9]##g; s#[0-9]*>>?[[:space:]]*/dev/null##g; s#&&# #g')
+  printf '%s' "$command_without_safe_operators" | grep -Eq '>|&|--output|\$\(|`' && return 1
   while IFS= read -r segment; do
     printf '%s' "$segment" | grep -Eq "^$READ_ONLY_WORDS([[:space:]]|\$)" || return 1
   done < <(printf '%s\n' "$command_text" | list_stripped_commands)
