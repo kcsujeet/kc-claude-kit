@@ -2,9 +2,9 @@
 # shellcheck disable=SC2016  # the replies hold Markdown backticks, not shell expansions
 # Tests scripts/guard-unchecked-claim.sh: text about to be published (a commit message, a pull request
 # or issue body or comment, a tracker write) that states a fact about code, data or a tool
-# (a quantified statement, a count, what a named thing does or is) is denied unless a tool
-# call of the turn, other than an edit or a call that publishes text, was given or returned text naming what the fact is about, or
-# the text says plainly it is unverified; plain text, quoted text, hedges, questions and the
+# (a quantified statement, a count, what a named thing does or is) is denied unless a tool call
+# of the turn (not an edit, not a call that publishes text) was given or returned text naming what
+# the fact is about, or the text says plainly it is unverified; plain text, quoted text, hedges, questions and the
 # turn's own changes go out. Text fixtures are in fixtures/guard-unchecked-claim/.
 set -euo pipefail
 

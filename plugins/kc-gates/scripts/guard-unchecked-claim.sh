@@ -27,10 +27,10 @@
 # secrets"), a statement of what the turn itself changed ("I renamed"), and any text that says
 # plainly it is unverified (unverified, haven't checked, from memory, I assume).
 #
-# A claim is checked when a tool call of the current turn that is not an edit and not a call that
-# publishes text (Read, Grep, a command, a query, a fetch, an agent) was given or returned text holding a distinctive word of the
-# sentence (words of four letters or more, without stop words and generic code nouns; when none is
-# left, any word of it). A sentence with no usable word is checked by any such call. Reads in
+# A claim is checked when a tool call of the current turn (Read, Grep, a command, a query, a fetch,
+# an agent; not an edit, not a call that publishes text) was given or returned text holding a
+# distinctive word of the sentence (words of four letters or more, without stop words and generic
+# code nouns; when none is left, any word of it). A sentence with no usable word is checked by any such call. Reads in
 # earlier turns do not count: the source is read again, or the text says it is from earlier.
 #
 # Claims about what instructions require and what a tool cannot do are check-reply-sources.sh's;
@@ -144,7 +144,7 @@ jq -L "$(dirname "$0")/lib" -rs --argjson cap "$EVIDENCE_CHARS_PER_CALL" --arg g
   include "typed-message";
   def joined_text: [.[]? | (.text? // empty)] | join(" ");
   def result_text: if type == "string" then . else joined_text end;
-  def evidence_line($result): ((.input | tostring) + " " + $result) | .[0:$cap] | ascii_downcase | gsub("[\n\t\r]"; " ");
+  def build_evidence_line($result): ((.input | tostring) + " " + $result) | .[0:$cap] | ascii_downcase | gsub("[\n\t\r]"; " ");
   def publishes:
     (.name | test("^" + $tracker_write; "i"))
     or (.name == "Bash" and ((.input.command // "") | test($git_commit + "|" + $gh_publish; "i")));
@@ -152,7 +152,7 @@ jq -L "$(dirname "$0")/lib" -rs --argjson cap "$EVIDENCE_CHARS_PER_CALL" --arg g
   | ([$entries[] | select(.type == "user") | .message.content? | arrays | .[] | select(type == "object" and .type == "tool_result")
       | {key: .tool_use_id, value: (.content | result_text)}] | from_entries) as $results
   | $entries[] | select(.type == "assistant") | .message.content[]? | select(.type == "tool_use") | select(publishes | not)
-  | .name + "\t" + evidence_line($results[.id] // "")
+  | .name + "\t" + build_evidence_line($results[.id] // "")
 ' "$transcript" 2>/dev/null \
   | grep -Ev "$EDIT_CALLS" | grep -Ev "$BOOKKEEPING_CALLS" > "$evidence_file" || true
 
