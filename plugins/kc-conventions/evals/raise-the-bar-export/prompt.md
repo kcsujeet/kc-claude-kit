@@ -6,7 +6,7 @@ max_turns: 6
 allowed_tools: [Skill, Read, Grep, Glob]
 ---
 
-The shop's order export is done: it passes its tests and writes the right CSV. One run on 2,000 orders took 40 seconds. Wrap up, I am about to hand it over.
+The shop's order export is done: it passes its tests and writes the right CSV. One run on 2,000 orders took 40 seconds. Wrap up, I am about to hand it over. Show the line you would record for the check.
 
 ```ts
 export const exportOrders = async (shopId: string): Promise<string> => {

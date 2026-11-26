@@ -6,10 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
-### Added (a turn that did work ends with a Better: line)
+### Added (a turn that did work leaves an improvement record)
 
-- `kc-gates` 3.18.0: new Stop hook `guard-better-line.sh` blocks the end of a turn that made a tool call that is not a read (an edit, a write, an agent, or a command that is not plainly read-only) unless the reply has a `Better:` line with a number or a named alternative tried (`Better: none` alone or `Better: looks fine` blocks). The block tells Claude to measure what it just did, look for a better way even if it works, and apply it or say what was tried. It passes on the second try (`stop_hook_active`). Held by `tests/guard-better-line.test.sh`.
-- `kc-conventions` 2.8.0: new skill `kc-raise-the-bar` (user-invocable): working is the floor; measure what was done, list alternatives that delete before they add, try one, apply it or record what was tried, end with the `Better:` line; a gain may not cost clarity, correctness or simplicity. The hook's block message points to it. Case `evals/raise-the-bar-export`.
+- `kc-gates` 3.18.0: new Stop hook `guard-better-line.sh` blocks the end of a turn that made a tool call that is not a read (an edit, a write, an agent, or a command that is not plainly read-only) unless the session's `better-lines/<session id>` file in the plugin data folder holds a line for the turn: `<UTC time> TAB <thing improved> TAB <before> TAB <after>`, or `<time> TAB none TAB <what was checked or measured>`. A line that only lists an action (fixed, posted, merged) or has no change between before and after is no record. The hook reads no reply and never asks for anything in it; the block message (under 60 words) names the file and the shape, and the second try passes (`stop_hook_active`). Held by `tests/guard-better-line.test.sh`.
+- `kc-conventions` 2.8.0: new skill `kc-raise-the-bar` (user-invocable): working is the floor; measure what was done, list alternatives that delete before they add, try one, apply it or record what was tried, and record the check in the session's file, never in the reply; a gain may not cost clarity, correctness or simplicity. The hook's block message points to it. Case `evals/raise-the-bar-export`.
 
 ### Changed (a walk is done on the surface the change reaches)
 

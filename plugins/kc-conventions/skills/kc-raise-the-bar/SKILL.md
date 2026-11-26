@@ -13,7 +13,10 @@ Working is the floor, not the finish. This is when to look for better and whethe
 2. **Assume a better way exists.** List two or three alternatives, the ones that do less first: delete a step, a loop or a branch; reuse what exists (`kc-simplicity`); then, only then, add something.
 3. **Try the most promising, measure again** the same way.
 4. **Apply it or record what was tried.** Keep it only when it is better on the measure and no worse on clarity, correctness and simplicity. A gain that adds code, a cache, a flag or a special case names what it costs and goes through the same gates as any change.
-5. **End the reply with a `Better:` line:** `Better: order export 40s -> 3s, one query replaces the per-order loop, 12 lines deleted`, or `Better: none, tried a cache (40s -> 38s, +30 lines) and a batch query (40s -> 3s, rejected: changes the export's order), 3 runs`.
+5. **Record it, in the session's file, never in the reply.** The Stop hook asks for one line per work turn in `better-lines/<session id>` under the plugin data folder (it names the full path when it blocks), tab-separated, the time first (`date -u +%Y-%m-%dT%H:%M:%SZ`):
+   - `<time> TAB order export TAB 40 s TAB 3 s`: the thing improved, its state before and after. Deleting the per-order loop is the thing, not "fixed the export".
+   - `<time> TAB none TAB tried a cache (40 s to 38 s, +30 lines) and a batch query (rejected: changes the order), 3 runs`: what was checked or measured. This is the plain default when nothing better exists.
+   A list of actions (fixed, posted, merged, confirmed) is no record: name what changed state. The reply to the person says nothing about this check.
 
 Faster or cheaper and simpler go together: prefer the change that deletes code, removes a step or a moving part. A speedup that makes the code harder to read or to trust is a trade, and a trade is the person's call.
 

@@ -2,4 +2,4 @@
 type: llm
 ---
 
-The reply ends with a line starting "Better:" that names a measurement (the 40 seconds, or a before and after number or a number of runs) and chooses a change that deletes the per-order customer lookup (one query or join for all the customers, or the customers loaded once), or says what was tried. A reply that adds a cache, a flag or a parallel pool instead of removing the per-order lookup, that has no "Better:" line, or whose line is only "none" or "looks fine", fails.
+The reply gives the record of the check as one tab-separated line: a time, the thing improved (the per-order customer lookup, or the export), its state before (the 40 seconds, or another measurement) and its state after, or the word none with what was checked or measured. The change it chooses deletes the per-order customer lookup (one query or join for all the customers, or the customers loaded once), not a cache, a flag or a parallel pool. A reply with no such line, with a line that only lists actions (fixed, posted, merged), or with a line starting "Better:" fails.
