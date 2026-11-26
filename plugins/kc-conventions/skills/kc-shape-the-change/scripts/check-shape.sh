@@ -43,12 +43,12 @@ awk -v box_count="$box_count" -v shapes_box="$shapes_box" -v rollout_box="$rollo
     pick_reason = picked; sub(/^[A-Za-z0-9]+/, "", pick_reason)
     if (count_words(pick_reason) < min_words) report_problem("§SH" shapes_box ": the pick needs its reason, at least " min_words " words")
   }
-  function check_flag_line(line,   flag_text, count, parts, change, answer, reason, decider, lowered_decider) {
+  function check_flag_line(line,   flag_text, flag_field_count, parts, change, answer, reason, decider, lowered_decider) {
     flag_text = line
     sub(/^[[:space:]]*- flag:[[:space:]]*/, "", flag_text)
-    count = split(flag_text, parts, /\|/)
+    flag_field_count = split(flag_text, parts, /\|/)
     change = trim(parts[1]); answer = tolower(trim(parts[2])); reason = trim(parts[3]); decider = trim(parts[4])
-    if (count != 4 || change == "" || answer !~ /^(yes|no)$/ || reason !~ /^[Rr]eason:/ || decider !~ /^[Dd]ecided-by:/) {
+    if (flag_field_count != 4 || change == "" || answer !~ /^(yes|no)$/ || reason !~ /^[Rr]eason:/ || decider !~ /^[Dd]ecided-by:/) {
       report_problem("§SH" rollout_box ": flag line must read \"- flag: <change> | yes|no | reason: <why> | decided-by: <who>\", got: " line)
       return
     }
@@ -96,14 +96,15 @@ awk -v box_count="$box_count" -v shapes_box="$shapes_box" -v rollout_box="$rollo
   }
   END {
     if (trivial) {
-      trivial_reason_text = tolower(trivial_line)
-      ok = 1
-      if (trivial_reason_text !~ /no new storage/) { report_problem("trivial: the line must say \"no new storage\""); ok = 0 }
-      if (trivial_reason_text !~ /no new unit/) { report_problem("trivial: the line must say \"no new unit\""); ok = 0 }
-      if (trivial_reason_text !~ /no behaviour move|no behavior move/) { report_problem("trivial: the line must say \"no behaviour move\""); ok = 0 }
+      lowered_trivial_line = tolower(trivial_line)
+      has_all_no_phrases = 1
+      if (lowered_trivial_line !~ /no new storage/) { report_problem("trivial: the line must say \"no new storage\""); has_all_no_phrases = 0 }
+      if (lowered_trivial_line !~ /no new unit/) { report_problem("trivial: the line must say \"no new unit\""); has_all_no_phrases = 0 }
+      if (lowered_trivial_line !~ /no behaviour move|no behavior move/) { report_problem("trivial: the line must say \"no behaviour move\""); has_all_no_phrases = 0 }
+      trivial_reason_text = lowered_trivial_line
       gsub(/trivial:|no new storage|no new unit|no behaviou?r move/, "", trivial_reason_text)
       gsub(/[,.:;-]/, " ", trivial_reason_text)
-      if (ok && count_words(trivial_reason_text) < min_words) report_problem("trivial: give the reason in at least " min_words " words after the three \"no\" phrases")
+      if (has_all_no_phrases && count_words(trivial_reason_text) < min_words) report_problem("trivial: give the reason in at least " min_words " words after the three \"no\" phrases")
       exit (problems > 0)
     }
     for (n = 1; n <= box_count; n++) {
@@ -111,14 +112,20 @@ awk -v box_count="$box_count" -v shapes_box="$shapes_box" -v rollout_box="$rollo
       if (seen[n] > 1) report_problem("§SH" n ": listed " seen[n] " times; keep one")
       if (!ticked[n]) { report_problem("§SH" n ": the box is not ticked; fill it, then tick it"); continue }
       if (count_words(box_answers[n]) < min_words) report_problem("§SH" n ": the answer is under " min_words " words")
-      if (tolower(box_answers[n]) ~ /(^|[^a-z])(todo|tbd)([^a-z]|$)/ || tolower(box_answers[n]) ~ /fill in/) report_problem("§SH" n ": unfinished (TODO, TBD or fill in)")
+      lowered_answer = tolower(box_answers[n])
+      if (lowered_answer ~ /(^|[^a-z])(todo|tbd)([^a-z]|$)/ || lowered_answer ~ /fill in/) report_problem("§SH" n ": unfinished (TODO, TBD or fill in)")
     }
     if ((shapes_box in seen) && shape_count < min_shapes) report_problem("§SH" shapes_box ": compare at least " min_shapes " shapes, as lines \"- shape A: ...\" and \"- shape B: ...\"")
     if (shapes_box in seen) check_pick_line(pick_line)
     if ((rollout_box in seen) && flag_lines == 0) report_problem("§SH" rollout_box ": no flag line; one per change, \"- flag: <change> | yes|no | reason: <why> | decided-by: <who>\"")
     if ((failures_box in seen) && failure_lines == 0) report_problem("§SH" failures_box ": no failure line; \"- failure: <mode> | noticed-by: <signal>\"")
     if ((approval_box in seen) && ticked[approval_box]) {
-      if (match(box_answers[approval_box], /"[^"]+"/) == 0 || count_words(substr(box_answers[approval_box], RSTART + 1, RLENGTH - 2)) < min_approval_words) \
+      approval_text = box_answers[approval_box]
+      has_quote = match(approval_text, /"[^"]+"/)
+      quoted_words = approval_text
+      sub(/^[^"]*"/, "", quoted_words)
+      sub(/".*$/, "", quoted_words)
+      if (!has_quote || count_words(quoted_words) < min_approval_words) \
         report_problem("§SH" approval_box ": quote the approval words of the person verbatim, at least " min_approval_words " words between double quotes")
     }
     exit (problems > 0)

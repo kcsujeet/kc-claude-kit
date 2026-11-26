@@ -23,6 +23,11 @@ get_field() {
   printf '%s' "$1" | jq -r "$2 // empty" 2>/dev/null
 }
 
+# Succeeds when the token is a redirect operator that takes its target from the next token.
+is_redirect_operator() {
+  case $1 in '>' | '>>' | [0-9]'>' | [0-9]'>>' | '&>') ;; *) return 1 ;; esac
+}
+
 # Prints the destination of a cp, mv, install or rsync: the last argument that is not a redirect,
 # reading the segment's arguments (passed here) up to the next ';'.
 get_last_argument() {
@@ -30,8 +35,8 @@ get_last_argument() {
   for argument in "$@"; do
     [ "$argument" = ';' ] && break
     if [ "$previous_is_redirect" = true ]; then previous_is_redirect=false; continue; fi
+    if is_redirect_operator "$argument"; then previous_is_redirect=true; continue; fi
     case "$argument" in
-      '>' | '>>' | [0-9]'>' | [0-9]'>>' | '&>') previous_is_redirect=true ;;
       '>'* | [0-9]'>'* | '&>'*) ;;
       *) destination=$argument ;;
     esac
@@ -61,8 +66,8 @@ get_shell_write_targets() {
       continue
     fi
     if [ "$pending_redirect" = true ]; then printf '%s\n' "$token"; pending_redirect=false; continue; fi
+    if is_redirect_operator "$raw_token"; then pending_redirect=true; continue; fi
     case "$raw_token" in
-      '>' | '>>' | [0-9]'>' | [0-9]'>>' | '&>') pending_redirect=true; continue ;;
       '>'?*) redirect_target=${token#>}; printf '%s\n' "${redirect_target#>}"; continue ;;
     esac
     case "$command_name" in
@@ -73,7 +78,7 @@ get_shell_write_targets() {
       cp | mv | install | rsync)
         # Later arguments of this command must not match again: the destination is the last one.
         get_last_argument "${command_tokens[@]:$index}"
-        command_name=copied ;;
+        command_name=handled ;;
     esac
   done
 }
@@ -136,6 +141,7 @@ handle_shape_hook() {
       if [[ "$shell_command" =~ ^[[:space:]]*cd[[:space:]]+([^[:space:]\;\&]+)[[:space:]]*\&\& ]]; then
         dir=${BASH_REMATCH[1]}
         dir=${dir//[\'\"]/}
+        case "$dir" in \~/* | \$HOME/*) dir=$HOME/${dir#*/} ;; esac
       fi
       targets=$(get_shell_write_targets "$shell_command")
       ;;

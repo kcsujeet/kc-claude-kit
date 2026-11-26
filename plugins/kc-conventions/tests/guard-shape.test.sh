@@ -13,6 +13,8 @@ hook="$plugin_dir/hooks/guard-shape.sh"
 skill="$plugin_dir/skills/kc-shape-the-change/SKILL.md"
 work_dir=$(mktemp -d)
 trap 'rm -rf "$work_dir"' EXIT
+# The hook falls back to its own cwd when a path has no existing folder: keep that outside any checkout.
+cd "$work_dir" || exit 1
 
 failures=0
 passes=0
@@ -97,6 +99,8 @@ expect_hook_verdict deny "a redirect ended by a semicolon is denied" "$(build_ba
 saved_home=$HOME
 HOME=$work_dir
 expect_hook_verdict deny "a home-relative path inside a checkout is denied" "$(build_bash_payload 'echo x > ~/shop/app/orders/fulfilment.ts')"
+expect_hook_verdict deny "a leading cd to a home-relative checkout is denied" "$(build_bash_payload 'cd ~/shop && echo x > app/orders/fulfilment.ts' /)"
+expect_hook_verdict deny "a leading cd to a HOME-relative checkout is denied" "$(build_bash_payload "cd \$HOME/shop && echo x > app/orders/fulfilment.ts" /)"
 HOME=$saved_home
 expect_hook_verdict allow "a quoted > argument (a read) passes" "$(build_bash_payload "grep '>' app/orders/fulfilment.ts")"
 expect_hook_verdict allow "a > inside a commit message passes" "$(build_bash_payload 'git commit -m "orders > fulfilment.ts"')"
