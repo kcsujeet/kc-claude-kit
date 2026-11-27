@@ -6,6 +6,8 @@ One line per version per plugin, newest first. Detail lives in the pull request 
 
 ## [Unreleased]
 
+- `kc-gates` 3.25.0: new `guard-publish-noise.sh` hook refuses publishing a file that holds a command-line tool's own notice; `check-walk-receipt.sh` needs a `design` line and a design capture per browser item; `guard-loop-stop.sh` counts only the branch task's own merged pull requests; `verify-gate-blocks.sh` no longer misreads a large receipt or stops on a byte the locale can't read
+- `kc-verify` 2.5.1: §UI7 names the walk receipt's design capture (`check-walk-receipt.sh`)
 - `kc-gates` 3.24.0: Markdown is bullets and checkboxes, no prose paragraphs (`scripts/check-no-paragraphs.sh`, CI); wording and form only
 - `kc-conventions` 2.14.0: New `kc-clean-up` skill (§CU1-§CU7) and `list-cleanup.sh`, pointed to from `kc-always` and `kc-do-a-task`
 - `kc-conventions` 2.13.0: Markdown is bullets and checkboxes, no prose paragraphs (`scripts/check-no-paragraphs.sh`, CI); wording and form only
