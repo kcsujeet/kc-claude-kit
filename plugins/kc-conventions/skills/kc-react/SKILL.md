@@ -57,7 +57,6 @@ paths:
 - [ ] §R36 A field that picks a record is a picker component in its own file, shaped like 2 cited pickers; a form or field fetching records and building options itself FAILS.
 - [ ] §R37 Markup shared by 2+ components is a component taking the differences as props; a hook or function returning JSX for callers to render FAILS (see §R37). (N/A: no shared markup)
 - [ ] §R38 Every value a render shows or passes on comes from a subscription (watched field, selector, state, hook return); a one-off `getValues()`, `getState()` or `ref.current` read in render FAILS.
-- [ ] §R39 Markup moved out of a wrapper (into a new layout, column, card or component) keeps each style the wrapper gave it (scrolling, clipping, height, padding, background) or the diff drops it on purpose; a move that loses one unnoticed FAILS (see §R39). (N/A: no markup moved out of a wrapper)
 
 - Examples and edge cases per box: references/detail.md (read when a box is unclear).
 

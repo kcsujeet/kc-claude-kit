@@ -30,7 +30,6 @@ paths:
 - [ ] §I8 Text a user sees is never also an identifier (stored, compared, linked, keyed): the stored side holds a key, the screen renders its translation; enumerate literals reaching both.
 - [ ] §I9 No grammar attached to a placeholder (`{name}'s`, `{count}th`); the placeholder stands alone or an ordinal is `selectordinal`; swept by `placeholder-grammar.sh`.
 - [ ] §I10 One term, one spelling across the source locale (no `Addons` beside `Add-ons`), touched or not; each word from `term-spellings.sh` gets a verdict. (N/A: no message value added or changed)
-- [ ] §I11 A value placed inside a translated message (a relative time, date, number, list, currency) is formatted in that message's language; one formatted with no locale or another one FAILS, since it reads as English inside a translated sentence (see §I11). (N/A: no translated message takes a formatted value)
 
 - Examples and edge cases per box: references/detail.md (read when a box is unclear).
 

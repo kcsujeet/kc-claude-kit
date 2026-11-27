@@ -22,8 +22,7 @@ cat > messages/en.json <<'JSON'
     "save": "Save"
   },
   "orders": {
-    "title": "Orders",
-    "totalLine": "Total: {total}"
+    "title": "Orders"
   }
 }
 JSON
@@ -34,23 +33,18 @@ cat > messages/fr.json <<'JSON'
     "save": "Enregistrer"
   },
   "orders": {
-    "title": "Commandes",
-    "totalLine": "Total : {total}"
+    "title": "Commandes"
   }
 }
 JSON
 cat > src/i18n/t.ts <<'TS'
 import { IntlMessageFormat } from 'intl-messageformat'
-import en from '../../messages/en.json'
-import fr from '../../messages/fr.json'
+import messages from '../../messages/en.json'
 
-const catalogs: Record<string, unknown> = { en, fr }
-
-/** Looks up a message by dotted key in `language` and formats it as ICU MessageFormat with `values`. */
-export function t(key: string, values: Record<string, string | number> = {}, language = 'en'): string {
-  const catalog = catalogs[language] ?? en
-  const template = key.split('.').reduce<unknown>((node, part) => (node as Record<string, unknown>)[part], catalog)
-  return String(new IntlMessageFormat(String(template), language).format(values))
+/** Looks up a message by dotted key and formats it as ICU MessageFormat with `values`. */
+export function t(key: string, values: Record<string, string | number> = {}): string {
+  const template = key.split('.').reduce<unknown>((node, part) => (node as Record<string, unknown>)[part], messages)
+  return String(new IntlMessageFormat(String(template), 'en').format(values))
 }
 TS
 cat > src/settings/storeSettings.ts <<'TS'
@@ -171,16 +165,6 @@ export function describeDeliveries(deliverAts: Date[], settings: StoreSettings):
   const countLine = t('common.delivery', { count: deliverAts.length })
   const dateLines = deliverAts.map((deliverAt) => formatDeliveryDate(deliverAt, settings))
   return [countLine, ...dateLines]
-}
-TS
-# §I11: a translated total line whose amount is formatted in US English whatever the customer reads.
-cat > src/orders/totalLine.ts <<'TS'
-import { t } from '../i18n/t'
-
-/** The total line on the order page, in the language the customer reads the store in. */
-export function describeOrderTotal(totalCents: number, currency: string, language: string): string {
-  const total = new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(totalCents / 100)
-  return t('orders.totalLine', { total }, language)
 }
 TS
 git add -A

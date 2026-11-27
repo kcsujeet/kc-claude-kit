@@ -445,7 +445,3 @@ const COLUMNS = [{ key: 'name' }, { key: 'size' }]
 ### §R38
 
 - **Checklist wording (moved from SKILL.md):** Every value a render reads for what it shows or passes on comes from a subscription (a watched form field, a store selector, state, a hook's return value). A one-off read during render (`getValues()`, `getState()`, `ref.current`, a module variable that changes) FAILS: a memoizing compiler or `memo` can keep its first result, and a ref is unset on the first render; read it in an effect or event handler, or subscribe. (N/A: no render reads a form, store or ref)
-
-### §R39
-
-A wrapper carries behaviour its children rely on: a scroll container keeps wide content inside it, a fixed height clips, padding and a background set the surface. When a change lifts markup out of its old wrapper, into a new layout, column, card or component, list each style the old wrapper set and check the new home gives each one, or that the diff drops it on purpose and says why. Examples: an order email body moved from a scrolling card into a grid column, so a wide table now spills under the next column; a product description moved out of a clamped box into a drawer, so a long one runs off the page; a chart moved out of a fixed-height panel, so it collapses to zero height. The finding names the moved markup, the style it lost and where it should live now.
