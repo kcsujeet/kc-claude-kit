@@ -39,7 +39,7 @@ To stay current, turn on auto-update: `/plugin`, the Marketplaces tab, `kc-claud
 - **A pointer rule loads the skill.** "Doing X, load skill Y" is the only rule text loaded while you work; the skill loads when the work needs it.
 - **Review is one agent per topic.** `kc-code-review` runs the gate agents, scripts count every receipt, and the result is one PASSED or FAILED in chat. Nothing is posted without your say-so.
 - **Hooks hold what must not be skipped.** A guard blocks an unreviewed push, an unapproved post or a merge on a red round; it costs nothing until it fires.
-- **One pass before a human sees the PR.** `kc-ready-for-review` runs the review, the QA walk and your repo's hand-off checklist once, fixes what it finds and proves each fix with a test.
+- **One pass before a human sees the PR.** `kc-ready-for-review` runs `kc-code-review` (which includes the one QA walk), your repo's hand-off checklist and CI's commands once, fixes what it finds and proves each fix with a test.
 
 ## Start here
 
@@ -76,7 +76,7 @@ flowchart TD
 
 Most start on their own when the topic comes up; you can type any as `/plugin:skill`.
 
-**`kc-gates`:** `kc-code-review` (review a PR, branch or changes), `kc-ready-for-review` (the one review and QA pass on your own PR), `kc-post-review` (draft PR comments and replies, post on your signal).
+**`kc-gates`:** `kc-code-review` (review a PR, branch or changes, walking every changed behaviour: the one QA, own PRs and others'), `kc-ready-for-review` (the one review and QA pass on your own PR), `kc-post-review` (draft PR comments and replies, post on your signal).
 
 **`kc-verify`:** `kc-ui` (the change rendered, every state), `kc-ux` (a person can use it), `kc-e2e` (every layer, front to back).
 

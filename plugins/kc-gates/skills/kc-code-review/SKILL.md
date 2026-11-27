@@ -24,7 +24,7 @@ Orchestrate one gate agent per convention topic over a diff and report one PASSE
 ## Step 2: select and dispatch the gates
 
 1. Select by script, never by judgment: `bash "${CLAUDE_PLUGIN_ROOT}/scripts/select-gates.sh" "$DIFF_FILE" "$CHANGED_FILES"`. It prints `GATES=`, a reason per gate, and `WALK=`. On a later round of `kc-ready-for-review` add `--later-round`.
-2. When `WALK=required`, walk each `walk-item` on its surface and save `walk-receipt.tsv`. `bash "${CLAUDE_PLUGIN_ROOT}/scripts/check-walk-receipt.sh" <select-gates output> <walk-receipt.tsv>` must pass before any verdict.
+2. When `WALK=required`, this review is also the QA: walk each `walk-item` on its surface with `kc-verify:kc-ui`, `kc-verify:kc-ux` and the project's QA rules, every state, every audience, and save `walk-receipt.tsv`. Keep one "after" screenshot per flow (§G8). `bash "${CLAUDE_PLUGIN_ROOT}/scripts/check-walk-receipt.sh" <select-gates output> <walk-receipt.tsv>` must pass before any verdict.
 3. Phase 1: one Agent call per listed gate, all in one message. Give each `HEAD_SHA`, `DIFF_FILE`, `CHANGED_FILES` and the repo root; add `uses.txt` for correctness.
 
 | Gate | Agent (`subagent_type`) | Dispatch note |
@@ -84,7 +84,7 @@ Every gate returns `GATE:`, `STATUS: PASS | PASS (N/A) | FAIL`, `BOXES:` (one `[
 **Checklist:** Always; Scope; one line per trigger group (a receipt or `n/a, diff does not touch X`); Walk; Integrity
 - Always: <files read at sha, findings cite file:line + sha, nothing posted>.
 - Scope: <§G1-§G5 results>.
-- Walk: <`WALK=not-required`, or one line per walk-item; with the public-path reason, also the audiences walked (signed out included) and each replayed write>.
+- Walk: <`WALK=not-required`, or one line per walk-item (states, audiences, screenshot per flow); with the public-path reason, also signed out and each replayed write>.
 - Integrity: <n> fixes re-checked; <n> rewrites checked; <n> findings, <n> verified, <n> dropped, <n> fail safe.
 
 **Dropped:** `<file>:L<n>` <finding>: <reason>.
@@ -118,5 +118,6 @@ Tick each box, then say PASS, FAIL (file:line) or N/A (why).
 - [ ] §G5 The approach was questioned first: goal in one line, one other way compared; a materially simpler one leads the report. (N/A: never)
 - [ ] §G6 Under the title, `**Does it work / what can it break**` has before and after numbers (or `not measured: <why>`) and the `Uses:` line. Held by `check-review-report.sh`. (N/A: never)
 - [ ] §G7 Every `path:line` finding in `verdicts/*.txt` is in the report or on a `Dropped:` line. Held by `check-report-findings.sh`. (N/A: never)
+- [ ] §G8 QA walked once, here: every state and audience (signed out for a `public or guest path`) via kc-ui and kc-ux; one "after" screenshot per flow. Held by `check-walk-receipt.sh`. (N/A: `WALK=not-required`)
 
 Full wording of each box, and the hard rules, output examples and iteration notes: `references/detail.md`.

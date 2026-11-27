@@ -6,7 +6,7 @@ description: "Drafts review findings and replies to reviewers as PR comments, po
 
 # Drafting and posting PR comments
 
-Load this before drafting any PR comment or reply (replies to reviewers on your own PR included) and any chat, DM or ticket message the user sends as themselves. Findings from `kc-code-review` become [Conventional Comments](https://conventionalcomments.org/) here. Nothing is posted without the user's fresh post signal. Full wording, tone examples and the closed spec: `${CLAUDE_PLUGIN_ROOT}/skills/kc-post-review/references/detail.md` (read the matching `### ` section when a line here is unclear).
+Load this before drafting any PR comment or reply (replies to reviewers on your own PR included) and any chat, DM or ticket message the user sends as themselves. This follows a `kc-code-review` run on someone else's PR (it already walked the change; no second QA here). Its findings become [Conventional Comments](https://conventionalcomments.org/) here. Nothing is posted without the user's fresh post signal. Full wording, tone examples and the closed spec: `${CLAUDE_PLUGIN_ROOT}/skills/kc-post-review/references/detail.md` (read the matching `### ` section when a line here is unclear).
 
 ## Steps
 

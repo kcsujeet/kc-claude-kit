@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Tests scripts/check-walk-receipt.sh: every walk-item needs a receipt line with something seen,
 # evidence that is an existing capture or a request with its status, and the states walked (at
-# least two, or "only state:" with a reason): kc-ready-for-review §H8.
+# least two, or "only state:" with a reason): kc-code-review §G8.
 set -euo pipefail
 
 tests_dir=$(cd "$(dirname "$0")" && pwd)
@@ -180,22 +180,22 @@ printf 'GATES=naming\nWALK=required\nwalk: x\nwalk-item: app/models/order.rb\n' 
 write_states() { printf 'env\tbin/review-env up\tGET /health 200\napp/models/order.rb\tcreated an order\tPOST /orders 201\t%s\n' "$1" > "$receipt"; }
 printf 'env\tbin/review-env up\tGET /health 200\napp/models/order.rb\tcreated an order\tPOST /orders 201\n' > "$receipt"
 missing_states=$(run_walk_receipt_check)
-expect_contains "§H8: an item with no states field fails" "walk-item app/models/order.rb: fewer than two states walked" "$missing_states"
-expect_contains "§H8: the message says to list every shape and walk each" "list every shape the change's output can take" "$missing_states"
+expect_contains "§G8: an item with no states field fails" "walk-item app/models/order.rb: fewer than two states walked" "$missing_states"
+expect_contains "§G8: the message says to list every shape and walk each" "list every shape the change's output can take" "$missing_states"
 write_states 'states: empty cart'
-expect_contains "§H8: one state fails" "fewer than two states walked" "$(run_walk_receipt_check)"
+expect_contains "§G8: one state fails" "fewer than two states walked" "$(run_walk_receipt_check)"
 write_states 'states: empty cart;  ; '
-expect_contains "§H8: blank entries are not states" "fewer than two states walked" "$(run_walk_receipt_check)"
+expect_contains "§G8: blank entries are not states" "fewer than two states walked" "$(run_walk_receipt_check)"
 write_states 'states: empty cart; one long row; many short rows; landscape'
-expect_eq "§H8: four states pass" clean "$(run_walk_receipt_check)"
+expect_eq "§G8: four states pass" clean "$(run_walk_receipt_check)"
 write_states 'states: empty cart; two items'
-expect_eq "§H8: two states pass" clean "$(run_walk_receipt_check)"
+expect_eq "§G8: two states pass" clean "$(run_walk_receipt_check)"
 write_states 'only state: the page has no variants'
-expect_eq "§H8: only state with a reason passes" clean "$(run_walk_receipt_check)"
+expect_eq "§G8: only state with a reason passes" clean "$(run_walk_receipt_check)"
 write_states 'only state: none'
-expect_contains "§H8: only state with a one-word reason fails" "fewer than two states walked" "$(run_walk_receipt_check)"
+expect_contains "§G8: only state with a one-word reason fails" "fewer than two states walked" "$(run_walk_receipt_check)"
 write_states 'only state:'
-expect_contains "§H8: only state with no reason fails" "fewer than two states walked" "$(run_walk_receipt_check)"
+expect_contains "§G8: only state with no reason fails" "fewer than two states walked" "$(run_walk_receipt_check)"
 
 # Dimensions: a walk-dimension item needs its states field to cover each dimension the diff varies along.
 printf 'GATES=naming\nWALK=required\nwalk: x\nwalk-item: src/cart/total.tsx\nwalk-dimension: src/cart/total.tsx: viewport\n' > "$select_output"

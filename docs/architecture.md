@@ -41,7 +41,7 @@ kc-claude-kit/
     │   ├── scripts/change-class.sh, approvals-needed.sh  # a small change's lighter path through the guards; every typed phrase ahead in one block
     │   ├── scripts/guard-ask-product-only.sh  # denies a question to the person that holds code or review words or does not say its product, scope, irreversible or intent kind
     │   ├── scripts/remind-better-line.sh  # PostToolUse: on git push, gh pr create or gh pr ready, a line to measure and look for a better way
-    │   ├── scripts/guard-review-walk.sh, lib/review-dir.sh  # no verification gate dispatch while the walk receipt fails (PreToolUse)
+    │   ├── scripts/guard-review-walk.sh, lib/review-dir.sh  # no verification gate dispatch while the walk receipt kc-code-review writes fails (PreToolUse)
     │   ├── scripts/guard-unchecked-claim.sh     # PreToolUse: denies a commit message, PR or issue text or tracker write that states a fact about code, data or a tool that nothing in the turn read
     │   ├── scripts/update-marketplace.sh, check-loaded-version.sh  # plugin updates during a session; the one check of the loaded version, for the whole kit
     │   ├── scripts/verify-gate-blocks.sh, verify-gate-receipts.sh  # the mechanical half of the verification gate: citations, per-hit verdicts, STATUS, SCOPE, and each trigger group's headline receipt
