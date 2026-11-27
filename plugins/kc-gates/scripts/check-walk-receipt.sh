@@ -265,6 +265,7 @@ get_consumer_problem() {
 
 dimension_lines=$(sed -n 's/^walk-dimension: //p' "$select_output")
 
+browser_items=()
 problems=0
 record_walk_problem() { echo "walk-item $1: $2"; problems=$((problems + 1)); }
 
@@ -275,6 +276,7 @@ while IFS= read -r item_line; do
   surface=""
   if [[ $item_line =~ ^(.*)\ surface:\ ($KC_QA_SURFACES)$ ]]; then walk_item_path=${BASH_REMATCH[1]}; surface=${BASH_REMATCH[2]}; fi
   add_env_kinds "$surface"
+  if [ "$surface" = browser ]; then browser_items+=("$walk_item_path"); fi
   allowed_kinds=$(kc_get_surface_evidence_kinds "$surface")
   allowed_kinds_text=$(kc_describe_evidence_kinds "$allowed_kinds")
   line=""
@@ -349,6 +351,35 @@ if [ -n "$items" ]; then
       echo "env: $env_problem"
       problems=$((problems + 1))
     fi
+  fi
+fi
+
+# The design line. A change a person sees is walked beside what it should look like, so the
+# receipt names that design (a prototype or mock link, or a file) and each browser item carries a
+# capture of the design in the same state: design: <capture>. With no design, the line says so and why.
+if [ "${#browser_items[@]}" -gt 0 ]; then
+  design_line=""
+  if [ -r "$receipt" ]; then design_line=$(awk -F'\t' '$1 == "design" { print; exit }' "$receipt"); fi
+  design_source=$(printf '%s' "$design_line" | awk -F'\t' '{ print $2 }')
+  if [ -z "$design_line" ] || ! printf '%s' "$design_source" | grep -q '[^[:space:]]'; then
+    echo "design: no design line in $receipt: write design<TAB><the design the change follows: a prototype or mock link, or a file> and add a capture of the design in the same state to each browser item (design: <capture>), or design<TAB>none: <why, three or more words>"
+    problems=$((problems + 1))
+  elif printf '%s' "$design_source" | grep -Eiq '^[[:space:]]*none:'; then
+    if ! printf '%s' "$design_source" | grep -Eiq '^[[:space:]]*none:[[:space:]]*[^[:space:]]+([[:space:]]+[^[:space:]]+){2,}'; then
+      echo "design: none needs a reason of three or more words (none: the ticket links no design and the page has no mock)"
+      problems=$((problems + 1))
+    fi
+  else
+    for browser_item in "${browser_items[@]}"; do
+      item_line=$(awk -F'\t' -v item="$browser_item" '$1 == item { print; exit }' "$receipt" 2>/dev/null || true)
+      [ -n "$item_line" ] || continue
+      design_capture=$(printf '%s' "$item_line" | tr '\t' '\n' | sed -n 's/^[[:space:]]*design:[[:space:]]*//p' | head -n 1)
+      if [ -z "$design_capture" ]; then
+        record_walk_problem "$browser_item" "the walk follows a design ($design_source) but has no capture of it: open the design in the same state, capture it and add design: <capture> beside what the walk saw"
+      elif [ -z "$(find_evidence_file "$design_capture")" ]; then
+        record_walk_problem "$browser_item" "design capture does not exist: $design_capture"
+      fi
+    done
   fi
 fi
 

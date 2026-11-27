@@ -21,7 +21,7 @@ run_walk_receipt_check() {
   if [ "$status" -eq 0 ]; then echo clean; else printf '%s\n' "$output"; fi
 }
 
-printf 'env\tbin/review-env up\tGET /health 200\napp/models/order.rb\tcreated an order with a free item, total 0\tPOST /orders 201\tstates: empty cart; two items\nsrc/cart/total.ts\tcart page shows 2 items\t%s\tstates: one item; many items\n' "$work_dir/total.png" > "$receipt"
+printf 'design\tnone: no mock for this page\nenv\tbin/review-env up\tGET /health 200\napp/models/order.rb\tcreated an order with a free item, total 0\tPOST /orders 201\tstates: empty cart; two items\nsrc/cart/total.ts\tcart page shows 2 items\t%s\tstates: one item; many items\n' "$work_dir/total.png" > "$receipt"
 expect_eq "§V11: a full receipt passes" clean "$(run_walk_receipt_check)"
 
 printf 'app/models/order.rb\tcreated an order\tPOST /orders 201\tstates: empty cart; two items\n' > "$receipt"
@@ -32,29 +32,47 @@ expect_eq "only the missing item is listed" 1 "$(printf '%s\n' "$missing" | grep
 rm -f "$receipt"
 expect_contains "§V11: no receipt file fails every item" "walk-item app/models/order.rb: no receipt line" "$(run_walk_receipt_check)"
 
-printf 'env\tbin/review-env up\tGET /health 200\napp/models/order.rb\t\tPOST /orders 201\tstates: empty cart; two items\nsrc/cart/total.ts\t  \t%s\tstates: one item; many items\n' "$work_dir/total.png" > "$receipt"
+printf 'design\tnone: no mock for this page\nenv\tbin/review-env up\tGET /health 200\napp/models/order.rb\t\tPOST /orders 201\tstates: empty cart; two items\nsrc/cart/total.ts\t  \t%s\tstates: one item; many items\n' "$work_dir/total.png" > "$receipt"
 empty_seen=$(run_walk_receipt_check)
 expect_contains "an empty seen fails" "walk-item app/models/order.rb: nothing seen" "$empty_seen"
 expect_contains "a blank seen fails" "walk-item src/cart/total.ts: nothing seen" "$empty_seen"
 
-printf 'env\tbin/review-env up\tGET /health 200\napp/models/order.rb\tcreated an order\tlooked fine\tstates: empty cart; two items\nsrc/cart/total.ts\tcart page\t%s\tstates: one item; many items\n' "$work_dir/gone.png" > "$receipt"
+printf 'design\tnone: no mock for this page\nenv\tbin/review-env up\tGET /health 200\napp/models/order.rb\tcreated an order\tlooked fine\tstates: empty cart; two items\nsrc/cart/total.ts\tcart page\t%s\tstates: one item; many items\n' "$work_dir/gone.png" > "$receipt"
 bad_evidence=$(run_walk_receipt_check)
 expect_contains "evidence that is prose fails" "walk-item app/models/order.rb: evidence is none of" "$bad_evidence"
 expect_contains "a capture that does not exist fails" "walk-item src/cart/total.ts: evidence file does not exist" "$bad_evidence"
 
-printf 'env\tbin/review-env up\tGET /health 200\napp/models/order.rb\tcreated an order\tPOST /orders\tstates: empty cart; two items\nsrc/cart/total.ts\tcart page\t%s\tstates: one item; many items\n' "$work_dir/total.png" > "$receipt"
+printf 'design\tnone: no mock for this page\nenv\tbin/review-env up\tGET /health 200\napp/models/order.rb\tcreated an order\tPOST /orders\tstates: empty cart; two items\nsrc/cart/total.ts\tcart page\t%s\tstates: one item; many items\n' "$work_dir/total.png" > "$receipt"
 expect_contains "a request line with no status fails" "walk-item app/models/order.rb: evidence is none of" "$(run_walk_receipt_check)"
 
-printf 'env\tbin/review-env up\tGET /health 200\napp/models/order.rb\tcreated an order\tPOST /orders 201\tstates: empty cart; two items\nsrc/cart/total.ts\tcart page\ttotal.png\tstates: one item; many items\n' > "$receipt"
+printf 'design\tnone: no mock for this page\nenv\tbin/review-env up\tGET /health 200\napp/models/order.rb\tcreated an order\tPOST /orders 201\tstates: empty cart; two items\nsrc/cart/total.ts\tcart page\ttotal.png\tstates: one item; many items\n' > "$receipt"
 expect_eq "a relative capture path is read from the receipt's folder" clean "$(run_walk_receipt_check)"
 
-printf 'env\tbin/review-env up\tGET /health 200\napp/models/order.rb\tcreated an order\tPOST /orders 201\tstates: empty cart; two items\nsrc/cart/total.ts\tcart page\t%s\tstates: one item; many items\n' "$work_dir/total.webm" > "$receipt"
+printf 'design\tnone: no mock for this page\nenv\tbin/review-env up\tGET /health 200\napp/models/order.rb\tcreated an order\tPOST /orders 201\tstates: empty cart; two items\nsrc/cart/total.ts\tcart page\t%s\tstates: one item; many items\n' "$work_dir/total.webm" > "$receipt"
 printf 'webm' > "$work_dir/total.webm"
 expect_eq "a recording in the shared capture formats (webm) is evidence" clean "$(run_walk_receipt_check)"
 
 printf 'GATES=naming\nWALK=not-required\nwalk: no non-test source file in the diff\n' > "$select_output"
 rm -f "$receipt"
 expect_eq "no walk-item lines: nothing to walk, passes with no receipt" clean "$(run_walk_receipt_check)"
+
+# A browser change is walked beside its design: the receipt names it, or says why there is none.
+printf 'GATES=react\nWALK=required\nwalk: x\nwalk-item: src/storefront/OrderPanel.tsx surface: browser\n' > "$select_output"
+printf 'png' > "$work_dir/panel.png"; printf 'png' > "$work_dir/panel-design.png"
+printf 'env\tbin/review-env up\t%s\nsrc/storefront/OrderPanel.tsx\tpanel shows totals on the right\t%s\tstates: empty cart; two items\n' "$work_dir/panel.png" "$work_dir/panel.png" > "$receipt"
+expect_contains "§UI7 design-walk: a browser walk with no design line fails" "design: no design line" "$(run_walk_receipt_check)"
+printf 'env\tbin/review-env up\t%s\ndesign\thttps://mock.example/storefront\nsrc/storefront/OrderPanel.tsx\tpanel shows totals on the right\t%s\tstates: empty cart; two items\n' "$work_dir/panel.png" "$work_dir/panel.png" > "$receipt"
+expect_contains "§UI7 design-walk: a linked design with no capture of it fails" "walk-item src/storefront/OrderPanel.tsx: the walk follows a design" "$(run_walk_receipt_check)"
+printf 'env\tbin/review-env up\t%s\ndesign\thttps://mock.example/storefront\nsrc/storefront/OrderPanel.tsx\tpanel shows totals on the right\t%s\tstates: empty cart; two items\tdesign: %s\n' "$work_dir/panel.png" "$work_dir/panel.png" "$work_dir/panel-design.png" > "$receipt"
+expect_eq "§UI7 design-walk: a linked design with its capture beside the walk passes" clean "$(run_walk_receipt_check)"
+printf 'env\tbin/review-env up\t%s\ndesign\tnone: no mock exists for this page\nsrc/storefront/OrderPanel.tsx\tpanel shows totals on the right\t%s\tstates: empty cart; two items\n' "$work_dir/panel.png" "$work_dir/panel.png" > "$receipt"
+expect_eq "§UI7 design-walk: none with a reason passes" clean "$(run_walk_receipt_check)"
+printf 'env\tbin/review-env up\t%s\ndesign\tnone:\nsrc/storefront/OrderPanel.tsx\tpanel\t%s\tstates: empty cart; two items\n' "$work_dir/panel.png" "$work_dir/panel.png" > "$receipt"
+expect_contains "§UI7 design-walk: none with no reason fails" "design: none needs a reason" "$(run_walk_receipt_check)"
+printf 'GATES=naming\nWALK=required\nwalk: x\nwalk-item: app/jobs/nightly_export.rb surface: terminal\n' > "$select_output"
+printf 'exported 3 rows\n' > "$work_dir/run.txt"
+printf 'env\tbin/export\texit 0: %s\napp/jobs/nightly_export.rb\texported 3 rows\texit 0: %s\tstates: no rows; three rows\n' "$work_dir/run.txt" "$work_dir/run.txt" > "$receipt"
+expect_eq "§UI7 design-walk: a change nobody sees needs no design line" clean "$(run_walk_receipt_check)"
 
 status=0
 bash "$walk_receipt_checker" > /dev/null 2>&1 || status=$?
@@ -73,7 +91,7 @@ expect_eq "a blank walk-item line is not an item" clean "$(run_walk_receipt_chec
 # The environment line: the one command that brought the app up, with evidence it answered.
 printf 'GATES=naming\nWALK=required\nwalk: x\nwalk-item: app/models/order.rb\nwalk-item: src/cart/total.ts\n' > "$select_output"
 printf 'png' > "$work_dir/total.png"
-write_with_env() { printf 'env\t%s\t%s\n' "$1" "$2" > "$receipt"; printf '%b' "$items_only" >> "$receipt"; }
+write_with_env() { printf 'design\tnone: no mock for this page\nenv\t%s\t%s\n' "$1" "$2" > "$receipt"; printf '%b' "$items_only" >> "$receipt"; }
 items_only='app/models/order.rb\tcreated an order\tPOST /orders 201\tstates: empty cart; two items\nsrc/cart/total.ts\tcart page\tPOST /orders 201\tstates: empty cart; two items\n'
 printf '%b' "$items_only" > "$receipt"
 expect_contains "env: no env line fails" "env: no env line" "$(run_walk_receipt_check)"
@@ -85,7 +103,7 @@ write_with_env '' 'GET /health 200'
 expect_contains "env: a blank command fails" "env: no command" "$(run_walk_receipt_check)"
 write_with_env 'bin/review-env up' 'it came up'
 expect_contains "env: evidence that is prose fails" "env: evidence is none of" "$(run_walk_receipt_check)"
-printf 'env\tbin/review-env up\t%s\tstates: one item; many items\n' "$work_dir/gone.png" > "$receipt"
+printf 'design\tnone: no mock for this page\nenv\tbin/review-env up\t%s\tstates: one item; many items\n' "$work_dir/gone.png" > "$receipt"
 printf '%b' "$items_only" >> "$receipt"
 expect_contains "env: a capture that does not exist fails" "env: evidence file does not exist" "$(run_walk_receipt_check)"
 write_with_env 'bin/review-env up' 'total.png'
@@ -127,7 +145,7 @@ printf 'HTTP/1.1 200 OK\r\ncontent-type: application/json\r\n\r\n{"id":7}\n' > "
 printf '{"id":7}\n' > "$work_dir/body-only.txt"
 write_surfaces() {
   {
-    printf 'env\tscripts/sync.sh --dry-run\t%s\n' "$1"
+    printf 'design\tnone: no mock for this page\nenv\tscripts/sync.sh --dry-run\t%s\n' "$1"
     printf 'src/ui/Cart.tsx\tcart shows 2 items\t%s\tstates: one item; many items\n' "$2"
     printf 'app/controllers/orders_controller.rb\torder 7 returned\t%s\tstates: found; missing\n' "$3"
     printf 'scripts/sync.sh\tdry run listed 3 orders\t%s\tstates: dry run; --help\n' "$4"
@@ -162,23 +180,23 @@ cp "$work_dir/resp.txt" "$work_dir/out.png"
 write_surfaces 'exit 0: run.txt' 'total.png' 'curl -si https://shop.test/orders/7: out.png' 'exit 0: run.txt' 'exit 0: run.txt'
 expect_eq "surfaces: a curl line whose saved file is named like a capture is still a curl response" clean "$(run_walk_receipt_check)"
 printf 'GATES=naming\nWALK=required\nwalk: x\nwalk-item: src/ui/Cart.tsx surface: browser\n' > "$select_output"
-printf 'env\tbin/review-env up\tGET /health 200\nsrc/ui/Cart.tsx\tcart shows 2 items\ttotal.png\tstates: one item; many items\n' > "$receipt"
+printf 'design\tnone: no mock for this page\nenv\tbin/review-env up\tGET /health 200\nsrc/ui/Cart.tsx\tcart shows 2 items\ttotal.png\tstates: one item; many items\n' > "$receipt"
 expect_contains "env: a browser-only walk takes a capture for the env line, not a request line" "env: evidence is none of a screenshot or recording, after the command: GET /health 200" "$(run_walk_receipt_check)"
-printf 'env\tbin/review-env up\ttotal.png\nsrc/ui/Cart.tsx\tcart shows 2 items\ttotal.png\tstates: one item; many items\n' > "$receipt"
+printf 'design\tnone: no mock for this page\nenv\tbin/review-env up\ttotal.png\nsrc/ui/Cart.tsx\tcart shows 2 items\ttotal.png\tstates: one item; many items\n' > "$receipt"
 expect_eq "env: a browser-only walk with a capture env line passes" clean "$(run_walk_receipt_check)"
 printf 'GATES=naming\nWALK=required\nwalk: x\nwalk-item: scripts/sync.sh surface: terminal\n' > "$select_output"
-printf 'env\tscripts/sync.sh --dry-run\tGET /health 200\nscripts/sync.sh\tdry run listed 3 orders\texit 0: run.txt\tstates: dry run; --help\n' > "$receipt"
+printf 'design\tnone: no mock for this page\nenv\tscripts/sync.sh --dry-run\tGET /health 200\nscripts/sync.sh\tdry run listed 3 orders\texit 0: run.txt\tstates: dry run; --help\n' > "$receipt"
 expect_contains "env: a terminal-only walk needs a transcript for the env line, not a request line" "env: evidence is none of a run transcript (exit 0: run.txt), after the command: GET /health 200" "$(run_walk_receipt_check)"
 printf 'GATES=naming\nWALK=required\nwalk: x\nwalk-item: scripts/sync.sh\n' > "$select_output"
-printf 'env\tscripts/sync.sh --dry-run\tGET /health 200\nscripts/sync.sh\tdry run listed 3 orders\ttotal.png\tstates: dry run; --help\n' > "$receipt"
+printf 'design\tnone: no mock for this page\nenv\tscripts/sync.sh --dry-run\tGET /health 200\nscripts/sync.sh\tdry run listed 3 orders\ttotal.png\tstates: dry run; --help\n' > "$receipt"
 expect_eq "legacy: a walk-item line with no surface accepts any kind (capture here)" clean "$(run_walk_receipt_check)"
-printf 'env\tscripts/sync.sh --dry-run\tGET /health 200\nscripts/sync.sh\tdry run listed 3 orders\tcurl -si https://shop.test/x: resp.txt\tstates: dry run; --help\n' > "$receipt"
+printf 'design\tnone: no mock for this page\nenv\tscripts/sync.sh --dry-run\tGET /health 200\nscripts/sync.sh\tdry run listed 3 orders\tcurl -si https://shop.test/x: resp.txt\tstates: dry run; --help\n' > "$receipt"
 expect_eq "legacy: a curl response is accepted with no surface" clean "$(run_walk_receipt_check)"
 
 # The states walked: one walk of one state is not QA.
 printf 'GATES=naming\nWALK=required\nwalk: x\nwalk-item: app/models/order.rb\n' > "$select_output"
-write_states() { printf 'env\tbin/review-env up\tGET /health 200\napp/models/order.rb\tcreated an order\tPOST /orders 201\t%s\n' "$1" > "$receipt"; }
-printf 'env\tbin/review-env up\tGET /health 200\napp/models/order.rb\tcreated an order\tPOST /orders 201\n' > "$receipt"
+write_states() { printf 'design\tnone: no mock for this page\nenv\tbin/review-env up\tGET /health 200\napp/models/order.rb\tcreated an order\tPOST /orders 201\t%s\n' "$1" > "$receipt"; }
+printf 'design\tnone: no mock for this page\nenv\tbin/review-env up\tGET /health 200\napp/models/order.rb\tcreated an order\tPOST /orders 201\n' > "$receipt"
 missing_states=$(run_walk_receipt_check)
 expect_contains "§G8: an item with no states field fails" "walk-item app/models/order.rb: fewer than two states walked" "$missing_states"
 expect_contains "§G8: the message says to list every shape and walk each" "list every shape the change's output can take" "$missing_states"
@@ -199,7 +217,7 @@ expect_contains "§G8: only state with no reason fails" "fewer than two states w
 
 # Dimensions: a walk-dimension item needs its states field to cover each dimension the diff varies along.
 printf 'GATES=naming\nWALK=required\nwalk: x\nwalk-item: src/cart/total.tsx\nwalk-dimension: src/cart/total.tsx: viewport\n' > "$select_output"
-write_dimension_states() { printf 'env\tbin/review-env up\tGET /health 200\nsrc/cart/total.tsx\tcard sits at the top\tPOST /orders 201\t%s\n' "$1" > "$receipt"; }
+write_dimension_states() { printf 'design\tnone: no mock for this page\nenv\tbin/review-env up\tGET /health 200\nsrc/cart/total.tsx\tcard sits at the top\tPOST /orders 201\t%s\n' "$1" > "$receipt"; }
 write_dimension_states 'states: 1280px; 390px'
 viewport_missing=$(run_walk_receipt_check)
 expect_contains "viewport: no wide desktop width fails" "walk-item src/cart/total.tsx: its diff varies along viewport, but the states field does not cover it (a wide desktop (1920px or more))" "$viewport_missing"
@@ -268,7 +286,7 @@ write_dimension_states 'states: empty cart; two items'
 expect_eq "no walk-dimension line needs no dimension" clean "$(run_walk_receipt_check)"
 
 printf 'GATES=naming\nWALK=required\nwalk: x\nwalk-item: app/[locale]/page.tsx\nwalk-dimension: app/[locale]/page.tsx: print\n' > "$select_output"
-printf 'env\tbin/review-env up\tGET /health 200\napp/[locale]/page.tsx\tpage\tPOST /orders 201\tstates: screen; narrow screen\n' > "$receipt"
+printf 'design\tnone: no mock for this page\nenv\tbin/review-env up\tGET /health 200\napp/[locale]/page.tsx\tpage\tPOST /orders 201\tstates: screen; narrow screen\n' > "$receipt"
 expect_contains "a path with regex characters still gets its dimension checked" "varies along print" "$(run_walk_receipt_check)"
 
 # Consumers (§V11, §B8): a changed unit is walked from every consumer's side. uses.txt is
@@ -291,7 +309,7 @@ tests: 1
 summary: 2 names, 5 uses, 1 test files
 USES
 write_consumer_receipt() {
-  printf 'env\tbin/review-env up\tGET /health 200\napp/models/order.rb\tsaved an order\tPOST /orders 201\tstates: full form; empty cart\t%s\n' "$1" > "$receipt"
+  printf 'design\tnone: no mock for this page\nenv\tbin/review-env up\tGET /health 200\napp/models/order.rb\tsaved an order\tPOST /orders 201\tstates: full form; empty cart\t%s\n' "$1" > "$receipt"
 }
 run_consumer_check() {
   local output status=0
@@ -367,7 +385,7 @@ expect_contains "§V11: an enclosing name used at command position is a consumer
 expect_contains "§V11: an enclosing name used as a member call after other text is a consumer" "consumer lib/caller_a.rb uses what this item changes" "$enclosing_callers"
 write_consumer_receipt "$full_entries"
 printf 'name Order (definition, app/models/order.rb): 1 uses\n  app/models/order.rb:9: Order.first\ntests: 0\nsummary: 1 names, 1 uses, 0 test files\n' > "$uses_file"
-printf 'env\tbin/review-env up\tGET /health 200\napp/models/order.rb\tsaved an order\tPOST /orders 201\tstates: full form; empty cart\n' > "$receipt"
+printf 'design\tnone: no mock for this page\nenv\tbin/review-env up\tGET /health 200\napp/models/order.rb\tsaved an order\tPOST /orders 201\tstates: full form; empty cart\n' > "$receipt"
 expect_eq "§V11: an item with no consumer outside itself and its tests needs no fifth field" clean "$(run_consumer_check)"
 status=0
 bash "$walk_receipt_checker" "$select_output" "$receipt" "$work_dir/no-such-uses.txt" > /dev/null 2>&1 || status=$?
