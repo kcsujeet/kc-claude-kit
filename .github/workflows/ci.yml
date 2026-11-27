@@ -54,6 +54,14 @@ jobs:
       - name: Rules lint
         run: bash scripts/lint-rules.sh
 
+      # A checklist box is one line of at most 220 characters; longer wording lives in references/detail.md.
+      - name: Checklist boxes are one line
+        run: bash scripts/check-box-length.sh
+
+      # The topic gate agents are generated from one template (scripts/build-gate-agents.sh).
+      - name: Gate agents match their template
+        run: bash scripts/build-gate-agents.sh plugins/kc-gates/gate-agent.template.md --check
+
       # What the kit puts in every session's context: always-on rules, skill and agent
       # descriptions, hook-printed text. Report only; a budget is set by passing a flag
       # (--budget-rules, --budget-descriptions, --max-description, --budget-hooks, --budget-tool-hooks,
@@ -91,6 +99,12 @@ jobs:
 
       - name: Stop hook check tests
         run: bash scripts/tests/check-stop-hooks.test.sh
+
+      - name: Box length check tests
+        run: bash scripts/tests/check-box-length.test.sh
+
+      - name: Gate agent generator tests
+        run: bash scripts/tests/build-gate-agents.test.sh
 
       # An end-of-turn hook (Stop, SubagentStop) runs after the person has read the reply, so one that
       # reminds or blocks only adds noise. Each must be in .claude/stop-hooks-allowed.txt with the

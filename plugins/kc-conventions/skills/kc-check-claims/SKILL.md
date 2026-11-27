@@ -38,7 +38,7 @@ Applies to whoever made the claim: you, a review agent or a subagent. Check the 
 
 ## Review checklist
 
-- [ ] §CL1 Text about to be published (a commit message, a pull request or issue body or comment, a tracker comment) states no fact about code, data, a setting or a tool that nothing in the turn read a source for: each such fact was checked in this turn or the text says plainly that it is unverified. Held by `kc-gates` `guard-unchecked-claim.sh`. (N/A: the text states no such fact)
+- [ ] §CL1 Published text states no fact about code, data, a setting or a tool that this turn did not read a source for, or says plainly it is unverified (`guard-unchecked-claim.sh`).
 - [ ] §CL2 Never reported success on a red loop: when tests fail, say so and show the output.
 - [ ] §CL3 A skipped step or one that could not be run is named with why; silence reads as done.
 - [ ] §CL4 A number given about your own work (agents run, tests passed, rows changed, time spent) is counted from the record; an estimate says it is one.

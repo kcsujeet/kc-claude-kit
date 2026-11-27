@@ -13,7 +13,9 @@ sweep="$plugin_dir/skills/kc-performance/scripts/boundary-payloads.sh"
 
 failures=0
 fail_rule_check() { echo "FAIL $1"; failures=$((failures + 1)); }
-require_box_text() { grep -qE "^- \[ \] $2 .*$3" "$1" || fail_rule_check "$2 box must carry: $3"; }
+# shellcheck source=lib/box-text.sh
+. "$tests_dir/lib/box-text.sh"
+require_box_text() { box_has "$(basename "$(dirname "$1")")" "$2" "$3" || fail_rule_check "$2 box must carry: $3"; }
 
 require_box_text "$skill" §PF1 'sized for the receiver'
 require_box_text "$skill" §PF1 'boundary-payloads.sh'

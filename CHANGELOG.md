@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Changed (one-line boxes, approvals last the branch, fewer false blocks)
+
+- `kc-conventions` 2.11.0: every checklist box is one line of at most 220 characters (`scripts/check-box-length.sh`, CI); the longer wording moved verbatim into each skill's `references/detail.md` under `### §ID`.
+- `kc-gates` 3.22.0: a phrase the user typed (`approve rework`, `skip ledger`, `approve merge`, `approve prose`) counts for the rest of the branch (any typed message since its first commit over the default branch), still with the `KC_*=1` token on the command; text inside a commit's `-m`/`--message` is not read as a command (no false block on `gh pr create` in a message); `guard-unchecked-claim.sh` counts the staged diff as read for a commit message; the topic gate agents are generated from `gate-agent.template.md` by `scripts/build-gate-agents.sh` (CI checks drift).
+
 ### Changed (working agreement split into skills, quieter hooks)
 
 - `kc-conventions` 2.10.0: `rules/kc-working-agreement.md` is split into the skills that own each part (new `kc-do-a-task` holds the order of work and its boxes §DT1 to §DT10; boxes added to `kc-assess`, `kc-shape-the-change`, `kc-check-claims`, `kc-delegate`, `kc-look-back`) and replaced by the ~150-word `rules/kc-always.md`; `kc-claims` is renamed `kc-check-claims` and `kc-delegation` `kc-delegate`; `install-rules.sh` removes the installed working agreement; the plugin no longer ships its own `check-loaded-version.sh`.

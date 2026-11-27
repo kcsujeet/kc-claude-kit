@@ -10,6 +10,8 @@ set -euo pipefail
 
 tests_dir=$(cd "$(dirname "$0")" && pwd)
 plugin_dir=$(dirname "$tests_dir")
+# shellcheck source=lib/box-text.sh
+. "$tests_dir/lib/box-text.sh"
 combined_skill() {
   local out
   out=$(mktemp)
@@ -22,8 +24,8 @@ testing=$(combined_skill kc-testing)
 failures=0
 fail() { echo "FAIL $1"; failures=$((failures + 1)); }
 
-grep -qE '^- \[ \] §I6 A fixed label, heading, column or nav item is a plain string key' "$i18n" || fail "§I6 box must say a fixed label is a plain string key"
-grep -qE '^- \[ \] §I6 .*A literal count \(`count: 0`, `1`, `2`\) passed to get a word form FAILS' "$i18n" || fail "§I6 box must fail a literal count"
+box_has kc-i18n §I6 'A fixed label, heading, column or nav item is a plain string key' || fail "§I6 box must say a fixed label is a plain string key"
+box_has kc-i18n §I6 'A literal count \(`count: 0`, `1`, `2`\) passed to get a word form FAILS' || fail "§I6 box must fail a literal count"
 grep -qE '^- \[ \] §I6 .*literal-plural-count\.sh' "$i18n" || fail "§I6 box must name the literal-plural-count.sh sweep"
 grep -q 'Never pass a literal count' "$i18n" || fail "i18n rule: never pass a literal count"
 grep -q 'Mastodon' "$i18n" || fail "§I6 detail must carry the short why (Mastodon keeps labels plain)"
@@ -33,13 +35,13 @@ grep -qE '^- \[ \] §I9 No grammar attached to a placeholder' "$i18n" || fail "�
 grep -qE '^- \[ \] §I9 .*placeholder-grammar\.sh' "$i18n" || fail "§I9 box must name the placeholder-grammar.sh sweep"
 grep -q '^### §I9\. No grammar attached to a placeholder' "$i18n" || fail "§I9 detail heading missing"
 grep -qE '^- \[ \] §I10 One term, one spelling' "$i18n" || fail "§I10 box missing"
-grep -qE '^- \[ \] §I10 .*whether or not the diff touched that line' "$i18n" || fail "§I10 box must fail a stale spelling the diff did not touch"
+box_has kc-i18n §I10 'whether or not the diff touched that line' || fail "§I10 box must fail a stale spelling the diff did not touch"
 grep -qE '^- \[ \] §I10 .*term-spellings\.sh' "$i18n" || fail "§I10 box must name the term-spellings.sh lookup"
 grep -q '^### §I10\. One term, one spelling, on every screen' "$i18n" || fail "§I10 detail heading missing"
 grep -q 'bash "${CLAUDE_PLUGIN_ROOT}/skills/kc-i18n/scripts/term-spellings.sh"' "$i18n" || fail "term-spellings.sh not wired into the i18n Sweeps"
 grep -q 'bash "${CLAUDE_PLUGIN_ROOT}/skills/kc-i18n/scripts/literal-plural-count.sh"' "$i18n" || fail "literal-plural-count.sh not wired into the i18n Sweeps"
 grep -q 'bash "${CLAUDE_PLUGIN_ROOT}/skills/kc-i18n/scripts/placeholder-grammar.sh"' "$i18n" || fail "placeholder-grammar.sh not wired into the i18n Sweeps"
-grep -qE '^- \[ \] §T4 .*A render or mount of the same component .* in 2\+ tests is setup even when each is one call' "$testing" || fail "§T4 box must call a repeated render setup"
+box_has kc-testing §T4 'A render or mount of the same component .* in 2\+ tests is setup even when each is one call' || fail "§T4 box must call a repeated render setup"
 grep -qE '^- \[ \] §T4 .*repeated-render\.sh' "$testing" || fail "§T4 box must name the repeated-render.sh sweep"
 grep -q 'bash "${CLAUDE_PLUGIN_ROOT}/skills/kc-testing/scripts/repeated-render.sh"' "$testing" || fail "repeated-render.sh not wired into the testing Sweeps"
 

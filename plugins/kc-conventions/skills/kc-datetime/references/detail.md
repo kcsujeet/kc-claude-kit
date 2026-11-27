@@ -38,9 +38,13 @@ When you see manual splitting, coercion, or arithmetic doing time math, flag it 
 
 **Comparison is the exception.** Comparing two `Date` objects with `<` / `>` / `>=` is fine, not a finding. What *is* a finding: comparing a `Date` to a string, or comparing two formatted strings, where the ordering only accidentally works.
 
+**Checklist wording (moved from SKILL.md):** No hand-rolled date/time math: no `split(':')` time parsing, `new Date(str)` ad-hoc parsing, `getTime()` arithmetic, `+86_400_000`/`+7*24*60*60*1000` day-or-week shifts, manual `padStart` formatting, or reimplemented `addDays`/`startOfDay`/`endOfDay`/`isBefore`/`isAfter`/`isValid`; uses the project's date library (or its wrapper hook/util, if one exists). (N/A: no date/time logic)
+
 ### §D2. (Soft) A start+end range is its own helper
 
 If the repo already has a shared helper for rendering a start+end range together, hand-composing `${format(start)} - ${format(end)}` with its own same-day/all-day branching is a finding even when it "looks right" — a purpose-built helper typically already encodes same-day vs multi-day collapsing, an all-day case, the separator, and time rendering, and a hand-rolled version tends to silently drop one of those cases. Grep the repo for such a helper before raising this; if none exists, this box is N/A rather than a mandate to build one.
+
+**Checklist wording (moved from SKILL.md):** (soft) If the repo has a shared start/end range-formatting helper, a start+end range rendered together uses it rather than hand-composing `${format(start)} - ${format(end)}` with its own same-day/all-day branching. (N/A: no start+end range rendered, or repo has no such helper)
 
 ### §D3. Serialize an instant as full ISO 8601 with offset
 
@@ -58,6 +62,8 @@ When sending a date/time to a backend, putting it in a URL/query string, or pers
 const startIso = new Date().toISOString()             // '2026-05-27T19:17:20.548Z'
 const endIso = format(end, "yyyy-MM-dd'T'HH:mm:ssXXX") // '2026-05-27T19:17:20+00:00'
 ```
+
+**Checklist wording (moved from SKILL.md):** An instant sent to a backend, a URL, or persisted state is serialized as full ISO 8601 with offset, not truncated to `yyyy-MM-dd` or sent as a local-time string with no offset. Date-only/time-only is fine when the field is genuinely date-only or time-only in the domain. (N/A: nothing serialized)
 
 ### §D4. Truncating an instant: account for what the string is for
 
@@ -87,6 +93,8 @@ Flag any diff that:
 
 The fix is usually to delete the round trip, not to document it.
 
+**Checklist wording (moved from SKILL.md):** Every truncated date/time derived from an instant is accounted for: the diff makes clear whether it is a **serialized value** (§D3 applies), a **round-trip key** (parse must match the format's locality), or a **comparison** (both sides same form and locality) — truncation is the trigger, not serialization. (N/A: no instant truncated to a date or time)
+
 ### §D5. `new Date()` captured in render or inside a memo
 
 `new Date()` evaluated during render is a fresh object every time, so it can never be a stable memo dependency on its own. Two ways this goes wrong:
@@ -108,6 +116,8 @@ const config = useMemo(
 
 A timestamp needs no parse and has no locality, so most date libraries accept it anywhere they accept a `Date`. A formatted `yyyy-MM-dd` string can work as a key too, but only paired with a matching parse, which puts you back in §D4 — prefer the timestamp.
 
+**Checklist wording (moved from SKILL.md):** A `new Date()` (or equivalent "now") evaluated in render or inside a memo is either genuinely per-render or has a stable, granularity-appropriate primitive in its dependency list — it is not frozen for the life of the mount, and the dependency is not a full ISO string or object identity that changes every render. (N/A: no "now" captured in render or memo)
+
 ### §D6. Timezone, week-start, and hour-format are inputs, not constants
 
 Three different clocks exist in any system with a browser, a configurable user/org, and a server, and they are not interchangeable: the browser's local clock, the user or organization's configured timezone, and the server's clock. Anything user-visible or query-bound must say which of the three it means — don't let a value silently cross from one to another.
@@ -116,6 +126,8 @@ Three different clocks exist in any system with a browser, a configurable user/o
 - **12-hour vs. 24-hour formatting** comes from a stored user/app setting, never from the display locale alone. A page in one language can still be set to the other hour format — locale controls wording (am/pm marker, month names), not the hour convention.
 - **Server-rendered artifacts** — emails, PDFs, background jobs — have no browser context at all. Anything relying on "the viewer's timezone" or "the viewer's locale" is simply wrong there; only stored settings (the user's or org's configured timezone/format) are available to that code path.
 - **Earliest/latest of several dates** should use the date library's `max`/`min`, not `new Date(Math.max(...dates.map(d => d.getTime())))`. The hand-rolled version is not wrong, but it is unnecessary reinvention of a one-line library call and is worth flagging alongside §D1.
+
+**Checklist wording (moved from SKILL.md):** Timezone, week-start, and 12/24-hour formatting are treated as inputs from user/app settings, never hardcoded or inferred from locale/browser alone; server-rendered artifacts use stored settings, not browser context; the earliest/latest of several dates uses the date library's `max`/`min`, not `new Date(Math.max(...))`. (N/A: no timezone/week-start/hour-format/min-max logic)
 
 ### §D7. A locale formatter gets the configured time zone
 
@@ -130,3 +142,5 @@ new Intl.DateTimeFormat(locale, { hour: 'numeric', minute: '2-digit', timeZone: 
 ```
 
 The `timeZone` option is documented on MDN's [`Intl.DateTimeFormat` constructor page](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Intl/DateTimeFormat/DateTimeFormat). When the project's date library wraps formatting with its own time-zone support, use that wrapper instead of a bare `Intl` call.
+
+**Checklist wording (moved from SKILL.md):** No locale formatter (`Intl.DateTimeFormat`, `Date.prototype.toLocaleString`/`toLocaleDateString`/`toLocaleTimeString`, or a library call that delegates to them) runs without an explicit time zone when the app has a configured one; without it the output follows the machine's zone. (N/A: no locale date formatting in diff, or the app has no configured time zone)

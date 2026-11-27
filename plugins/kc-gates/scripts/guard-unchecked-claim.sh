@@ -31,7 +31,8 @@
 # an agent; not an edit, not a call that publishes text) was given or returned text holding a
 # distinctive word of the sentence (words of four letters or more, without stop words and generic
 # code nouns; when none is left, any word of it). A sentence with no usable word is checked by any such call. Reads in
-# earlier turns do not count: the source is read again, or the text says it is from earlier.
+# earlier turns do not count: the source is read again, or the text says it is from earlier. A
+# `git commit` message is also checked against the staged diff (git diff --cached in the payload's cwd).
 #
 # Claims about what instructions require and what a tool cannot do are check-reply-sources.sh's;
 # they are left to it. Never blocks what it can't read: no jq, no transcript or no text exits 0.
@@ -155,6 +156,12 @@ jq -L "$(dirname "$0")/lib" -rs --argjson cap "$EVIDENCE_CHARS_PER_CALL" --arg g
   | .name + "\t" + build_evidence_line($results[.id] // "")
 ' "$transcript" 2>/dev/null \
   | grep -Ev "$EDIT_CALLS" | grep -Ev "$BOOKKEEPING_CALLS" > "$evidence_file" || true
+
+# A commit message that describes the diff being committed checked it: the staged diff is evidence too.
+commit_dir=$(printf '%s' "$payload" | jq -r '.cwd // empty' 2>/dev/null)
+if [ -n "$commit_dir" ] && is_text_matching "${command_text:-}" "$GIT_COMMIT"; then
+  git -C "$commit_dir" diff --cached --no-color 2>/dev/null | head -c "$EVIDENCE_CHARS_PER_CALL" | tr '[:upper:]' '[:lower:]' | tr '\n\t\r' '   ' >> "$evidence_file" || true
+fi
 
 unchecked=()
 for sentence in "${claims[@]}"; do

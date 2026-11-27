@@ -22,9 +22,13 @@ A new way of doing any of these is the last resort. Try each existing way first 
 
 Typical misses this catches: a create action that builds its record inline when similar actions build it in a setup callback; a subclass that overrides a save hook only to wrap it in a lock, when similar code takes the lock up front; a validation repeated in the write step that similar code leaves to the validator; a controller that rewrites its own request params when no other controller does; a new serializer variant for one response when similar responses reuse the existing serializer.
 
+**Checklist wording (moved from SKILL.md):** Done the way similar code does it: for every changed Ruby file, the evidence names by path the similar code read for each layer the change touches (about ten pieces per layer, or all there are when fewer: validation, the write, controller, routes and API shape, associations, serializer, query, job, spec), states the pattern that code follows, and lists what the change does differently. Fewer than ten read when more exist FAILS, and so does any new way of doing a layer's job without evidence that the existing ways were tried and the developer agreed. A changed file with no similar code named is FAIL, never N/A. (N/A: only specs and config changed)
+
 ### §RL2. Rails conventions
 
 Deviating from Rails conventions costs every future reader an assumption they are entitled to make. A scope beats an inline `where(active: true)` repeated across call sites, because the concept gets one name and one definition. An association without `dependent:` leaves deletes to chance.
+
+**Checklist wording (moved from SKILL.md):** Rails conventions: path matches class, pluralisation conventional, every new association declares `dependent:`, a filter used in more than one place or named for a concept is a `scope`, callbacks are documented ones. Enumerate added `has_many|has_one|where(` lines. (N/A: no model, association or query added)
 
 ### §RL3. Work in the app's own layers
 
@@ -79,6 +83,8 @@ A write that replaces a set (`order.storefront_ids = [...]`) removes as well as 
 
 See `references/backfills.md`. Failing any of its boxes fails this gate.
 
+**Checklist wording (moved from SKILL.md):** Stored values: when the diff renames, merges or retires a stored value or adds a backfill, every box in `references/backfills.md` was walked. (N/A: no enum, status constant, column meaning or backfill changed)
+
 ### §RL7. Specs that prove the change
 
 A hand-rolled counter that watches one SQL pattern only proves what you already suspected; the app's detector scans every query. Three records, because detectors need repetition. A route that never asked for the fix proves the seam is general.
@@ -86,3 +92,43 @@ A hand-rolled counter that watches one SQL pattern only proves what you already 
 Mutation-check: remove the hook, the assignment, the preload in turn; each should fail a specific spec. A mutation that fails every spec in a file usually broke loading, not the behaviour.
 
 `bin/rails db:migrate` rewrites `db/schema.rb` from the local database. A database behind the main branch silently drops other migrations' columns and indexes from the dump. For a data-only change the schema diff is a version bump at most.
+
+### §RL3a
+
+**Checklist wording (moved from SKILL.md):** Layers: each piece of work sits in the layer similar code puts it in; no controller building, saving or validating inline where similar controllers delegate. (N/A: no controller, command or service touched)
+
+### §RL3b
+
+**Checklist wording (moved from SKILL.md):** One check, one place: no rule checked twice (validator or contract and again in the write), unless the second runs under a lock the first cannot and a comment says so. (N/A: no validation or guard added)
+
+### §RL3c
+
+**Checklist wording (moved from SKILL.md):** No dead hooks or options: every override point, callback hook and contract or form option added is used by something today. Enumerate added `option :`, `attr_reader`, and methods that only call `super`. (N/A: none added)
+
+### §RL3e
+
+**Checklist wording (moved from SKILL.md):** Races: every check-then-act on shared state takes its lock or transaction before the check, or the race is stated. Enumerate added `exists?|lock|with_lock|first_or_create|find_or_create`. (N/A: no check-then-act)
+
+### §RL4a
+
+**Checklist wording (moved from SKILL.md):** Per-record reads: every added `sum|count|average|minimum|maximum|any?|exists?|pluck` reached per record is classified (walks loaded rows vs queries); a querying one has a bulk pass. (N/A: none added)
+
+### §RL4d
+
+**Checklist wording (moved from SKILL.md):** The client asks for what it needs: every added serializer attribute belongs to the serializer's own model, and no relationship is loaded or sent unless the client includes it. An attribute whose value is read from another model (`object.store.currency`, a computed attribute that delegates to an associated record, an association's ids such as `taggings.map(&:tag_id)`) FAILS: expose it on that model's serializer and have the client include the relationship. When the association is missing from the client's path, add the relationship, not the attribute. (N/A: no serializer attribute added)
+
+### §RL4e
+
+**Checklist wording (moved from SKILL.md):** Params handed to a serializer or view carry data, not a decision precomputed for one consumer (`signed_in: customer.present?`): pass the record and let the attribute that needs it check it. (N/A: no serializer or view params added)
+
+### §RL4f
+
+**Checklist wording (moved from SKILL.md):** Which records the client gets is the client's filter: no serializer drops records from a collection or relationship by status, a flag or a context param (`object.events.reject(&:archived?)`, `has_many :events do ... end` returning a subset). The client sends the filter and the query applies it. (N/A: no serializer collection or relationship changed)
+
+### §RL5c
+
+**Checklist wording (moved from SKILL.md):** Every accepted attribute has a defined result for present, `null`, `""` and missing, traced (or run) through coercion, validation and the write. (N/A: no attribute added or its handling unchanged)
+
+### §RL5e
+
+**Checklist wording (moved from SKILL.md):** A write that replaces a set of links (`tag_ids = [...]`) checks the caller's access to every id it removes as well as every id it adds, and a spec removes one the caller can't reach. A check over `ids - current_ids` alone FAILS. (N/A: no set-replacing write)

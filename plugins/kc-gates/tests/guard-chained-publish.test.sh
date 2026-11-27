@@ -35,6 +35,8 @@ expect_eq "--configured: a folder that is not a repo" 1 "$(lint_status "$work_di
 run_git_in "$repo" checkout -q -b lesson
 ledger_verdict deny "blocked: commit then push in a ledger repo" "git commit -m x && git push -u origin lesson"
 expect_contains "the block says to commit first" "Commit in one command" "$last_hook_output"
+ledger_verdict allow "allowed: a commit whose message text names git push and gh pr create" 'git commit -q -m \"x\" -m \"remind-better-line.sh fires on git push, gh pr create and gh pr ready.\"'
+hand_off_verdict allow "allowed: a commit whose message text names git push and gh pr create" 'git commit -q -m \"x\" -m \"remind-better-line.sh fires on git push, gh pr create and gh pr ready.\"'
 ledger_verdict deny "blocked: pull then push in a ledger repo" "git pull && git push -u origin lesson"
 run_git_in "$repo" checkout -q main
 ledger_verdict deny "blocked: a switch to a feature branch, then its push, from main" "git checkout -b lesson2 && git push -u origin lesson2"

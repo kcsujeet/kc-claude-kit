@@ -19,7 +19,7 @@
 # this branch itself introduces (drop_carried_in_lines).
 #
 # A command containing the literal KC_PROSE_APPROVED=1 passes only when the user's own words approve
-# it: the latest message they typed in the session transcript (the payload's transcript_path)
+# it: a message they typed on this branch in the session transcript (the payload's transcript_path)
 # contains "approve prose" (user_approved in lib/hook-input.sh). The token without those words, no
 # transcript, or a session with no typed message (a subagent) stays blocked.
 #
@@ -43,7 +43,7 @@ readonly INSTRUCTION_PATHS='(^|/)(CLAUDE|AGENTS)\.md$|(^|/)\.claude/(rules/|revi
 
 # $1 is the repository the commit runs in.
 deny_prose_only_rule() {
-  print_pretooluse_deny "Blocked by the kc-gates plugin: a new rule needs a check that blocks the mistake in the same commit (script, hook, test or CI); prose alone is not accepted. This commit adds rule lines to an instruction file and adds or changes no check file. Add the check, or ask the user: only their typed words approve prose alone. When their latest message says \"approve prose\", prefix the command with KC_PROSE_APPROVED=1; the token without those words stays blocked.$(needed_phrases_sentence "$1" "$APPROVAL_PHRASE")"
+  print_pretooluse_deny "Blocked by the kc-gates plugin: a new rule needs a check that blocks the mistake in the same commit (script, hook, test or CI); prose alone is not accepted. This commit adds rule lines to an instruction file and adds or changes no check file. Add the check, or ask the user: only their typed words approve prose alone. When a message they typed on this branch says \"approve prose\", prefix the command with KC_PROSE_APPROVED=1; the token without those words stays blocked.$(needed_phrases_sentence "$1" "$APPROVAL_PHRASE")"
 }
 
 # Drops the added lines of a `git diff -U0` (stdin) that a merge only carries in: lines already in that
@@ -128,10 +128,10 @@ main() {
   input="$(cat)"
   command="$(extract_field "$input" command)"
   [ -n "$command" ] || exit 0
-  case "$command" in
-    *"$APPROVAL_TOKEN"*) ! user_approved "$(extract_field "$input" transcript_path)" "$APPROVAL_PHRASE" || exit 0 ;;
-  esac
   dir="$(extract_field "$input" cwd)"
+  case "$command" in
+    *"$APPROVAL_TOKEN"*) ! user_approved "$(extract_field "$input" transcript_path)" "$APPROVAL_PHRASE" "${dir:-$PWD}" || exit 0 ;;
+  esac
   walk_segments "$command" "${dir:-$PWD}" check_segment || true
   exit 0
 }

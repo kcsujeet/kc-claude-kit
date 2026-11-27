@@ -155,6 +155,18 @@ done
 expect_eq "the matcher leaves a Slack message out" no "$(printf '%s' mcp__claude_ai_Slack__slack_send_message_draft | grep -Eq "^($tracker_matcher)" && echo yes || echo no)"
 expect_eq "no Stop hook runs the guard" 0 "$(jq '[.hooks.Stop[]?.hooks[] | select(.command | contains("guard-unchecked-claim.sh"))] | length' "$hooks_json")"
 
+# A commit message about the diff being committed: the staged diff counts as read.
+staged_repo="$work_dir/staged-repo"
+git init -q -b main "$staged_repo"
+run_git_in "$staged_repo" commit -q --allow-empty -m base
+printf 'currency = 1\n' > "$staged_repo/orders.rb"
+run_git_in "$staged_repo" add orders.rb
+start_turn "commit it"
+run_commit_in() { jq -cn --arg c "$1" --arg d "$2" --arg path "$transcript" '{session_id: "s", cwd: $d, transcript_path: $path, tool_name: "Bash", tool_input: {command: $c}}' | bash "$guard_script" | grep -q '"permissionDecision":"deny"' && echo held || echo out; }
+expect_eq "a commit message naming a word of the staged diff goes out" out "$(run_commit_in 'git commit -m "Every order has a currency set in orders.rb"' "$staged_repo")"
+expect_eq "a commit message with a claim the staged diff does not hold is held" held "$(run_commit_in 'git commit -m "Every invoice has a refund set"' "$staged_repo")"
+expect_eq "the same message in a repo with nothing staged is held" held "$(run_commit_in 'git commit -m "Every order has a currency set in orders.rb"' "$work_dir")"
+
 # What it can't read.
 { emit_typed_message "are totals safe to sum?"; } > "$transcript"
 expect_eq "a missing transcript prints nothing" "" "$(jq -cn --arg tool Bash '{tool_name: $tool, transcript_path: "/nonexistent", tool_input: {command: "git commit -m \"Every order has a currency set\""}}' | bash "$guard_script")"

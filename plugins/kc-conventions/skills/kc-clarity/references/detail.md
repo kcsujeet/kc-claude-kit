@@ -44,9 +44,13 @@ const value = maybeThing() ?? fallbackThing()
 
 Walk every new `as T` in the diff: if the un-cast expression already types as `T`, the cast is redundant.
 
+**Checklist wording (moved from SKILL.md):** No redundant `as T` assertion on a value the compiler already infers as `T`. **Enumerate with the `as-casts.sh` sweep, do not eyeball**; the evidence format is in §C15's detail file. (N/A: only when `as-casts.sh` returns 0 hits, stated as `grepped as-casts: 0 hits`)
+
 ### §C5. Side effects out of render/computation closures
 
 Side effects defined inline inside render closures, map/filter/reduce callbacks, or memoized-selector bodies — especially with closed-over indices or refs — force the reader to separate "what this produces" from "what this does" while parsing a single expression. Pull the side effect into a named handler called from outside the closure so the closure stays a pure computation.
+
+**Checklist wording (moved from SKILL.md):** No side effects inside render/computation closures (map/filter/reduce callbacks, memoized selectors, inline JSX expressions); side effects live in named handlers called from outside the closure. (N/A: no closure with a side effect in diff)
 
 ### §C6. Comments: prefer self-documenting code, but write them when they earn their place
 
@@ -71,6 +75,8 @@ Default is self-documenting code: descriptive names, small functions, and named 
 - Document a known limitation or TODO with enough context to act on later.
 
 If the existing comment is doing useful work but is too long, suggest a tightening rather than a deletion.
+
+**Checklist wording (moved from SKILL.md):** Comments earn their place AND are sparse: none paraphrase the next line or restate a name; none narrate the task, ticket, or review round instead of the code; the diff does not comment most blocks by default (over-commenting density is itself a FAIL); non-obvious constraints are commented. (N/A: no comments added)
 
 ### §C7. Two-step state mutations without ordering rationale
 
@@ -209,6 +215,8 @@ const body: ErrorBody = await response.json().catch(() => ({}))
 
 When walking §C11 (extract unhappy-path complexity), check each extraction against this rule. The fix for tangled logic is sometimes naming the chain (§C10), sometimes splitting into helpers (§C11), and sometimes just rewriting the original block more tightly. Don't extract reflexively.
 
+**Checklist wording (moved from SKILL.md):** No thin-wrapper helper whose name only restates a one-line body (over-extraction); a second caller does not rescue a plain one-expression helper (simplicity §P11). (N/A: no new single-purpose helper in diff)
+
 ### §C13. Dense inlined sub-expressions — extract named locals
 
 When one expression (a template literal, function argument, JSX prop, or `return`) inlines two or more *non-trivial* sub-expressions — each a `??`/optional-chain fallback, a call, a ternary, or a cast — the line does several things at once and reads poorly. Name each sub-expression on its own line first, then compose. A bare identifier or a single property access is trivial and stays inline; the rule triggers on the *second* non-trivial part crammed into the same expression.
@@ -234,6 +242,8 @@ The same goes for a line that does several things in a row: a value read, conver
 
 **Enumerate by script, do not eyeball.** The `dense-expressions.sh` sweep (see Sweeps) lists added lines with a call chain of 3+ links, calls nested 3+ deep, or 3+ non-trivial parts in a line of 70+ characters; it skips comments, imports and test files, and reads a line broken across several lines one line at a time. Each hit gets its own verdict: extracted to named locals, or dismissed with the reason it reads plainly. State `grepped dense expressions: N hits` (`0 hits` when none) and name each hit as `path:line` in the box.
 
+**Checklist wording (moved from SKILL.md):** An expression (template literal, call argument, JSX prop, assignment, or return) that inlines 2+ non-trivial sub-expressions (each a `??`/optional-chain fallback, call, ternary, or cast), a call chain of 3+ links, or calls nested 3+ deep extracts them to named locals first. **Enumerate with the `dense-expressions.sh` sweep, do not eyeball**: one verdict per hit, and `verify-gate-blocks.sh` fails the round when the receipt's count is not the script's or a hit has no `path:line` verdict. (N/A: only when `dense-expressions.sh` returns 0 hits, stated as `grepped dense expressions: 0 hits`)
+
 ### §C14. Circular imports (soft)
 
 Be alert to circular imports while reading. They are not a hard blocker (TypeScript and bundlers usually tolerate them), but they signal coupling problems and occasionally cause runtime `undefined` issues at module init.
@@ -245,6 +255,8 @@ You will not catch every cycle by reading — that is fine. Flag the obvious one
 ### §C15. Ternaries: flag when nested, long, or multi-line
 
 The full detail (the four failure modes, the fixes, the remedy limits, the acceptable shapes) and the evidence format for the ternary and cast sweeps are in `${CLAUDE_PLUGIN_ROOT}/skills/kc-clarity/references/ternaries.md`. Read it in full before grading §C15 or §C4.
+
+**Checklist wording (moved from SKILL.md):** Ternaries: none nested/chained (2+ `?`), long, multi-line once formatted, or with a non-trivial branch (more than a short value/identifier). Applies to value/assignment/returned/arg ternaries too, not just JSX — the branch content is irrelevant, only the shape. Walk every ternary in the diff. A proposed fix respects the remedy limits in §C15 (no `flagA && value` for a value-or-absent prop, no conditionally spread options object). **Enumerate with the `ternaries.sh` sweep, do not eyeball**, labelling every hit single-line or MULTI-LINE; see §C15. (N/A: only when `ternaries.sh` returns 0 hits, stated as `grepped ternaries: 0 hits`)
 
 ### §C16. Question magic numbers; use named constants or design tokens
 
@@ -267,6 +279,8 @@ setTimeout(() => pollStatus(), RETRY_DELAY_MS)
 
 The same intent expressed as different magic numbers (one call site waits `3000`, another waits `2500` for what's meant to be the same delay) is the tell that a shared constant is missing. A magic value repeated 2+ times is also a DRY finding independent of the naming issue.
 
+**Checklist wording (moved from SKILL.md):** Bare numeric literals for dimensions/thresholds/timeouts are named constants with a one-line why, or a design token when the project has a token system; a magic value repeated 2+ times is also a DRY finding. **Enumerate with the `numeric-literals.sh` sweep**, one verdict per hit. (N/A: only when `numeric-literals.sh` returns 0 hits, stated as `grepped numeric literals: 0 hits`)
+
 ### §C17. Type escape hatches: lying casts, `any`, non-null assertions
 
 §C4 catches a cast that is merely redundant. This box catches the worse case: a cast, an `any`, or a `!` that tells the compiler something untrue so an error goes away. The error was the type system reporting a real mismatch; the escape hatch hides it until runtime.
@@ -279,6 +293,8 @@ The same intent expressed as different magic numbers (one call site waits `3000`
 
 For another language, also run patterns for its escape hatches (force unwrap, force cast, `# type: ignore`, and so on) by hand, and state which scripts and patterns were run. One line per hit with a verdict, and `grepped any: 0 hits` / `grepped non-null assertions: 0 hits` printed explicitly when true.
 
+**Checklist wording (moved from SKILL.md):** No type escape hatches: no `as` cast (including `as unknown as T`) that asserts a type the value does not actually have in order to silence a mismatch; no `any`, explicit or through an untyped boundary; no non-null assertion (`value!`). **Enumerate with the `as-casts.sh`, `any-types.sh` and `non-null-assertions.sh` sweeps, do not eyeball**; see §C17. (N/A: only when all three sweeps return 0 hits, stated as `grepped as-casts: 0 hits`, `grepped any: 0 hits`, `grepped non-null assertions: 0 hits`)
+
 ### §C18. Do not suggest removing a readable intermediate
 
 A named intermediate that splits an expression into readable parts (a named branch, a named clause, a named sub-expression) is the fix for §C13 and §C15, not a defect. A review, from any gate, must not suggest inlining it because it:
@@ -288,6 +304,8 @@ A named intermediate that splits an expression into readable parts (a named bran
 - eagerly evaluates a branch the ternary will not take, when the branch is trivial (formatting, key building, a cheap lookup).
 
 This does not protect a pure alias that renames one identifier to another with nothing added (`const handleClose = onClose`): that is a dead wrapper (structure §S4). The line is whether the name describes a computed value or only repeats an existing one. The clarity gate grades its own proposed fixes against this box; simplicity §P6 and structure §S4 point here so their inline suggestions pass the same test.
+
+**Checklist wording (moved from SKILL.md):** No finding this gate proposes suggests removing a named intermediate that makes an expression readable on the grounds that it looks redundant, costs a type-narrowing step, or eagerly evaluates a trivial branch the ternary will not take. Sibling gates that propose inlining (simplicity §P6, structure §S4) apply the same test. (N/A: no finding proposes removing a named intermediate)
 
 ### §C19. Conditional spreads
 
@@ -311,6 +329,10 @@ On a component, `prop={flagA ? value : undefined}`. Before proposing it, check t
 
 **Enumerate by grep, do not eyeball.** Run the `conditional-spreads.sh` sweep (see Sweeps). It over-matches (a spread of a plain call, `...(await loadWidgets())`), and each such hit is dismissed in writing. One line per hit with a verdict, and `grepped conditional spreads: 0 hits` printed explicitly when none are found.
 
+**Checklist wording (moved from SKILL.md):** No conditional spread, of any size and whatever its comment: no `...(flagA ? { key } : {})` or `...(flagA && { key })` inline, and no object built conditionally (`const extra = flagA && { key }`) and spread later into an object or as component props. The fix gives the key or prop a permanent slot set to `undefined` when absent, and the finding confirms the consumer drops `undefined`. **Enumerate with the `conditional-spreads.sh` sweep.** (N/A: only when `conditional-spreads.sh` returns 0 hits, stated as `grepped conditional spreads: 0 hits`)
+
 ### §C20. A comment about other code is checked against it
 
 A comment that explains why a function exists often names its readers: "the export job and the settings page read this". Written from memory, it sounds right and is easy to get half wrong, and a reader trusts it more than the code because it is plain English. Before writing such a line, grep the readers, the callers or the response it describes and write what is there. When the change touches that other code later, the comment is part of what must stay true.
+
+**Checklist wording (moved from SKILL.md):** Comments about other code are true: every added or edited comment that states another unit's behaviour (a caller, a reader, a response's contents) was checked against that unit, with the unit named in the evidence; a claim the code does not bear out FAILS. **Enumerate** such comments. (N/A: no such comment added or edited)

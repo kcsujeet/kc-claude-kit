@@ -21,11 +21,15 @@ feature.json:L44: deleteWidgetMessage = "Are you sure you want to delete this wi
 
 Do not batch rows from memory. For every new key, walk §I2 through §I9 below and fill in the corresponding cell — a row filled in without actually running the grep and the plural/naming checks is the exact glaze-over that ships violations. Output the table first, then let the individual boxes' findings expand on any row marked FLAG.
 
+**Checklist wording (moved from SKILL.md):** Per-key audit table produced: one row per NEW key in the diff, in the required shape (below). Absence of the table is an automatic gate FAIL — an aggregate report ("N keys, all unique ✓") does not satisfy this box. (N/A: no locale files changed)
+
 ### §I2. Only the source locale is edited
 
 Determine the project's source locale from the repo (usually `en`) and the set of other locales it ships. If the project machine-generates its non-source locales — a TMS-style pipeline or translation-export process that regenerates those files on deploy — any hand-edit to a generated locale file is pointless: it is overwritten on the next deploy and accomplishes nothing for the user reading the PR. Flag any such edit and tell the author to revert the non-source-locale files; only the source-locale file's edits survive.
 
 If the project's locale files are all hand-maintained (no generation pipeline), this box is N/A — state that explicitly rather than silently skipping it.
+
+**Checklist wording (moved from SKILL.md):** Only the source locale was edited. If the project machine-generates non-source locales, any edit to a generated locale file is a FAIL. (N/A: no locale files changed, or every locale in the project is hand-maintained — state which)
 
 ### §I3. No duplicates — search before adding, including pre-existing entries
 
@@ -47,6 +51,8 @@ Any hit outside the file being edited is a duplicate or near-duplicate. This is 
 **No exemptions.** "It's a validation message," "it's a config label," and "the wording is slightly different" are the three rationalizations that let semantic duplicates through — none of them is valid. This applies equally to nouns, labels, headings, sentences, action phrases, and validation/parametric/interpolated messages.
 
 **Any duplicate surfaced in the audit table is a FINDING, never just a row annotation.** The fix is always the same: delete the new key and reuse the existing one at the call site (e.g. call the shared key directly rather than through the feature namespace). The value grep is necessary but not sufficient — a clean "no hit" result passes only this box; it does not pass §I4 or §I5 below, which are walked per key regardless of the grep outcome.
+
+**Checklist wording (moved from SKILL.md):** No duplicates: for EVERY new key, and every pre-existing key in a file the diff touches, both the value grep and the unscoped leaf-key grep were run across the whole source-locale tree, plus semantic-equivalent reasoning. Any hit outside the file being added to is a FAIL, no exemptions. (N/A: no new or touched keys)
 
 ### §I4. Key name matches the value (or an established short form)
 
@@ -107,6 +113,8 @@ Never pass a literal count (`count: 0`, `1`, `2`) to get a word form out of a pl
 
 **A neighbouring key stored as a plural message and read with a literal count is a pre-existing miss, not precedent.** A new label stays a plain key.
 
+**Checklist wording (moved from SKILL.md):** A fixed label, heading, column or nav item is a plain string key (`addOn`, `addOns`); an ICU plural message is only for a real count, uses `#`, and is read with the actual count variable. A literal count (`count: 0`, `1`, `2`) passed to get a word form FAILS, as does a message that shows a count with no plural and an `x`/`xs` key pair picked by `count === 1`. A finding on this carries its short why (§I6 detail). **Enumerate with the `literal-plural-count.sh` sweep** (see Sweeps). (N/A: no label, count message or translation call added in the diff — state which; the receipt `grepped literal plural counts: N hits` is stated either way)
+
 ### §I7. Never concatenate translations
 
 Do not join two translatable fragments at the call site: `t('edit') + ' ' + t('widget')` or the template-literal equivalent `${t('edit')} ${t('widget')}`. Word order varies across languages, so concatenation produces grammatically broken output the moment a language reorders verb and noun.
@@ -134,14 +142,22 @@ t('edit') + ' ' + t('widget')
 
 **Caveat — a verb phrase still uses the action template even when its slot is data.** The label-plus-data carve-out above is for nouns/labels followed by data (`dueDate`, `amountDue`). It does not license a one-off key for a verb phrase whose slot happens to be data. `"Pay {amount}"` starts with the transitive verb "Pay," so it belongs in the action-template file as `actions.paySomething: "Pay {something}"`, called with the formatted amount as `something` — not a standalone `payAmount: "Pay {amount}"` key. The verb decomposition rule applies whether the slot is a noun or a data value; the verb is what forces the action-template path. A single interpolated key outside the action-template file is only correct for a non-verb phrase that is one translatable sentence unit with a data slot and duplicates no existing base label — e.g. a full greeting like `"Welcome back, {name}"`.
 
+**Checklist wording (moved from SKILL.md):** No translation concatenation: no `t(a) + t(b)` or template-joined translatable fragments; verb+noun values decompose into an action template plus a noun key; label+data is interpolation and is not flagged, and no redundant composite key was invented in its place. (N/A: no new key values or call sites in diff)
+
 ### §I8. Text shown to people is never also an identifier
 
 A filter offers "Other" for records with no category and uses the same string as the option's value: the link reads `?category=Other` and the code compares against `"Other"`. It works until the screen is translated. Then the label either stays in the source language, or it changes and every saved link and comparison stops matching. Keep a key for the value (`other`) and translate it only where it is shown.
+
+**Checklist wording (moved from SKILL.md):** Text shown to people is never an identifier: every string the diff adds that a user sees and that is also stored, compared, put in a link or used as a key FAILS; the stored side holds a key and the screen renders its translation. **Enumerate** constants and literals that reach both a screen and a value. (N/A: none added)
 
 ### §I9. No grammar attached to a placeholder
 
 A placeholder reaches the translator as `{name}`, a value they can't see or inflect. `"{name}'s plan"` assumes the English possessive, `"{count}th"` the English ordinal, `"a {thing}"` the English article: each is wrong in a language that marks the same idea another way (a case ending, a preposition, a different ordinal). Write the sentence so the placeholder stands alone: `"The plan for {name}"`, `"Position: {count}"`. An ordinal that has to be an ordinal is a `selectordinal` message, which carries the suffix in the message where the translator can change it. `placeholder-grammar.sh` lists added possessive and ordinal-suffix shapes in locale files; articles and agreement are judged by reading.
 
+**Checklist wording (moved from SKILL.md):** No grammar attached to a placeholder: a message with `{name}'s`, `{count}th` or another suffix, article or agreement written against a placeholder FAILS; the placeholder stands alone (`The plan for {name}`), or an ordinal is a `selectordinal` message. **Enumerate with the `placeholder-grammar.sh` sweep** (see Sweeps). (N/A: no message value added in the diff, stated as `grepped placeholder grammar: 0 hits`)
+
 ### §I10. One term, one spelling, on every screen
 
 A term the product renames (`Addons` to `Add-ons`) is renamed everywhere people read it, not only in the strings the change was about: a button, a drawer title or an empty state left in the old spelling is what a tester finds next. Diff sweeps read only added lines, and the stale spelling sits in lines the diff never touched, so `term-spellings.sh` reads the whole source-locale tree and lists every word written in more than one spelling once case and hyphens are set aside, with each place of each spelling that is not the most used one. Two spellings with two meanings (`checkout` the purchase, `check-out` the departure) are a verdict, not a change. Spellings that differ by a space (`add ons`) are judged by reading.
+
+**Checklist wording (moved from SKILL.md):** One term, one spelling: when the diff adds, renames or respells a term in a message value, every other message in the source locale writes it the same way. A second spelling of it that differs only by a hyphen (`Addons` beside `Add-ons`, `e-mail` beside `email`) FAILS, whether or not the diff touched that line: a renamed term left in its old spelling on another screen is the miss. **Enumerate with the `term-spellings.sh` lookup** over the whole source-locale tree (see Sweeps), and give each listed word a verdict (respell, or two meanings such as `checkout` and `check-out`). (N/A: no message value added or changed in the diff, stated as `term spellings: N words` either way)
