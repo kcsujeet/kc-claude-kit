@@ -8,7 +8,7 @@ disable-model-invocation: true
 
 QA agents can only be as good as their ability to run the app. This writes the recipe they use and proves it works. Nothing here is guessed silently: anything you cannot determine, ask the user. If any step fails and you cannot fix it, stop and report; do not continue to later steps.
 
-Run from the repo root. Create a scratch directory once and reuse it for every step: `SCRATCH=$(mktemp -d)` (re-create it in each Bash call that needs it, or write its path down and reuse the literal path, since shell state does not persist).
+- [ ] Run from the repo root. Create a scratch directory once and reuse it for every step: `SCRATCH=$(mktemp -d)` (re-create it in each Bash call that needs it, or write its path down and reuse the literal path, since shell state does not persist).
 
 ## Steps
 

@@ -28,7 +28,7 @@ A screen can match its design in every state and still leave people stuck. `kc-v
 
 ## Gate checklist
 
-Do not report a change usable until every box is ticked:
+- [ ] Do not report a change usable until every box is ticked:
 
 - [ ] §UX1 Each changed screen was walked toward its goal from each entry point as someone new, after load; every stop-and-work-it-out place is reported as a finding.
 - [ ] §UX2 Every pointer to another screen was followed: the destination has the field, saves, the first screen updates without reload, and matches the design; a read-only value with no editing screen is a bug.

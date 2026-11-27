@@ -15,7 +15,7 @@ Working is the floor, not the finish. This is when to look for better and whethe
 4. Apply it or record what was tried. Keep it only when it is better on the measure and no worse on clarity, correctness and simplicity. A gain that adds code, a cache, a flag or a special case names its cost and goes through the same gates.
 5. Keep it out of the reply. A hook reminds you once at hand-off; nothing is written to a file and nothing about this check goes to the person. When nothing better exists, move on.
 
-Faster or cheaper and simpler go together; a speedup that makes the code harder to read or trust is a trade, and a trade is the person's call.
+- Faster or cheaper and simpler go together; a speedup that makes the code harder to read or trust is a trade, and a trade is the person's call.
 
 ## Gate checklist
 

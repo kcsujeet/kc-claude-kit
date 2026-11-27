@@ -10,7 +10,7 @@ paths:
 
 ## Rules
 
-Fail early, fail loudly, never swallow.
+- Fail early, fail loudly, never swallow.
 
 - No empty catch, and no catch that only logs. Either handle it meaningfully or let it propagate.
 - Throw a typed error with a stable machine-readable code. An unexpected error surfaces as a server error and pages someone; it does not get mapped to a friendly success.

@@ -4,34 +4,34 @@ Covers the standing DRY/YAGNI/KISS lens applied to every diff, reuse-over-reinve
 
 ### §P1–P3. The DRY / YAGNI / KISS standing lens
 
-Apply this to every diff, not just the constructs called out elsewhere in this file. Evaluate every change against three questions and surface a finding whenever the answer is "no" — these are first-class smells with the same any-finding-fails weight as any other rule here, not stylistic extras to mention only if there's room.
+- [ ] Apply this to every diff, not just the constructs called out elsewhere in this file. Evaluate every change against three questions and surface a finding whenever the answer is "no" — these are first-class smells with the same any-finding-fails weight as any other rule here, not stylistic extras to mention only if there's room.
 
 - **DRY (§P1)** — is any knowledge duplicated that should be a single source? A copied block of real logic, a re-declared constant, a re-implemented helper, a repeated format or domain rule, a repeated JSX shape. DRY is about knowledge, not about lines that look alike: two copies of a plain expression are not a finding (§P11). (Repeated *conversions* have their own rule, §P5 below; repeated *sibling JSX* is covered by the `react` skill's §R6 — don't double-flag the same instance under both.)
 - **YAGNI (§P2)** — is there speculative or unused code? Concretely: unused params/props; an abstraction built for a hypothetical second caller when there is only one; a config option nothing in the diff actually passes; a dead branch. A generality the PR doesn't use is a finding even if it "might be needed later."
 - **KISS (§P3)** — is there a materially simpler equivalent already available? Concretely: a lookup object beating nested conditionals; an early return beating nesting; an existing util or stdlib call beating a hand-roll. Fewer moving parts for the same behavior wins.
 
-Surface each confirmed one with evidence and let the reader judge; never withhold it because the complexity seemed "probably needed." A candidate you cannot back with evidence from the code is dropped, not softened into a "maybe".
+- Surface each confirmed one with evidence and let the reader judge; never withhold it because the complexity seemed "probably needed." A candidate you cannot back with evidence from the code is dropped, not softened into a "maybe".
 
-**Checklist wording (moved from SKILL.md):** DRY: no knowledge duplicated that should have one source (a copied block of real logic, a re-declared constant, a re-implemented helper, a repeated format or domain rule). When the diff moves a literal into a shared constant, grep the repo for the literal's text: every other copy reads the constant or is listed. Lines that only look alike, with a meaning plain on sight, are not a DRY finding at any count; see §P11. (N/A: nothing duplicated in the diff)
+- **Checklist wording (moved from SKILL.md):** DRY: no knowledge duplicated that should have one source (a copied block of real logic, a re-declared constant, a re-implemented helper, a repeated format or domain rule). When the diff moves a literal into a shared constant, grep the repo for the literal's text: every other copy reads the constant or is listed. Lines that only look alike, with a meaning plain on sight, are not a DRY finding at any count; see §P11. (N/A: nothing duplicated in the diff)
 
 ### §P4. Reuse over reinvention
 
-Before accepting a new component, util, hook, or type, grep for it. Most target repos are large enough that most domain primitives already exist somewhere.
+- Before accepting a new component, util, hook, or type, grep for it. Most target repos are large enough that most domain primitives already exist somewhere.
 
-When you spot a candidate for duplication, run two greps before flagging: one for the symbol name, one for keywords describing the behavior. If the existing thing is close but not quite right, suggest extending it — a variant, a new prop — rather than letting the new copy stand.
+- When you spot a candidate for duplication, run two greps before flagging: one for the symbol name, one for keywords describing the behavior. If the existing thing is close but not quite right, suggest extending it — a variant, a new prop — rather than letting the new copy stand.
 
 #### Assume the capability already exists — exhaust the search before hand-rolling
 
-This is the general form of the rule above. The default assumption for any new code is **"this probably already exists,"** not "I'll build it." The failure mode is concluding *"there's no built-in way to do this, so I'll implement it"* without actually looking — and the hand-rolled version then drifts from the existing thing's styling, behavior, spacing, and edge-case handling. Reaching for a fresh implementation is the **last** step, taken only after the search comes up empty.
+- This is the general form of the rule above. The default assumption for any new code is **"this probably already exists,"** not "I'll build it." The failure mode is concluding *"there's no built-in way to do this, so I'll implement it"* without actually looking — and the hand-rolled version then drifts from the existing thing's styling, behavior, spacing, and edge-case handling. Reaching for a fresh implementation is the **last** step, taken only after the search comes up empty.
 
-"Already exists" spans every layer — check all of them before writing new code:
+- "Already exists" spans every layer — check all of them before writing new code:
 
 - **A prop or slot on the component you're already using.** Before rendering an element *next to* a shared component, check its props/type definitions for one that produces it (e.g. `helperText`, `label`, `error`, adornments, `placeholder`, icon/empty-state slots). Illustrative, not exhaustive.
 - **A shared hook or util** already present in the codebase for this exact concern.
 - **An existing component or a variant of one** — extend it (`variant`/`size`/prop) rather than inlining styles.
 - **Data already in a store or in state already fetched on the page** — filter or derive it client-side rather than adding a redundant endpoint or a new piece of state.
 
-**Hook-reuse camouflages component-reuse.** A component can *look* compliant because it reuses a shared hook, while still reinventing a shared component that already wraps that same hook. When a component assembles a shared values hook (`useXValues`) + a generic input (a select/autocomplete/picker primitive) + option/filter wiring, that assembled trio is usually already packaged as a shared component (e.g. `<XPicker>` = `useXValues` + the generic input + scoping/filtering). "It uses the shared hook" is NOT enough — grep for a shared component that composes the same hook and prefer it, expressing the delta through its props (an exclude list, a disabled predicate, a query filter) instead of re-hand-assembling.
+- **Hook-reuse camouflages component-reuse.** A component can *look* compliant because it reuses a shared hook, while still reinventing a shared component that already wraps that same hook. When a component assembles a shared values hook (`useXValues`) + a generic input (a select/autocomplete/picker primitive) + option/filter wiring, that assembled trio is usually already packaged as a shared component (e.g. `<XPicker>` = `useXValues` + the generic input + scoping/filtering). "It uses the shared hook" is NOT enough — grep for a shared component that composes the same hook and prefer it, expressing the delta through its props (an exclude list, a disabled predicate, a query filter) instead of re-hand-assembling.
 
 ```tsx
 // Flag: hand-assembles what <XPicker> already packages, even though useXValues is "reused"
@@ -43,36 +43,36 @@ const available = options.filter((o) => !selectedIds.includes(o.value))
 <XPicker multiple name="x_ids" excludeIds={selectedIds} />
 ```
 
-When flagging, grep the target repo for the shared component's path and cite it — note that hook-level reuse does not exempt the finding.
+- When flagging, grep the target repo for the shared component's path and cite it — note that hook-level reuse does not exempt the finding.
 
-Concrete instance (the recurring one): a sibling element hand-rendering a field's helper text, with manual padding to approximate alignment —
+- Concrete instance (the recurring one): a sibling element hand-rendering a field's helper text, with manual padding to approximate alignment —
 
 ```tsx
 <SomeField name="x" label={label} />
 <Typography sx={{ color: 'text.secondary', fontSize: 11, pl: 1 }} variant="caption">{helper}</Typography>
 ```
 
-— when the field already takes the prop and renders it correctly (right layout/alignment, and it yields to the validation error when invalid):
+- — when the field already takes the prop and renders it correctly (right layout/alignment, and it yields to the validation error when invalid):
 
 ```tsx
 <SomeField name="x" label={label} helperText={helper} />
 ```
 
-When flagging: grep for the existing thing (the component's prop types, the hook, the store) and cite it, then flag the hand-rolled version. Don't flag if a genuine search confirms nothing fits.
+- When flagging: grep for the existing thing (the component's prop types, the hook, the store) and cite it, then flag the hand-rolled version. Don't flag if a genuine search confirms nothing fits.
 
-**Search by shape, not only by name.** A duplicate usually has a different name, so a name grep alone misses it:
+- **Search by shape, not only by name.** A duplicate usually has a different name, so a name grep alone misses it:
 
 - For a new **type**, grep for its field set (two or three of its distinctive field names together), not its name. A second interface with the same fields is the duplicate.
 - For a new **component**, grep for its core props and its distinctive markup (the primitive it renders, the prop combination it takes). A near-copy of an existing component rarely shares its name.
 - For a new **helper**, grep for the calls it makes and the keywords of what it computes.
 
-**Checklist wording (moved from SKILL.md):** Assume-it-exists: any new hand-rolled capability was checked against a prop/slot on the component already in use, a shared hook/util, a component variant, and data already in state/store, in that order, before being written; a component that only reuses a shared *hook* is still checked against a shared *component* that composes that same hook; a new type was grepped by its field set and a new component by its core props and markup, not only by name. (N/A: nothing hand-rolled in the diff)
+- **Checklist wording (moved from SKILL.md):** Assume-it-exists: any new hand-rolled capability was checked against a prop/slot on the component already in use, a shared hook/util, a component variant, and data already in state/store, in that order, before being written; a component that only reuses a shared *hook* is still checked against a shared *component* that composes that same hook; a new type was grepped by its field set and a new component by its core props and markup, not only by name. (N/A: nothing hand-rolled in the diff)
 
 ### §P5. Numeric hygiene
 
 #### Safe numeric coercion
 
-Flag numeric coercion/fallback that is either unsafe or redundant:
+- [ ] Flag numeric coercion/fallback that is either unsafe or redundant:
 
 - `value ?? 0` where `value` is a nullable/optional numeric (or numeric string) and the `0` is standing in as a numeric default.
 - `Number(x) || 0` — the `||` also swallows a legitimate `0`-after-coercion result, which reads as a hack.
@@ -88,11 +88,11 @@ const amount = coerceNumber(balanceDue)
 const rate = coerceNumber(input)
 ```
 
-Fix: use the project's safe-coercion helper if one already exists (grep for it before proposing a new one). If none exists, propose a small named helper rather than repeating the `?? 0` / `|| 0` pattern inline. **Do NOT wrap an already-guaranteed `number`.** If the value is typed `number` with no `null`/`undefined`/string in its union, wrapping it in a coercion call is redundant — that's the clarity redundant-coercion flag, not an improvement. The rule applies only when a coercion or fallback is genuinely needed.
+- [ ] Fix: use the project's safe-coercion helper if one already exists (grep for it before proposing a new one). If none exists, propose a small named helper rather than repeating the `?? 0` / `|| 0` pattern inline. **Do NOT wrap an already-guaranteed `number`.** If the value is typed `number` with no `null`/`undefined`/string in its union, wrapping it in a coercion call is redundant — that's the clarity redundant-coercion flag, not an improvement. The rule applies only when a coercion or fallback is genuinely needed.
 
 #### A non-trivial conversion repeated across call sites → one named helper
 
-When the same small conversion/encoding is written inline at 2+ call sites, extract a named helper so the encoding lives in one place. This is easy to miss because each instance is individually a "fine short ternary": no single one trips a ternary-complexity rule, and a boolean-to-value mapping isn't discriminator-selection, so other gates pass each instance in isolation. The smell is the *repetition of the mapping*, especially both directions of the same encoding (encode at write, decode at read) — adding one more case then means editing N sites, and it's easy to get a branch backwards.
+- When the same small conversion/encoding is written inline at 2+ call sites, extract a named helper so the encoding lives in one place. This is easy to miss because each instance is individually a "fine short ternary": no single one trips a ternary-complexity rule, and a boolean-to-value mapping isn't discriminator-selection, so other gates pass each instance in isolation. The smell is the *repetition of the mapping*, especially both directions of the same encoding (encode at write, decode at read) — adding one more case then means editing N sites, and it's easy to get a branch backwards.
 
 ```ts
 // Flag: the same boolean<->Mode encoding inlined at four sites (read + write, two fields)
@@ -107,15 +107,15 @@ const isOn = (value?: Mode) => (value ?? Mode.ON) === Mode.ON
 const toMode = (on: boolean) => (on ? Mode.ON : Mode.OFF)
 ```
 
-Calibrate by cost: a trivial 2-site repeat is a `nitpick`; a both-directions encoding or 3+ sites is a `suggestion`. This is distinct from the repeated-*JSX*-block rule (the `react` skill's §R6, which maps an array); this rule is about a repeated *expression/conversion* becoming a named helper.
+- Calibrate by cost: a trivial 2-site repeat is a `nitpick`; a both-directions encoding or 3+ sites is a `suggestion`. This is distinct from the repeated-*JSX*-block rule (the `react` skill's §R6, which maps an array); this rule is about a repeated *expression/conversion* becoming a named helper.
 
-**Checklist wording (moved from SKILL.md):** Numeric hygiene: coercions are NaN-safe and don't silently swallow a legitimate `0` (no bare `value ?? 0` on a nullable/optional numeric, no `Number(x) || 0`, no NaN-risky `Number(x)` on a possibly-empty/non-numeric value; no wrapping of an already-guaranteed `number`); a non-trivial conversion/encoding repeated at 2+ call sites is extracted to a named helper rather than re-inlined per site. (N/A: no numeric coercion and no repeated conversion in the diff)
+- **Checklist wording (moved from SKILL.md):** Numeric hygiene: coercions are NaN-safe and don't silently swallow a legitimate `0` (no bare `value ?? 0` on a nullable/optional numeric, no `Number(x) || 0`, no NaN-risky `Number(x)` on a possibly-empty/non-numeric value; no wrapping of an already-guaranteed `number`); a non-trivial conversion/encoding repeated at 2+ call sites is extracted to a named helper rather than re-inlined per site. (N/A: no numeric coercion and no repeated conversion in the diff)
 
 ### §P6. The delete-or-collapse test
 
-For every new construct in the diff, ask **"what breaks if I delete or collapse this?"** If the answer is "nothing, the behavior is identical", it is a finding, and the simplest form that produces the same observable behavior is the correct one. Apply it on your own to every changed line; missing an obvious collapse that the user then has to point out is a review defect, the same as missing a bug.
+- For every new construct in the diff, ask **"what breaks if I delete or collapse this?"** If the answer is "nothing, the behavior is identical", it is a finding, and the simplest form that produces the same observable behavior is the correct one. Apply it on your own to every changed line; missing an obvious collapse that the user then has to point out is a review defect, the same as missing a bug.
 
-Concretely (illustrations, not an exhaustive list):
+- Concretely (illustrations, not an exhaustive list):
 
 - **A `let` plus `if`-assignment that one expression replaces.**
   ```ts
@@ -133,13 +133,13 @@ Concretely (illustrations, not an exhaustive list):
 - **A prop, param, or option that every caller passes with the same value**, or that the callee could read from a context it already consumes.
 - **A default, wrapper, or type alias** that restates what it wraps (overlaps structure §S4; report it once, under the closer fit).
 
-Give the concrete simpler form in the finding, not "simplify this", and scan the rest of the diff for the same shape. A named intermediate that exists for readability is not a collapse candidate (clarity §C18).
+- [ ] Give the concrete simpler form in the finding, not "simplify this", and scan the rest of the diff for the same shape. A named intermediate that exists for readability is not a collapse candidate (clarity §C18).
 
-**Checklist wording (moved from SKILL.md):** Delete-or-collapse: every new construct (variable, branch, guard, helper, prop, param, option, type, default, wrapper) passes "what breaks if I delete or collapse this?"; one that collapses to a simpler form with identical behavior FAILS, and the finding gives the concrete simpler form. "It works", "it's defensive", and "it's more explicit" are not justifications. A named intermediate kept for readability is exempt (clarity §C18). (N/A: no new construct in the diff)
+- **Checklist wording (moved from SKILL.md):** Delete-or-collapse: every new construct (variable, branch, guard, helper, prop, param, option, type, default, wrapper) passes "what breaks if I delete or collapse this?"; one that collapses to a simpler form with identical behavior FAILS, and the finding gives the concrete simpler form. "It works", "it's defensive", and "it's more explicit" are not justifications. A named intermediate kept for readability is exempt (clarity §C18). (N/A: no new construct in the diff)
 
 ### §P7. A type is as narrow as its sink needs
 
-The delete-or-collapse test applies to type signatures too. A return or parameter type can carry surface that no consumer uses, exactly like an unused branch.
+- The delete-or-collapse test applies to type signatures too. A return or parameter type can carry surface that no consumer uses, exactly like an unused branch.
 
 ```ts
 // Flag: every consumer passes the result to a class-merging helper, which drops '' and undefined alike
@@ -149,43 +149,43 @@ getItemClassName?: (item: Item) => string | undefined
 getItemClassName?: (item: Item) => string
 ```
 
-Before flagging, open (or run) the sink and confirm it treats the empty value exactly like the default: a class-merging helper dropping `''`, a renderer skipping `null`, a serializer omitting `undefined`. If the sink distinguishes them, the wider type is doing work and stays.
+- Before flagging, open (or run) the sink and confirm it treats the empty value exactly like the default: a class-merging helper dropping `''`, a renderer skipping `null`, a serializer omitting `undefined`. If the sink distinguishes them, the wider type is doing work and stays.
 
-**Checklist wording (moved from SKILL.md):** Types as narrow as their sink: every new or changed return/param type carries no member its consumers treat identically to another (a `=> T | undefined`, `| null`, or `| ''` whose sink handles the empty value exactly like the default narrows to `=> T`); the sink's behavior was opened or run before the finding claims it. (N/A: no new or changed signature)
+- **Checklist wording (moved from SKILL.md):** Types as narrow as their sink: every new or changed return/param type carries no member its consumers treat identically to another (a `=> T | undefined`, `| null`, or `| ''` whose sink handles the empty value exactly like the default narrows to `=> T`); the sink's behavior was opened or run before the finding claims it. (N/A: no new or changed signature)
 
 ### §P8. "This mirrors X" is diffed, not asserted
 
-When the PR, or your own notes, describe a new member as following, mirroring, or matching an existing sibling, put the two signatures side by side in the evidence and compare them literally. Siblings that disagree in shape are a finding unless the difference is justified:
+- When the PR, or your own notes, describe a new member as following, mirroring, or matching an existing sibling, put the two signatures side by side in the evidence and compare them literally. Siblings that disagree in shape are a finding unless the difference is justified:
 
 ```ts
 isItemDisabled?: (item: Item) => boolean            // existing sibling: definite return
 getItemClassName?: (item: Item) => string | undefined // new: optional return, for no stated reason
 ```
 
-"This mirrors X" without the comparison is the same shortcut as asserting a library's behavior from memory.
+- "This mirrors X" without the comparison is the same shortcut as asserting a library's behavior from memory.
 
-**Checklist wording (moved from SKILL.md):** Mirror claims are diffed: wherever the PR or the review says a new member mirrors, follows, or matches an existing sibling, the two signatures are set side by side in the evidence; an unjustified difference between siblings is a finding. (N/A: no new member beside an existing sibling, and no such claim)
+- **Checklist wording (moved from SKILL.md):** Mirror claims are diffed: wherever the PR or the review says a new member mirrors, follows, or matches an existing sibling, the two signatures are set side by side in the evidence; an unjustified difference between siblings is a finding. (N/A: no new member beside an existing sibling, and no such claim)
 
 ### §P9. Refactor leftovers
 
-An incomplete refactor leaves debris the diff no longer needs:
+- An incomplete refactor leaves debris the diff no longer needs:
 
 - Markup or a block duplicated because the new version was added and the old one never removed.
 - An import nothing in the file uses any more. If the target repo's linter reports unused imports, its output is the receipt; cite it.
 - A prop or parameter still threaded through a component or function that no longer reads it.
 - Commented-out code. Version control keeps the old version; the comment only adds noise.
 
-**Checklist wording (moved from SKILL.md):** No refactor leftovers: no markup or block left duplicated by an incomplete refactor, no import nothing uses, no prop or param threaded through and never read, no commented-out code. (N/A: none in the diff)
+- **Checklist wording (moved from SKILL.md):** No refactor leftovers: no markup or block left duplicated by an incomplete refactor, no import nothing uses, no prop or param threaded through and never read, no commented-out code. (N/A: none in the diff)
 
 ### §P10. A shared prop added for one caller
 
-A prop or option added to a shared component or helper so that one caller can get a special case makes every other caller carry it. Ask whether the caller could own the behavior (wrap or compose the shared piece), or whether the case is general enough that several callers would plausibly use it today. A shared component with many props, several of which only one caller passes, is the accumulated form of this finding.
+- A prop or option added to a shared component or helper so that one caller can get a special case makes every other caller carry it. Ask whether the caller could own the behavior (wrap or compose the shared piece), or whether the case is general enough that several callers would plausibly use it today. A shared component with many props, several of which only one caller passes, is the accumulated form of this finding.
 
-**Checklist wording (moved from SKILL.md):** A prop or option added to a shared component or shared helper for a single caller's case is questioned: could the caller own it, or compose the shared piece instead? (N/A: no shared component or helper signature changed)
+- **Checklist wording (moved from SKILL.md):** A prop or option added to a shared component or shared helper for a single caller's case is questioned: could the caller own it, or compose the shared piece instead? (N/A: no shared component or helper signature changed)
 
 ### §P11. A helper earns its place by the knowledge it carries
 
-A new util, hook or small component is worth its indirection when it holds something its callers should not have to know, whatever its length: an API call, a data format or conversion, a domain rule, several steps in a fixed order. Wide use earns it too. Code whose meaning is plain on sight stays inline even with two callers:
+- A new util, hook or small component is worth its indirection when it holds something its callers should not have to know, whatever its length: an API call, a data format or conversion, a domain rule, several steps in a fixed order. Wide use earns it too. Code whose meaning is plain on sight stays inline even with two callers:
 
 ```ts
 // Not a finding at two call sites: the line says what it does
@@ -195,7 +195,7 @@ const widget = widgets.find((item) => item.id === widgetId)
 const toWidgetSlug = (name: string) => name.trim().toLowerCase().replace(/\s+/g, '-')
 ```
 
-A conversion earns a helper only when the helper is where the conversion lives. When the body is one call to something that already exists, applied to a field of the argument, the knowledge is in the function being called and the helper adds only a name, and a new import at every call site:
+- A conversion earns a helper only when the helper is where the conversion lives. When the body is one call to something that already exists, applied to a field of the argument, the knowledge is in the function being called and the helper adds only a name, and a new import at every call site:
 
 ```ts
 // Flag: the conversion is toNumber's; this only renames it
@@ -205,17 +205,17 @@ const toWidgetId = (widget: Pick<Widget, 'id'>) => toNumber(widget.id)
 selectedIds.includes(Number(widget.id))
 ```
 
-Before accepting one, grep how the repo already writes the same expression. When most call sites write it inline, so does this one.
+- Before accepting one, grep how the repo already writes the same expression. When most call sites write it inline, so does this one.
 
-A finding that proposes a helper for a plain expression is itself a miss, under any gate. The naming skill's §N3 applies the same test to repeated predicates, and clarity §C12 to helpers that only restate their body.
+- A finding that proposes a helper for a plain expression is itself a miss, under any gate. The naming skill's §N3 applies the same test to repeated predicates, and clarity §C12 to helpers that only restate their body.
 
-**Checklist wording (moved from SKILL.md):** A helper earns its place: every new or proposed helper (util, hook, small component) carries knowledge its callers should not hold (an API call, a data format or conversion, a domain rule, several steps) or is used in many places. A helper around one plain expression FAILS even with two callers, and so does a finding that proposes one. So does a helper whose body is one call to an existing function or built-in on a field of its argument (`toWidgetId = (widget) => toNumber(widget.id)`): the called function already holds the knowledge, and a comment calling it a conversion doesn't change that. The evidence shows how the repo writes the same expression elsewhere. (N/A: no helper added or proposed)
+- **Checklist wording (moved from SKILL.md):** A helper earns its place: every new or proposed helper (util, hook, small component) carries knowledge its callers should not hold (an API call, a data format or conversion, a domain rule, several steps) or is used in many places. A helper around one plain expression FAILS even with two callers, and so does a finding that proposes one. So does a helper whose body is one call to an existing function or built-in on a field of its argument (`toWidgetId = (widget) => toNumber(widget.id)`): the called function already holds the knowledge, and a comment calling it a conversion doesn't change that. The evidence shows how the repo writes the same expression elsewhere. (N/A: no helper added or proposed)
 
 ### §P12. Defaults carry the everyday case
 
-A variant per scenario is duplication in disguise: a component plus `WidgetWithIcon`, a hook plus a sibling that only presets one argument, `formatPriceShort` beside `formatPriceLong`, a fixture plus `mockOrderWithOwner`, a test file's `renderWidget` plus `renderWidgetWithNotes`. Each new case needs another variant, and a reader has to compare two definitions to see what differs. This applies to every unit of code, tests included.
+- A variant per scenario is duplication in disguise: a component plus `WidgetWithIcon`, a hook plus a sibling that only presets one argument, `formatPriceShort` beside `formatPriceLong`, a fixture plus `mockOrderWithOwner`, a test file's `renderWidget` plus `renderWidgetWithNotes`. Each new case needs another variant, and a reader has to compare two definitions to see what differs. This applies to every unit of code, tests included.
 
-Give the base unit the defaults most callers can live with. The caller that differs passes a prop, an argument or a one-field override, so the call site shows what it depends on:
+- [ ] Give the base unit the defaults most callers can live with. The caller that differs passes a prop, an argument or a one-field override, so the call site shows what it depends on:
 
 ```tsx
 // Flag: a variant per scenario
@@ -227,83 +227,83 @@ export const mockOrderWithOwner = { ...mockOrder, owner: mockOwner }
 render(<OwnerBadge order={{ ...mockOrder, owner: undefined }} />) // this case is about "no owner"
 ```
 
-When moving data into a shared default breaks some callers, they were silently relying on it being missing. Fix them with an explicit override rather than keeping a second variant, and re-run every consumer (for a test fixture, every test that imports it).
+- When moving data into a shared default breaks some callers, they were silently relying on it being missing. Fix them with an explicit override rather than keeping a second variant, and re-run every consumer (for a test fixture, every test that imports it).
 
-**Checklist wording (moved from SKILL.md):** Defaults carry the everyday case: no new variant per scenario of a component, hook, util, fixture or test helper when the base unit could hold the common data or behavior with a default and the one differing caller could pass a prop, argument or override. A caller that depends on something being absent says so in its own override. (N/A: no new variant or scenario helper)
+- **Checklist wording (moved from SKILL.md):** Defaults carry the everyday case: no new variant per scenario of a component, hook, util, fixture or test helper when the base unit could hold the common data or behavior with a default and the one differing caller could pass a prop, argument or override. A caller that depends on something being absent says so in its own override. (N/A: no new variant or scenario helper)
 
 ### §P13. Everything new conforms to how the codebase already does it
 
-§P4 asks whether a *capability* already exists. This asks the same of a *technique*. Before accepting a new way of doing something, find 2 places in the repo that already do it that way. Illustrations of new patterns, each of which can pass every other box: a wrapper hook every component calls instead of the data hook itself; showing a pending value from a mutation's input while it saves, where other controls show the saved value; a new option on a shared hook.
+- §P4 asks whether a *capability* already exists. This asks the same of a *technique*. Before accepting a new way of doing something, find 2 places in the repo that already do it that way. Illustrations of new patterns, each of which can pass every other box: a wrapper hook every component calls instead of the data hook itself; showing a pending value from a mutation's input while it saves, where other controls show the saved value; a new option on a shared hook.
 
 1. **Look first.** Name the job, search for how the repo already does it by what the code does rather than where it lives, and read about ten hits (all of them when there are fewer). Two or three can be the odd ones out. Files with similar *names* are not precedent; the *pattern* is. An option a shared type declares but no caller passes is not precedent either, and neither is a single file doing something the rest of the repo does another way: copying a one-off spreads it.
 2. **Nothing fits? Ask before building.** A new pattern is the last resort, after each existing way has been tried and shown not to fit, and it is the developer's decision. In a self-review, stop and ask, with what you found and what you would propose. In a review, raise it as a `question`. Do not introduce it and explain it afterwards.
 
-Most of what this catches is not exotic. It is an ordinary thing built in a shape similar code does not have: an endpoint that trims what the caller asked for when no other endpoint does; a data read named for the one screen that uses it where every other is named for its resource; related data loaded up front in one place when similar code loads it on request; a record created on first use when records like it are created with their parent; an error message in a library's default words where the repo has its own. Each passes a line-by-line review, and similar code side by side shows the difference at once. The same holds for a fix to a review finding: the fix is new code, and it conforms too.
+- Most of what this catches is not exotic. It is an ordinary thing built in a shape similar code does not have: an endpoint that trims what the caller asked for when no other endpoint does; a data read named for the one screen that uses it where every other is named for its resource; related data loaded up front in one place when similar code loads it on request; a record created on first use when records like it are created with their parent; an error message in a library's default words where the repo has its own. Each passes a line-by-line review, and similar code side by side shows the difference at once. The same holds for a fix to a review finding: the fix is new code, and it conforms too.
 
-A sibling's shape is not copied when it breaks a rule in another topic's checklist (a test that loops over per-item lookups that can come back empty breaks testing §T14, say): the finding names that box, and the new code follows the box.
+- A sibling's shape is not copied when it breaks a rule in another topic's checklist (a test that loops over per-item lookups that can come back empty breaks testing §T14, say): the finding names that box, and the new code follows the box.
 
-**Checklist wording (moved from SKILL.md):** Everything new conforms: every new or reshaped unit in the diff (an endpoint, a data read, a class, function or hook, a file, a message, a test, an abstraction or technique) names the similar code read (about ten pieces that do the same job, or all there are when fewer) and matches it in shape, name, place and wording; each difference is a finding unless the diff says why. A file with a similar name is not precedent, and neither is an option a shared type declares but no caller passes, or a lone unit that does it differently from the rest. With no precedent, the finding is a `question` to the author (in a self-review, ask the developer before writing it). **Enumerate** the new and reshaped units with the similar code read for each. (N/A: nothing new or reshaped in the diff)
+- **Checklist wording (moved from SKILL.md):** Everything new conforms: every new or reshaped unit in the diff (an endpoint, a data read, a class, function or hook, a file, a message, a test, an abstraction or technique) names the similar code read (about ten pieces that do the same job, or all there are when fewer) and matches it in shape, name, place and wording; each difference is a finding unless the diff says why. A file with a similar name is not precedent, and neither is an option a shared type declares but no caller passes, or a lone unit that does it differently from the rest. With no precedent, the finding is a `question` to the author (in a self-review, ask the developer before writing it). **Enumerate** the new and reshaped units with the similar code read for each. (N/A: nothing new or reshaped in the diff)
 
 ### §P14. Handle the states the data can be in, not the ones a comment says it once was
 
-Old comments outlive the data they describe: "the first store may have no name of its own" stays in the code after a backfill names every store and creation starts naming new ones. Code that trusts the comment grows a special case (a name may stay blank, but only if it was blank before) that guards a state nothing can produce any more, and every reader has to learn it. Before writing such a branch, find what could still produce the state: the create path, the update path, an import, a job. If none can, and a backfill has run, enforce the rule plainly (required, validated) and leave the old state to the backfill. If one still can, say which.
+- Old comments outlive the data they describe: "the first store may have no name of its own" stays in the code after a backfill names every store and creation starts naming new ones. Code that trusts the comment grows a special case (a name may stay blank, but only if it was blank before) that guards a state nothing can produce any more, and every reader has to learn it. Before writing such a branch, find what could still produce the state: the create path, the update path, an import, a job. If none can, and a backfill has run, enforce the rule plainly (required, validated) and leave the old state to the backfill. If one still can, say which.
 
-**Checklist wording (moved from SKILL.md):** Every new branch, fallback or exception for a data state (blank, missing, legacy shape) cites evidence that the state can still occur: the writer that can still produce it, or a data query. A state that create-time defaults, validations or a completed backfill rule out FAILS; handle it in the backfill or the validation instead. (N/A: no new branch for a data state)
+- **Checklist wording (moved from SKILL.md):** Every new branch, fallback or exception for a data state (blank, missing, legacy shape) cites evidence that the state can still occur: the writer that can still produce it, or a data query. A state that create-time defaults, validations or a completed backfill rule out FAILS; handle it in the backfill or the validation instead. (N/A: no new branch for a data state)
 
 ### §P15. Deferred work is done when its condition is met
 
-A change that ships in steps leaves markers behind: `// TODO: drop once the old checkout is gone`, a field kept "until the frontend reads the new one", a column ignored "until the next deploy". They are promises, and they are kept only if the step that meets the condition looks for them. When a step finishes (the old checkout is deleted, the frontend switched), grep for the markers that name it and remove the code they guard in the same change. At the end of the whole effort, sweep every marker it left; one that stays says plainly what it is waiting for (a production run, a deploy), so the next reader knows when it can go.
+- A change that ships in steps leaves markers behind: `// TODO: drop once the old checkout is gone`, a field kept "until the frontend reads the new one", a column ignored "until the next deploy". They are promises, and they are kept only if the step that meets the condition looks for them. When a step finishes (the old checkout is deleted, the frontend switched), grep for the markers that name it and remove the code they guard in the same change. At the end of the whole effort, sweep every marker it left; one that stays says plainly what it is waiting for (a production run, a deploy), so the next reader knows when it can go.
 
-**Checklist wording (moved from SKILL.md):** Deferred work is done when its condition is met: grep the repo for the markers of the work this diff finishes (its feature or phase name, `once`, `after`, `remove when`); each one whose condition the diff meets FAILS unless the diff removes the code it guards. Each one left in place states what it still waits on. (N/A: the diff finishes no deferred work)
+- **Checklist wording (moved from SKILL.md):** Deferred work is done when its condition is met: grep the repo for the markers of the work this diff finishes (its feature or phase name, `once`, `after`, `remove when`); each one whose condition the diff meets FAILS unless the diff removes the code it guards. Each one left in place states what it still waits on. (N/A: the diff finishes no deferred work)
 
 
 ### §P16. The shape of the whole change is the simplest that works
 
-Every other box here looks at one construct. This one looks at the change from above, and it comes first: a reviewer who starts line by line can list fifteen correct findings against code that a different shape would have deleted, and the author fixes all fifteen and keeps the wrong design.
+- Every other box here looks at one construct. This one looks at the change from above, and it comes first: a reviewer who starts line by line can list fifteen correct findings against code that a different shape would have deleted, and the author fixes all fifteen and keeps the wrong design.
 
-Example: a change made an order list group items more precisely. It added a second grouping method beside the existing one, a flag choosing between them at each step, and a pass after grouping that worked out per-day counts again from the grouped result. The existing method could already take the precise boundaries, so one method served both cases, and the grouping step already knew the counts as it placed each item. A review that went straight to lines flagged ternaries, names and duplicated arithmetic in code the simpler shape removes.
+- Example: a change made an order list group items more precisely. It added a second grouping method beside the existing one, a flag choosing between them at each step, and a pass after grouping that worked out per-day counts again from the grouped result. The existing method could already take the precise boundaries, so one method served both cases, and the grouping step already knew the counts as it placed each item. A review that went straight to lines flagged ternaries, names and duplicated arithmetic in code the simpler shape removes.
 
-The same question applies before writing: sketch two shapes and pick the smaller before the first line.
+- The same question applies before writing: sketch two shapes and pick the smaller before the first line.
 
-**Checklist wording (moved from SKILL.md):** The shape of the whole change is the simplest that works: state the result the diff is after, then at least one other way to get it, and compare. A diff that runs two mechanisms for one job (two storage shapes, two lookups, a branch on a mode through every step), recomputes downstream what an earlier step already knew, or adds a layer an existing one could carry FAILS when the other way is materially simpler, and the finding describes that shape in a sentence or a short sketch. Line findings that shape would delete go under this one, not beside it. (N/A: never; even a one-line change has a goal another shape could meet)
+- **Checklist wording (moved from SKILL.md):** The shape of the whole change is the simplest that works: state the result the diff is after, then at least one other way to get it, and compare. A diff that runs two mechanisms for one job (two storage shapes, two lookups, a branch on a mode through every step), recomputes downstream what an earlier step already knew, or adds a layer an existing one could carry FAILS when the other way is materially simpler, and the finding describes that shape in a sentence or a short sketch. Line findings that shape would delete go under this one, not beside it. (N/A: never; even a one-line change has a goal another shape could meet)
 
 ### §P17. A flow people know from other products works the way they know it
 
-§P13 matches new code to the rest of the codebase. This matches what people go through to the rest of the products they use. Nobody learns signing up, signing in, resetting a password, checking out, editing their account or getting around a site from one product: they arrive knowing how it goes, because the products they already use do it the same way. A flow in that order needs no explaining. One in a different order, even a shorter one, makes people stop and wonder what is happening, and a confused person at a sign-in or a checkout gives up or writes to support. Being consistent with what people know beats being clever.
+- §P13 matches new code to the rest of the codebase. This matches what people go through to the rest of the products they use. Nobody learns signing up, signing in, resetting a password, checking out, editing their account or getting around a site from one product: they arrive knowing how it goes, because the products they already use do it the same way. A flow in that order needs no explaining. One in a different order, even a shorter one, makes people stop and wonder what is happening, and a confused person at a sign-in or a checkout gives up or writes to support. Being consistent with what people know beats being clever.
 
-Example: a password reset asked for the new password first, then emailed a code to confirm it. It saved a screen and it worked, and it confused the first person who used it, who expected what every other site does:
+- Example: a password reset asked for the new password first, then emailed a code to confirm it. It saved a screen and it worked, and it confused the first person who used it, who expected what every other site does:
 
 1. Enter the email.
 2. Get a code (or a link) by email.
 3. Enter the code, then choose the new password.
 
-Others in the same family: a checkout that takes payment before the shipping address; a Back button inside a multi-step form that leaves the form instead of going back one step; a logo that does not lead home.
+- Others in the same family: a checkout that takes payment before the shipping address; a Back button inside a multi-step form that leaves the form instead of going back one step; a logo that does not lead home.
 
-Before designing a flow, write down how it usually goes, step by step, from products people already use, and start from that order. Each difference needs a reason a person going through the flow would care about; saving the developer a screen, a request or a table is not one. When the codebase already runs the flow its own way, and that way departs from the familiar one, raise it with the developer rather than copying it to a new place.
+- Before designing a flow, write down how it usually goes, step by step, from products people already use, and start from that order. Each difference needs a reason a person going through the flow would care about; saving the developer a screen, a request or a table is not one. When the codebase already runs the flow its own way, and that way departs from the familiar one, raise it with the developer rather than copying it to a new place.
 
-**Checklist wording (moved from SKILL.md):** Familiar flows stay familiar: every flow people go through that the diff adds or reshapes (sign-up, sign-in, password reset, checkout, account settings, navigation, or any other task most products run the same way) asks for things in the order, and behaves the way, people know from other products. A step dropped, merged, moved or added against that order to save a screen or a request FAILS; a departure the developer chose is fine only when the diff or the PR says so, and otherwise is a `question`. A flow that copies a departure the codebase already has is raised as one too, not taken as precedent (§P13). **Enumerate** each flow with its steps in order beside the order most products use. (N/A: the diff adds or reshapes no flow a person goes through)
+- **Checklist wording (moved from SKILL.md):** Familiar flows stay familiar: every flow people go through that the diff adds or reshapes (sign-up, sign-in, password reset, checkout, account settings, navigation, or any other task most products run the same way) asks for things in the order, and behaves the way, people know from other products. A step dropped, merged, moved or added against that order to save a screen or a request FAILS; a departure the developer chose is fine only when the diff or the PR says so, and otherwise is a `question`. A flow that copies a departure the codebase already has is raised as one too, not taken as precedent (§P13). **Enumerate** each flow with its steps in order beside the order most products use. (N/A: the diff adds or reshapes no flow a person goes through)
 
 ### §P18. A caller the convention misses passes the value, not a smarter guess
 
-A shared unit that works a value out by convention is right for most callers and wrong for a few. Making the guess cleverer for one of them (a pluralization rule, a second regex, a special-cased name) changes the result for every caller, needs each one checked, and still misses the next odd name. An optional override is one line, changes nothing for anyone else, and says exactly what the caller needs.
+- A shared unit that works a value out by convention is right for most callers and wrong for a few. Making the guess cleverer for one of them (a pluralization rule, a second regex, a special-cased name) changes the result for every caller, needs each one checked, and still misses the next odd name. An optional override is one line, changes nothing for anyone else, and says exactly what the caller needs.
 
-Example: a shared form autocomplete keeps picked records at `name` with `_ids` turned into `s`, so `tax_ids` lands at `taxs`. Teaching it that `x` takes `es` would also move every other `x_ids` field in the app. The fix was a `fieldName` prop, which the one form that needed it sets to `taxes`.
+- Example: a shared form autocomplete keeps picked records at `name` with `_ids` turned into `s`, so `tax_ids` lands at `taxs`. Teaching it that `x` takes `es` would also move every other `x_ids` field in the app. The fix was a `fieldName` prop, which the one form that needed it sets to `taxes`.
 
-This is not §P10's single-caller prop: the caller cannot own the behavior, because the shared unit is the one writing to the wrong place.
+- This is not §P10's single-caller prop: the caller cannot own the behavior, because the shared unit is the one writing to the wrong place.
 
-**Checklist wording (moved from SKILL.md):** A value a shared unit derives by convention (a name built from another name, a default read from a string pattern) is not made cleverer for one caller it gets wrong (pluralization rules, another regex, a special case); that caller passes the value through an optional override, and every other caller keeps the old default. (N/A: no derived value changed or worked around in the diff)
+- **Checklist wording (moved from SKILL.md):** A value a shared unit derives by convention (a name built from another name, a default read from a string pattern) is not made cleverer for one caller it gets wrong (pluralization rules, another regex, a special case); that caller passes the value through an optional override, and every other caller keeps the old default. (N/A: no derived value changed or worked around in the diff)
 
 
 ### §P19. New code has precedent in the codebase
 
-A way of doing a job that nothing else in the repo does (a package no file imports, a unit or property no stylesheet uses, a browser API where a hook already wraps it, a mocking style the other tests don't use, a config key or file-name pattern that stands alone) is a decision the repo never made. Before accepting it, find how the codebase does that kind of job (grep the siblings) and use that; keep the new way only with the reason it can't be done the existing way. A hit is a prompt to look, not proof of a fault: a first use that is the point of the change (the dependency a feature is about) states so. Examples: `navigator.clipboard` called in a component when a copy hook exists; `@container` units in a repo that sizes in `%`; `jest.spyOn` in a repo that mocks with `vi.mock`; a `*.spec.tsx` file beside `*.test.tsx` files.
+- A way of doing a job that nothing else in the repo does (a package no file imports, a unit or property no stylesheet uses, a browser API where a hook already wraps it, a mocking style the other tests don't use, a config key or file-name pattern that stands alone) is a decision the repo never made. Before accepting it, find how the codebase does that kind of job (grep the siblings) and use that; keep the new way only with the reason it can't be done the existing way. A hit is a prompt to look, not proof of a fault: a first use that is the point of the change (the dependency a feature is about) states so. Examples: `navigator.clipboard` called in a component when a copy hook exists; `@container` units in a repo that sizes in `%`; `jest.spyOn` in a repo that mocks with `vi.mock`; a `*.spec.tsx` file beside `*.test.tsx` files.
 
-**Checklist wording (moved from SKILL.md):** New code has precedent in the codebase: every hit of the `no-precedent.sh` sweep (a package, CSS unit or property, browser global, test-mocking call, config key or file-name pattern the diff introduces that nothing else in the repo uses at the base) FAILS unless the author uses the way the repo already does that job (name the file that does it) or a comment or the description says why it can't. Receipt: `grepped no precedent: N hits`, one verdict per hit. (N/A: `grepped no precedent: 0 hits`)
+- **Checklist wording (moved from SKILL.md):** New code has precedent in the codebase: every hit of the `no-precedent.sh` sweep (a package, CSS unit or property, browser global, test-mocking call, config key or file-name pattern the diff introduces that nothing else in the repo uses at the base) FAILS unless the author uses the way the repo already does that job (name the file that does it) or a comment or the description says why it can't. Receipt: `grepped no precedent: N hits`, one verdict per hit. (N/A: `grepped no precedent: 0 hits`)
 
 ### §P2
 
-**Checklist wording (moved from SKILL.md):** YAGNI: no speculative or unused code — no unused params/props, no abstraction with a single caller built for a hypothetical second one, no config option nothing passes, no dead branch. (N/A: no new abstraction, param, prop, or config option in the diff)
+- **Checklist wording (moved from SKILL.md):** YAGNI: no speculative or unused code — no unused params/props, no abstraction with a single caller built for a hypothetical second one, no config option nothing passes, no dead branch. (N/A: no new abstraction, param, prop, or config option in the diff)
 
 ### §P3
 
-**Checklist wording (moved from SKILL.md):** KISS: no materially simpler equivalent left on the table — a lookup object beats nested conditionals, an early return beats nesting, an existing util/stdlib call beats a hand-roll. (N/A: nothing in the diff has a simpler available equivalent)
+- **Checklist wording (moved from SKILL.md):** KISS: no materially simpler equivalent left on the table — a lookup object beats nested conditionals, an early return beats nesting, an existing util/stdlib call beats a hand-roll. (N/A: nothing in the diff has a simpler available equivalent)

@@ -10,7 +10,7 @@ paths:
 
 ## Rules
 
-Type errors are not warnings, and an escape hatch is a decision to hide one.
+- Type errors are not warnings, and an escape hatch is a decision to hide one.
 
 - No `any`. If the type is genuinely unknown, use `unknown` and narrow it.
 - No cast to silence an error, and no non-null assertion. Fix the type or narrow properly.

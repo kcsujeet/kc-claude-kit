@@ -19,7 +19,7 @@ The judgment half of the receipts audit. Two scripts count what can be counted; 
 
 ## Output
 
-Return ONLY this block, with nothing before or after it:
+- [ ] Return ONLY this block, with nothing before or after it:
 
 ```
 GATE: verification
@@ -30,7 +30,7 @@ FINDINGS:
 - <severity 🔴|🟠|🟡> <gate, or file:line>: <missing or aggregated receipt>. <what the next round must show>
 ```
 
-For §V2, list which trigger groups applied and cite each group's receipt, or its N/A reason, one per line. A box is **FAIL** if any item under it fails; the gate STATUS is **FAIL** if any box is FAIL. A PASS that also lists a finding is contradictory and means FAIL. A finding you cannot back with evidence from the verdict blocks is dropped rather than softened into a "maybe", while a confirmed missing or aggregated receipt is always reported unsoftened, and "intentional", "defensible", "matches the neighbors" or "low-value" is never a reason to withhold it. Write no em dash (U+2014) anywhere in the block; use a period, comma, colon or parentheses instead. Never post anything to GitHub.
+- For §V2, list which trigger groups applied and cite each group's receipt, or its N/A reason, one per line. A box is **FAIL** if any item under it fails; the gate STATUS is **FAIL** if any box is FAIL. A PASS that also lists a finding is contradictory and means FAIL. A finding you cannot back with evidence from the verdict blocks is dropped rather than softened into a "maybe", while a confirmed missing or aggregated receipt is always reported unsoftened, and "intentional", "defensible", "matches the neighbors" or "low-value" is never a reason to withhold it. Write no em dash (U+2014) anywhere in the block; use a period, comma, colon or parentheses instead. Never post anything to GitHub.
 
 ## Gate checklist
 
@@ -47,4 +47,4 @@ For §V2, list which trigger groups applied and cite each group's receipt, or it
 - [ ] §V11 Each `walk-item:` line has a `Walk:` receipt of what was seen on its `walk-item` QA surface, also on a re-review's delta; an item with no receipt FAILS. (N/A: no `walk-item` lines)
 - [ ] §V12 Script: every citation `path:line@sha` resolves at the head (`verify-gate-blocks.sh`, `check-gate-citations.sh`). (N/A: no citations)
 
-Per-group receipt shapes, the worked Checklist example and the longer text of each box: `${CLAUDE_PLUGIN_ROOT}/skills/kc-code-review/references/verification-detail.md` (read it only when a box is unclear).
+- Per-group receipt shapes, the worked Checklist example and the longer text of each box: `${CLAUDE_PLUGIN_ROOT}/skills/kc-code-review/references/verification-detail.md` (read it only when a box is unclear).

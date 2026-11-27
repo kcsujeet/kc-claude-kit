@@ -4,7 +4,7 @@ This repo is public. Anyone can install and read these plugins.
 
 ## Examples stay neutral
 
-Rules here are often learned on other projects. Write the lesson, never the project.
+- Rules here are often learned on other projects. Write the lesson, never the project.
 
 - No names, ticket ids, people, repo or file paths, class or component names, or domain details from the project a rule came from. That covers files, commit messages, PR titles and PR descriptions.
 - Examples use a neutral domain (a shop, its storefronts and orders) and placeholder ids (`ABC-1`).
@@ -12,7 +12,7 @@ Rules here are often learned on other projects. Write the lesson, never the proj
 
 ## Rules stay general
 
-A lesson arrives as one case. The rule is the habit that catches the whole class. Before writing it, strip what the case brought with it.
+- A lesson arrives as one case. The rule is the habit that catches the whole class. Before writing it, strip what the case brought with it.
 
 - No one API shape (query params, includes, REST verbs), library (`lodash`), framework name or UI element (a picker, when the habit covers every read).
 - State the principle at the widest scope it holds. Keep the case as one example among several ("a list, table, picker, search or count").
@@ -20,23 +20,23 @@ A lesson arrives as one case. The rule is the habit that catches the whole class
 
 ## Plugins stand alone
 
-A plugin works in any repo that installs it, with nothing added to that repo.
+- A plugin works in any repo that installs it, with nothing added to that repo.
 
 - What a skill, agent, hook or script runs ships inside the plugin.
 - A file it reads from the repo is optional configuration with a default that works when the file is missing.
 - A project's own rules live in that project's plugin or repo, never here.
 
-Before a plugin change calls, sources or requires anything outside its own folder, ship it in the plugin or make it optional config. Examples: a hook that ran a check script only when the repo had one at a fixed path; a skill whose steps call a `make lint` target few repos have; an agent told to read a docs folder by a path one project uses.
+- Before a plugin change calls, sources or requires anything outside its own folder, ship it in the plugin or make it optional config. Examples: a hook that ran a check script only when the repo had one at a fixed path; a skill whose steps call a `make lint` target few repos have; an agent told to read a docs folder by a path one project uses.
 
 ## Lessons
 
-A lesson comes from the maintainer's other work: a correction, a review comment or a QA finding that a habit would have caught, and that passes the bar in `kc-do-a-task` step 6. What this kit's own review pass finds on a kit PR is fixed in that PR or left open, never the reason for the next one. Each lesson is its own PR, written to the two sections above, and merged once its checks pass.
+- A lesson comes from the maintainer's other work: a correction, a review comment or a QA finding that a habit would have caught, and that passes the bar in `kc-do-a-task` step 6. What this kit's own review pass finds on a kit PR is fixed in that PR or left open, never the reason for the next one. Each lesson is its own PR, written to the two sections above, and merged once its checks pass.
 
-Installs update only with auto-update on for this marketplace. Where `DISABLE_AUTOUPDATER=1` is set (desktop app sessions have been seen with it), `FORCE_AUTOUPDATE_PLUGINS=1` in `~/.claude/settings.json` is also needed; the README's "Install" section says how. kc-gates also updates installs during a session, and each plugin tells Claude when the session runs an older version than is installed, so Claude asks for `/reload-plugins`. When a lesson does not show up, check `claude plugin list` before assuming it loaded.
+- Installs update only with auto-update on for this marketplace. Where `DISABLE_AUTOUPDATER=1` is set (desktop app sessions have been seen with it), `FORCE_AUTOUPDATE_PLUGINS=1` in `~/.claude/settings.json` is also needed; the README's "Install" section says how. kc-gates also updates installs during a session, and each plugin tells Claude when the session runs an older version than is installed, so Claude asks for `/reload-plugins`. When a lesson does not show up, check `claude plugin list` before assuming it loaded.
 
-Future rules are a check that blocks the mistake. A lint rule, test, script or hook is the lesson; prose alone is not accepted. `plugins/kc-gates/scripts/feedback-ledger.sh check` fails a lesson whose PR adds or changes no script, hook, test, eval, CI workflow or lint-rule file. Existing prose rules stay as they are.
+- Future rules are a check that blocks the mistake. A lint rule, test, script or hook is the lesson; prose alone is not accepted. `plugins/kc-gates/scripts/feedback-ledger.sh check` fails a lesson whose PR adds or changes no script, hook, test, eval, CI workflow or lint-rule file. Existing prose rules stay as they are.
 
-Before writing a lesson:
+- Before writing a lesson:
 
 1. Write the class of mistake in one sentence, then two or three other cases it would catch, from other areas. The case that taught it is one example among those.
 2. Treat wording the request suggests (from the user or another session) as a starting point. It was written about the case.
@@ -56,22 +56,22 @@ Before writing a lesson:
    - Name each box's id in the case or test that proves it. A rule file that gains lines with no box added or rewritten gained prose no gate walks, and needs the `held-by:` line too. An agent or `kc-always.md` has no boxes, so a change that adds to one always does.
    - Before calling a lesson wording-only, look for the check a script could make (a draft check, a sweep, a mutant, a hook) and make it.
 
-The checklist applies to draft PRs too (`drafts: true` in its front matter). The hand-off guard will not open even a draft PR here until its head commit has a checklist receipt (`ready-receipt.sh write <sha> --checklist`).
+- The checklist applies to draft PRs too (`drafts: true` in its front matter). The hand-off guard will not open even a draft PR here until its head commit has a checklist receipt (`ready-receipt.sh write <sha> --checklist`).
 
 ## Versions
 
-Raise a changed plugin's `plugin.json` version by the smallest step that fits. Semver's "new behavior is a minor" does not apply: a new rule is the everyday change, and a minor for each says more changed than did.
+- Raise a changed plugin's `plugin.json` version by the smallest step that fits. Semver's "new behavior is a minor" does not apply: a new rule is the everyday change, and a minor for each says more changed than did.
 
 - **Patch:** a rule, box, example or wording added to or changed in an existing skill, agent or script, and any fix. Almost every PR, every lesson included.
 - **Minor:** a new skill, agent, hook or command in the plugin.
 - **Major:** renaming or removing something an install relies on (a plugin, skill, agent or installed rule file), so users must reinstall or rerun something.
 
-When unsure, it is a patch; ask before going higher. `CHANGELOG.md` gets one line per plugin version, newest first.
+- When unsure, it is a patch; ask before going higher. `CHANGELOG.md` gets one line per plugin version, newest first.
 
 ## Before a PR
 
-Run `/kc-gates:kc-ready-for-review`. It walks `.claude/hand-off-checklist.md`, which checks the rules above and the version bump.
+- [ ] Run `/kc-gates:kc-ready-for-review`. It walks `.claude/hand-off-checklist.md`, which checks the rules above and the version bump.
 
 ## Developing
 
-Layout, conventions and release steps are in `docs/architecture.md`. The README stays short: what each plugin and skill is for and how they connect. Detail goes in `docs/architecture.md`.
+- Layout, conventions and release steps are in `docs/architecture.md`. The README stays short: what each plugin and skill is for and how they connect. Detail goes in `docs/architecture.md`.

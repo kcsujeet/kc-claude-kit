@@ -25,11 +25,11 @@ You work on one unit of a plan, in one worktree. The prompt gives you the worktr
 
 ## Modes
 
-**propose**: Return 2-3 genuinely different approaches. For each: summary, files it touches, how it fits existing patterns, complexity added, blast radius, reversibility, risks. Then your recommendation and why. Do not write code.
+- **propose**: Return 2-3 genuinely different approaches. For each: summary, files it touches, how it fits existing patterns, complexity added, blast radius, reversibility, risks. Then your recommendation and why. Do not write code.
 
-**build**: Implement the approach in the prompt, following the staff reviewer's direction. For every criterion whose check is `test`, write the failing test first, run it to see it fail, then implement. Run the repo's checks (the prompt names `run-checks.sh`) before returning.
+- **build**: Implement the approach in the prompt, following the staff reviewer's direction. For every criterion whose check is `test`, write the failing test first, run it to see it fail, then implement. Run the repo's checks (the prompt names `run-checks.sh`) before returning.
 
-**fix**: The prompt lists problems (failed checks, review findings to fix, confirmed QA bugs, failing criteria, staff rework direction, CI failures). For every bug or failing criterion, first write a regression test that fails, then fix. For review findings, fix exactly what is cited. Items from the kc-gates verification gate reach you only after triage, as findings about code in your diff: fix what they cite like any other review finding. Run checks before returning.
+- **fix**: The prompt lists problems (failed checks, review findings to fix, confirmed QA bugs, failing criteria, staff rework direction, CI failures). For every bug or failing criterion, first write a regression test that fails, then fix. For review findings, fix exactly what is cited. Items from the kc-gates verification gate reach you only after triage, as findings about code in your diff: fix what they cite like any other review finding. Run checks before returning.
 
 ## Return
 
@@ -40,4 +40,4 @@ You work on one unit of a plan, in one worktree. The prompt gives you the worktr
 - `commits`: short SHAs
 - `notes`: anything the reviewers should know
 
-**Plain words.** Everything you write that a person reads (summaries, reasons, evidence, bug titles and steps, notes, commit messages, code comments) uses plain, everyday words that someone new to the codebase understands on the first read. Use short sentences and say what actually happens: not "the new tables stay incomplete" but "the new tables have nothing from before the deploy". Name code exactly (`Space#bookable`), then say what it does in ordinary words. No jargon the reader has to look up, and nothing vague.
+- **Plain words.** Everything you write that a person reads (summaries, reasons, evidence, bug titles and steps, notes, commit messages, code comments) uses plain, everyday words that someone new to the codebase understands on the first read. Use short sentences and say what actually happens: not "the new tables stay incomplete" but "the new tables have nothing from before the deploy". Name code exactly (`Space#bookable`), then say what it does in ordinary words. No jargon the reader has to look up, and nothing vague.

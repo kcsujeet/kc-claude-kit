@@ -91,7 +91,7 @@ bash "${CLAUDE_PLUGIN_ROOT}/scripts/ready-receipt.sh" write <full-sha> --rounds 
 
 ## Checklist
 
-Tick each box, then say PASS, FAIL (file:line) or N/A (why). Detail per box: `references/detail.md`.
+- [ ] Tick each box, then say PASS, FAIL (file:line) or N/A (why). Detail per box: `references/detail.md`.
 
 - [ ] §H1 Rounds converge: round 1 whole diff, later rounds the fixes and their uses, each smaller, at most 3, last found nothing or open list to the user. Held by `ready-receipt.sh`, `guard-merge.sh`. (N/A: never)
 - [ ] §H2 One writer: only mechanical edits (`check-gate-fixes.sh` `apply`) applied as written; every `write` was written by you. (N/A: no gate edits)

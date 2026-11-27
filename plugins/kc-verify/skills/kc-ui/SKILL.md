@@ -73,11 +73,11 @@ A green test suite says nothing about whether a screen looks right: tests assert
 
 ## Tools
 
-Use what the project has (a browser tool, its screenshot setup, a simulator, a dev server); install no new framework. If you cannot see the UI, say so.
+- [ ] Use what the project has (a browser tool, its screenshot setup, a simulator, a dev server); install no new framework. If you cannot see the UI, say so.
 
 ## Gate checklist
 
-Do not report a UI change verified until every box is ticked:
+- [ ] Do not report a UI change verified until every box is ticked:
 
 - [ ] §UI1 Every surface the diff reaches is listed, including other consumers of shared components and every screen any branch or PR of the work changes.
 - [ ] §UI2 The app was brought up with one tested command run as written; it is named in the report and the walk receipt's `env` line, or a script was written for it first.

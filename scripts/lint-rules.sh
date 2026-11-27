@@ -36,7 +36,7 @@ box_ids_in() {
   grep -ohE "^[[:space:]]*- \[ \] $id_pattern" "$@" 2>/dev/null | grep -oE "$id_pattern" || true
 }
 heading_ids_in() {
-  grep -ohE "^(#{2,4} |\*\*)$id_pattern\." "$@" 2>/dev/null | grep -oE "$id_pattern" || true
+  grep -ohE "^(#{2,4} |(- )?\*\*)$id_pattern\." "$@" 2>/dev/null | grep -oE "$id_pattern" || true
 }
 
 # 1. Duplicate box ids within one file.

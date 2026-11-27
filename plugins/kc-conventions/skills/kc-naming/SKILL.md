@@ -15,7 +15,7 @@ paths:
 
 ## Review checklist
 
-Tick every box for each construct you add or change. Report each: PASS, FAIL (file:line) or N/A (why).
+- [ ] Tick every box for each construct you add or change. Report each: PASS, FAIL (file:line) or N/A (why).
 
 - [ ] §N1 Names state the role, not the type (no `data`/`result`/`value`/`temp`/`item`/`obj` for behaviour-bearing values); function names describe the effect, not the trigger.
 - [ ] §N2 Each non-obvious operand of a `&&`/`||` chain with 2+ of them, and each parenthesized part, gets its own named boolean; naming the whole chain fails; `and-or-chains.sh` swept.
@@ -31,11 +31,11 @@ Tick every box for each construct you add or change. Report each: PASS, FAIL (fi
 - [ ] §N12 One word per concept: a new name for a thing the codebase already names (`reservation` where it says `booking`) reuses the existing word. (N/A: no new names)
 - [ ] §N13 Casing follows the language and the siblings: `snake_case` SQL columns and plural tables, `UpperCamelCase` types, `kebab-case` plural route nouns and file names. (N/A: nothing new named)
 
-Examples and edge cases per box: references/detail.md (read when a box is unclear).
+- Examples and edge cases per box: references/detail.md (read when a box is unclear).
 
 ## Sweeps
 
-Save the diff under review to a file (`gh pr diff <num> > /tmp/review.diff`, or `git diff <default-branch>...HEAD > /tmp/review.diff`) and run each script over it; `-` reads the diff from stdin. Each prints one `path:line: text` hit per line, where `line` is the new-side line number, and nothing else. Give every hit its own verdict, and state the receipt with its count, `0 hits` included.
+- [ ] Save the diff under review to a file (`gh pr diff <num> > /tmp/review.diff`, or `git diff <default-branch>...HEAD > /tmp/review.diff`) and run each script over it; `-` reads the diff from stdin. Each prints one `path:line: text` hit per line, where `line` is the new-side line number, and nothing else. Give every hit its own verdict, and state the receipt with its count, `0 hits` included.
 
 - `added-lines.sh` (citation map): every added line as `path:line: text`, with the source line number at the head SHA. Cite every finding's line from this output or from a sweep hit, never from a position in the diff file.
 

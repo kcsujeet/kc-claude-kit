@@ -1,1 +1,1 @@
-Run check before merge.
+- Run check before merge.

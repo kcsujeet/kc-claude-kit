@@ -2,15 +2,15 @@
 
 ### Full wording before the steps rewrite
 
-The whole `SKILL.md` body as it was, moved verbatim (headings two levels down). Read the part a step or box points to.
+- The whole `SKILL.md` body as it was, moved verbatim (headings two levels down). Read the part a step or box points to.
 
 ### Verifying a UI change
 
-A green test suite tells you nothing about whether the screen looks right. Unit tests assert the values; they do not notice that the heading is clipped, the empty state never renders, or the total sits under a sticky footer.
+- A green test suite tells you nothing about whether the screen looks right. Unit tests assert the values; they do not notice that the heading is clipped, the empty state never renders, or the total sits under a sticky footer.
 
-So look at it. Once, deliberately, before saying it is done.
+- So look at it. Once, deliberately, before saying it is done.
 
-This skill checks that it looks right. Whether a person can use it (the flows, where each action lands, what the words say) is `kc-verify:kc-ux`; a change a person both sees and uses gets both.
+- This skill checks that it looks right. Whether a person can use it (the flows, where each action lands, what the words say) is `kc-verify:kc-ux`; a change a person both sees and uses gets both.
 
 #### Hard rules
 
@@ -29,11 +29,11 @@ This skill checks that it looks right. Whether a person can use it (the flows, w
 
 ##### Step 1 — list the surfaces
 
-Name every screen, component, and state the diff can reach. A shared component means every consumer of it, not just the one you were working on. If the list is long, say so and prioritize, rather than checking three and implying you checked all.
+- [ ] Name every screen, component, and state the diff can reach. A shared component means every consumer of it, not just the one you were working on. If the list is long, say so and prioritize, rather than checking three and implying you checked all.
 
 ##### Step 1b — when there is a design, build the state matrix from it
 
-Before opening the app, walk the design (mockup, prototype, spec) and write down every state it shows. A state is any setting or condition that changes what the screen renders. Illustrations, not a complete list:
+- Before opening the app, walk the design (mockup, prototype, spec) and write down every state it shows. A state is any setting or condition that changes what the screen renders. Illustrations, not a complete list:
 
 - every on/off switch on the screen, in both positions (a disabled record often hides whole sections, not just a badge)
 - every option of a choice that changes the layout (visibility, type, mode, plan)
@@ -42,23 +42,23 @@ Before opening the app, walk the design (mockup, prototype, spec) and write down
 - every drawer, dialog, menu and confirmation the screen opens, with its exact wording, in each state of filling it in: empty, one item picked, several picked, and editing an existing item (what appears after a pick is where drawers differ most)
 - what each choice in a create form adds to the form (picking one option can reveal a required field), and the state the new record lands in after create: switched on or off, which sections show
 
-Then put the app in each state and diff it against the design: which sections, fields, columns and actions appear, in which states, and what they do. Each difference in structure or behaviour is a finding, unless the ticket or the product owner decided otherwise; name that decision when you skip one.
+- Then put the app in each state and diff it against the design: which sections, fields, columns and actions appear, in which states, and what they do. Each difference in structure or behaviour is a finding, unless the ticket or the product owner decided otherwise; name that decision when you skip one.
 
-Compare each element, not only which sections and columns show: for every element the design shows, check its presence, its order among its siblings, its colour, its variant (filled or outlined, primary or secondary, soft or solid), its weight, its copy and its state (disabled, selected, empty, loading). Examples: a status badge outlined in the design and filled in the app; two columns in a different order; a button the design shows disabled in a state where the app leaves it live; an API field's casing or type against its contract. A difference that only follows the app's own pattern for that kind of element is allowed (see below), and the walk says that it was weighed.
+- [ ] Compare each element, not only which sections and columns show: for every element the design shows, check its presence, its order among its siblings, its colour, its variant (filled or outlined, primary or secondary, soft or solid), its weight, its copy and its state (disabled, selected, empty, loading). Examples: a status badge outlined in the design and filled in the app; two columns in a different order; a button the design shows disabled in a state where the app leaves it live; an API field's casing or type against its contract. A difference that only follows the app's own pattern for that kind of element is allowed (see below), and the walk says that it was weighed.
 
-Then compare every new or changed component with its siblings on the same screen: a new card next to existing cards uses the same title size, subtitle style, field label style and spacing. Measure it (computed font size, weight and colour) rather than eyeballing it.
+- Then compare every new or changed component with its siblings on the same screen: a new card next to existing cards uses the same title size, subtitle style, field label style and spacing. Measure it (computed font size, weight and colour) rather than eyeballing it.
 
-A design is not a pixel spec for things the app already has a pattern for. Titles, button labels, casing, icons, chips and wording follow the app's existing patterns so the product stays consistent; a difference there is not a finding unless the design introduces something the app has no pattern for. The call is made per element after comparing it: a variant or colour that differs where the app has no pattern for it is a finding, and one that follows the app's pattern is noted as chosen.
+- A design is not a pixel spec for things the app already has a pattern for. Titles, button labels, casing, icons, chips and wording follow the app's existing patterns so the product stays consistent; a difference there is not a finding unless the design introduces something the app has no pattern for. The call is made per element after comparing it: a variant or colour that differs where the app has no pattern for it is a finding, and one that follows the app's pattern is noted as chosen.
 
 ##### Step 2 — get real data in front of it
 
-Bring the app (a review or QA environment) up with one command that was tested: a script or target in the repo (`bin/dev`, `make up`, a compose file) run as written, never started by hand step by step. If none exists, write it first and run it from a clean state; the next person, and the reviewer, then get the same environment. The report and the walk receipt name that command.
+- Bring the app (a review or QA environment) up with one command that was tested: a script or target in the repo (`bin/dev`, `make up`, a compose file) run as written, never started by hand step by step. If none exists, write it first and run it from a clean state; the next person, and the reviewer, then get the same environment. The report and the walk receipt name that command.
 
-Use the project's seed or fixture path if it has one. Otherwise construct data that is deliberately awkward: a long name, an empty collection, a large collection, a zero amount, a negative amount, a missing optional field, a non-Latin string.
+- [ ] Use the project's seed or fixture path if it has one. Otherwise construct data that is deliberately awkward: a long name, an empty collection, a large collection, a zero amount, a negative amount, a missing optional field, a non-Latin string.
 
-The point is not coverage for its own sake. Every one of those is a shape that has broken a layout before.
+- The point is not coverage for its own sake. Every one of those is a shape that has broken a layout before.
 
-Sign in as a seeded local user without anyone's password. When sign-in goes through an outside identity provider, a check that waits on the user's password stalls every time a dev server restarts or runs on a new port: browser sessions and cookies are kept per origin. Look for a credential the local backend can mint itself, often an auth strategy it already accepts (an API key, a signed token) that only tests create. Have the frontend send it only in its development mode. If the project has no such path, propose one before building it, guarded at every layer:
+- Sign in as a seeded local user without anyone's password. When sign-in goes through an outside identity provider, a check that waits on the user's password stalls every time a dev server restarts or runs on a new port: browser sessions and cookies are kept per origin. Look for a credential the local backend can mint itself, often an auth strategy it already accepts (an API key, a signed token) that only tests create. Have the frontend send it only in its development mode. If the project has no such path, propose one before building it, guarded at every layer:
 
 - The secret signing the credential exists only in development, so staging and production reject it.
 - The mint command refuses to run outside the development environment.
@@ -66,11 +66,11 @@ Sign in as a seeded local user without anyone's password. When sign-in goes thro
 - The build fails if the variable is set for a production build, rather than ignoring it.
 - The credential lives in the process environment, never in a committed file or in chat.
 
-When the app keeps its session in a cookie scoped to a parent domain (`.example.test`), a local port can't hold it, and signing in for QA in the browser the developer uses would replace their own session on every subdomain. Sign in from a separate headless browser instead: map a throwaway subdomain of that domain to the local server (Chrome's `--host-resolver-rules="MAP qa-abc-1.example.test 127.0.0.1"`), open the app on it, and trade the dev-only credential for the session cookie there. For example, a server-rendered admin page whose shell reads the session cookie, a storefront that shares a login cookie with its account pages, or a legacy page embedded in a newer app.
+- When the app keeps its session in a cookie scoped to a parent domain (`.example.test`), a local port can't hold it, and signing in for QA in the browser the developer uses would replace their own session on every subdomain. Sign in from a separate headless browser instead: map a throwaway subdomain of that domain to the local server (Chrome's `--host-resolver-rules="MAP qa-abc-1.example.test 127.0.0.1"`), open the app on it, and trade the dev-only credential for the session cookie there. For example, a server-rendered admin page whose shell reads the session cookie, a storefront that shares a login cookie with its account pages, or a legacy page embedded in a newer app.
 
 ##### Step 3 — walk the states
 
-For each surface, look at every state it can be in, not only the populated one:
+- For each surface, look at every state it can be in, not only the populated one:
 
 - loading
 - empty
@@ -79,13 +79,13 @@ For each surface, look at every state it can be in, not only the populated one:
 - populated, overflowing (long strings, large counts)
 - interactive states worth seeing: focus, hover, disabled, selected
 
-A missing empty state and a missing loading state are the two most commonly shipped omissions, because the developer's data is always already there.
+- A missing empty state and a missing loading state are the two most commonly shipped omissions, because the developer's data is always already there.
 
-When the surface finds or rewrites content people write (a signature or footer swapped when the sender changes, a template filled in, pasted text cleaned up), each shape of that content is a state too: plain, line breaks, several blocks, formatting or a link against other words, images beside text and alone, tables, empty and none. Put each through every action that moves it (insert, swap, remove, swap back) and look at what is left on screen, not only the shape the change was written for.
+- When the surface finds or rewrites content people write (a signature or footer swapped when the sender changes, a template filled in, pasted text cleaned up), each shape of that content is a state too: plain, line breaks, several blocks, formatting or a link against other words, images beside text and alone, tables, empty and none. Put each through every action that moves it (insert, swap, remove, swap back) and look at what is left on screen, not only the shape the change was written for.
 
-Then fill a list or page taller than the viewport and check the background, footer and scrolling hold.
+- Then fill a list or page taller than the viewport and check the background, footer and scrolling hold.
 
-A behaviour a person sets off is walked through every way they set it off, not only the one the report or the fix names: a click, a scroll by hand (slow and fast), the keyboard, a link that opens the page at a spot, a reload; while the page is still loading and once it has settled; on every page that shares the component. For example, a scroll-linked highlight fixed for clicks while scrolling by hand still skipped sections, a keyboard shortcut fixed for the button but not for its menu entry, and a deep link that lands on the right section before images above it load and then drifts.
+- A behaviour a person sets off is walked through every way they set it off, not only the one the report or the fix names: a click, a scroll by hand (slow and fast), the keyboard, a link that opens the page at a spot, a reload; while the page is still loading and once it has settled; on every page that shares the component. For example, a scroll-linked highlight fixed for clicks while scrolling by hand still skipped sections, a keyboard shortcut fixed for the button but not for its menu entry, and a deep link that lands on the right section before images above it load and then drifts.
 
 ##### Step 4 — vary the environment
 
@@ -95,7 +95,7 @@ A behaviour a person sets off is walked through every way they set it off, not o
 
 ##### Step 5 — look for the specific defects
 
-Scan each capture for these, by name, rather than glancing at it:
+- Scan each capture for these, by name, rather than glancing at it:
 
 - clipped or truncated text
 - overlapping elements
@@ -110,17 +110,17 @@ Scan each capture for these, by name, rather than glancing at it:
 
 ##### Step 6 — report
 
-One line per surface: what you looked at, in which configurations, and what you saw. Then the findings, each with the state and configuration that produced it, so someone else can reproduce it without guessing.
+- One line per surface: what you looked at, in which configurations, and what you saw. Then the findings, each with the state and configuration that produced it, so someone else can reproduce it without guessing.
 
-Finish with what you did not check and why.
+- Finish with what you did not check and why.
 
-A QA pass on something already shipped ends at the report: change no code until the findings are triaged with the user, each one sorted into a bug or a question for the team, then into a fix now (a hotfix) or a ticket for later, with what introduced it checked in history. A remark about one finding during that talk ("this should be X") is input to the triage, not a go-ahead to build X while the rest are untriaged.
+- A QA pass on something already shipped ends at the report: change no code until the findings are triaged with the user, each one sorted into a bug or a question for the team, then into a fix now (a hotfix) or a ticket for later, with what introduced it checked in history. A remark about one finding during that talk ("this should be X") is input to the triage, not a go-ahead to build X while the rest are untriaged.
 
 ##### Step 6b — a walkthrough for others (a video of how to test)
 
-When the evidence is for someone who doesn't know the change (a tester, the reporter, a reviewer), it must explain itself without you there. Before a change goes to review, its ticket gets a **How to test** section at the end of the description, written for someone who has never seen it: links to the change's pull requests (with the merge order when one depends on another), the setup, the cases as numbered steps with what to expect, and the walkthrough video embedded under them. Append it without rewording the rest of the description. Write the setup for the team's usual local environment (the hostnames and commands everyone runs), in the pull request's How to test too, never the ports, worktrees or server entries of your own session: a reader can't follow `localhost:3014` and a CORS override they don't run.
+- When the evidence is for someone who doesn't know the change (a tester, the reporter, a reviewer), it must explain itself without you there. Before a change goes to review, its ticket gets a **How to test** section at the end of the description, written for someone who has never seen it: links to the change's pull requests (with the merge order when one depends on another), the setup, the cases as numbered steps with what to expect, and the walkthrough video embedded under them. Append it without rewording the rest of the description. Write the setup for the team's usual local environment (the hostnames and commands everyone runs), in the pull request's How to test too, never the ports, worktrees or server entries of your own session: a reader can't follow `localhost:3014` and a CORS override they don't run.
 
-The walkthrough:
+- The walkthrough:
 
 - **Open with the setup**: the data each case needs, the switch or setting and where it lives, and the checks in order.
 - **One case per frame or clip, captioned** with the state ("Flag on, record not archived") and the expected result in one sentence.
@@ -133,13 +133,13 @@ The walkthrough:
 
 #### Tools
 
-Use whatever the project already has: a browser tool if one is connected, the project's own screenshot or visual-regression setup, a simulator, or a dev server plus a manual look. Do not install a new visual testing framework to satisfy this skill; the point is to look at the screen, not to build an apparatus for looking at screens.
+- [ ] Use whatever the project already has: a browser tool if one is connected, the project's own screenshot or visual-regression setup, a simulator, or a dev server plus a manual look. Do not install a new visual testing framework to satisfy this skill; the point is to look at the screen, not to build an apparatus for looking at screens.
 
-If nothing is available and you genuinely cannot see the UI, say that plainly and let the user decide. A confident "looks good" from something that never rendered the page is the exact failure this skill exists to prevent.
+- If nothing is available and you genuinely cannot see the UI, say that plainly and let the user decide. A confident "looks good" from something that never rendered the page is the exact failure this skill exists to prevent.
 
 #### Gate checklist
 
-Do not report a UI change verified until every box is ticked:
+- [ ] Do not report a UI change verified until every box is ticked:
 
 - [ ] Every surface the diff reaches is listed, including other consumers of shared components.
 - [ ] The app was brought up with one tested command run as written, not by hand step by step; the command is named in the report and in the walk receipt's `env` line (`env<TAB><command><TAB><evidence the app answered>`, which `check-walk-receipt.sh` requires), or a script was written for it first.

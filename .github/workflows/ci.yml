@@ -54,6 +54,10 @@ jobs:
       - name: Rules lint
         run: bash scripts/lint-rules.sh
 
+      # No prose paragraphs in tracked Markdown: checkboxes for things to do or check, bullets for the rest.
+      - name: No prose paragraphs
+        run: bash scripts/check-no-paragraphs.sh
+
       # A checklist box is one line of at most 220 characters; longer wording lives in references/detail.md.
       - name: Checklist boxes are one line
         run: bash scripts/check-box-length.sh
@@ -102,6 +106,9 @@ jobs:
 
       - name: Box length check tests
         run: bash scripts/tests/check-box-length.test.sh
+
+      - name: Paragraph check tests
+        run: bash scripts/tests/check-no-paragraphs.test.sh
 
       - name: Gate agent generator tests
         run: bash scripts/tests/build-gate-agents.test.sh

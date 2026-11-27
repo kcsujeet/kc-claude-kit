@@ -15,7 +15,7 @@ paths:
 
 ## Review checklist
 
-Tick every box for each construct you add or change. Report each: PASS, FAIL (file:line) or N/A (why).
+- [ ] Tick every box for each construct you add or change. Report each: PASS, FAIL (file:line) or N/A (why).
 
 - [ ] §T1 Every new behaviour or fix has a test at its owning unit that fails if it breaks; list each case added and each test deleted with what covers it now (see §T1).
 - [ ] §T2 No assertion on a class name as evidence of state; assert what a user or consumer observes (role, text, accessible state, emitted value); `class-assertions.sh` swept. (N/A: 0 hits)
@@ -38,11 +38,11 @@ Tick every box for each construct you add or change. Report each: PASS, FAIL (fi
 - [ ] §T19 A test that fails only in CI was reproduced locally (slow the suspected gap until it fails the way CI does) and the fix passes under the same delay. (N/A: no CI-only failure)
 - [ ] §T20 Where e2e runs in a harness or fixture app, each headline feature also has one test driving the shipped app with default configuration and seed data. (N/A: no such suite or feature)
 
-Examples and edge cases per box: references/detail.md (read when a box is unclear).
+- Examples and edge cases per box: references/detail.md (read when a box is unclear).
 
 ## Sweeps
 
-Save the diff under review to a file (`gh pr diff <num> > /tmp/review.diff`, or `git diff <default-branch>...HEAD > /tmp/review.diff`) and run each script over it; `-` reads the diff from stdin for the three test sweeps. Those three scan only added lines in test files (`KC_TEST_PATHS` in `scripts/lib/diff-lines.sh`: `*.test.*`, `*.spec.*`, `*_test.*`, `*_spec.*`, `test_*.py`, and anything under `test/`, `tests/`, `spec/`, `__tests__/` or `e2e/`). Each prints one `path:line: text` hit per line, where `line` is the new-side line number, and nothing else. Give every hit its own verdict, and state each receipt with its count, `0 hits` included.
+- [ ] Save the diff under review to a file (`gh pr diff <num> > /tmp/review.diff`, or `git diff <default-branch>...HEAD > /tmp/review.diff`) and run each script over it; `-` reads the diff from stdin for the three test sweeps. Those three scan only added lines in test files (`KC_TEST_PATHS` in `scripts/lib/diff-lines.sh`: `*.test.*`, `*.spec.*`, `*_test.*`, `*_spec.*`, `test_*.py`, and anything under `test/`, `tests/`, `spec/`, `__tests__/` or `e2e/`). Each prints one `path:line: text` hit per line, where `line` is the new-side line number, and nothing else. Give every hit its own verdict, and state each receipt with its count, `0 hits` included.
 
 - `added-lines.sh` (citation map): every added line as `path:line: text`, with the source line number at the head SHA. Cite every finding's line from this output or from a sweep hit, never from a position in the diff file.
 

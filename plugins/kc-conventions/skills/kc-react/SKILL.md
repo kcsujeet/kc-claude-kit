@@ -17,7 +17,7 @@ paths:
 
 ## Review checklist
 
-Tick every box for each construct you add or change. Report each: PASS, FAIL (file:line) or N/A (why).
+- [ ] Tick every box for each construct you add or change. Report each: PASS, FAIL (file:line) or N/A (why).
 
 - [ ] §R1 Bulletproof-react placement: feature code sits under `features/<feature>/{api,components,hooks}`; code used across features sits at the shared app level.
 - [ ] §R2 No cross-feature imports (`features/A` importing from `features/B`'s internals); composition happens at the app/routes level. (N/A: no feature-to-feature import in diff)
@@ -58,11 +58,11 @@ Tick every box for each construct you add or change. Report each: PASS, FAIL (fi
 - [ ] §R37 Markup shared by 2+ components is a component taking the differences as props; a hook or function returning JSX for callers to render FAILS (see §R37). (N/A: no shared markup)
 - [ ] §R38 Every value a render shows or passes on comes from a subscription (watched field, selector, state, hook return); a one-off `getValues()`, `getState()` or `ref.current` read in render FAILS.
 
-Examples and edge cases per box: references/detail.md (read when a box is unclear).
+- Examples and edge cases per box: references/detail.md (read when a box is unclear).
 
 ## Sweeps
 
-Save the diff under review to a file (`gh pr diff <num> > /tmp/review.diff`, or `git diff <default-branch>...HEAD > /tmp/review.diff`) and run each script over it; `-` reads the diff from stdin. Each prints one `path:line: text` hit per line, where `line` is the new-side line number, and nothing else. Give every hit its own verdict, and state each receipt with its count, `0 hits` included.
+- [ ] Save the diff under review to a file (`gh pr diff <num> > /tmp/review.diff`, or `git diff <default-branch>...HEAD > /tmp/review.diff`) and run each script over it; `-` reads the diff from stdin. Each prints one `path:line: text` hit per line, where `line` is the new-side line number, and nothing else. Give every hit its own verdict, and state each receipt with its count, `0 hits` included.
 
 - `added-lines.sh` (citation map): every added line as `path:line: text`, with the source line number at the head SHA. Cite every finding's line from this output or from a sweep hit, never from a position in the diff file.
 

@@ -50,7 +50,7 @@ Load this before drafting any PR comment or reply (replies to reviewers on your 
 
 ## Checklist
 
-Tick each box, then say PASS, FAIL (file:line) or N/A (why).
+- [ ] Tick each box, then say PASS, FAIL (file:line) or N/A (why).
 
 - [ ] Length: each draft is at most 3 sentences (code aside); a reply is one sentence plus the SHA.
 - [ ] Format: label on its own line; no em dash, no `§` citation, no praise opener, no `(blocking)`, no emoji.
@@ -73,4 +73,4 @@ Tick each box, then say PASS, FAIL (file:line) or N/A (why).
 - [ ] §PC11 When your change alters someone else's work, the PR says up front what of theirs is kept and what changed and why, with command output.
 - [ ] §PC12 Content handed to a tool that transforms it (editor, formatter, importer) is shaped to survive it and read back afterwards.
 
-Detail per box and the full tone, example, reply and posting text: `references/detail.md`.
+- Detail per box and the full tone, example, reply and posting text: `references/detail.md`.

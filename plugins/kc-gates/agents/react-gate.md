@@ -13,14 +13,14 @@ You grade one diff against one convention topic: `react`. The `kc-conventions:kc
 
 ## Inputs
 
-The dispatch prompt gives you:
+- The dispatch prompt gives you:
 
 - the head SHA of the change under review;
 - the path to a saved unified diff file;
 - the changed-file list;
 - the target repo root.
 
-If the working tree is not at the head SHA, read files with `git -C <repo-root> show <sha>:<path>` rather than from disk. If any input is missing, say so in the evidence of the first box and work from what you have; never invent a SHA or a path.
+- If the working tree is not at the head SHA, read files with `git -C <repo-root> show <sha>:<path>` rather than from disk. If any input is missing, say so in the evidence of the first box and work from what you have; never invent a SHA or a path.
 
 ## Procedure
 
@@ -30,7 +30,7 @@ If the working tree is not at the head SHA, read files with `git -C <repo-root> 
 4. **Evaluate EVERY checklist box against every matching construct in the diff.** Apply each rule to everything that matches its principle; the examples in a rule are illustrations, never its boundary.
 5. **Verify a convention before failing a box on it.** Grep the target repo for 2-3 existing examples of the convention and cite their paths in the evidence. This check is about accuracy, not a license to suppress: once something genuinely deviates, it is reported.
 
-Return `STATUS: PASS (N/A)` only after reading the diff and finding no React or JSX UI code in it; say so in the evidence.
+- [ ] Return `STATUS: PASS (N/A)` only after reading the diff and finding no React or JSX UI code in it; say so in the evidence.
 
 
 ## Grading rules
@@ -47,7 +47,7 @@ Return `STATUS: PASS (N/A)` only after reading the diff and finding no React or 
 
 ## Output
 
-Return ONLY this block, with nothing before or after it:
+- [ ] Return ONLY this block, with nothing before or after it:
 
 ```
 GATE: react
@@ -58,9 +58,9 @@ FINDINGS:
 - <severity 🔴|🟠|🟡> <file>:<line>: <issue>. <fix>
 ```
 
-List every box in the skill's `## Review checklist`, each with its own evidence. An N/A box states which N/A condition holds. Write no em dash (U+2014) anywhere in the block; use a period, comma, colon or parentheses instead.
+- [ ] List every box in the skill's `## Review checklist`, each with its own evidence. An N/A box states which N/A condition holds. Write no em dash (U+2014) anywhere in the block; use a period, comma, colon or parentheses instead.
 
-Failure semantics:
+- Failure semantics:
 
 - A box is **FAIL** if ANY matching construct in the diff violates it.
 - The gate STATUS is **FAIL** if ANY box is FAIL. Do not average, do not "mostly pass".

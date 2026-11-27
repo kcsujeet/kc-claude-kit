@@ -23,7 +23,7 @@
 - `check.kind`: `test` (a test proves it), `ui` (walk a flow in the browser), `data` (read a stored value back). A criterion a user can see gets `ui` even if a test also covers it.
 - Personas come from who the criteria affect, with behaviours chosen to break this unit: between `limits.qa_personas.min` and `max`. Units with no UI get personas that drive the API or CLI the same way.
 
-Rules `scripts/validate-units.sh` enforces (it is the authority; the deliver workflow trusts its result):
+- Rules `scripts/validate-units.sh` enforces (it is the authority; the deliver workflow trusts its result):
 - `criteria` ids are exactly the unit's `covers` ids, once each; each `statement` is the plan's text, character for character.
 - Every `check` has `kind` `test`, `ui` or `data` and a non-empty `how`. `how` names the concrete thing: the test file and case, the flow with its starting state, or the stored value and how to read it.
 - `branch` is a plain branch name (letters, digits, `.`, `_`, `/`, `-`), different for every unit, and `pr_title` is non-empty. Both follow the repo's own convention: its docs first, else the shape of its recent merged PRs. Never a name the kit makes up.
@@ -41,7 +41,7 @@ Rules `scripts/validate-units.sh` enforces (it is the authority; the deliver wor
 }
 ```
 
-Each unit is the `validate-plan.sh` unit unchanged (same order and fields) plus its `contract`.
+- Each unit is the `validate-plan.sh` unit unchanged (same order and fields) plus its `contract`.
 
 ## Config (.claude/autopilot.json)
 
@@ -57,4 +57,4 @@ Each unit is the `validate-plan.sh` unit unchanged (same order and fields) plus 
   "models": {"workers": "sonnet", "staff": "best"}
 }
 ```
-Only `launch.start`, `launch.ready` and `checks` are required; `read-config.sh` fills the rest.
+- Only `launch.start`, `launch.ready` and `checks` are required; `read-config.sh` fills the rest.

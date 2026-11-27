@@ -2,11 +2,11 @@
 
 ### Full wording before the steps rewrite
 
-The whole `SKILL.md` body as it was, moved verbatim (headings two levels down). Read the part a step or box points to.
+- The whole `SKILL.md` body as it was, moved verbatim (headings two levels down). Read the part a step or box points to.
 
 ### Investigate a production problem
 
-A problem in production has already been recorded: request traces, job timestamps, slow logs, error stacks, change logs and commit history hold most answers before anything new is built. A probe built for the first guessed cause measures that guess and nothing else, takes a deploy and a wait, and can be wrong itself. Read what exists first, hop by hop, and build a probe only for a cause the records cannot settle.
+- A problem in production has already been recorded: request traces, job timestamps, slow logs, error stacks, change logs and commit history hold most answers before anything new is built. A probe built for the first guessed cause measures that guess and nothing else, takes a deploy and a wait, and can be wrong itself. Read what exists first, hop by hop, and build a probe only for a cause the records cannot settle.
 
 #### Procedure
 

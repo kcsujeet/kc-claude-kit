@@ -48,7 +48,7 @@ Orchestrate one gate agent per convention topic over a diff and report one PASSE
 7. Phase 2, later round: `verify-gate-blocks.sh`'s block is the verification record; no agent.
 8. A gate agent type that does not exist: dispatch `general-purpose` told to invoke `kc-conventions:kc-<topic>` first and follow the same contract; report the fallback. A topic skill that cannot load makes the gate FAIL.
 
-Every gate returns `GATE:`, `STATUS: PASS | PASS (N/A) | FAIL`, `BOXES:` (one `[PASS|FAIL|N/A] <box id>: <evidence>` each) and `FINDINGS:`. Optional inputs for a caller that fixes (`FIX:` lines, `EDIT` blocks, mutation output): "### Step 3: the gate-agent contract" in detail.md.
+- Every gate returns `GATE:`, `STATUS: PASS | PASS (N/A) | FAIL`, `BOXES:` (one `[PASS|FAIL|N/A] <box id>: <evidence>` each) and `FINDINGS:`. Optional inputs for a caller that fixes (`FIX:` lines, `EDIT` blocks, mutation output): "### Step 3: the gate-agent contract" in detail.md.
 
 ## Step 3: verify every finding
 
@@ -91,7 +91,7 @@ Every gate returns `GATE:`, `STATUS: PASS | PASS (N/A) | FAIL`, `BOXES:` (one `[
 **Overall:** <one sentence; if FAILED, what must change>.
 ```
 
-The Gate status table is mandatory. Report ✅ PASSED with one line when the whole PR is clean.
+- The Gate status table is mandatory. Report ✅ PASSED with one line when the whole PR is clean.
 
 ## Rules that hold in every step
 
@@ -109,7 +109,7 @@ The Gate status table is mandatory. Report ✅ PASSED with one line when the who
 
 ## Checklist
 
-Tick each box, then say PASS, FAIL (file:line) or N/A (why).
+- [ ] Tick each box, then say PASS, FAIL (file:line) or N/A (why).
 
 - [ ] §G1 Not stacked: `scope-facts.sh` listed the author's other open PRs; a 30+ file diff or another branch's commits stops the review and suggests a rebase. (N/A: local diff, no other PR)
 - [ ] §G2 The diff does only what its title and description say; out-of-scope work is one finding asking to split the PR. (N/A: never)
@@ -122,4 +122,4 @@ Tick each box, then say PASS, FAIL (file:line) or N/A (why).
 - [ ] §G9 The PR description is short and readable: what changed and why, how to test, evidence; no process notes, no word counts, no restating the diff. (N/A: never)
 - [ ] §G10 Screenshots and any video are in the PR description, uploaded with `gh pr create --attach <file>` or `gh pr edit <n> --attach <file>`; `gh --version` checked first. (N/A: no visual change)
 
-Full wording of each box, and the hard rules, output examples and iteration notes: `references/detail.md`.
+- Full wording of each box, and the hard rules, output examples and iteration notes: `references/detail.md`.

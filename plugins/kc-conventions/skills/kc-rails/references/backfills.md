@@ -2,7 +2,7 @@
 
 Read in full by the rails gate when the diff changes an `enum` member, a status, reason, type or kind constant, a column's meaning or type, or writes a backfill. Failing any box here fails §RL6.
 
-**Trigger sweep:** grep the added lines for `enum :`, changed constants, `update_all`, `update_columns`, `in_batches`, `execute`, `UPDATE`, and every file under `db/migrate/` and the app's task folder.
+- **Trigger sweep:** grep the added lines for `enum :`, changed constants, `update_all`, `update_columns`, `in_batches`, `execute`, `UPDATE`, and every file under `db/migrate/` and the app's task folder.
 
 ## Checklist
 
@@ -22,8 +22,8 @@ Read in full by the rails gate when the diff changes an `enum` member, a status,
 
 ## Why
 
-A retired value is usually overloaded. A status set by three code paths for three reasons, mapped onto a new name derived from the one path being edited, puts a confident false label on rows from the other two. Ask what the old value proved, not what the new one is called; the check has to start from a grep of every write site.
+- A retired value is usually overloaded. A status set by three code paths for three reasons, mapped onto a new name derived from the one path being edited, puts a confident false label on rows from the other two. Ask what the old value proved, not what the new one is called; the check has to start from a grep of every write site.
 
-A backfill inside a migration holds row locks on every matched row for one transaction and blocks the deploy while it runs. A batched task throttles, resumes and runs on someone's schedule. A data backfill is not DDL; its risk is long-held row locks, and its mitigation is batching.
+- A backfill inside a migration holds row locks on every matched row for one transaction and blocks the deploy while it runs. A batched task throttles, resumes and runs on someone's schedule. A data backfill is not DDL; its risk is long-held row locks, and its mitigation is batching.
 
-A backfill that guesses a row's meaning from its stored value is only as good as its list of writers. A timestamp at exactly midnight UTC may mean "a picked date" from one writer and "an event ending at 4 PM in Vancouver" from another. Count disagreements rather than the size of the ambiguous bucket, and score any rule tweak on the real rows before trusting it.
+- A backfill that guesses a row's meaning from its stored value is only as good as its list of writers. A timestamp at exactly midnight UTC may mean "a picked date" from one writer and "an event ending at 4 PM in Vancouver" from another. Count disagreements rather than the size of the ambiguous bucket, and score any rule tweak on the real rows before trusting it.

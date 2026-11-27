@@ -24,7 +24,7 @@ Between "assess" and "build" in `kc-conventions:kc-do-a-task`. Code can be right
 trivial: no new storage, no new unit, no behaviour move: fixes the rounding of one displayed total
 ```
 
-`guard-shape.sh` denies an edit or write (Edit, Write, MultiEdit, a shell redirect, `sed -i`, `tee`, `cp`, `mv`, a REPL `write(` or `edit(` call) to a non-test source file on a branch whose shape file is missing or fails `check-shape.sh`. The default branch, a detached head, test files and non-source files are never blocked.
+- `guard-shape.sh` denies an edit or write (Edit, Write, MultiEdit, a shell redirect, `sed -i`, `tee`, `cp`, `mv`, a REPL `write(` or `edit(` call) to a non-test source file on a branch whose shape file is missing or fails `check-shape.sh`. The default branch, a detached head, test files and non-source files are never blocked.
 
 ## The shape file
 
@@ -50,7 +50,7 @@ trivial: no new storage, no new unit, no behaviour move: fixes the rounding of o
 
 ## Gate checklist
 
-The shape file's boxes, in order; `check-shape.sh` grades them and `guard-shape.sh` holds source edits until the file passes. (N/A for all: the change adds no source code)
+- The shape file's boxes, in order; `check-shape.sh` grades them and `guard-shape.sh` holds source edits until the file passes. (N/A for all: the change adds no source code)
 
 - [ ] §SH1 Requirement: what the change must do, in the person's terms.
 - [ ] §SH2 Facts: where each fact lives, its source of truth, stored as itself or derived, and why.
@@ -63,7 +63,7 @@ The shape file's boxes, in order; `check-shape.sh` grades them and `guard-shape.
 
 ## Approach checklist
 
-Asked before writing or reviewing any code, with or without a shape file. (N/A: the change adds no source code)
+- Asked before writing or reviewing any code, with or without a shape file. (N/A: the change adds no source code)
 
 - [ ] §SH9 Asked whether this is the best and simplest way, assuming a simpler one exists: one mechanism instead of two, an existing tool, doing less.
 - [ ] §SH10 Sketched one other shape and compared it first: better in a way the person would care about, tell them with its cost; changes the ask, the choice is theirs.

@@ -11,18 +11,18 @@ This is the kit's per-repo extension point. Every other gate ships fixed rules; 
 
 ## Inputs
 
-The dispatch prompt gives you:
+- The dispatch prompt gives you:
 
 - the head SHA of the change under review;
 - the path to a saved unified diff file;
 - the changed-file list;
 - the target repo root.
 
-If the working tree is not at the head SHA, read files with `git -C <repo-root> show <sha>:<path>` rather than from disk. Every finding cites `path:line@<short-sha>` in the source file at the head SHA, never a line number inside the saved diff file.
+- If the working tree is not at the head SHA, read files with `git -C <repo-root> show <sha>:<path>` rather than from disk. Every finding cites `path:line@<short-sha>` in the source file at the head SHA, never a line number inside the saved diff file.
 
 ## Purpose
 
-Look for `.claude/review-conventions.md` at the target repo root (at the head SHA).
+- [ ] Look for `.claude/review-conventions.md` at the target repo root (at the head SHA).
 
 - **Present:** every rule in it becomes a gate box, walked exactly like a built-in rule.
 - **Absent:** the gate is `PASS (N/A: no .claude/review-conventions.md in target repo)`. State plainly that the file was looked for and not found; don't invent conventions for a repo that hasn't written any down.
@@ -44,7 +44,7 @@ Look for `.claude/review-conventions.md` at the target repo root (at the head SH
 
 ## Output
 
-Return ONLY this block, with nothing before or after it:
+- [ ] Return ONLY this block, with nothing before or after it:
 
 ```
 GATE: project-conventions
@@ -55,4 +55,4 @@ FINDINGS:
 - <severity 🔴|🟠|🟡> <file>:<line>: <issue>. <fix>
 ```
 
-The repo-derived boxes use the repo's own ids. A box is **FAIL** if ANY matching construct in the diff violates it; the gate STATUS is **FAIL** if ANY box is FAIL. A gate PASSES only when it found nothing; a PASS that also lists a finding means FAIL. A finding you cannot back with evidence from the code or docs is dropped rather than softened into a "maybe", while a confirmed rule violation is always reported unsoftened, and "intentional", "defensible", "matches the neighbors" or "low-value" is never a reason to withhold it. Write no em dash (U+2014) anywhere in the block; use a period, comma, colon or parentheses instead. Never post anything to GitHub.
+- The repo-derived boxes use the repo's own ids. A box is **FAIL** if ANY matching construct in the diff violates it; the gate STATUS is **FAIL** if ANY box is FAIL. A gate PASSES only when it found nothing; a PASS that also lists a finding means FAIL. A finding you cannot back with evidence from the code or docs is dropped rather than softened into a "maybe", while a confirmed rule violation is always reported unsoftened, and "intentional", "defensible", "matches the neighbors" or "low-value" is never a reason to withhold it. Write no em dash (U+2014) anywhere in the block; use a period, comma, colon or parentheses instead. Never post anything to GitHub.

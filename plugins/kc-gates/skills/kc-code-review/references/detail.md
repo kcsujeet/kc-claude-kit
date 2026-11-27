@@ -2,9 +2,9 @@
 
 The full text of `SKILL.md` before it was cut to steps, moved verbatim (`## ` headings are now `### `). Read the section a step or box points to.
 
-This skill reviews a diff against a fixed set of quality gates, plus any repo-specific conventions the target project declares for itself. It is the orchestrator: it gathers the diff, checks scope, dispatches the gate agents, and aggregates their verdicts. The rules each gate grades against live in the `kc-conventions` plugin's topic skills; the gates themselves are this plugin's agents.
+- This skill reviews a diff against a fixed set of quality gates, plus any repo-specific conventions the target project declares for itself. It is the orchestrator: it gathers the diff, checks scope, dispatches the gate agents, and aggregates their verdicts. The rules each gate grades against live in the `kc-conventions` plugin's topic skills; the gates themselves are this plugin's agents.
 
-The correctness gate hunts bugs on every diff. The other gates catch what slips through a regular review: convention drift, code placed in the wrong layer, duplicated logic that already exists somewhere else, and code that takes three readings to understand.
+- The correctness gate hunts bugs on every diff. The other gates catch what slips through a regular review: convention drift, code placed in the wrong layer, duplicated logic that already exists somewhere else, and code that takes three readings to understand.
 
 ### Hard rules
 
@@ -45,13 +45,13 @@ The correctness gate hunts bugs on every diff. The other gates catch what slips 
 
 ### Workflow: agent-driven gates
 
-The review is NOT a single inline pass. It is a fan-out of independent **gate agents**, one per convention topic, aggregated into a single PASS/FAIL verdict. The fan-out runs **every time the skill is invoked**, a re-review included, and there is no "I already looked at this" shortcut for code a gate has not read. What a re-review reads is the code that is new: the commits the author pushed since the head reviewed last time (Step 1 gathers that delta on its own), with `select-gates.sh` run on that delta, so a gate the new commits don't need isn't dispatched. Reading the whole pull request again spends a full review to re-judge lines that already had one, and a second sampling of old lines finds things by chance, which sends the author a new list each round. A fix that brings a new violation is in the delta, so the gates still see it. The whole diff is reviewed again only when the delta can't be made (the author rebased). A re-review is for someone else's new push; your own fixes in `kc-ready-for-review` get no round (see "A round reviews one version of the code").
+- The review is NOT a single inline pass. It is a fan-out of independent **gate agents**, one per convention topic, aggregated into a single PASS/FAIL verdict. The fan-out runs **every time the skill is invoked**, a re-review included, and there is no "I already looked at this" shortcut for code a gate has not read. What a re-review reads is the code that is new: the commits the author pushed since the head reviewed last time (Step 1 gathers that delta on its own), with `select-gates.sh` run on that delta, so a gate the new commits don't need isn't dispatched. Reading the whole pull request again spends a full review to re-judge lines that already had one, and a second sampling of old lines finds things by chance, which sends the author a new list each round. A fix that brings a new violation is in the delta, so the gates still see it. The whole diff is reviewed again only when the delta can't be made (the author rebased). A re-review is for someone else's new push; your own fixes in `kc-ready-for-review` get no round (see "A round reviews one version of the code").
 
-**Why agents instead of inline:** an inline reviewer silently skips checklist items ("low-value", "matches the neighbors", "no new keys"); this has been the repeated failure mode. A dedicated agent that owns exactly one topic and must return a per-box PASS/FAIL verdict has no other job to crowd it out, so it cannot quietly drop a box.
+- **Why agents instead of inline:** an inline reviewer silently skips checklist items ("low-value", "matches the neighbors", "no new keys"); this has been the repeated failure mode. A dedicated agent that owns exactly one topic and must return a per-box PASS/FAIL verdict has no other job to crowd it out, so it cannot quietly drop a box.
 
 ### Step 1: gather context (you, the orchestrator)
 
-Run the bundled scripts from the target repo's working directory; each prints what it gathered, so read its output rather than re-deriving it.
+- [ ] Run the bundled scripts from the target repo's working directory; each prints what it gathered, so read its output rather than re-deriving it.
 
 - **Diff, head SHA, changed files:** `bash "${CLAUDE_PLUGIN_ROOT}/scripts/gather-review.sh" <num>` for a PR, or `bash "${CLAUDE_PLUGIN_ROOT}/scripts/gather-review.sh" --branch [<base>]` for a local branch (base: `origin/HEAD`, then `main`, then `master`). It saves `review.diff` and `changed-files.txt` under `${TMPDIR:-/tmp}/kc-review-<sha>/` and prints `meta.env`: `HEAD_SHA`, `BASE`, `TITLE`, `DIFF_FILE`, `CHANGED_FILES`, and `PR` in PR mode. Branch mode adds `BASE_STALE=` when a local base is behind its upstream, so the diff holds merged work: gather again with the `--branch` ref it names. Every gate gets `DIFF_FILE` and `HEAD_SHA` from it; the sweep scripts run against `DIFF_FILE`.
 - **Head checkout:** when `meta.env` has a `FETCH=` line, the working tree is not on the head commit. Run that command so the gate agents can read files at the exact head SHA via `git show <sha>:<path>`.
@@ -66,9 +66,9 @@ Run the bundled scripts from the target repo's working directory; each prints wh
 
 - **Uses of what changed:** `bash "${CLAUDE_PLUGIN_ROOT}/scripts/trace-uses.sh" "$DIFF_FILE" > <review-dir>/uses.txt`, from the target repo's root with the head checked out, and `--also <dir>` for a sibling repo the change reaches (an API and the frontend that calls it) when the user names one or its checkout sits beside this one. It lists each function, hook, component, helper, service, field, prop, route or column the diff changes, every use of it across the repo (and the sibling), in files the diff never touches, and the tests that cover those uses. Run those tests when the checkout can run them (unit specs, not an end-to-end suite), and give the correctness gate the list and the results; when it can't, say so in the report. A change's damage usually lands in a file that uses the changed thing, not beside the change, and a gate that searches for those uses finds some; one handed the list judges them all.
 
-If a script fails, relay its message; fall back to the equivalent `gh`/`git` command by hand only when the script itself is unavailable, and say so in the report.
+- If a script fails, relay its message; fall back to the equivalent `gh`/`git` command by hand only when the script itself is unavailable, and say so in the report.
 
-**Scope checks (you, before the fan-out).** These are about the target as a whole, so no single gate owns them. Walk each box yourself and record the result as a `SCOPE:` block in the same `BOXES:` shape the gate agents return (Step 3); the verification gate audits it (its §V7). A scope finding goes into the report like any gate finding and fails the review the same way.
+- **Scope checks (you, before the fan-out).** These are about the target as a whole, so no single gate owns them. Walk each box yourself and record the result as a `SCOPE:` block in the same `BOXES:` shape the gate agents return (Step 3); the verification gate audits it (its §V7). A scope finding goes into the report like any gate finding and fails the review the same way.
 
 - [ ] §G1 The target is not stacked: the author's other open PRs were listed (`scope-facts.sh`), and when the diff is large (30+ files) or the PR's base or commits belong to another open branch (compare its head, base and commit count with the listed PRs), the review stops and reports the stacking before any line-level finding, suggesting a rebase onto the default branch. A stacked diff cannot be reviewed in isolation. (N/A: local diff, or the author has no other open PR)
 - [ ] §G2 The diff does only what its title and description say. Out-of-scope work (an unrelated refactor, removed public surface, a new abstraction, a bundled feature or option) is one finding asking to split the PR, naming which commits belong in which PR; it is not reviewed silently as if it were in scope. On a re-review the box is checked again against the commits added since the last round: work that arrived between rounds is scoped like a new pull request before any of it is reviewed. (N/A: never; every target has a stated purpose, even if it is only a branch name)
@@ -83,15 +83,15 @@ If a script fails, relay its message; fall back to the equivalent `gh`/`git` com
 
 ### Step 2: dispatch the gate agents in two phases (mandatory: every gate the diff needs, EVERY round)
 
-First decide which phase-1 gates this diff needs, by script, never by judgment: `bash "${CLAUDE_PLUGIN_ROOT}/scripts/select-gates.sh" "$DIFF_FILE" "$CHANGED_FILES"`, from the target repo's root. It prints `GATES=` (the gates to dispatch) and one line per gate saying why it runs or why it is N/A, then `WALK=required` or `WALK=not-required` with its reason (see the hard rule on the walk), read from the changed files and the added lines (a React gate only when the diff has `.jsx`/`.tsx` files or a changed module imports React, a Rails gate only for Ruby, rake, Gemfile or `db/` files, and so on).
+- First decide which phase-1 gates this diff needs, by script, never by judgment: `bash "${CLAUDE_PLUGIN_ROOT}/scripts/select-gates.sh" "$DIFF_FILE" "$CHANGED_FILES"`, from the target repo's root. It prints `GATES=` (the gates to dispatch) and one line per gate saying why it runs or why it is N/A, then `WALK=required` or `WALK=not-required` with its reason (see the hard rule on the walk), read from the changed files and the added lines (a React gate only when the diff has `.jsx`/`.tsx` files or a changed module imports React, a Rails gate only for Ruby, rake, Gemfile or `db/` files, and so on).
 
-On a later round of `kc-ready-for-review` (the delta of your own fixes), run it with `--later-round`: the always-run gates then follow the delta. A delta of test files only runs testing (the code under test did not change, and testing owns whether an assertion is exact); a delta whose every changed line is a rename (`rename-only-lines.sh`) runs naming; any other delta runs the same gates as round 1. Round 1 and a teammate's re-review run it without the flag.
+- On a later round of `kc-ready-for-review` (the delta of your own fixes), run it with `--later-round`: the always-run gates then follow the delta. A delta of test files only runs testing (the code under test did not change, and testing owns whether an assertion is exact); a delta whose every changed line is a rename (`rename-only-lines.sh`) runs naming; any other delta runs the same gates as round 1. Round 1 and a teammate's re-review run it without the flag.
 
-Dispatch each listed gate with the Agent tool, `subagent_type` set to the agent name below. Phase 1 runs in parallel: issue every listed gate's Agent call in a single message. Phase 2 (verification) runs only after every phase-1 agent has returned, because it audits their returned verdict blocks rather than re-deriving findings.
+- [ ] Dispatch each listed gate with the Agent tool, `subagent_type` set to the agent name below. Phase 1 runs in parallel: issue every listed gate's Agent call in a single message. Phase 2 (verification) runs only after every phase-1 agent has returned, because it audits their returned verdict blocks rather than re-deriving findings.
 
-Each topic gate preloads its `kc-conventions:kc-<topic>` skill, so it already holds that topic's `## Review checklist` and `## Sweeps`; its `references/detail.md` holds the examples and edge cases per box, and the gate reads it. You do not paste rules into the prompt.
+- Each topic gate preloads its `kc-conventions:kc-<topic>` skill, so it already holds that topic's `## Review checklist` and `## Sweeps`; its `references/detail.md` holds the examples and edge cases per box, and the gate reads it. You do not paste rules into the prompt.
 
-**Phase 1: dispatch the gates `GATES=` lists, in parallel.**
+- **Phase 1: dispatch the gates `GATES=` lists, in parallel.**
 
 | Gate | Agent (`subagent_type`) | Dispatch note |
 |------|-------------------------|---------------|
@@ -108,30 +108,30 @@ Each topic gate preloads its `kc-conventions:kc-<topic>` skill, so it already ho
 | security | `kc-gates:security-gate` | when a controller, route, API or route handler, middleware or auth, session, token or webhook file changed, or an added line reads request input or declares a handler |
 | project-conventions | `kc-gates:project-conventions-gate` | when the target repo has `.claude/review-conventions.md` |
 
-**Phase 2: dispatch only after every phase-1 agent has returned.**
+- **Phase 2: dispatch only after every phase-1 agent has returned.**
 
 | Gate | Agent (`subagent_type`) | Dispatch note |
 |------|-------------------------|---------------|
 | verification | script first, then `kc-gates:verification-gate` | run `bash "${CLAUDE_PLUGIN_ROOT}/scripts/verify-gate-blocks.sh" [--later-round] <round-dir> <repo-root>` on the saved verdicts, and `bash "${CLAUDE_PLUGIN_ROOT}/scripts/verify-gate-receipts.sh" <round-dir>` (the headline receipt of each trigger group the diff hits): they list one line per mechanical problem (citations that don't resolve at the head, a sweep's hits without a verdict each, a box contradicting its own verdict, a STATUS its boxes contradict, a missing gate or `SCOPE:` block) and you fix those first. Its passing output is a verification block. In a **later round** that block is the verification record: no agent. In round 1 the agent still runs, for what a script can't judge (cited library claims, defended findings, re-review origins), with both scripts' output, `select-gates.sh`'s output, every phase-1 block verbatim (a summary drops the sweep counts it audits), your `SCOPE:` block and your classification of carried-over findings |
 
-Dispatch exactly the gates `GATES=` lists: never leave a listed gate out because it looks inapplicable, and never add or drop one by judgment. A gate the script leaves out is reported ⚪ N/A in the gate table with the script's reason, and the verification gate audits it from that line. A listed gate whose rules turn out not to apply once it reads the diff still returns `PASS (N/A)` **with the reason**; that verdict is the gate agent's, never an assumption you make on its behalf. When a review covers several diffs at once (a backend and a frontend PR, a stack), each diff gets its own `select-gates.sh` run, and one agent per gate can grade every diff that lists it, returning one block per diff.
+- [ ] Dispatch exactly the gates `GATES=` lists: never leave a listed gate out because it looks inapplicable, and never add or drop one by judgment. A gate the script leaves out is reported ⚪ N/A in the gate table with the script's reason, and the verification gate audits it from that line. A listed gate whose rules turn out not to apply once it reads the diff still returns `PASS (N/A)` **with the reason**; that verdict is the gate agent's, never an assumption you make on its behalf. When a review covers several diffs at once (a backend and a frontend PR, a stack), each diff gets its own `select-gates.sh` run, and one agent per gate can grade every diff that lists it, returning one block per diff.
 
-The `project-conventions` gate is how this skill stays repo-agnostic while still enforcing house rules: it reads the target repo's own `.claude/review-conventions.md` (if one exists) and grades the diff against whatever that file declares. A repo with no such file is legitimately N/A; it is not this skill's job to invent conventions for a repo that hasn't written any down. When a repo rule contradicts a built-in convention, the repo rule wins for that repo: the gate lists the override (its §X3), and you report the built-in box as overridden, citing the repo rule, instead of failing it.
+- The `project-conventions` gate is how this skill stays repo-agnostic while still enforcing house rules: it reads the target repo's own `.claude/review-conventions.md` (if one exists) and grades the diff against whatever that file declares. A repo with no such file is legitimately N/A; it is not this skill's job to invent conventions for a repo that hasn't written any down. When a repo rule contradicts a built-in convention, the repo rule wins for that repo: the gate lists the override (its §X3), and you report the built-in box as overridden, citing the repo rule, instead of failing it.
 
-**Fallback when a gate agent is unavailable.** If an Agent call fails because the `kc-gates:<gate>` agent type does not exist (for example, the `kc-conventions` dependency failed to load, or the plugin's agents are not registered), dispatch a `general-purpose` agent for that gate instead. Tell it to invoke the `kc-conventions:kc-<topic>` skill with the Skill tool first, then follow the gate-agent contract in Step 3 exactly, returning the same verdict block. For project-conventions or verification, tell it to read `${CLAUDE_PLUGIN_ROOT}/agents/<gate>.md` and follow it. If the `kc-conventions:kc-<topic>` skill cannot be invoked either, the gate is FAIL with the evidence "topic skill unavailable"; never grade a topic from memory. Report every fallback in the output (see Output format).
+- **Fallback when a gate agent is unavailable.** If an Agent call fails because the `kc-gates:<gate>` agent type does not exist (for example, the `kc-conventions` dependency failed to load, or the plugin's agents are not registered), dispatch a `general-purpose` agent for that gate instead. Tell it to invoke the `kc-conventions:kc-<topic>` skill with the Skill tool first, then follow the gate-agent contract in Step 3 exactly, returning the same verdict block. For project-conventions or verification, tell it to read `${CLAUDE_PLUGIN_ROOT}/agents/<gate>.md` and follow it. If the `kc-conventions:kc-<topic>` skill cannot be invoked either, the gate is FAIL with the evidence "topic skill unavailable"; never grade a topic from memory. Report every fallback in the output (see Output format).
 
 ### Step 3: the gate-agent contract
 
-The agents carry this contract in their own definitions; the dispatch prompt supplies the inputs. Give each phase-1 agent:
+- The agents carry this contract in their own definitions; the dispatch prompt supplies the inputs. Give each phase-1 agent:
 
 - the head SHA (`HEAD_SHA` from `meta.env`);
 - the path to the saved unified diff file (`DIFF_FILE` from `meta.env`);
 - the changed-file list (`CHANGED_FILES` from `meta.env`);
 - the target repo root.
 
-**Context you add** (what the author already settled) informs the gate; it never narrows what the gate checks in the diff it was given. On a re-review that diff is the delta, and each gate still reads the changed files whole at the head, so new code is judged against the old code it touches. Settled means a design stays, not that it works: the prompt still has each gate walk every input that design handles. A brief that called a text-matching swap "accepted; review its correctness" and listed only the round's fix had every gate check that fix, while inputs the design never handled went unchecked for three rounds.
+- **Context you add** (what the author already settled) informs the gate; it never narrows what the gate checks in the diff it was given. On a re-review that diff is the delta, and each gate still reads the changed files whole at the head, so new code is judged against the old code it touches. Settled means a design stays, not that it works: the prompt still has each gate walk every input that design handles. A brief that called a text-matching swap "accepted; review its correctness" and listed only the round's fix had every gate check that fix, while inputs the design never handled went unchecked for three rounds.
 
-**Optional inputs**, for a caller that acts on the findings itself (`kc-ready-for-review` passes them; a review on request passes none, and its findings stay one line each). The chat report still shows each finding as one line.
+- **Optional inputs**, for a caller that acts on the findings itself (`kc-ready-for-review` passes them; a review on request passes none, and its findings stay one line each). The chat report still shows each finding as one line.
 
 - **Fixes.** Under each finding's line, unindented, `FIX: <what must be true after the fix, and every place it must hold>`: the behaviour expected, not the code. One writer, the caller, writes the code, having read every finding; code a gate writes for one finding is written blind to the others and to the uses of what it changes. The one exception is a mechanical fix (a rename, a deleted or moved line), given as edits that apply as written, each SEARCH block copied exactly from the file at the head SHA and found once in it, replacing at most two lines:
 
@@ -149,7 +149,7 @@ The agents carry this contract in their own definitions; the dispatch prompt sup
 
 - **Uses**, on every review, for the correctness gate: the `uses.txt` Step 1 saved and the results of the tests it lists. The gate gives each listed use one verdict (correctness §B8).
 
-Each agent must:
+- Each agent must:
 
 1. Read its topic's `## Review checklist` in full, and its `references/detail.md`.
 2. **Sweep the greppable constructs FIRST, before reading the diff for meaning.** Some boxes cover constructs a script can enumerate exactly, and those boxes are graded on whether the hits were **listed**, not on whether they were noticed. The agent runs every script under its topic's `## Sweeps` against the diff file, then gives every hit a `file:line` verdict in the evidence, with the hit count. `0 hits` must be stated explicitly; a box with no receipt is FAIL by default, because silence is indistinguishable from never having looked.
@@ -167,7 +167,7 @@ Each agent must:
 6. Drop a finding it cannot confirm, never a confirmed one, and write no em dash (U+2014) in the block.
 7. Walk every fix it proposes against every gate's checklist, not only its own, before writing it into a finding, and for a fix that changes behaviour, list each state reaching the line with its result before and after (correctness §B15). It writes code only for a mechanical fix (see Fixes above).
 
-A verdict that does not have this shape, or that has a box with no evidence, is rejected: send it back to the same agent for the per-box `BOXES:` breakdown before aggregating.
+- A verdict that does not have this shape, or that has a box with no evidence, is rejected: send it back to the same agent for the per-box `BOXES:` breakdown before aggregating.
 
 ### Step 4: aggregate into one verdict (you, the orchestrator)
 
@@ -180,15 +180,15 @@ A verdict that does not have this shape, or that has a box with no evidence, is 
 - Emit the gate-status table, the deduped findings, then the `PASSED`/`FAILED` verdict (see Output format).
 - On a re-review, run Steps 1-4 on the delta and fold in the author's replies to your prior comments (Step 1): mark each carried-over item as fixed (verify the whole class), declined-with-reason (surface it, don't re-post over their reply), or still-open. Report the new verdict; do not carry forward a prior round's PASS.
 
-**Self-review trigger:** when *I* am the one implementing changes (not reviewing a teammate's PR), the gate fan-out runs in two cases only: when the user asks for a review, or as part of `kc-gates:kc-ready-for-review`, the one pass before a PR goes to a reviewer, which runs it once, holds the fixes by tests, and then hands what is still open to the user. It does not run after each fix, commit or push, or on uncommitted work before showing it to the person for approval; the fan-out costs too much time and too many tokens for that, and the pass at hand-off runs it again anyway. When it runs, lint and types passing is not the same as gate-clean, and every gate's checklist is walked box by box to a PASS. Separately, UI work is looked at rendered in a browser before I call it done (see the verification gate's self-review group), since tests lay nothing out; on a task headed for a pull request, that walk is the QA step of the hand-off pass, not a second walk while building.
+- **Self-review trigger:** when *I* am the one implementing changes (not reviewing a teammate's PR), the gate fan-out runs in two cases only: when the user asks for a review, or as part of `kc-gates:kc-ready-for-review`, the one pass before a PR goes to a reviewer, which runs it once, holds the fixes by tests, and then hands what is still open to the user. It does not run after each fix, commit or push, or on uncommitted work before showing it to the person for approval; the fan-out costs too much time and too many tokens for that, and the pass at hand-off runs it again anyway. When it runs, lint and types passing is not the same as gate-clean, and every gate's checklist is walked box by box to a PASS. Separately, UI work is looked at rendered in a browser before I call it done (see the verification gate's self-review group), since tests lay nothing out; on a task headed for a pull request, that walk is the QA step of the hand-off pass, not a second walk while building.
 
-**"Matches the existing pattern" is a yellow flag, not a green light.** A gate agent must not pass a box because the diff copied the shape of nearby code. If the surrounding pattern violates the rule, the new code that extends it violates it too. Every copied block, every matched helper, every duplicated key style is evaluated against the rule on its own; nearby precedent is not the evaluation.
+- **"Matches the existing pattern" is a yellow flag, not a green light.** A gate agent must not pass a box because the diff copied the shape of nearby code. If the surrounding pattern violates the rule, the new code that extends it violates it too. Every copied block, every matched helper, every duplicated key style is evaluated against the rule on its own; nearby precedent is not the evaluation.
 
 ### Output format
 
-Report directly in chat. No file output. **Be terse.** The reader is the user, not the PR author; they want to scan, not read prose.
+- [ ] Report directly in chat. No file output. **Be terse.** The reader is the user, not the PR author; they want to scan, not read prose.
 
-**Rules:**
+- **Rules:**
 - One finding = one line. Two short lines max if a fix snippet is genuinely needed.
 - **No explanation paragraphs anywhere in the report**: not under a finding, not under the verdict, not as a preamble to a section. The gate table, the finding line and the fix carry the whole message.
 - Prefix every finding with a severity color so the user can scan weight at a glance: 🔴 must-fix (real bug, regression, security, drift from a stated convention), 🟠 should-address (correctness gap, validation hole, behavior question that needs an answer), 🟡 low (style, naming, nit, cleanup). These emojis are chat-only: never put them in posted PR comment bodies, where the Conventional Comments label (`issue` / `suggestion` / `nitpick`) carries the weight instead.
@@ -197,7 +197,7 @@ Report directly in chat. No file output. **Be terse.** The reader is the user, n
 - Do not repeat the same finding under two gates. Pick the closer fit.
 - Skip an empty section's header.
 
-**Format:**
+- **Format:**
 
 ```
 ### Review: <PR title>
@@ -252,29 +252,29 @@ Report directly in chat. No file output. **Be terse.** The reader is the user, n
 **Overall:** <one short sentence; if FAILED, name what must change for the next round to pass>.
 ```
 
-The verification gate's "How to use this in the output" section, with a full worked Checklist example, is in `${CLAUDE_PLUGIN_ROOT}/agents/verification-gate.md`.
+- The verification gate's "How to use this in the output" section, with a full worked Checklist example, is in `${CLAUDE_PLUGIN_ROOT}/agents/verification-gate.md`.
 
-The **Gate status table is mandatory and follows the §G6 section**: it is the receipt that every gate was checked by its agent this round. A review without the full table (all gates listed, each with PASS / FAIL / N/A) is incomplete. The top-line **Verdict is FAILED if any gate is FAIL**, full stop; do not report PASSED with a failing gate, and do not omit a gate to make the table look clean.
+- The **Gate status table is mandatory and follows the §G6 section**: it is the receipt that every gate was checked by its agent this round. A review without the full table (all gates listed, each with PASS / FAIL / N/A) is incomplete. The top-line **Verdict is FAILED if any gate is FAIL**, full stop; do not report PASSED with a failing gate, and do not omit a gate to make the table look clean.
 
-**Each gate's verdict reflects every box in its checklist, not just the headline rule.** A gate agent reports `PASS` only after walking every box in its topic's `## Review checklist` and citing evidence for each. A vague "naming looks fine" from an agent is a rejected verdict; send it back for the per-box `BOXES:` breakdown.
+- **Each gate's verdict reflects every box in its checklist, not just the headline rule.** A gate agent reports `PASS` only after walking every box in its topic's `## Review checklist` and citing evidence for each. A vague "naming looks fine" from an agent is a rejected verdict; send it back for the per-box `BOXES:` breakdown.
 
-**Examples of good vs bad findings:**
+- **Examples of good vs bad findings:**
 
-Bad (too wordy, paragraph-shaped):
+- Bad (too wordy, paragraph-shaped):
 > 1. **Opaque local names: `current` / `prev`** (`Widget.tsx:63-66`)
 >    In this function, `current` is "the new item" and `prev` is "the previously removed item." A reader has to trace through the logic to figure that out. Suggested: `newItem` / `previouslyRemovedItem`.
 
-Good (single line, fix in-place):
+- Good (single line, fix in-place):
 > - `Widget.tsx:63,66`: `current` / `prev` are opaque. Rename `newItem` / `previouslyRemovedItem`.
 
-Bad:
+- Bad:
 > 4. **Magic spread + override + default mix** (`Widget.tsx:72-77`)
 >    Three different things happening in one literal: spread, override, default. Reads cleaner as a named helper: ...
 
-Good:
+- Good:
 > - `Widget.tsx:72-77`: Spread + override + default in one literal. Extract a named `revivedItem`.
 
-If the whole PR looks clean, one line:
+- If the whole PR looks clean, one line:
 
 ```
 ### Review: <PR title>
@@ -285,7 +285,7 @@ If the whole PR looks clean, one line:
 
 ### Drafting and posting PR comments
 
-This skill does not draft or post PR comments. To turn findings into comments, or to post them, the user runs `/kc-gates:kc-post-review`, which carries the Conventional Comments format, the draft audits, and the explicit post-signal protocol.
+- This skill does not draft or post PR comments. To turn findings into comments, or to post them, the user runs `/kc-gates:kc-post-review`, which carries the Conventional Comments format, the draft audits, and the explicit post-signal protocol.
 
 ### What this skill is not
 
@@ -294,7 +294,7 @@ This skill does not draft or post PR comments. To turn findings into comments, o
 
 ### Notes for iteration
 
-This skill is in active iteration. When the user gives feedback ("you missed X", "you flagged a non-issue Y", "we have a convention for Z"):
+- This skill is in active iteration. When the user gives feedback ("you missed X", "you flagged a non-issue Y", "we have a convention for Z"):
 
 1. Identify which file the feedback belongs in. **Topic feedback goes to the `kc-conventions` plugin, never to kc-gates:**
    - Identifier naming → `plugins/kc-conventions/skills/kc-naming/SKILL.md`
@@ -324,9 +324,9 @@ This skill is in active iteration. When the user gives feedback ("you missed X",
 
 4. **Inline code examples must use generic names AND a generic shape, not specific identifiers OR the specific operation from the case that triggered the update.** Use placeholders like `flagA`, `flagB`, `mode`, `valueByMode`, `someBoolean`, `predicateA`, not identifiers lifted from the current task. Just as important: do not frame the rule around the *operation* that happened to trip it. If a multi-line ternary with a `.filter()` branch triggers the rule, the rule is "multi-line/non-trivial-branch ternaries," NOT "ternaries with `.filter()`"; the branch could be anything. Naming the trigger operation in the rule narrows a general rule to one instance and is exactly how the next instance slips through. State the shape/principle; treat the operation as incidental.
 
-4.5. **Express every rule as a checklist of independent failure modes.** When adding or refining a rule, break it into discrete boxes a reviewer can tick one by one. Failing any single box is a finding (see the Hard Rules). A rule written as one prose blob invites "eh, close enough"; a checklist forces a yes/no per failure mode.
+- 4.5. **Express every rule as a checklist of independent failure modes.** When adding or refining a rule, break it into discrete boxes a reviewer can tick one by one. Failing any single box is a finding (see the Hard Rules). A rule written as one prose blob invites "eh, close enough"; a checklist forces a yes/no per failure mode.
 
-4b. **Every topic skill with a gate MUST carry a `## Review checklist` block, and every new rule MUST add a box to it.** The gate agents read that block to know what to tick, so a rule that lives only in prose is invisible to its gate. When you add or change a rule, update that skill's `## Review checklist` in the same edit: one box per independent failure mode, each box self-contained enough that an agent can mark it PASS / FAIL / N/A against a diff. A box must state its own N/A condition (e.g. "or N/A: no form schema in diff") so the agent never has to guess whether a silent gate means pass or skip.
+- 4b. **Every topic skill with a gate MUST carry a `## Review checklist` block, and every new rule MUST add a box to it.** The gate agents read that block to know what to tick, so a rule that lives only in prose is invisible to its gate. When you add or change a rule, update that skill's `## Review checklist` in the same edit: one box per independent failure mode, each box self-contained enough that an agent can mark it PASS / FAIL / N/A against a diff. A box must state its own N/A condition (e.g. "or N/A: no form schema in diff") so the agent never has to guess whether a silent gate means pass or skip.
 
 5. Keep `SKILL.md` lean. If a section grows beyond a few paragraphs, move it to the agent or topic skill that owns it and replace it with a one-line summary plus pointer.
 
