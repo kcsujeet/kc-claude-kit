@@ -45,7 +45,7 @@ box_has kc-testing §T4 'A render or mount of the same component .* in 2\+ tests
 grep -qE '^- \[ \] §T4 .*repeated-render\.sh' "$testing" || fail "§T4 box must name the repeated-render.sh sweep"
 grep -q 'bash "${CLAUDE_PLUGIN_ROOT}/skills/kc-testing/scripts/repeated-render.sh"' "$testing" || fail "repeated-render.sh not wired into the testing Sweeps"
 
-post_review="$plugin_dir/../kc-gates/skills/kc-post-review/SKILL.md"
+post_review="$plugin_dir/../kc-gates/skills/kc-post-review/references/detail.md"
 grep -q 'a fixed label is a plain key' "$post_review" || fail "kc-post-review translation example must carry the plain-label why"
 grep -q 'countable nouns are ICU plurals' "$post_review" && fail "kc-post-review must not say countable nouns are ICU plurals"
 

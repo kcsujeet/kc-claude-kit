@@ -11,7 +11,7 @@
 # `held-by: <path>`, each a test script or eval file the change adds lines to. So no lesson is
 # merged as prose with nothing a machine runs behind it.
 #
-# CLAUDE.md's Lessons step 4 asks for that proof; a skip has to be stated here, so the reviewer
+# CLAUDE.md's Lessons step 5 asks for that proof; a skip has to be stated here, so the reviewer
 # reads the reason.
 #
 # Usage: scripts/check-lesson-proof.sh <base-ref> [--body-file <file>]

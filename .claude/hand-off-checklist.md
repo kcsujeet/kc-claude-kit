@@ -30,11 +30,11 @@ Read by `kc-gates:kc-ready-for-review` before a pull request here is opened or m
 
 - [ ] Each changed plugin's `plugin.json` version is raised by the level `CLAUDE.md`'s Versions section gives: a patch for a new or changed rule, box, example or fix; a minor only for a new skill, agent, hook or command; a major only for a rename or removal. CI's `version-bumps` job checks that it went up, not the level.
 - [ ] `CHANGELOG.md` has the entry, with the same version.
-- [ ] A rule added to a topic skill has a box on that skill's review checklist, and `rules/` was regenerated.
+- [ ] A rule added to a topic skill has a box on that skill's review checklist, and the box is one line of at most 220 characters.
 
 ## It is proven
 
-- [ ] A lesson that changes what a review gate catches adds a seeded file and a grader to that gate's `<gate>-boxes` fixture (a QA-skill lesson, its own case) per `CLAUDE.md` Lessons step 4, run once before merging, and the PR says whether it passed. A wording-only change adds none.
+- [ ] A lesson that changes what a review gate catches adds a seeded file and a grader to that gate's `<gate>-boxes` fixture (a QA-skill lesson, its own case) per `CLAUDE.md` Lessons step 5, run once before merging, and the PR says whether it passed. A wording-only change adds none.
 - [ ] Each part of the lesson a script can decide (a draft check, a sweep, a mutant, a hook) is a script with a test, every new branch broken once to see a test fail. A PR whose rule edits have no box carries `wording-only: <why>` in its description, and when the rule files grow, a `held-by: <path>` line for each test or eval file that holds the new text (CI's `check-lesson-proof.sh` checks the lines and that each file gains lines in the PR, not that the why is true).
 - [ ] A lesson's eval case fails with the lesson's rule edits taken out (`run-changed-evals.sh` runs it a third time and records it); a case that passes there is rewritten until it shows what the lesson adds, or tagged `guard` and not used as the lesson's proof.
 - [ ] No Stop or SubagentStop hook reminds or blocks: a check goes on the action (PreToolUse that denies it, or `additionalContext` from UserPromptSubmit or PostToolUse), and an end-of-turn hook that must stay is listed in `.claude/stop-hooks-allowed.txt` with why it has to run at the end of a turn and that it records only (`scripts/check-stop-hooks.sh`, run in CI).

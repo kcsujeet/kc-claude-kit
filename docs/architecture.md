@@ -8,7 +8,8 @@ How the kit is laid out and why. Every decision cites the Claude Code documentat
 kc-claude-kit/
 ├── .claude-plugin/marketplace.json      # plugin entries carry no "version"
 ├── .github/workflows/ci.yml             # validate, rules lint, script tests, eval records
-├── scripts/export-agent-skills.sh       # copy every skill into another tool's skills directory
+├── .claude/                             # this repo's hand-off checklist and its end-of-turn hook allowlist
+├── scripts/                             # CI checks (lint-rules, check-box-length, check-always-on, build-gate-agents, check-version-bumps, check-lesson-proof, ...) and their tests; export-agent-skills.sh copies every skill into another tool's skills directory
 ├── docs/architecture.md                 # this file
 ├── CHANGELOG.md
 └── plugins/
@@ -16,24 +17,26 @@ kc-claude-kit/
     │   ├── .claude-plugin/plugin.json      # version lives here only
     │   ├── skills/
     │   │   ├── kc-<topic>/SKILL.md         # one topic = one file: Review checklist + Sweeps (the checklist is used when writing and when reviewing)
+    │   │   ├── kc-<process>/SKILL.md       # a process skill (assess, shape-the-change, look-back, ...): numbered steps, then a Gate checklist
     │   │   ├── kc-<topic>/scripts/*.sh     # that topic's deterministic sweeps
     │   │   ├── kc-<topic>/references/*.md  # detail.md: examples and edge cases per box; other files hold clusters moved out of it
+    │   │   ├── kc-do-a-task/SKILL.md       # the order of work, and the skill that holds each step
     │   │   └── kc-init/SKILL.md            # copies the rules into a project (on request)
     │   ├── rules/                          # hand-written, installed by install-rules.sh
     │   │   ├── kc-conventions.md           # pointer rule: "doing X -> load skill Y", scoped by paths to code and manifests
     │   │   └── kc-always.md                # always loaded: reply rules and pointers to kc-do-a-task, kc-check-claims, kc-delegate, kc-look-back
     │   ├── scripts/install-rules.sh        # what kc-init and the first-prompt hook run: copies rules/, removes stale generated kc-*.md copies, writes the version stamp
     │   ├── tests/                          # sweep and lookup fixtures, their runners, install-rules and mutation-sweep tests
-    │   ├── hooks/                          # first prompt: installs or refreshes ~/.claude/rules, reports a stale project copy; PreToolUse guards (source reads through the shell, forks of a large context, investigation write-ups, source writes with no shape file)
+    │   ├── hooks/                          # first prompt: installs or refreshes ~/.claude/rules and reports a stale project copy; PreToolUse guards for source reads through the shell, forks of a large context, investigation write-ups and source writes with no shape file
     │   └── evals/
     ├── kc-gates/
     │   ├── .claude-plugin/plugin.json      # depends on kc-conventions
     │   ├── skills/
-    │   │   ├── kc-code-review/SKILL.md     # orchestrator: scope, dispatch, aggregate
-    │   │   ├── kc-post-review/             # user-invoked only: drafting and posting comments
-    │   │   └── kc-ready-for-review/SKILL.md # the one pass before a PR goes to a reviewer
-    │   ├── agents/<topic>-gate.md          # one gate agent per topic (generated from ../gate-agent.template.md by scripts/build-gate-agents.sh), plus project-conventions-gate.md and verification-gate.md
-    │   ├── hooks/hooks.json                # hand-off reminder at session start; keeps the marketplace's plugins current and says when the session runs an older kc-gates; blocks unapproved GitHub posts and unreviewed hand-offs; reminds of the look-back after an approval; installs a merged kit change at once; starts each turn with the reply rules and names the last reply's misses (an unchecked claim about instructions, an unchecked account-CLI command, a reply over 180 words); adds a read-first line when the prompt asks where work stands
+    │   │   ├── kc-code-review/             # orchestrator as numbered steps and a checklist; references/ hold the long wording
+    │   │   ├── kc-post-review/             # drafting and posting comments, posted only on the user's signal
+    │   │   └── kc-ready-for-review/        # the one pass before a PR goes to a reviewer
+    │   ├── agents/<topic>-gate.md          # one gate agent per topic (generated from ../gate-agent.template.md by scripts/build-gate-agents.sh), plus project-conventions-gate.md and verification-gate.md (the judgment half; scripts count the rest)
+    │   ├── hooks/hooks.json                # session-start hand-off reminder; plugin updates and the loaded-version check; guards for GitHub posts, hand-offs, merges, loop stops and unchecked claims; look-back reminders; per-turn reply rules naming the last reply's misses
     │   ├── scripts/guard-github-post.sh, guard-hand-off.sh, guard-loop-stop.sh, guard-prose-rule.sh, guard-batched-wait.sh, guard-merge.sh, remind-look-back.sh, remind-look-back-prompt.sh, remind-after-replies.sh, check-reply-sources.sh, check-reply-length.sh, remind-reply-rules.sh, update-after-merge.sh, lib/hook-input.sh, lib/reply-misses.sh, lib/typed-message.jq
     │   ├── scripts/change-class.sh, approvals-needed.sh  # a small change's lighter path through the guards; every typed phrase ahead in one block
     │   ├── scripts/guard-ask-product-only.sh  # denies a question to the person that holds code or review words or does not say its product, scope, irreversible or intent kind
@@ -41,6 +44,7 @@ kc-claude-kit/
     │   ├── scripts/guard-review-walk.sh, lib/review-dir.sh  # no verification gate dispatch while the walk receipt fails (PreToolUse)
     │   ├── scripts/guard-unchecked-claim.sh     # PreToolUse: denies a commit message, PR or issue text or tracker write that states a fact about code, data or a tool that nothing in the turn read
     │   ├── scripts/update-marketplace.sh, check-loaded-version.sh  # plugin updates during a session; the one check of the loaded version, for the whole kit
+    │   ├── scripts/verify-gate-blocks.sh, verify-gate-receipts.sh  # the mechanical half of the verification gate: citations, per-hit verdicts, STATUS, SCOPE, and each trigger group's headline receipt
     │   ├── scripts/*.sh                    # gather-review, scope-facts, review-threads, build-comment-payloads, check-draft-names
     │   ├── tests/
     │   └── evals/
@@ -78,10 +82,11 @@ Convention topics, each a skill at `plugins/kc-conventions/skills/kc-<topic>/SKI
 | security | yes | `kc-gates:security-gate` |
 | type-safety | no (rules only) | |
 | error-handling | no (rules only) | |
+| rails | yes | `kc-gates:rails-gate` |
 | performance | yes, graded inside the correctness gate (its §PF boxes) | `kc-gates:correctness-gate` |
 | dependencies | no (rules only) | |
 
-Two gate agents own no topic skill: `kc-gates:project-conventions-gate` (reads the target repo's `.claude/review-conventions.md`) and `kc-gates:verification-gate` (audits the other gates' receipts, dispatched second).
+Two gate agents own no topic skill: `kc-gates:project-conventions-gate` (reads the target repo's `.claude/review-conventions.md`) and `kc-gates:verification-gate` (judges what scripts cannot: cited library claims, defended findings, renamed-is-not-fixed, walk receipts; `verify-gate-blocks.sh` and `verify-gate-receipts.sh` run first and count the rest; dispatched second).
 
 Autopilot agents, at `plugins/kc-autopilot/agents/<role>.md`, dispatched by `workflows/deliver.js` as `agentType: 'kc-autopilot:<role>'`:
 
@@ -101,11 +106,13 @@ Autopilot agents, at `plugins/kc-autopilot/agents/<role>.md`, dispatched by `wor
 A topic skill's body has these sections, in this order:
 
 1. `## Review checklist`: the `- [ ] §<id> ... (N/A: ...)` boxes, ticked when writing and by a gate agent when reviewing, then one line pointing to `references/detail.md` (examples and edge cases per box, read when a box is unclear). When that file nears 500 lines, a cluster moves to `references/<cluster>.md`, linked by its `${CLAUDE_PLUGIN_ROOT}` path; gates read it from there. Topics with no checklist (dependencies, error-handling, type-safety) keep their `## Rules` as the body.
+
+A process or review skill (`kc-assess`, `kc-look-back`, `kc-code-review`, `kc-ready-for-review`, `kc-ui`, and the like) is numbered steps, each one action or script call, ending in a checklist of boxes to tick. Its long wording and examples live in `references/detail.md` under `### Step N` or `### §<id>`, read when a step is unclear; target at most 2,000 words in the `SKILL.md`.
 2. `## Sweeps`: the bundled scripts, each run as `bash "${CLAUDE_PLUGIN_ROOT}/skills/kc-<topic>/scripts/<name>.sh" <diff-file>`, printing one `file:line: text` hit per line and nothing else. A lookup, which takes a name or a key instead of a diff (`kc-naming/scripts/name-collisions.sh`, `kc-i18n/scripts/locale-duplicates.sh`), is listed there too and says so.
 
 Posting approval token: a GitHub write passes the kc-gates guard only when the same Bash command contains `KC_REVIEW_POST_APPROVED=1`, typed after the user's explicit post signal.
 
-Each checklist box is one line of at most 220 characters (`scripts/check-box-length.sh`, CI); longer wording lives in the skill's `references/detail.md` under `### §<id>`.
+Each checklist box (under `## Review checklist`, `## Gate checklist`, `## Checklist`, `## Investigation checklist` or `## Approach checklist`) is one line of at most 220 characters (`scripts/check-box-length.sh`, CI); longer wording lives in the skill's `references/detail.md` under `### §<id>`.
 
 Typed-phrase approvals (`approve rework`, `skip ledger`, `approve merge`, `approve prose`): the guard passes only when the command carries its `KC_*=1` token and a message the user typed since the branch's first commit over the default branch holds the phrase (`user_approved` in `lib/hook-input.sh`); on the default branch only the latest typed message counts. A phrase typed before the branch existed never counts. `guard-unchecked-claim.sh` counts the staged diff as read for a commit message, and text inside a commit's `-m` is not read as a command by the publish guards (`without_commit_message` in `lib/hook-input.sh`).
 

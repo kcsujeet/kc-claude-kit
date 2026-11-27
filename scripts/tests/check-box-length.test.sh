@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Tests scripts/check-box-length.sh in a throwaway repo: a checklist box over 220 characters fails,
-# one at the limit passes, a long line outside the `## Review checklist` section is left alone, and
+# one at the limit passes, a long line outside a checklist section (`## Review checklist`,
+# `## Gate checklist`, `## Checklist`, `## Investigation checklist`, `## Approach checklist`) is left alone, and
 # a long box in any skill of any plugin is found.
 set -euo pipefail
 
@@ -20,10 +21,10 @@ expect_verdict() {
   if [ "$actual" = "$expectation" ]; then pass "$label"; else fail "$label (expected $expectation, got $actual: $last_output)"; fi
 }
 
-# write_skill <plugin> <skill> <checklist box line>
+# write_skill <plugin> <skill> <checklist box line> [<checklist heading>]
 write_skill() {
   mkdir -p "$repo/plugins/$1/skills/$2"
-  printf '# Skill\n\n## Review checklist\n\n%s\n\n## Notes\n\n%s\n' "$3" "$(head -c 400 /dev/zero | tr '\0' 'x')" > "$repo/plugins/$1/skills/$2/SKILL.md"
+  printf '# Skill\n\n## %s\n\n%s\n\n## Notes\n\n%s\n' "${4:-Review checklist}" "$3" "$(head -c 400 /dev/zero | tr '\0' 'x')" > "$repo/plugins/$1/skills/$2/SKILL.md"
 }
 box_of_length() { printf -- '- [ ] §X1 %s' "$(head -c $(($1 - 11)) /dev/zero | tr '\0' 'a')"; }
 
@@ -37,6 +38,14 @@ expect_verdict pass "the long line under ## Notes is left alone"
 write_skill kc-b kc-two "$(box_of_length 300)"
 expect_verdict fail "a long box in another plugin's skill is found"
 rm -rf "$repo/plugins/kc-b"
+for heading in "Gate checklist" "Checklist" "Investigation checklist" "Approach checklist"; do
+  write_skill kc-a kc-one "$(box_of_length 221)" "$heading"
+  expect_verdict fail "a box of 221 characters under ## $heading fails"
+  write_skill kc-a kc-one "$(box_of_length 220)" "$heading"
+  expect_verdict pass "a box of 220 characters under ## $heading passes"
+done
+write_skill kc-a kc-one "$(box_of_length 300)" "Examples"
+expect_verdict pass "a long box-shaped line under ## Examples is left alone"
 mkdir -p "$repo/empty/plugins"
 if bash "$script" "$repo/empty" > /dev/null 2>&1; then pass "a repo with no skills passes"; else fail "a repo with no skills failed"; fi
 

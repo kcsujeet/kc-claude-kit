@@ -20,13 +20,13 @@ Delegating any of it: `kc-conventions:kc-delegate`. Stating what code or a tool 
 
 ## Gate checklist
 
-- [ ] §DT1 Assessed first (`kc-assess` §AS1): the task and its code are not someone else's (`task-claims.sh <key> --repo <owner/name> --path <file>... --since <commit>`), and the cause and fix were presented before any build.
+- [ ] §DT1 Assessed first (`kc-assess` §AS1): the task and its code are not someone else's (`task-claims.sh <key> --repo <owner/name> --path <file>...`), cause and fix presented before any build.
 - [ ] §DT2 Shaped when the change stores something new, adds a unit or moves behaviour or data (`kc-shape-the-change`). (N/A: no new storage, unit or behaviour move)
 - [ ] §DT3 Build ran lint, types and affected tests only; the mistake a fix is for is named and what the fix adds is checked against it.
 - [ ] §DT4 Committed locally only after the person approved committing; nothing pushed before the review and QA pass.
 - [ ] §DT5 Review and QA ran once, on the committed branch, as soon as the commit existed and without asking (`kc-ready-for-review`).
 - [ ] §DT6 The code-overlap check ran again before the push (`task-claims.sh ... --since <start commit>`); when the default branch or another open pull request changed that code, the person was asked first.
 - [ ] §DT7 The pull request was opened ready (or as the repo wants) from the body file the review pass wrote.
-- [ ] §DT8 The look-back started once the task was handed off: the previous batch's lesson pull requests checked merged first, feedback listed with `feedback-ledger.sh list`, lessons written as one batch, unasked (`kc-look-back`).
-- [ ] §DT9 Every step the workflow owes (look-back, cleanup, follow-up, reply, re-check) is on the visible task list until done or deferred; before a hand-off or status change the open steps were re-read and the skill each names loaded.
-- [ ] §DT10 Cleanup done: background work and child processes the session started are stopped, and files made only to hand on (a rendered video after upload, an export after sending, a scratch copy) are removed once the copy that matters is confirmed; files the person asked for stay.
+- [ ] §DT8 Look-back started once handed off: previous lesson PRs checked merged, feedback listed with `feedback-ledger.sh list`, lessons written as one batch, unasked (`kc-look-back`).
+- [ ] §DT9 Every step the workflow owes (look-back, cleanup, follow-up, reply, re-check) is on the visible task list until done or deferred; open steps re-read and the skill each names loaded before a hand-off.
+- [ ] §DT10 Cleanup done: session-started background work stopped; files made only to hand on (a video, an export, a scratch copy) removed once the copy that matters is confirmed; files the person asked for stay.

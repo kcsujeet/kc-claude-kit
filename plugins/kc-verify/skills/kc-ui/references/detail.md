@@ -1,0 +1,169 @@
+# kc-ui detail
+
+### Full wording before the steps rewrite
+
+The whole `SKILL.md` body as it was, moved verbatim (headings two levels down). Read the part a step or box points to.
+
+### Verifying a UI change
+
+A green test suite tells you nothing about whether the screen looks right. Unit tests assert the values; they do not notice that the heading is clipped, the empty state never renders, or the total sits under a sticky footer.
+
+So look at it. Once, deliberately, before saying it is done.
+
+This skill checks that it looks right. Whether a person can use it (the flows, where each action lands, what the words say) is `kc-verify:kc-ux`; a change a person both sees and uses gets both.
+
+#### Hard rules
+
+- **Never report a UI change complete without having seen it.** "The tests pass" is not the same claim and must not be presented as one.
+- **The browser check is not optional.** It is part of fixing a UI bug, the same as the code change: never offer it as a choice or a follow-up ("QA first, or post as is?"), and never tell a tester or reviewer something is fixed before you have seen it fixed. If the dev servers are down, start them; if a sign-in stands in the way, use the project's dev-only sign-in (Step 2), and only where it has none, ask the user for theirs. Until then nothing is called fixed.
+- **Report what you did and what you saw**, screen by screen. Not "verified the layout" but "narrow viewport, dark mode: the invoice total wraps under the button".
+- **Keep the failure.** If a state renders wrong, that is the finding. Do not adjust the data until it looks fine and then call it passing.
+- **Realistic data or nothing.** `Lorem ipsum`, `Test User`, and a three-row list prove only that the happy path with short strings works. Production has 400 rows, names with diacritics, and a description that runs four lines.
+- **State what you could not check.** No device, no seed data, no access to that route: say so explicitly rather than quietly narrowing the sweep.
+- **Spot checks are not QA.** Opening the screen you just changed and seeing that it renders is a smoke test. QA walks every state the screen can be in, the way a QA engineer works through a test plan, and does that every time, not only when asked.
+- **When there is a design or another reference, it is the test plan, and the comparison is measured.** Walk a design state by state and compare the app to it. A screen that exists to show that something matches a reference (output drawn on a template or guide, a total that equals the sum of its lines, labels that fit their sheet) is checked in numbers for every item it shows: each item's offset from the reference, each total against its parts. An overlay drawn from the same numbers as the output only agrees with itself. The measurement then stays as a test that fails when an item moves off the reference. For example, a storefront page shows product photos fitted to a marketplace's frame: seeing every photo load and the frame draw says nothing about whether each photo sits on the frame, and only a per-photo measure shows that.
+- **Trace a layout bug before parking it.** A reported layout defect (a gap, a bar, content past its background, a blank page in a generated document) is read in code first: the element's styles, then every ancestor up to the root layout (display, fixed sizes, overflow, backgrounds). "Needs a look in the browser" is not a status; reproduce it there with the same content size the report shows, in the renderer that produced it. That is the engine and version the report came from (the customer's browser, a mail client, a device's webview, the headless browser a document service prints with), read from the evidence (a PDF's Creator and Producer fields, a request's user agent, the service's docs), not assumed to be the one on your machine. A defect that doesn't show in your version isn't fixed by that: see the fix work in the reported version and the current one, so an upgrade on their side doesn't bring it back, and prefer a fix that removes what triggers the defect over one tuned to a version's quirk.
+- **Look at the shipped screen, not a stand-in.** A story, fixture page or test harness is not the app, and neither is reading the code or the author's screenshots: the code says what should render, and screenshots show only the states someone captured. Check the change where users see it, running its own code (every branch it needs, a server change included, on throwaway data when it migrates), with its real configuration, and never ask whether to run it: QA of someone else's change runs it the same as your own. Treat a probe as evidence only after it has been shown it can fail (see `kc-verify:kc-e2e`).
+
+#### Workflow
+
+##### Step 1 — list the surfaces
+
+Name every screen, component, and state the diff can reach. A shared component means every consumer of it, not just the one you were working on. If the list is long, say so and prioritize, rather than checking three and implying you checked all.
+
+##### Step 1b — when there is a design, build the state matrix from it
+
+Before opening the app, walk the design (mockup, prototype, spec) and write down every state it shows. A state is any setting or condition that changes what the screen renders. Illustrations, not a complete list:
+
+- every on/off switch on the screen, in both positions (a disabled record often hides whole sections, not just a badge)
+- every option of a choice that changes the layout (visibility, type, mode, plan)
+- every role or permission that sees the screen differently
+- with and without each optional piece of data (no items, one item, many)
+- every drawer, dialog, menu and confirmation the screen opens, with its exact wording, in each state of filling it in: empty, one item picked, several picked, and editing an existing item (what appears after a pick is where drawers differ most)
+- what each choice in a create form adds to the form (picking one option can reveal a required field), and the state the new record lands in after create: switched on or off, which sections show
+
+Then put the app in each state and diff it against the design: which sections, fields, columns and actions appear, in which states, and what they do. Each difference in structure or behaviour is a finding, unless the ticket or the product owner decided otherwise; name that decision when you skip one.
+
+Compare each element, not only which sections and columns show: for every element the design shows, check its presence, its order among its siblings, its colour, its variant (filled or outlined, primary or secondary, soft or solid), its weight, its copy and its state (disabled, selected, empty, loading). Examples: a status badge outlined in the design and filled in the app; two columns in a different order; a button the design shows disabled in a state where the app leaves it live; an API field's casing or type against its contract. A difference that only follows the app's own pattern for that kind of element is allowed (see below), and the walk says that it was weighed.
+
+Then compare every new or changed component with its siblings on the same screen: a new card next to existing cards uses the same title size, subtitle style, field label style and spacing. Measure it (computed font size, weight and colour) rather than eyeballing it.
+
+A design is not a pixel spec for things the app already has a pattern for. Titles, button labels, casing, icons, chips and wording follow the app's existing patterns so the product stays consistent; a difference there is not a finding unless the design introduces something the app has no pattern for. The call is made per element after comparing it: a variant or colour that differs where the app has no pattern for it is a finding, and one that follows the app's pattern is noted as chosen.
+
+##### Step 2 — get real data in front of it
+
+Bring the app (a review or QA environment) up with one command that was tested: a script or target in the repo (`bin/dev`, `make up`, a compose file) run as written, never started by hand step by step. If none exists, write it first and run it from a clean state; the next person, and the reviewer, then get the same environment. The report and the walk receipt name that command.
+
+Use the project's seed or fixture path if it has one. Otherwise construct data that is deliberately awkward: a long name, an empty collection, a large collection, a zero amount, a negative amount, a missing optional field, a non-Latin string.
+
+The point is not coverage for its own sake. Every one of those is a shape that has broken a layout before.
+
+Sign in as a seeded local user without anyone's password. When sign-in goes through an outside identity provider, a check that waits on the user's password stalls every time a dev server restarts or runs on a new port: browser sessions and cookies are kept per origin. Look for a credential the local backend can mint itself, often an auth strategy it already accepts (an API key, a signed token) that only tests create. Have the frontend send it only in its development mode. If the project has no such path, propose one before building it, guarded at every layer:
+
+- The secret signing the credential exists only in development, so staging and production reject it.
+- The mint command refuses to run outside the development environment.
+- The frontend reads it behind a compile-time development check, so production builds drop it.
+- The build fails if the variable is set for a production build, rather than ignoring it.
+- The credential lives in the process environment, never in a committed file or in chat.
+
+When the app keeps its session in a cookie scoped to a parent domain (`.example.test`), a local port can't hold it, and signing in for QA in the browser the developer uses would replace their own session on every subdomain. Sign in from a separate headless browser instead: map a throwaway subdomain of that domain to the local server (Chrome's `--host-resolver-rules="MAP qa-abc-1.example.test 127.0.0.1"`), open the app on it, and trade the dev-only credential for the session cookie there. For example, a server-rendered admin page whose shell reads the session cookie, a storefront that shares a login cookie with its account pages, or a legacy page embedded in a newer app.
+
+##### Step 3 — walk the states
+
+For each surface, look at every state it can be in, not only the populated one:
+
+- loading
+- empty
+- error
+- populated, typical
+- populated, overflowing (long strings, large counts)
+- interactive states worth seeing: focus, hover, disabled, selected
+
+A missing empty state and a missing loading state are the two most commonly shipped omissions, because the developer's data is always already there.
+
+When the surface finds or rewrites content people write (a signature or footer swapped when the sender changes, a template filled in, pasted text cleaned up), each shape of that content is a state too: plain, line breaks, several blocks, formatting or a link against other words, images beside text and alone, tables, empty and none. Put each through every action that moves it (insert, swap, remove, swap back) and look at what is left on screen, not only the shape the change was written for.
+
+Then fill a list or page taller than the viewport and check the background, footer and scrolling hold.
+
+A behaviour a person sets off is walked through every way they set it off, not only the one the report or the fix names: a click, a scroll by hand (slow and fast), the keyboard, a link that opens the page at a spot, a reload; while the page is still loading and once it has settled; on every page that shares the component. For example, a scroll-linked highlight fixed for clicks while scrolling by hand still skipped sections, a keyboard shortcut fixed for the button but not for its menu entry, and a deep link that lands on the right section before images above it load and then drifts.
+
+##### Step 4 — vary the environment
+
+- **Narrow, laptop and wide viewport.** The narrow one is where things break; check it first. A change to size, position, spacing, font size or transform is walked at a phone width (390 or less), a laptop (1280) and a wide desktop (1920 or more): a unit or offset that is relative to the screen moves when the screen is bigger than the design. Walk every dimension the change varies along, not only the states you picked: viewport, data size (empty and large), locale (two, one right-to-left), print or PDF, and for a form, dialog, drawer or confirmation every way out (submit or confirm, cancel or close then submit again, a failed save), for each set of fields that leads to a different one. List them on the walk receipt's `states:` field (widths with px); `check-walk-receipt.sh` fails a change whose states leave one uncovered.
+- **Dark and light**, if the project supports both. A colour defined only inside one theme block is invisible in the other.
+- **Largest font scale** the platform offers. Text that fits at default clips at 200%.
+
+##### Step 5 — look for the specific defects
+
+Scan each capture for these, by name, rather than glancing at it:
+
+- clipped or truncated text
+- overlapping elements
+- content under a safe area, sticky header, or fixed footer
+- horizontal scroll on the page body
+- a table or code block that overflows instead of scrolling inside its own container
+- numbers that fail to line up in a column
+- an image with no dimensions causing layout shift
+- contrast that fails in one theme but not the other
+- a background or border that stops before the content does (scroll to the very end of the page)
+- a new or changed field sized unlike its neighbours: a short picker as wide as the input beside it, a width set as a share of the row instead of by its content, or an unchanged field the change moved into a new container (inside a radio option, a label, a flex row) that now shrinks to its content
+
+##### Step 6 — report
+
+One line per surface: what you looked at, in which configurations, and what you saw. Then the findings, each with the state and configuration that produced it, so someone else can reproduce it without guessing.
+
+Finish with what you did not check and why.
+
+A QA pass on something already shipped ends at the report: change no code until the findings are triaged with the user, each one sorted into a bug or a question for the team, then into a fix now (a hotfix) or a ticket for later, with what introduced it checked in history. A remark about one finding during that talk ("this should be X") is input to the triage, not a go-ahead to build X while the rest are untriaged.
+
+##### Step 6b — a walkthrough for others (a video of how to test)
+
+When the evidence is for someone who doesn't know the change (a tester, the reporter, a reviewer), it must explain itself without you there. Before a change goes to review, its ticket gets a **How to test** section at the end of the description, written for someone who has never seen it: links to the change's pull requests (with the merge order when one depends on another), the setup, the cases as numbered steps with what to expect, and the walkthrough video embedded under them. Append it without rewording the rest of the description. Write the setup for the team's usual local environment (the hostnames and commands everyone runs), in the pull request's How to test too, never the ports, worktrees or server entries of your own session: a reader can't follow `localhost:3014` and a CORS override they don't run.
+
+The walkthrough:
+
+- **Open with the setup**: the data each case needs, the switch or setting and where it lives, and the checks in order.
+- **One case per frame or clip, captioned** with the state ("Flag on, record not archived") and the expected result in one sentence.
+- **Box what to look at.** A red outline around the part that changes, with a short label inside it ("Archived item hidden"). Where the change is something missing, box what remains and say so ("Only the open item shows").
+- **Make it a video, not a GIF.** A GIF can't be paused or scrubbed, and a still first frame reads as an image, so people stop watching. Build a short MP4 (H.264, `yuv420p`, `+faststart`) with each frame held for a set time (about 5 seconds a case, 6 for the setup); the player's own controls let people pause on a case. With `ffmpeg`, give each image its own `-loop 1 -t <seconds>` input and join them with the `concat` filter: the concat demuxer's `duration` lines cut the first image short.
+- **Shape it like the screen people use.** Record in the aspect ratio of the device the product is mainly used on: 16:9 for a product used on laptops (a 1440×810 viewport at 2x gives 2880×1620), portrait only when the ticket is about phones. Full-page shots of a long page come out tall and shrink to nothing in a player, so frame each case on the part that changes and keep every frame the same size.
+- **Keep it sharp.** Capture each frame at 2x device pixels from a headless browser (Playwright's `deviceScaleFactor: 2`, a full-page or clipped `screenshot`), never from an agent tool's screenshot, which comes back downscaled and JPEG-compressed. Draw the captions and boxes into the page before the shot so they stay text, not scaled pixels; to caption a screenshot already saved, load it into a page built from a string as a `data:` URL (such a page can't load `file://`), and don't count on the encoder to draw text, since builds without a font library have no text filter. Encode at the frames' own size (`-crf 16 -tune stillimage`) without scaling down. Before sending it, pull a frame back out of the video and read small text at 100%.
+- **Drive it the way a person does, and read every frame whole.** Reach each state through the app's own controls (a click on the tab, not a script scrolling the page), since a script's own scroll or state change can leave the page in a state no person reaches. Then look at everything in each frame, not only the boxed part: a highlighted menu item, a stale badge, a dev overlay or a wrong active tab is what the viewer sees too. For example, a capture that scrolled a settings card into the middle of the page showed the side menu highlighting the next section, which the viewer caught and the recorder didn't.
+- **Embed it as a player, and see it play.** Trackers render an attached video either as a block player or as an inline file chip, and the chip often won't play. A connector's "append this file inline" option tends to produce the chip, so write the block media node yourself, copying one from a ticket whose video already plays. Then have someone signed in open the ticket and press play before it goes to review: a successful upload says nothing about playback.
+
+#### Tools
+
+Use whatever the project already has: a browser tool if one is connected, the project's own screenshot or visual-regression setup, a simulator, or a dev server plus a manual look. Do not install a new visual testing framework to satisfy this skill; the point is to look at the screen, not to build an apparatus for looking at screens.
+
+If nothing is available and you genuinely cannot see the UI, say that plainly and let the user decide. A confident "looks good" from something that never rendered the page is the exact failure this skill exists to prevent.
+
+#### Gate checklist
+
+Do not report a UI change verified until every box is ticked:
+
+- [ ] Every surface the diff reaches is listed, including other consumers of shared components.
+- [ ] The app was brought up with one tested command run as written, not by hand step by step; the command is named in the report and in the walk receipt's `env` line (`env<TAB><command><TAB><evidence the app answered>`, which `check-walk-receipt.sh` requires), or a script was written for it first.
+- [ ] The app was signed in through the project's dev-only credential, not someone's password; where it has none, the guarded path was proposed, and the user signed in only until it exists.
+- [ ] A session cookie scoped to a parent domain was set in a separate headless browser on a mapped throwaway subdomain, never in the browser the developer uses.
+- [ ] When the work spans several branches or pull requests, the list covers every screen any of them changes, not only the one being worked on now.
+- [ ] If a design exists, the state matrix is written from it, covering every switch in both positions, every layout-changing option, every role, empty/one/many, and every drawer and dialog.
+- [ ] Every drawer and dialog was opened and filled in: empty, one item picked, several picked, and editing an existing item.
+- [ ] The app, running the change's own code (every branch it needs), was put in every state of the matrix and compared to the design section by section and, within each, element by element (presence, order, colour, variant, weight, copy, state), not only the state you happened to land in or which sections and columns show; the code and the author's screenshots count for no state; and where a screen shows items matching a reference (a template, a guide, a total, a sheet), each item was measured against it in numbers, with the measurement kept as a test that fails when an item moves off it.
+- [ ] Every new or changed component, and every one the change moved into a new container, was measured against its siblings on the same screen (title, subtitle, field labels, spacing, and each field's width against what it holds).
+- [ ] Every behaviour the change touches was set off every way a person can (click, hand scroll, keyboard, deep link, reload), while loading and once settled, on every page that shares the component.
+- [ ] Each finding is about structure or behaviour; cosmetic differences where the app has an existing pattern (titles, labels, casing, icons) follow the app.
+- [ ] Loading, empty and error states were each seen.
+- [ ] A surface that finds or rewrites content people write was walked with every shape of that content (plain, line breaks, several blocks, formatting against words, links, images, tables, empty, none) through every action that moves it, not only the shape the change was about.
+- [ ] Each create form was submitted for every option that changes it, and the new record's landing state (on or off, sections shown) was compared with the design.
+- [ ] A list or page was filled past the viewport, and the background, footer and scrolling held.
+- [ ] Every reported layout defect was traced through its ancestors in code and reproduced at the content size the report shows, in the renderer and version that produced it (named, with where that came from), before it was fixed or left open, and the fix was seen in that version and the current one.
+- [ ] Narrow viewport, the other theme and the largest font scale were done, or the report says why not; every dimension the change varies along (viewport widths including 1920 or more, data size, locale, print) was walked and named on the walk receipt's `states:` field.
+- [ ] Every UI fix was seen fixed in a browser before it was reported done or anyone was told it is fixed, internal admin pages included (signed in through a dev-only credential, as in Step 2), not only covered by specs.
+- [ ] The report lists each state checked, each finding with the state that produces it, and what was not checked.
+- [ ] After a QA pass on shipped work, no code changed until the user agreed which findings are bugs, which are questions, and which go in a hotfix versus a ticket.
+- [ ] Before review, the ticket's description ends with a How to test section (PR links, setup, numbered cases, expected results) and the walkthrough: a short MP4, not a GIF, that opens with the setup, captions each case with its state and expected result, and boxes and labels what to look at.
+- [ ] The How to test setup, on the ticket and the pull request, is the team's usual local environment, with no port, worktree or server entry from your own session.
+- [ ] The walkthrough is in the product's main device aspect ratio (16:9 for a laptop product, portrait only for a phone ticket), every frame the same size.
+- [ ] The walkthrough's frames were captured at 2x in a headless browser, not from a downscaled tool screenshot, encoded at their own size, and a frame pulled from the video reads sharp at 100%.
+- [ ] The walkthrough is embedded as a block player, not an inline file chip, and was seen playing on the ticket.
+- [ ] Each walkthrough state was reached through the app's own controls, and every frame was read whole (menus, highlights, badges, overlays), not only the boxed part, before it was sent.
