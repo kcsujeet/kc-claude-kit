@@ -12,38 +12,28 @@ require_jq
 
 
 
-# The loop-stop guard reads the same chain.
+# The loop-stop guard reads the same chain, inside an open review pass whose round 1 fixed line 2.
 loop_repo="$work_dir/loop"
 git init -q -b main "$loop_repo"
-git init -q --bare "$loop_repo.git"
-git -C "$loop_repo" remote add origin "$loop_repo.git"
 printf 'a1\na2\na3\n' > "$loop_repo/f.txt"
-printf 'n1\nn2\nn3\n' > "$loop_repo/notes.md"
 run_git_in "$loop_repo" add .
-run_git_in "$loop_repo" commit -q -m "fix f"
-git -C "$loop_repo" push -q origin main
-export KC_READY_DIR="$work_dir/receipts"
-mkdir -p "$KC_READY_DIR"
-printf 'rounds=1\n' > "$KC_READY_DIR/$(git -C "$loop_repo" rev-parse HEAD)"
+run_git_in "$loop_repo" commit -q -m "order totals"
+export KC_READY_DIR="$work_dir/receipts" KC_PASS_ROOT="$work_dir/passes"
+mkdir -p "$KC_READY_DIR" "$KC_PASS_ROOT/kc-pass-chain/round-1"
+printf 'HEAD_SHA=%s\n' "$(git -C "$loop_repo" rev-parse HEAD)" > "$KC_PASS_ROOT/kc-pass-chain/round-1/meta.env"
+printf 'a1\nround one\na3\n' > "$loop_repo/f.txt"
+run_git_in "$loop_repo" commit -q -am "round 1 fix"
 loop_verdict() { expect_hook_verdict "$scripts/guard-loop-stop.sh" "$1" "$2" "$3" "$loop_repo"; }
-printf 'a1\nchanged\na3\n' > "$loop_repo/f.txt"
-loop_verdict deny "blocked: a chain that stages an edit of a receipted line" "git add f.txt && git commit -m again"
-loop_verdict deny "blocked: a commit of a path that edits a receipted line" "git commit f.txt -m again"
+printf 'a1\nsecond round fix\na3\n' > "$loop_repo/f.txt"
+loop_verdict deny "blocked: a chain that stages a rewrite of round 1's fix" "git add f.txt && git commit -m again"
+loop_verdict deny "blocked: a commit of a path that rewrites round 1's fix" "git commit f.txt -m again"
 loop_verdict deny "blocked: a build step before the staging" "./build.sh; git add f.txt && git commit -m again"
-printf 'a1\nchanged\na3\n' > "$loop_repo/f.txt"
-printf 'docs\n' > "$loop_repo/readme.md"
-run_git_in "$loop_repo" add readme.md
-loop_verdict deny "blocked: an index that holds only a small prose change does not excuse a chain that stages code" "git add f.txt && git commit -m again"
-run_git_in "$loop_repo" reset -q
-rm "$loop_repo/readme.md"
-printf 'a1\na2\na3\n' > "$loop_repo/f.txt"
-printf 'n1\nchanged\nn3\n' > "$loop_repo/notes.md"
-loop_verdict deny "blocked: a chain that stages a small prose edit of a receipted line is graded in full" "git add notes.md && git commit -m again"
-loop_verdict deny "blocked: a commit of a prose path that edits a receipted line is graded in full" "git commit notes.md -m again"
-printf 'n1\nn2\nn3\n' > "$loop_repo/notes.md"
+printf 'a1\nround one\na3\n' > "$loop_repo/f.txt"
 printf 'new\n' > "$loop_repo/new.txt"
 loop_verdict allow "allowed: a chain that stages a new file" "git add new.txt && git commit -m new"
 loop_verdict deny "blocked: a build step before staging a new file" "./build.sh; git add new.txt && git commit -m new"
-unset KC_READY_DIR
+rm -rf "$KC_PASS_ROOT/kc-pass-chain"
+loop_verdict allow "allowed: with no open pass, a build step before staging is not judged" "./build.sh; git add new.txt && git commit -m new"
+unset KC_READY_DIR KC_PASS_ROOT
 
 finish

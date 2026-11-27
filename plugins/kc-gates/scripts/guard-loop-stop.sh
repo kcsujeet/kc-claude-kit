@@ -1,34 +1,25 @@
 #!/usr/bin/env bash
-# PreToolUse guard for Bash: the loop-stop rule as a block. A fix of an earlier fix is where a
-# change starts going in circles, so a commit or a PR whose changed lines were written by a commit
-# that was already handed off stops until the user says to go on.
+# PreToolUse guard for Bash: the loop-stop rule as a block, armed only inside an agent's review/fix
+# loop. A kc-ready-for-review pass reviews the change in rounds, and each round's fixes are
+# reviewed by the next; a fix that rewrites lines an earlier round's fix wrote is where that loop
+# starts going in circles, so such a commit stops until the user says to go on.
 #
-# On `git commit` and `gh pr create` it lists the lines the change touches (the staged diff for a
-# commit, `git commit -a` reading the working tree against HEAD; the branch's diff from its
-# merge-base with the base branch for a PR) and `git blame`s the old side of each changed line (at
-# HEAD for a commit, at the merge-base for a PR). It blocks when a blamed commit was already handed
-# off:
-#   - it has a kc-ready-for-review receipt (ready-receipt.sh check), or
-#   - it is on the default branch, was committed in the last 7 days, and GitHub lists a pull
-#     request for it that merged in the last 7 days (gh api commits/<sha>/pulls).
-# Everything the guard cannot read (no receipt folder, a failed lookup, no default branch) counts as
-# not handed off: it never blocks what it can't read. Lines the change only adds have no old side,
-# and neither do new files. A hunk whose changed lines only set a version (`"version": "1.2.0"`,
-# `version = "1.2.0"`, `VERSION = "1.2.0"`) is left out: every release raises it, so it is not a
-# fix being redone. A commit that concludes a merge of the default branch into a branch, taking the
-# index as staged, is left out too: its staged diff is the default branch's own work, already handed
-# off through its own PRs, plus any conflict resolutions, which are not checked. With -a it is checked.
+# The guard is armed while a pass is open on the branch: a pass folder
+# (${KC_PASS_ROOT:-${TMPDIR:-/tmp}}/kc-pass-*/round-1/meta.env) whose round-1 head (HEAD_SHA) is HEAD or
+# an ancestor of it, with no kc-ready-for-review receipt on that head or any commit after it (the
+# receipt ends the pass). With no open pass it never blocks: a person's edits, a reviewer's
+# requested changes after the hand-off, and lines other work merged are no agent loop.
 #
-# The branch's whole change (from its merge-base with the default branch, the staged or -a result for
-# a commit) is classed by change-class.sh first: prose_small (a few prose lines, nothing else) is
-# never blocked, and code_small (small, no risk line) is not blocked for lines the branch's own
-# earlier commits wrote (receipted commits not yet on the default branch), only for lines a commit
-# already on the default branch wrote. full is checked as above.
+# On a `git commit` inside an open pass it blames the old side of each line the commit changes (the
+# staged diff, or the working tree with -a) and blocks when the line was written by a commit of the
+# pass's own fix rounds: after its round-1 head, up to HEAD. A fix of round 1's findings edits the
+# original change and passes; a later round rewriting an earlier round's fix is blocked. A hunk whose
+# changed lines only set a version is left out, and so is a commit concluding a merge of the default
+# branch as staged. Everything it cannot read counts as no loop.
 #
 # A command containing the literal KC_REWORK_APPROVED=1 passes only when the user's own words approve
 # it: a message they typed on this branch in the session transcript (the payload's transcript_path)
-# contains "approve rework" (user_approved in lib/hook-input.sh). The token without those words, no
-# transcript, or a session with no typed message (a subagent) stays blocked.
+# contains "approve rework" (user_approved in lib/hook-input.sh).
 #
 # Output: the PreToolUse deny JSON on a blocked command, nothing otherwise. Always exits 0.
 # Hook schema: https://code.claude.com/docs/en/hooks
@@ -44,8 +35,6 @@ scripts_dir=$(dirname "$0")
 
 readonly APPROVAL_TOKEN='KC_REWORK_APPROVED=1'
 readonly APPROVAL_PHRASE='approve rework'
-readonly HANDED_OFF_DAYS=7
-readonly HANDED_OFF_SECONDS=$((HANDED_OFF_DAYS * 24 * 60 * 60))
 # A changed line that only sets a version: a JSON or TOML key, or a constant, holding a quoted value.
 readonly VERSION_LINE='^[-+][[:space:]]*"?(version|VERSION)"?[[:space:]]*[:=][[:space:]]*"[^"]*",?[[:space:]]*$'
 
@@ -97,64 +86,56 @@ list_blamed_old_lines() {
   print_blame_of_file
 }
 
-# Prints the task key of the branch checked out in $1 (`abc-12` from `ABC-12-order-total`), lower case,
-# or nothing when the branch name carries none.
-get_branch_task_key() {
-  git -C "$1" rev-parse --abbrev-ref HEAD 2>/dev/null | grep -Eo '^[A-Za-z]{2,}-[0-9]+' | tr '[:upper:]' '[:lower:]' || true
+# True when commit $2 (in directory $1) has a kc-ready-for-review receipt.
+has_receipt() { bash "$scripts_dir/ready-receipt.sh" check "$2" >/dev/null 2>&1; }
+
+# Prints the round-1 head of the review pass open on the branch in $1, or nothing: the newest pass
+# folder whose round-1 head is HEAD or an ancestor of it and that no receipt has ended yet.
+find_open_pass_start() {
+  local dir=$1 meta pass_start newest="" sha is_ended
+  for meta in "${KC_PASS_ROOT:-${TMPDIR:-/tmp}}"/kc-pass-*/round-1/meta.env; do
+    [ -f "$meta" ] || continue
+    pass_start=$(sed -n 's/^HEAD_SHA=//p' "$meta" | head -n 1)
+    [ -n "$pass_start" ] || continue
+    git -C "$dir" merge-base --is-ancestor "$pass_start" HEAD 2>/dev/null || continue
+    is_ended=false
+    for sha in "$pass_start" $(git -C "$dir" rev-list "$pass_start..HEAD" 2>/dev/null); do
+      if has_receipt "$dir" "$sha"; then is_ended=true; break; fi
+    done
+    $is_ended && continue
+    if [ -z "$newest" ] || git -C "$dir" merge-base --is-ancestor "$newest" "$pass_start" 2>/dev/null; then newest=$pass_start; fi
+  done
+  printf '%s' "$newest"
 }
 
-# True when commit $2 (in directory $1) reached the default branch $3 through a pull request that
-# merged in the last HANDED_OFF_DAYS days. When the branch names a task, only a pull request of that
-# task counts (its title or branch carries the key): a line someone else's merged work wrote is not a
-# fix of this task's own, so editing it is no loop. Each step fails to "not merged": a lookup that
-# can't be made never blocks.
-was_merged_recently() {
-  local dir=$1 sha=$2 default_branch_ref=$3 committed merged_pull_count task_key task_filter=true
-  [ -n "$default_branch_ref" ] || return 1
-  git -C "$dir" merge-base --is-ancestor "$sha" "$default_branch_ref" 2>/dev/null || return 1
-  committed=$(git -C "$dir" show -s --format=%ct "$sha" 2>/dev/null) || return 1
-  [ $(($(date +%s) - committed)) -le "$HANDED_OFF_SECONDS" ] || return 1
-  task_key=$(get_branch_task_key "$dir")
-  if [ -n "$task_key" ]; then task_filter="(((.title // \"\") + \" \" + (.head.ref // \"\")) | ascii_downcase | contains(\"$task_key\"))"; fi
-  merged_pull_count=$(cd "$dir" && gh api "repos/{owner}/{repo}/commits/$sha/pulls" \
-    --jq "def merged_in_window: .merged_at != null and ((.merged_at | fromdateiso8601) > (now - $HANDED_OFF_SECONDS)); [.[] | select(merged_in_window and $task_filter)] | length" 2>/dev/null) || return 1
-  [ "${merged_pull_count:-0}" -gt 0 ]
-}
-
-# Prints "<sha> <subject> (<file>:<line>)" of the first blamed commit that was already handed off,
-# or nothing. $1 is the directory, $2 the revision to blame at, $3 the change's class
-# (change-class.sh): code_small skips commits the default branch doesn't have yet. The diff is on stdin.
-find_handed_off_fix() {
-  local dir=$1 rev=$2 change_class=${3:-full} default_branch_ref sha location seen=" " subject
-  default_branch_ref=$(get_default_branch_ref "$dir")
+# Prints "<sha> <subject> (<file>:<line>)" of the first blamed line a fix round of the pass wrote:
+# a commit after the pass's round-1 head $2, up to HEAD, in directory $1. The diff is on stdin.
+find_fix_round_line() {
+  local dir=$1 pass_start=$2 round_commits sha location subject
+  round_commits=" $(git -C "$dir" rev-list "$pass_start..HEAD" 2>/dev/null | tr '\n' ' ') "
+  [ "$round_commits" != "  " ] || return 1
   while read -r sha location; do
-    case "$seen" in *" $sha "*) continue ;; esac
-    seen="$seen$sha "
-    if [ "$change_class" = code_small ] && [ -n "$default_branch_ref" ] \
-      && ! git -C "$dir" merge-base --is-ancestor "$sha" "$default_branch_ref" 2>/dev/null; then
-      continue
-    fi
-    if bash "$scripts_dir/ready-receipt.sh" check "$sha" >/dev/null 2>&1 || was_merged_recently "$dir" "$sha" "$default_branch_ref"; then
-      subject=$(git -C "$dir" show -s --format=%s "$sha" 2>/dev/null)
-      printf '%s %s (%s)' "$(printf '%s' "$sha" | cut -c1-9)" "$subject" "$location"
-      return 0
-    fi
-  done < <(list_blamed_old_lines "$rev" "$dir")
+    case "$round_commits" in *" $sha "*) ;; *) continue ;; esac
+    subject=$(git -C "$dir" show -s --format=%s "$sha" 2>/dev/null)
+    printf '%s %s (%s)' "$(printf '%s' "$sha" | cut -c1-9)" "$subject" "$location"
+    return 0
+  done < <(list_blamed_old_lines HEAD "$dir")
   return 1
 }
 
-# $1 is the earlier fix, $2 the directory.
-deny_edit_of_handed_off_fix() {
-  print_pretooluse_deny "Blocked by the kc-gates plugin: this edits lines an earlier, already-handed-off fix wrote ($1): the loop-stop rule says stop and question the approach; ask the user. Ask the user: only their typed words approve it. When a message they typed on this branch says \"approve rework\", prefix the command with KC_REWORK_APPROVED=1; the token without those words stays blocked.$(needed_phrases_sentence "$2" "$APPROVAL_PHRASE")"
+# $1 is the earlier round's fix, $2 the directory.
+deny_fix_of_a_fix() {
+  print_pretooluse_deny "Blocked by the kc-gates plugin: inside the open review pass, this fix rewrites lines an earlier round's fix wrote ($1). A fix of a fix is where the review loop goes in circles: the loop-stop rule says stop and question the approach; ask the user: only their typed words approve it. When a message they typed on this branch says \"approve rework\", prefix the command with KC_REWORK_APPROVED=1; the token without those words stays blocked.$(needed_phrases_sentence "$2" "$APPROVAL_PHRASE")"
 }
 
 # Checks a `git commit`; $1 is the directory, the rest the words after `git`.
 check_commit() {
-  local handed_off_fix change_class stage_mode=--staged
+  local pass_start round_line
   parse_git_command "$@"
   [ "${GIT_ARGS[0]:-}" = commit ] || return 0
-  # An unborn branch has no old side to blame.
   git -C "$GIT_DIR" rev-parse -q --verify HEAD >/dev/null 2>&1 || return 0
+  pass_start=$(find_open_pass_start "$GIT_DIR")
+  [ -n "$pass_start" ] || return 0
   # Only the merge as staged: `-a` would add edits the merge didn't bring.
   if is_default_branch_merge "$GIT_DIR" && ! is_commit_staging_all "${GIT_ARGS[@]:1}"; then
     return 0
@@ -163,59 +144,19 @@ check_commit() {
     print_pretooluse_deny "Blocked by the kc-gates plugin: $UNJUDGEABLE_COMMIT_REASON"
     return 1
   fi
-  ! is_commit_staging_all "${GIT_ARGS[@]:1}" || stage_mode=--all
-  change_class=$(read_change_class "$GIT_DIR" "$stage_mode")
-  # The index as it is now is not what a commit staged by this command, or one that names paths, will record: grade it in full.
-  if [ "${#CHAIN_STAGING[@]}" -gt 0 ] || [ -n "$(get_commit_paths "$GIT_DIR" "${GIT_ARGS[@]:1}")" ]; then change_class=full; fi
-  [ "$change_class" != prose_small ] || return 0
-  handed_off_fix=$(get_commit_diff "$GIT_DIR" -U0 "${GIT_ARGS[@]:1}" | drop_version_bump_hunks | find_handed_off_fix "$GIT_DIR" HEAD "$change_class") || return 0
-  deny_edit_of_handed_off_fix "$handed_off_fix" "$GIT_DIR"
-  return 1
-}
-
-# Checks a `gh pr create`; $1 is the directory, the rest the words after `gh pr create`.
-check_pr_create() {
-  local dir=$1 word base="" take=false merge_base handed_off_fix base_ref="" candidate_refs change_class
-  shift
-  for word in "$@"; do
-    if $take; then base=$word; take=false; continue; fi
-    case "$word" in
-      -B | --base) take=true ;;
-      --base=*) base=${word#--base=} ;;
-    esac
-  done
-  candidate_refs="${base:+origin/$base $base} $(get_default_branch_ref "$dir")"
-  for base_ref in $candidate_refs; do
-    git -C "$dir" rev-parse -q --verify "$base_ref^{commit}" >/dev/null 2>&1 && break
-    base_ref=""
-  done
-  # No base or merge-base to compare with: nothing to blame, so nothing to block.
-  [ -n "$base_ref" ] || return 0
-  merge_base=$(git -C "$dir" merge-base "$base_ref" HEAD 2>/dev/null) || return 0
-  change_class=$(read_change_class "$dir" --base "$merge_base" --head HEAD)
-  [ "$change_class" != prose_small ] || return 0
-  handed_off_fix=$(git -C "$dir" diff -U0 --no-color --no-ext-diff --no-renames "$merge_base" HEAD | drop_version_bump_hunks | find_handed_off_fix "$dir" "$merge_base" "$change_class") || return 0
-  deny_edit_of_handed_off_fix "$handed_off_fix" "$dir"
+  round_line=$(get_commit_diff "$GIT_DIR" -U0 "${GIT_ARGS[@]:1}" | drop_version_bump_hunks | find_fix_round_line "$GIT_DIR" "$pass_start") || return 0
+  deny_fix_of_a_fix "$round_line" "$GIT_DIR"
   return 1
 }
 
 # Checks one shell segment of the command, run in directory $2.
 check_segment() {
-  local segment=$1 dir=$2 git_args_text gh_args_text git_words_list=() gh_words_list=()
+  local segment=$1 dir=$2 git_args_text git_words_list=()
   note_chain_segment "$segment" "$dir"
   git_args_text=$(git_words "$segment")
-  if [ -n "$git_args_text" ]; then
-    read -ra git_words_list <<< "$git_args_text"
-    check_commit "$dir" "${git_words_list[@]}"
-    return
-  fi
-  gh_args_text=$(gh_words "$segment")
-  read -ra gh_words_list <<< "$gh_args_text"
-  if [ "${gh_words_list[0]:-} ${gh_words_list[1]:-}" = "pr create" ]; then
-    check_pr_create "$dir" "${gh_words_list[@]:2}"
-    return
-  fi
-  return 0
+  [ -n "$git_args_text" ] || return 0
+  read -ra git_words_list <<< "$git_args_text"
+  check_commit "$dir" "${git_words_list[@]}"
 }
 
 main() {

@@ -10,8 +10,8 @@ tests_dir=$(cd "$(dirname "$0")" && pwd)
 . "$tests_dir/lib/harness.sh"
 scripts="$(dirname "$tests_dir")/scripts"
 require_jq
-export KC_READY_DIR="$work_dir/receipts"
-mkdir -p "$KC_READY_DIR" "$work_dir/gh"
+export KC_READY_DIR="$work_dir/receipts" KC_PASS_ROOT="$work_dir/passes"
+mkdir -p "$KC_READY_DIR" "$KC_PASS_ROOT" "$work_dir/gh"
 use_gh_fixtures "$work_dir/gh"
 : > "$work_dir/gh/routes.tsv"
 
@@ -38,17 +38,30 @@ expect_eq "a small prose branch editing a handed-off line: no phrase" "" "$(need
 run_git checkout -q -b rework main
 sed '2s/.*/echo three/' "$repo/order.sh" > "$work_dir/o.tmp" && mv "$work_dir/o.tmp" "$repo/order.sh"
 run_git commit -q -am rework
-expect_eq "a branch editing a handed-off script line: approve rework" "approve rework" "$(needed)"
+expect_eq "a branch editing a handed-off script line, outside a review pass: no phrase" "" "$(needed)"
 printf 'sha=%s\nrounds=1\nopen=1\nclean=no\n' "$(git -C "$repo" rev-parse HEAD)" > "$KC_READY_DIR/$(git -C "$repo" rev-parse HEAD)"
-expect_eq "and a receipt that left findings open: approve merge too" "approve rework
-approve merge" "$(needed)"
+expect_eq "a receipt that left findings open: approve merge" "approve merge" "$(needed)"
 printf 'sha=%s\nrounds=1\nopen=0\nclean=yes\n' "$(git -C "$repo" rev-parse HEAD)" > "$KC_READY_DIR/$(git -C "$repo" rev-parse HEAD)"
-expect_eq "a clean receipt needs no merge phrase" "approve rework" "$(needed)"
+expect_eq "a clean receipt needs no merge phrase" "" "$(needed)"
 
 printf 'Always ship orders in one box.\nNever split a refund.\n' >> "$repo/CLAUDE.md"
 run_git add CLAUDE.md
-expect_eq "a staged rule with no check: approve prose first" "approve prose
-approve rework" "$(needed)"
+expect_eq "a staged rule with no check: approve prose" "approve prose" "$(needed)"
+run_git reset -q --hard HEAD
+
+# Inside an open review pass, a staged rewrite of an earlier round's fix needs "approve rework".
+run_git checkout -q -b loop main
+sed '1s/.*/echo first/' "$repo/order.sh" > "$work_dir/o.tmp" && mv "$work_dir/o.tmp" "$repo/order.sh"
+run_git commit -q -am "change under review"
+mkdir -p "$KC_PASS_ROOT/kc-pass-loop/round-1"
+printf 'HEAD_SHA=%s\n' "$(git -C "$repo" rev-parse HEAD)" > "$KC_PASS_ROOT/kc-pass-loop/round-1/meta.env"
+sed '2s/.*/echo round one fix/' "$repo/order.sh" > "$work_dir/o.tmp" && mv "$work_dir/o.tmp" "$repo/order.sh"
+run_git commit -q -am "round 1 fix"
+sed '2s/.*/echo a second round fix/' "$repo/order.sh" > "$work_dir/o.tmp" && mv "$work_dir/o.tmp" "$repo/order.sh"
+run_git add order.sh
+expect_eq "inside a review pass, a staged rewrite of a round's fix: approve rework" "approve rework" "$(needed)"
+run_git reset -q --hard HEAD
+rm -rf "$KC_PASS_ROOT/kc-pass-loop"
 
 mkdir -p "$work_dir/not-a-repo"
 expect_eq "outside a repository: no phrase" "" "$(bash "$scripts/approvals-needed.sh" --dir "$work_dir/not-a-repo")"
