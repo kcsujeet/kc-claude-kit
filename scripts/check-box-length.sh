@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # shellcheck disable=SC2016 # single-quoted text holds Markdown backticks and awk code, not shell expansions
-# Fails when a checklist box in a SKILL.md `## Review checklist` section is longer than 220
+# Fails when a checklist box in a SKILL.md checklist section (`## Review checklist`, `## Gate checklist`,
+# `## Checklist`, `## Investigation checklist`, `## Approach checklist`) is longer than 220
 # bytes (LC_ALL=C, so every awk counts the same; § is two bytes). A box is one line: `- [ ] §ID <rule> (<one example>)`. Longer wording goes in the skill's
 # references/detail.md under `### §ID`, which the gate reads in full.
 #
@@ -14,7 +15,7 @@ max_chars=220
 problems=$(find "$root/plugins" -path '*/skills/*/SKILL.md' -type f -print0 \
   | LC_ALL=C xargs -0 --no-run-if-empty awk -v max="$max_chars" '
       FNR == 1 { in_checklist = 0 }
-      /^## / { in_checklist = ($0 == "## Review checklist") }
+      /^## / { in_checklist = ($0 ~ /^## (Review |Gate |Investigation |Approach )?[Cc]hecklist$/) }
       in_checklist && /^- \[[ xX]\]/ && length($0) > max {
         printf "%s:%d: box is %d characters (max %d): %s...\n", FILENAME, FNR, length($0), max, substr($0, 1, 60)
       }' | sort)

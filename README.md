@@ -1,62 +1,53 @@
 # kc-claude-kit
 
-Sujeet's personal [Claude Code](https://code.claude.com/docs) toolkit. It works in any codebase and does three things:
+A personal [Claude Code](https://code.claude.com/docs) toolkit that works in any codebase. It teaches Claude how to write code, reviews code against the same rules, and checks the work in the running app before calling it done. Everything is a Claude Code plugin; install the ones you want and add nothing to your project.
 
-1. **Teaches Claude how to write code** the way a careful engineer would (naming, structure, tests, and so on).
-2. **Reviews code** against those same rules, yours or a teammate's.
-3. **Checks the work** in the running app before calling it done.
+## Install
 
-Everything is a Claude Code plugin. Install the ones you want; nothing needs to be added to your project.
+Add the marketplace, then install what you want:
 
-## Start here: the skills used every day
+```
+/plugin marketplace add kcsujeet/kc-claude-kit
+/plugin install kc-gates@kc-claude-kit
+/plugin install kc-verify@kc-claude-kit
+/plugin install kc-instructions@kc-claude-kit
+/plugin install kc-usage-band@kc-claude-kit
+/plugin install kc-image-preview@kc-claude-kit
+```
 
-If you only try three things, try these. They are all in the `kc-gates` plugin.
+`kc-gates` brings `kc-conventions` with it. On your first prompt its hook copies two small rules into `~/.claude/rules/` (a pointer rule that names the skill to load for each kind of work, and an always-on rule with reply habits), so they load in every project. Set `KC_CONVENTIONS_AUTO_INSTALL=0` to opt out. To commit a copy into one project, run `/kc-conventions:kc-init` there.
 
-| When | Type or say | What happens |
-|---|---|---|
-| Your PR is about to go to a reviewer | `/kc-gates:kc-ready-for-review` | One review and QA pass on your own PR. Claude fixes what it finds, proves each fix with a test, and gives you a short list of anything left for you to decide. The goal: your reviewer finds nothing the rules already say. |
-| You are reviewing someone's PR (or want yours checked) | "review this PR" | `kc-code-review` reads the change against every rule and reports PASSED or FAILED with one line per finding. Nothing is posted anywhere. |
-| You want those findings as PR comments | `/kc-gates:kc-post-review` | Drafts short, polite comments, shows them to you, and posts only after you say so. |
+`kc-autopilot` is a work in progress; install it only to try it: `/plugin install kc-autopilot@kc-claude-kit`.
 
-The rest of the kit supports these three: the rules they check against, and the QA steps they run.
+To stay current, turn on auto-update: `/plugin`, the Marketplaces tab, `kc-claude-kit`, **Enable auto-update**.
 
-## The plugins
+## Plugins
 
 | Plugin | What it is for | When you would use it |
 |---|---|---|
-| `kc-gates` | Code review. The three skills above. | Every PR. |
-| `kc-conventions` | The coding rules, one skill per topic. They load on their own while Claude writes code, and `kc-gates` reviews against them. | Always on. Install it and forget it. |
-| `kc-verify` | QA. Looks at the change in the running app, checks a person can use it, and tests a change end to end. | Any change a person sees. |
-| `kc-instructions` | Audits a repo's Claude setup: what belongs in `CLAUDE.md`, a rule, a skill or a hook. | Once per repo, or when `CLAUDE.md` gets long. |
-| `kc-usage-band` | A status row above the prompt: model, branch, context used, rate limits, cost. | Always on. Terminal only. |
-| `kc-image-preview` | Shows thumbnails of images you paste into the prompt. | Always on. Terminal on macOS only. |
-| `kc-autopilot` 🚧 | **Work in progress.** Takes an approved plan and turns it into pull requests on its own. | Not ready for everyday use. |
+| [`kc-gates`](plugins/kc-gates) | Code review: `kc-code-review`, `kc-ready-for-review`, `kc-post-review`, plus the hooks that guard pushes, merges and posts. | Every PR. |
+| [`kc-conventions`](plugins/kc-conventions) | The coding rules (one checklist skill per topic) and the process skills (assess, shape, look back). | Always on; installed with `kc-gates`. |
+| [`kc-verify`](plugins/kc-verify) | QA: the change in the running app, whether a person can use it, end to end. | Any change a person sees. |
+| [`kc-instructions`](plugins/kc-instructions) | Audits a repo's Claude setup: what belongs in `CLAUDE.md`, a rule, a skill or a hook. | Once per repo. |
+| [`kc-usage-band`](plugins/kc-usage-band) | A status row above the prompt: model, branch, context, rate limits, cost. | Always on. Terminal only. |
+| [`kc-image-preview`](plugins/kc-image-preview) | Thumbnails of images you paste into the prompt. | Always on. Terminal on macOS only. |
+| [`kc-autopilot`](plugins/kc-autopilot) 🚧 | Work in progress: turns an approved plan into pull requests. | Not ready for everyday use. |
 
-## How they fit together
+## How it works
 
-```
-                 kc-conventions
-        (the rules: naming, tests, structure ...)
-              |                        |
-   loads while Claude writes     is what reviews check against
-              |                        |
-              v                        v
-         your code  ───────────►   kc-gates
-                                 kc-code-review      (review any change)
-                                 kc-ready-for-review (review + QA your own PR)
-                                 kc-post-review      (turn findings into PR comments)
-                                       |
-                              runs QA with
-                                       v
-                                   kc-verify
-                              (UI, usability, end to end)
-```
+- **Rules are checklists.** Each topic skill in `kc-conventions` is a list of one-line boxes. Claude ticks them while writing; review ticks the same boxes.
+- **A pointer rule loads the skill.** "Doing X, load skill Y" is the only rule text loaded while you work; the skill loads when the work needs it.
+- **Review is one agent per topic.** `kc-code-review` runs the gate agents, scripts count every receipt, and the result is one PASSED or FAILED in chat. Nothing is posted without your say-so.
+- **Hooks hold what must not be skipped.** A guard blocks an unreviewed push, an unapproved post or a merge on a red round; it costs nothing until it fires.
+- **One pass before a human sees the PR.** `kc-ready-for-review` runs `kc-code-review` (which includes the one QA walk), your repo's hand-off checklist and CI's commands once, fixes what it finds and proves each fix with a test.
 
-- **`kc-conventions` is the foundation.** The rules live there once. Claude follows them when writing, and `kc-gates` grades against the same text, so the two never disagree.
-- **`kc-gates` needs `kc-conventions`**, and installs it for you.
-- **`kc-ready-for-review` ties it together:** it runs `kc-code-review`, then the `kc-verify` QA skills, then your project's own hand-off checklist if it has one.
-- **`kc-instructions`, `kc-usage-band` and `kc-image-preview` stand alone.** Use them or not; nothing else depends on them.
-- **`kc-autopilot`** (work in progress) sits on top of `kc-gates` and `kc-conventions`.
+## Start here
+
+| When | Type or say | What happens |
+|---|---|---|
+| Your PR is about to go to a reviewer | `/kc-gates:kc-ready-for-review` | One review and QA pass on your own PR, fixes with tests, a short list left for you. |
+| You review a PR (or want yours checked) | "review this PR" | `kc-code-review` reports PASSED or FAILED, one line per finding. |
+| You want findings as PR comments | `/kc-gates:kc-post-review` | Drafts short comments, shows them, posts only after you say so. |
 
 ## Who runs on which model
 
@@ -83,106 +74,31 @@ flowchart TD
 
 ## Every skill, in one line
 
-Most skills start on their own when the topic comes up. You can also type any of them as `/plugin:skill`.
+Most start on their own when the topic comes up; you can type any as `/plugin:skill`.
 
-**`kc-gates`: review**
+**[`kc-gates`](plugins/kc-gates):** [`kc-code-review`](plugins/kc-gates/skills/kc-code-review/SKILL.md) (review a PR, branch or changes, walking every changed behaviour: the one QA, own PRs and others'), [`kc-ready-for-review`](plugins/kc-gates/skills/kc-ready-for-review/SKILL.md) (the one review and QA pass on your own PR), [`kc-post-review`](plugins/kc-gates/skills/kc-post-review/SKILL.md) (draft PR comments and replies, post on your signal).
 
-| Skill | What it does | Starts when |
-|---|---|---|
-| `kc-code-review` | Reviews a PR, branch or your working changes. One checker per topic, one PASSED or FAILED verdict. | You say "review this PR" or "review my changes". |
-| `kc-ready-for-review` | The one review and QA pass on your own PR before a person sees it. | Work is about to go to review. Claude is reminded to run it. |
-| `kc-post-review` | Drafts PR comments and replies, and posts them only on your say-so. | Claude is about to write any PR comment, or you type it. |
+**[`kc-verify`](plugins/kc-verify):** [`kc-ui`](plugins/kc-verify/skills/kc-ui/SKILL.md) (the change rendered, every state), [`kc-ux`](plugins/kc-verify/skills/kc-ux/SKILL.md) (a person can use it), [`kc-e2e`](plugins/kc-verify/skills/kc-e2e/SKILL.md) (every layer, front to back).
 
-**`kc-verify`: QA**
+**[`kc-conventions`](plugins/kc-conventions), topics:** [`kc-naming`](plugins/kc-conventions/skills/kc-naming/SKILL.md), [`kc-clarity`](plugins/kc-conventions/skills/kc-clarity/SKILL.md), [`kc-structure`](plugins/kc-conventions/skills/kc-structure/SKILL.md), [`kc-simplicity`](plugins/kc-conventions/skills/kc-simplicity/SKILL.md), [`kc-correctness`](plugins/kc-conventions/skills/kc-correctness/SKILL.md), [`kc-testing`](plugins/kc-conventions/skills/kc-testing/SKILL.md), [`kc-datetime`](plugins/kc-conventions/skills/kc-datetime/SKILL.md), [`kc-security`](plugins/kc-conventions/skills/kc-security/SKILL.md), [`kc-i18n`](plugins/kc-conventions/skills/kc-i18n/SKILL.md), [`kc-react`](plugins/kc-conventions/skills/kc-react/SKILL.md), [`kc-rails`](plugins/kc-conventions/skills/kc-rails/SKILL.md), [`kc-type-safety`](plugins/kc-conventions/skills/kc-type-safety/SKILL.md), [`kc-error-handling`](plugins/kc-conventions/skills/kc-error-handling/SKILL.md), [`kc-performance`](plugins/kc-conventions/skills/kc-performance/SKILL.md), [`kc-dependencies`](plugins/kc-conventions/skills/kc-dependencies/SKILL.md).
 
-| Skill | What it does | Starts when |
-|---|---|---|
-| `kc-ui` | Looks at the change rendered in a browser: every state, realistic data, different screen sizes. | "does this look right" |
-| `kc-ux` | Checks a person can actually use it: the flow, the wording, what happens on a mistake. | "is this easy to use", "check the flow" |
-| `kc-e2e` | Drives a change through every layer it touches, front to back. | "test this end to end" |
+**[`kc-conventions`](plugins/kc-conventions), process:** [`kc-do-a-task`](plugins/kc-conventions/skills/kc-do-a-task/SKILL.md) (the order of work, assess to look-back), [`kc-assess`](plugins/kc-conventions/skills/kc-assess/SKILL.md) (reproduce first, every reader of the broken value), [`kc-shape-the-change`](plugins/kc-conventions/skills/kc-shape-the-change/SKILL.md) (write and compare the design before code; a hook blocks source edits until it passes), [`kc-investigate`](plugins/kc-conventions/skills/kc-investigate/SKILL.md) (production problems from existing records), [`kc-look-back`](plugins/kc-conventions/skills/kc-look-back/SKILL.md) (feedback to lessons), [`kc-raise-the-bar`](plugins/kc-conventions/skills/kc-raise-the-bar/SKILL.md) (measure, look for a better way), [`kc-check-claims`](plugins/kc-conventions/skills/kc-check-claims/SKILL.md) (check a claim before stating it), [`kc-delegate`](plugins/kc-conventions/skills/kc-delegate/SKILL.md) (hand work to agents without the cost running away), [`kc-init`](plugins/kc-conventions/skills/kc-init/SKILL.md) (copy the rules into a project).
 
-**`kc-conventions`: the rules**
+**[`kc-instructions`](plugins/kc-instructions):** [`kc-audit`](plugins/kc-instructions/skills/kc-audit/SKILL.md) (review a repo's Claude instructions). **[`kc-autopilot`](plugins/kc-autopilot) 🚧:** [`kc-init`](plugins/kc-autopilot/skills/kc-init/SKILL.md), [`kc-run`](plugins/kc-autopilot/skills/kc-run/SKILL.md).
 
-| Skill | Covers |
-|---|---|
-| `kc-naming` | Names that say what a thing is for. |
-| `kc-clarity` | Code that reads in one pass: simple conditions, useful comments, no magic numbers. |
-| `kc-structure` | Where code lives and how files are shaped. |
-| `kc-simplicity` | Reuse what exists, build only what is needed. |
-| `kc-correctness` | Bugs: edge cases, wrong conditions, and other code that breaks when this code changes. |
-| `kc-testing` | Tests that fail when the code is broken. |
-| `kc-datetime` | Dates, times and time zones. |
-| `kc-security` | Request handlers: who may call them, ids that belong together, replay, scoping, server-owned values, secrets, redirects, injection. |
-| `kc-i18n` | Translations and locale files. |
-| `kc-react` | React components, hooks, data fetching and forms. |
-| `kc-rails` | Rails models, queries, migrations and specs. |
-| `kc-type-safety` | Types that tell the truth. |
-| `kc-error-handling` | Errors that are caught, reported and explained. |
-| `kc-performance` | Queries and renders that stay fast, and data sized for whatever receives it. |
-| `kc-dependencies` | Adding a library only when it earns its place. |
-| `kc-do-a-task` | The order of work on a task (assess, shape, build, commit, review and QA once, PR, look-back) and the skill that holds each step. |
-| `kc-delegate` | Handing work to subagents or a workflow without the cost running away. |
-| `kc-assess` | Assessing a task before building: claims check, reproduce first, every reader of the broken value. |
-| `kc-shape-the-change` | Writing the design down before code that stores something new, adds a unit or moves behaviour: where each fact lives, two shapes compared, rollout and who decided it, failure modes, approval. A hook blocks source edits until the file passes. |
-| `kc-investigate` | Investigating a production problem from the records that already exist, hop by hop, before building a probe or a fix. |
-| `kc-look-back` | The look-back at hand-off: list the feedback, a verdict each, lessons as one batch, where a lesson belongs. |
-| `kc-raise-the-bar` | Working is the floor: measure what was done, look for a better way that deletes before it adds, apply it or record what was tried. |
-| `kc-check-claims` | Checking a claim against its source before stating it. |
-| `kc-init` | Copies the rules into a project, to commit them there. The home copy installs itself. |
-
-**`kc-instructions`**
-
-| Skill | What it does | Starts when |
-|---|---|---|
-| `kc-audit` | Reviews a repo's Claude instructions and proposes a cleaner setup. | "audit my CLAUDE.md" |
-
-**`kc-autopilot`** 🚧 work in progress
-
-| Skill | What it does |
-|---|---|
-| `kc-init` | Sets a repo up for autopilot. Run once per repo, by typing it. |
-| `kc-run` | Splits an approved plan into units and delivers each as a pull request. |
-
-`kc-usage-band` and `kc-image-preview` have no skills. Once installed, they just show up above the prompt.
-
-## Install
-
-Add the marketplace, then install what you want. To get the everyday workflow, the first three lines are enough:
-
-```
-/plugin marketplace add kcsujeet/kc-claude-kit
-/plugin install kc-gates@kc-claude-kit
-/plugin install kc-verify@kc-claude-kit
-/plugin install kc-instructions@kc-claude-kit
-/plugin install kc-usage-band@kc-claude-kit
-/plugin install kc-image-preview@kc-claude-kit
-```
-
-`kc-gates` brings `kc-conventions` with it, and its hook copies the pointer rule (which names the skill to load for each kind of work) and the always-on rule (reply habits and pointers to the process skills) into `~/.claude/rules/` on your first prompt (and refreshes that copy after an update), so they load in every project; set `KC_CONVENTIONS_AUTO_INSTALL=0` to opt out. To also commit a copy into one project, run this there:
-
-```
-/kc-conventions:kc-init
-```
-
-`kc-autopilot` is a work in progress; install it only if you want to try it:
-
-```
-/plugin install kc-autopilot@kc-claude-kit
-```
-
-To keep the kit current, turn on auto-update for the marketplace: `/plugin`, the Marketplaces tab, `kc-claude-kit`, **Enable auto-update**.
+`kc-usage-band` and `kc-image-preview` have no skills.
 
 ## Make it yours
 
-The kit knows general rules, not your project. Three optional files in your repo teach it the rest. None is required.
+Four optional files in your repo teach the kit what it cannot know:
 
 | File | What it adds |
 |---|---|
-| `.claude/review-conventions.md` | Your project's own review rules. They win over the built-in ones. |
-| `.claude/hand-off-checklist.md` | What to check before a PR goes to review: the description, the ticket, linked PRs. |
-| `.claude/sensitive-paths.txt` | Paths to treat as risky, beyond the built-in list (payments, permissions, migrations). |
-| `.claude/public-paths.txt` | Paths a signed-out visitor reaches (one extended regex per line), beyond the built-in list; a change to one makes the review walk the page signed out. |
+| `.claude/review-conventions.md` | Your project's review rules. They win over the built-in ones. |
+| `.claude/hand-off-checklist.md` | What to check before a PR goes to review: description, ticket, linked PRs. |
+| `.claude/sensitive-paths.txt` | Paths to treat as risky, beyond the built-in list. |
+| `.claude/public-paths.txt` | Paths a signed-out visitor reaches (one extended regex per line); a change to one makes the review walk the page signed out. |
 
 ## More detail
 
-How the kit is built and why, its layout, conventions, versioning and tests: [`docs/architecture.md`](docs/architecture.md).
+Layout, conventions, versioning and tests: [`docs/architecture.md`](docs/architecture.md).

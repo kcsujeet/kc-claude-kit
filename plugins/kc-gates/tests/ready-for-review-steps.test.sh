@@ -7,7 +7,10 @@ set -euo pipefail
 
 tests_dir=$(cd "$(dirname "$0")" && pwd)
 plugin_dir=$(dirname "$tests_dir")
-skill="$plugin_dir/skills/kc-ready-for-review/SKILL.md"
+# The wording moved to references/detail.md; the skill and its detail are read as one text.
+skill=$(mktemp)
+trap 'rm -f "$skill"' EXIT
+cat "$plugin_dir/skills/kc-ready-for-review/SKILL.md" "$plugin_dir/skills/kc-ready-for-review/references/detail.md" > "$skill"
 
 failures=0
 fail() { echo "FAIL $1"; failures=$((failures + 1)); }

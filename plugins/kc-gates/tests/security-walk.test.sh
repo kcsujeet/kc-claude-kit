@@ -7,8 +7,17 @@ set -euo pipefail
 
 tests_dir=$(cd "$(dirname "$0")" && pwd)
 plugin_dir=$(dirname "$tests_dir")
-review="$plugin_dir/skills/kc-code-review/SKILL.md"
-verification="$plugin_dir/agents/verification-gate.md"
+# Wording moved to references/detail.md (the review skill) and verification-detail.md (the gate) is
+# checked where it now lives: each pair is read as one text.
+review_dir="$plugin_dir/skills/kc-code-review"
+review_text=$(mktemp)
+verification_text=$(mktemp)
+trap 'rm -f "$review_text" "$verification_text"' EXIT
+cat "$review_dir/SKILL.md" "$review_dir/references/detail.md" > "$review_text"
+cat "$plugin_dir/agents/verification-gate.md" "$review_dir/references/verification-detail.md" > "$verification_text"
+review="$review_text"
+verification="$verification_text"
+review_skill="$review_dir/SKILL.md"
 gate="$plugin_dir/agents/security-gate.md"
 
 max_skill_lines=500
@@ -31,7 +40,7 @@ grep -q 'N/A: no public-path reason)' "$verification" || fail "verification-gate
 grep -q 'other walk-items are §V11' "$verification" || fail "verification-gate §V10: every other walk-item is §V11's"
 grep -q 'grepped request surface: N hits' "$verification" || fail "verification-gate §V2: the security receipt"
 grep -q 'kc-conventions:kc-security' "$gate" || fail "security-gate preloads kc-security"
-[ "$(wc -l < "$review")" -lt "$max_skill_lines" ] || fail "kc-code-review SKILL.md must stay under $max_skill_lines lines"
+[ "$(wc -l < "$review_skill")" -lt "$max_skill_lines" ] || fail "kc-code-review SKILL.md must stay under $max_skill_lines lines"
 grep -q 'replayed with another record' "$plugin_dir/../kc-verify/skills/kc-e2e/SKILL.md" || fail "kc-e2e: the replay box"
 ! grep -q 'it is not a security review' "$review" || fail "kc-code-review: 'What this skill is not' must not deny the security gate it runs"
 grep -q 'correctness, security, project-conventions, this gate) was walked' "$verification" || fail "verification-gate self-review: the gate list includes security"

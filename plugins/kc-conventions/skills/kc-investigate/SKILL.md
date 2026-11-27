@@ -5,27 +5,27 @@ description: Use before building a probe, timing hook or fix for a production pr
 
 # Investigate a production problem
 
-A problem in production has already been recorded: request traces, job timestamps, slow logs, error stacks, change logs and commit history hold most answers before anything new is built. A probe built for the first guessed cause measures that guess and nothing else, takes a deploy and a wait, and can be wrong itself. Read what exists first, hop by hop, and build a probe only for a cause the records cannot settle.
+A problem in production has already been recorded: traces, job timestamps, slow logs, error stacks, change logs and commit history hold most answers before anything new is built. Read them hop by hop first; build a probe only for a cause the records cannot settle. Examples and full wording: `references/detail.md`.
 
-## Procedure
+## Steps
 
-1. **Start the write-up** at `$(git rev-parse --git-path kc-investigation)/<branch>.md` in the checkout the work happens in (the folder is created by you; nothing is committed). Copy the checklist below into it and fill each box with its evidence as you go. kc-conventions' `guard-investigation.sh` runs `check-investigation.sh` on that file before a pull request is opened or a comment or review is written (`gh pr create`, `gh pr comment`, `gh pr review`, `gh issue comment`, a comments API write, a tracker tool that creates or updates a comment) from that branch, and blocks while a box is open or has no evidence. Reading comments is never blocked.
-2. **Walk the boxes in order.** Each one names where its evidence comes from; evidence is a query or command in backticks, a `path:line`, a link, or a count. A box that cannot apply says `n/a: <why>` (never for §INV1 or §INV9).
-3. **Fill the cause table** (§INV9) last: every cause anyone has raised, each ruled `in` or `out` with the boxes that decide it, or `open` with the probe that would settle it.
-4. **Build only for an `open` cause.** A probe, a timing hook or a fix for a cause the table rules out is wasted work; one for a cause ruled in goes ahead with the table as its reason.
-5. **Run the check yourself** before sharing: `bash "${CLAUDE_PLUGIN_ROOT}/skills/kc-investigate/scripts/check-investigation.sh" <write-up>`.
+1. Start the write-up at `$(git rev-parse --git-path kc-investigation)/<branch>.md` in the checkout the work happens in (nothing is committed). Copy the checklist into it.
+2. Walk the boxes in order, filling each with evidence: a query or command in backticks, a `path:line`, a link or a count. A box that cannot apply says `n/a: <why>` (never for §INV1 or §INV9).
+3. Fill the cause table (§INV9) last: every cause anyone has raised, `in` or `out` with the deciding boxes, or `open` with the probe that would settle it.
+4. Build a probe, timing hook or fix only for an `open` cause, or one ruled in, with the table as its reason.
+5. Run the check yourself before sharing: `bash "${CLAUDE_PLUGIN_ROOT}/skills/kc-investigate/scripts/check-investigation.sh" <write-up>`. `guard-investigation.sh` runs it before `gh pr create`, `gh pr comment`, `gh pr review`, `gh issue comment`, a comments API write or a tracker comment from that branch, and blocks while a box is open or has no evidence. Reading comments is never blocked.
 
 ## Investigation checklist
 
-- [ ] §INV1 Hops: the symptom is split into the hops it passes (request in, write, enqueue, queue wait, pick-up, work, response or delivery), and each hop is timed from a record that already exists (a trace, a job's created and started times, a log timestamp), with the query that read it. Example: a slow async create split into the request (1 s) and the wait before a worker picked the job up (minutes).
-- [ ] §INV2 Dimensions: the timings are bucketed by input size, time window, tenant or account, and host or version, and the bucket that moves with the symptom is named with its numbers. Example: the median wait at 1 s under 5 MB and at minutes above 15 MB.
-- [ ] §INV3 Infrastructure: the datastore's slow log, network or byte metrics, the clients' own health warnings, and CPU or throttling on the hosts involved were read for the window. Example: a queue store's slow log listing the large writes, and the workers warning that the connection to it was slow. (N/A: says which of these the system has none of)
-- [ ] §INV4 Failures nearby: the error tracker's stacks and the status codes on the same path in the same window. Example: request timeouts whose stacks end in logging the job's arguments.
-- [ ] §INV5 Side effects: retries, duplicates and partial writes in the audit or change logs. Example: two records created a few seconds apart from one click, a retry after a timeout.
-- [ ] §INV6 Library source: for every hook, middleware or metric the investigation relies on or adds, the library's installed source was read to see where it runs and what it measures, cited by `path:line`. Example: a middleware that runs before the write it was meant to time. (N/A: nothing measured through a library hook)
+- [ ] §INV1 Hops: the symptom is split into the hops it passes and each is timed from an existing record (trace, job created/started times, log timestamp), with the query that read it.
+- [ ] §INV2 Dimensions: timings are bucketed by input size, time window, tenant and host or version; the bucket that moves with the symptom is named with its numbers.
+- [ ] §INV3 Infrastructure: the datastore's slow log, network or byte metrics, clients' health warnings and host CPU or throttling were read for the window. (N/A: names which the system has none of)
+- [ ] §INV4 Failures nearby: the error tracker's stacks and the status codes on the same path in the same window.
+- [ ] §INV5 Side effects: retries, duplicates and partial writes in the audit or change logs.
+- [ ] §INV6 Library source: for each hook, middleware or metric relied on or added, the installed source was read for where it runs and what it measures, cited `path:line`. (N/A: nothing measured via a library hook)
 - [ ] §INV7 History: the commit or pull request that introduced each suspect piece of code, from `git log` or blame.
 - [ ] §INV8 Vendor limits: the documented limits and guidance of each platform on the path (payload size, timeouts, connection counts), with the link.
-- [ ] §INV9 Cause table: a table with a `cause` column and a verdict column, one row per candidate cause, each `in` or `out` citing the boxes (§INV1 to §INV8) that decide it, or `open` naming the probe that would settle it. A probe is built only for an `open` row.
+- [ ] §INV9 Cause table: one row per candidate cause, `in` or `out` citing the boxes that decide it, or `open` naming the probe that would settle it; a probe is built only for an `open` row.
 
 ## The write-up
 
@@ -48,10 +48,3 @@ A problem in production has already been recorded: request traces, job timestamp
 | payload size | in: §INV2, §INV3, §INV4 |
 | worker capacity | open: probe the queue latency metric per worker |
 ```
-
-## Examples
-
-- A slow async create where a timing probe was built for the enqueue, when existing job records showed the enqueue took a second and the time went to moving a large payload to the worker; the wait grew with request size.
-- A report that "exports are missing", where the job's own log showed it stopped on one malformed row every night.
-- A flaky checkout where the error tracker grouped every failure under one third-party timeout that its status page had already reported.
-- Wrong totals after a deploy, where the commit history named the change to the rounding call.

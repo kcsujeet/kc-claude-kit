@@ -66,7 +66,7 @@ expect_contains "policy file: permissions risk" "risk: authentication or permiss
 make_case "$work_dir/pay" 'x = 1' src/checkout/summary.ts
 expect_contains "checkout folder: payments risk" "risk: payments (src/checkout/summary.ts)" "$(size_of "$work_dir/pay")"
 
-# A public or guest path makes kc-ready-for-review's signed-out walk required (§H6).
+# A public or guest path makes kc-ready-for-review's signed-out walk required (§G8).
 # Only where a file is decides it: no text on a changed line does.
 make_case "$work_dir/guest-flag" '  const canEditFooter = !isPublic && !locked' src/orders/OrderFooter.tsx
 expect_contains "an added public flag in an ordinary file: no signed-out walk" "risk: none" "$(size_of "$work_dir/guest-flag")"

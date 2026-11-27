@@ -15,7 +15,7 @@ combined_skill() {
 }
 plugins_root=$(dirname "$plugin_dir")
 always="$plugin_dir/rules/kc-always.md"
-assess="$plugin_dir/skills/kc-assess/SKILL.md"
+assess=$(combined_skill kc-assess)
 do_a_task="$plugin_dir/skills/kc-do-a-task/SKILL.md"
 
 failures=0
