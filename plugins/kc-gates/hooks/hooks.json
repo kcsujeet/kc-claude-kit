@@ -90,6 +90,12 @@
             "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/guard-unchecked-claim.sh\"",
             "shell": "bash",
             "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/guard-publish-noise.sh\"",
+            "shell": "bash",
+            "timeout": 10
           }
         ]
       },

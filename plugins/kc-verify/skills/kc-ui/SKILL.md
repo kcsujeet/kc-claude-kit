@@ -85,7 +85,7 @@ A green test suite says nothing about whether a screen looks right: tests assert
 - [ ] §UI4 A parent-domain session cookie was set in a separate headless browser on a mapped throwaway subdomain, never the developer's browser.
 - [ ] §UI5 If a design exists, the state matrix covers every switch in both positions, layout-changing option, role, empty/one/many, drawer and dialog.
 - [ ] §UI6 Every drawer and dialog was opened and filled in: empty, one item picked, several, and editing an existing item.
-- [ ] §UI7 The app, running the change's own code, was put in every matrix state and compared to the design section by section and element by element; code and the author's screenshots count for none.
+- [ ] §UI7 The app, running the change's own code, was put in every matrix state and compared to the design section by section and element by element; code and the author's screenshots count for none. The walk receipt's `design` line names the design and each browser item carries a capture of it in the same state (`design: <capture>`), or the line says `none: <why>`; `check-walk-receipt.sh` refuses a browser walk without it.
 - [ ] §UI8 Items matching a reference (template, guide, total, sheet) were measured against it in numbers, kept as a test that fails when an item moves off it.
 - [ ] §UI9 Every new or changed component, and each one moved into a new container, was measured against its siblings (title, subtitle, labels, spacing, field width against content).
 - [ ] §UI10 Every behaviour the change touches was set off every way a person can, while loading and settled, on every page sharing the component.

@@ -97,17 +97,27 @@ list_blamed_old_lines() {
   print_blame_of_file
 }
 
+# Prints the task key of the branch checked out in $1 (`abc-12` from `ABC-12-order-total`), lower case,
+# or nothing when the branch name carries none.
+get_branch_task_key() {
+  git -C "$1" rev-parse --abbrev-ref HEAD 2>/dev/null | grep -Eo '^[A-Za-z]{2,}-[0-9]+' | tr '[:upper:]' '[:lower:]' || true
+}
+
 # True when commit $2 (in directory $1) reached the default branch $3 through a pull request that
-# merged in the last HANDED_OFF_DAYS days. Each step fails to "not merged": a lookup that can't be
-# made never blocks.
+# merged in the last HANDED_OFF_DAYS days. When the branch names a task, only a pull request of that
+# task counts (its title or branch carries the key): a line someone else's merged work wrote is not a
+# fix of this task's own, so editing it is no loop. Each step fails to "not merged": a lookup that
+# can't be made never blocks.
 was_merged_recently() {
-  local dir=$1 sha=$2 default_branch_ref=$3 committed merged_pull_count
+  local dir=$1 sha=$2 default_branch_ref=$3 committed merged_pull_count task_key task_filter=true
   [ -n "$default_branch_ref" ] || return 1
   git -C "$dir" merge-base --is-ancestor "$sha" "$default_branch_ref" 2>/dev/null || return 1
   committed=$(git -C "$dir" show -s --format=%ct "$sha" 2>/dev/null) || return 1
   [ $(($(date +%s) - committed)) -le "$HANDED_OFF_SECONDS" ] || return 1
+  task_key=$(get_branch_task_key "$dir")
+  if [ -n "$task_key" ]; then task_filter="(((.title // \"\") + \" \" + (.head.ref // \"\")) | ascii_downcase | contains(\"$task_key\"))"; fi
   merged_pull_count=$(cd "$dir" && gh api "repos/{owner}/{repo}/commits/$sha/pulls" \
-    --jq "def merged_in_window: .merged_at != null and ((.merged_at | fromdateiso8601) > (now - $HANDED_OFF_SECONDS)); [.[] | select(merged_in_window)] | length" 2>/dev/null) || return 1
+    --jq "def merged_in_window: .merged_at != null and ((.merged_at | fromdateiso8601) > (now - $HANDED_OFF_SECONDS)); [.[] | select(merged_in_window and $task_filter)] | length" 2>/dev/null) || return 1
   [ "${merged_pull_count:-0}" -gt 0 ]
 }
 

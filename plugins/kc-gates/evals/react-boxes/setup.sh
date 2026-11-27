@@ -45,6 +45,28 @@ export function track(event: string, properties: Record<string, string> = {}): v
   navigator.sendBeacon('/api/events', JSON.stringify({ event, properties }))
 }
 TS
+cat > src/orders/EmailHtml.tsx <<'TSX'
+/** Renders an order email's HTML as the customer sent it. */
+export function EmailHtml({ html }: { html: string }) {
+  return <div className="email-html" dangerouslySetInnerHTML={{ __html: html }} />
+}
+TSX
+cat > src/orders/OrderEmailPanel.tsx <<'TSX'
+import { EmailHtml } from './EmailHtml'
+
+interface OrderEmailPanelProps {
+  html: string
+}
+
+/** The customer's email on the order page. Email HTML keeps its own widths, so it scrolls in its frame. */
+export function OrderEmailPanel({ html }: OrderEmailPanelProps) {
+  return (
+    <div className="email-frame" style={{ overflowX: 'auto', padding: 16 }}>
+      <EmailHtml html={html} />
+    </div>
+  )
+}
+TSX
 git add -A
 git commit -q -m "Add order types, orders hook and analytics"
 
@@ -134,6 +156,26 @@ interface OrderTotalProps {
 /** Shows an order's total in dollars. */
 export function OrderTotal({ order }: OrderTotalProps) {
   return <p>Total: ${(order.totalCents / 100).toFixed(2)}</p>
+}
+TSX
+# §R39: the email moves out of its scrolling frame into a two-column layout, and nothing scrolls it now.
+cat > src/orders/OrderEmailPanel.tsx <<'TSX'
+import type { ReactNode } from 'react'
+import { EmailHtml } from './EmailHtml'
+
+interface OrderEmailPanelProps {
+  html: string
+  summary: ReactNode
+}
+
+/** The customer's email on the order page, with the order summary beside it. */
+export function OrderEmailPanel({ html, summary }: OrderEmailPanelProps) {
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 16 }}>
+      <EmailHtml html={html} />
+      <aside>{summary}</aside>
+    </div>
+  )
 }
 TSX
 git add -A

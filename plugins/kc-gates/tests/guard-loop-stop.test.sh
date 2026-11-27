@@ -130,6 +130,17 @@ write_route none
 check_verdict allow "allowed: a commit on main that no PR merged" "git commit -m 'fix the fix'" "$merged_repo"
 : > "$work_dir/gh/routes.tsv"
 check_verdict allow "allowed: the PR lookup fails" "git commit -m 'fix the fix'" "$merged_repo"
+# loop-stop-task: on a branch that names a task, only that task's own merged work is a loop.
+run_git_in "$merged_repo" checkout -q -b ABC-12-order-total
+write_task_route() { # <title> <head ref>
+  printf 'api repos/{owner}/{repo}/commits/%s/pulls\tpulls.json\n' "$merged_commit_sha" > "$work_dir/gh/routes.tsv"
+  jq -cn --arg merged "$now_iso" --arg title "$1" --arg ref "$2" '[{number: 7, merged_at: $merged, title: $title, head: {ref: $ref}}]' > "$work_dir/gh/pulls.json"
+}
+write_task_route "ABC-12: Show the order total" "abc-12-order-total-first"
+check_verdict deny "loop-stop-task: blocked, this task's own merged fix wrote the line" "git commit -m 'fix the fix'" "$merged_repo"
+write_task_route "XYZ-9: Dark mode for the storefront" "xyz-9-dark-mode"
+check_verdict allow "loop-stop-task: allowed, another task's merged work wrote the line" "git commit -m 'move the line'" "$merged_repo"
+run_git_in "$merged_repo" checkout -q follow-up
 write_route "$now_iso"
 old_repo="$work_dir/old-repo"
 make_repo "$old_repo"

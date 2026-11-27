@@ -85,7 +85,9 @@ done
 # Per file: block, box and sweep checks. Prints `P<TAB>problem`, `G<TAB>gate` (a block seen),
 # `B<TAB>id` (a SCOPE box), `K<TAB>kind` (SCOPE block seen, a box, a sweep, a gate block checked).
 read_blocks() {
-  awk -v file="$(basename "$1")" '
+  # Byte-wise: a verdict copied from a terminal can hold a byte that is not valid in the session's
+  # locale, and a multibyte awk then stops on it.
+  LC_ALL=C awk -v file="$(basename "$1")" '
     function trim(s) { sub(/^[[:space:]]+/, "", s); sub(/[[:space:]]+$/, "", s); return s }
     function say(text) { printf "P\t%s: %s\n", file, text }
     function count_locations(text,   rest, seen, total, location) {
@@ -303,7 +305,9 @@ if $is_later_round; then
   receipt_text=""
   [ "${#files[@]}" -eq 0 ] || receipt_text=$(cat "${files[@]}")
   for receipt_line in "fixes re-checked" "rewrites checked" "rename-only lines kept"; do
-    printf '%s\n' "$receipt_text" | grep -Eq "(^|[^0-9])[0-9]+ $receipt_line" \
+    # A here-string, not printf into grep -q: grep -q stops at the first match and, under pipefail, a
+    # large receipt makes printf fail on the closed pipe, so a line that is there reads as missing.
+    grep -Eq "(^|[^0-9])[0-9]+ $receipt_line" <<<"$receipt_text" \
       || problem "verdicts/: no \"<n> $receipt_line\" line (write it in verdicts/checklist.txt, 0 when none)"
   done
   rename_count=$(bash "$scripts_dir/rename-only-lines.sh" "$round_dir/review.diff" | grep -c . || true)
@@ -315,7 +319,7 @@ if $is_later_round; then
   while IFS= read -r walk_path; do
     [ -n "$walk_path" ] || continue
     walk_count=$((walk_count + 1))
-    printf '%s\n' "$receipt_text" | grep -F "$walk_path" | grep -q 'Walk:' \
+    grep -F "$walk_path" <<<"$receipt_text" | grep 'Walk:' >/dev/null \
       || problem "verdicts/: walk-item $walk_path has no \"Walk:\" line naming it"
   done < <(printf '%s\n' "$gate_report" | sed -n 's/^walk-item: //p' | sed -E 's/ surface: [a-z]+$//')
 fi
