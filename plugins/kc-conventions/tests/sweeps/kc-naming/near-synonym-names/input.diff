@@ -1,0 +1,23 @@
+diff --git a/src/orders/OrderStatusBanner.tsx b/src/orders/OrderStatusBanner.tsx
+new file mode 100644
+--- /dev/null
++++ b/src/orders/OrderStatusBanner.tsx
+@@ -0,0 +1,8 @@
++export const OrderStatusBanner = ({ order }: Props) => {
++  const isShipping = order.status === Status.SHIPPING
++  const isAwaitingPayment = order.status === Status.AWAITING_PAYMENT
++  const hasFailedPayment = order.paymentReason === Reason.PAYMENT_FAILED
++  const hasPaymentError = isAwaitingPayment && hasFailedPayment
++  const canCancel = order.cancellable
++  return <Banner error={hasPaymentError} shipping={isShipping} />
++}
+diff --git a/app/refunds/refund_state.py b/app/refunds/refund_state.py
+new file mode 100644
+--- /dev/null
++++ b/app/refunds/refund_state.py
+@@ -0,0 +1,5 @@
++def refund_state(refund):
++    has_failed_refund = refund.failed
++    is_refund_open = refund.open
++    is_open = refund.open
++    return has_failed_refund

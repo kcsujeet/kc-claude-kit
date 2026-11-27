@@ -177,6 +177,8 @@ getItemClassName?: (item: Item) => string | undefined // new: optional return, f
 
 - **Checklist wording (moved from SKILL.md):** No refactor leftovers: no markup or block left duplicated by an incomplete refactor, no import nothing uses, no prop or param threaded through and never read, no commented-out code. (N/A: none in the diff)
 
+- **A new file that near-copies an existing one.** A helper, fixture or test setup written beside one that already does almost the same job (two "turn on a feature for the test store" helpers that differ only in which feature) is one unit taking the difference as an argument. `near-copies.sh` compares each added file's code shape with the repo's files, test folders included, and lists the closest; each pair gets a verdict: consolidate, or say why both stay.
+
 ### §P10. A shared prop added for one caller
 
 - A prop or option added to a shared component or helper so that one caller can get a special case makes every other caller carry it. Ask whether the caller could own the behavior (wrap or compose the shared piece), or whether the case is general enough that several callers would plausibly use it today. A shared component with many props, several of which only one caller passes, is the accumulated form of this finding.

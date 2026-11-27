@@ -72,5 +72,6 @@ Load this before drafting any PR comment or reply (replies to reviewers on your 
 - [ ] §PC10 Re-read before written to: anything shared (PR body, ticket, document, sheet) was fetched again just before the write; a row is found by its content.
 - [ ] §PC11 When your change alters someone else's work, the PR says up front what of theirs is kept and what changed and why, with command output.
 - [ ] §PC12 Content handed to a tool that transforms it (editor, formatter, importer) is shaped to survive it and read back afterwards.
+- [ ] §PC13 No emoji and no softener close ("if that's okay", "hope this helps") in a posted comment or reply, whatever a repo's own example shows. Held by `guard-github-post.sh`.
 
 - Detail per box and the full tone, example, reply and posting text: `references/detail.md`.

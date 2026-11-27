@@ -522,6 +522,28 @@ EOF
   printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"%s"}}' "$reason"
 }
 
+# Prints the deny JSON when a body the command posts carries an emoji or a stock softener ("if
+# that's okay", "hope this helps"): kc-post-review's tone rules, which prose alone did not hold.
+get_tone_verdict() {
+  local command=$1 found reason
+  command -v perl >/dev/null 2>&1 || return 0
+  found=$(extract_bodies "$command" | perl -CSD -0777 -ne '
+    my (@found, %seen);
+    for my $body (split /\x{1e}/) {
+      # A verdict report marks severity with emoji by design (kc-code-review).
+      next if $body =~ /^#{2,4} Review:|Verdict:[^A-Za-z]*(?:PASSED|FAILED)/m;
+      push @found, "an emoji" if $body =~ /[\x{1F300}-\x{1FAFF}\x{2600}-\x{27BF}\x{2B50}\x{2705}]/;
+      push @found, "a stock softener (\x{201c}$1\x{201d})"
+        if $body =~ /\b((?:if|hope) (?:that|this)(?:\x27s|\x{2019}s| is) (?:okay|ok|alright|fine)|hope (?:this|that) helps)\b/i;
+    }
+    print join("; ", grep { !$seen{$_}++ } @found);
+  ' 2>/dev/null)
+  [ -n "$found" ] || return 0
+  found=$(printf '%s' "$found" | sed 's/["\\]//g')
+  reason="Blocked by the kc-gates plugin: a body this posts carries $found (kc-post-review §PC13). Give the reason plainly and stop: no emoji, no softener close, whatever a repo's own example shows. Rewrite it, show the user the new text, then post."
+  printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"%s"}}' "$reason"
+}
+
 print_deny() {
   cat <<'EOF'
 {"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Blocked by the kc-gates plugin: this command writes a PR or issue comment or review to GitHub without the approval token. Do not retry and do not add the token yourself. Show the user the full draft, the head SHA it anchors to and the posting shape, then stop and wait for an explicit, fresh post signal in their latest message. Only after that signal, prefix each write command with KC_REVIEW_POST_APPROVED=1 in the same command (see /kc-gates:kc-post-review)."}}
@@ -549,6 +571,11 @@ main() {
           exit 0
         fi
         verdict=$(get_report_verdict "$command")
+        if [ -n "$verdict" ]; then
+          printf '%s' "$verdict"
+          exit 0
+        fi
+        verdict=$(get_tone_verdict "$command")
         if [ -n "$verdict" ]; then
           printf '%s' "$verdict"
           exit 0

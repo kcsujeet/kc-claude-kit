@@ -347,3 +347,8 @@ grepped &&/||: 6 hits
 - A group line ("booleans look fine") is insufficient. **Silence is not a pass:** a gate that found none must print `grepped &&/||: 0 hits`, so "no receipt" can never be mistaken for "nothing there." Single-operand JSX guards (`{editMode && <X />}`) pass trivially, but they still get listed — the count is what proves the sweep ran.
 
 - When a checklist box cites a convention rather than a hard rule (e.g. what counts as an established helper name in this codebase), grep the target repo for 2–3 existing examples before citing the convention — do not assert a house style from memory.
+
+### §N14
+
+- Two or more names in one scope that share a word (`isAwaitingPayment`, `hasFailedPayment`, `hasPaymentError`) read as the same thing unless each says what it tests. Name the condition, not a synonym of its neighbour: `isPaymentFailedReason` for a field check, `isAwaitingPayment` for a status, and inline or rename the one that combines them.
+- `near-synonym-names.sh` lists each group of boolean-shaped names that share a content word; one verdict per group. N/A: no boolean-shaped names added.

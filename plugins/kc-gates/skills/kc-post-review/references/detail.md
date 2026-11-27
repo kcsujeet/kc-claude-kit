@@ -479,3 +479,7 @@ KC_REVIEW_POST_APPROVED=1 gh api repos/{owner}/{repo}/pulls/<NUM>/comments/<FIRS
 ```bash
 KC_REVIEW_POST_APPROVED=1 gh api repos/{owner}/{repo}/pulls/comments/<COMMENT_ID> -X PATCH --input /tmp/edit-comment.json
 ```
+
+### §PC13
+
+- A repo's own example of a reply can carry an emoji or a softener close ("... if that's okay 🙂"). The tone rules here still hold: give the reason plainly and stop. `guard-github-post.sh` denies a posted body with an emoji or a softener close ("if that's okay", "hope this helps"); a review verdict report keeps its severity marks.

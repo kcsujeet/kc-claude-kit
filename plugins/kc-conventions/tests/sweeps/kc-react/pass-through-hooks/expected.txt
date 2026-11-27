@@ -1,0 +1,4 @@
+src/orders/OrderPanel.tsx:2:   const { receipt: fetchedReceipt, isLoading } = useOrderReceipt(order.id)
+src/orders/OrderPanel.tsx:19:   const notes = useOrderNotes(order.id)
+src/orders/OrderPanel.tsx:24:   const { label } = useOrderLabel(order.id)
+src/orders/RefundPanel.tsx:2:   const { refund, isLoading } = useRefund(order.id)
