@@ -6,6 +6,12 @@ set -euo pipefail
 
 tests_dir=$(cd "$(dirname "$0")" && pwd)
 plugin_dir=$(dirname "$tests_dir")
+combined_skill() {
+  local out
+  out=$(mktemp)
+  cat "$plugin_dir/skills/$1/SKILL.md" "$plugin_dir/skills/$1/references/detail.md" > "$out"
+  echo "$out"
+}
 plugins_root=$(dirname "$plugin_dir")
 agreement="$plugin_dir/rules/kc-working-agreement.md"
 assess="$plugin_dir/skills/kc-assess/SKILL.md"
@@ -37,7 +43,7 @@ grep -q 'is a bug, never a question: reproduce it and fix it' "$assess" || fail 
 grep -q 'gets its answer and no edit' "$assess" || fail "kc-assess: a question gets no edit in the same turn"
 
 # kc-testing: checks after a mechanical edit, and the full suites of a shared unit's users.
-testing="$plugin_dir/skills/kc-testing/SKILL.md"
+testing=$(combined_skill kc-testing)
 grep -q 'run lint and the formatter on every file it touched before committing' "$testing" || fail "kc-testing: lint every file a mechanical edit touched"
 grep -q "run the full suites of every package that uses it" "$testing" || fail "kc-testing: full suites of a shared unit's users"
 

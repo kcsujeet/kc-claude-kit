@@ -10,10 +10,15 @@
 #   --dest     where to install (default: .claude/rules in the current directory)
 #   --dry-run  print what would change and write nothing
 #
+# Also removes stale generated copies: a `kc-*.md` in the destination that no longer exists in
+# rules/ and carries the old "Generated from skills/" header (the per-topic rules this plugin
+# used to ship). Other files are never touched.
+#
 # Output: one line per rule, `new: <file>`, `unchanged: <file>` or
 # `replaced: <file>` (the installed copy differed and is overwritten; with
 # --dry-run, `would replace: <file>`), then `version: <v>` and
-# `installed <n> rule(s) into <dest>`.
+# `installed <n> rule(s) into <dest>`; `removed: <file>` (`would remove: <file>` with --dry-run)
+# for each stale copy.
 # Exits 0 on success, 1 when the rules or the plugin version cannot be found,
 # 2 on a usage error.
 set -euo pipefail
@@ -66,6 +71,22 @@ if [ "$dry_run" = false ]; then
   mkdir -p "$dest_dir"
 fi
 
+remove_stale() {
+  local stale_file stale_name
+  for stale_file in "$dest_dir"/kc-*.md; do
+    [ -f "$stale_file" ] || continue
+    stale_name=$(basename "$stale_file")
+    [ -e "$rules_dir/$stale_name" ] && continue
+    head -n 8 "$stale_file" | grep -q 'Generated from skills/' || continue
+    if [ "$dry_run" = true ]; then
+      echo "would remove: $stale_name"
+    else
+      rm -f "$stale_file"
+      echo "removed: $stale_name"
+    fi
+  done
+}
+
 for rule_file in "$rules_dir"/*.md; do
   rule_name=$(basename "$rule_file")
   installed_file="$dest_dir/$rule_name"
@@ -92,6 +113,8 @@ for rule_file in "$rules_dir"/*.md; do
   fi
   echo "$status: $rule_name"
 done
+
+remove_stale
 
 if [ "$dry_run" = true ]; then
   echo "version: $plugin_version (dry run, nothing written)"

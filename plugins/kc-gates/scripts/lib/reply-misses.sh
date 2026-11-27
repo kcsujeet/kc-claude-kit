@@ -1,8 +1,7 @@
 # shellcheck shell=bash
 # The reply rules' shared parts, sourced by the Stop hooks that note a reply's misses
 # (check-reply-length.sh, check-reply-sources.sh), the turn-start hook that names them
-# (remind-reply-rules.sh). Misses are kept per session in the plugin's data folder. is_question is
-# also read by guard-late-answer.sh.
+# (remind-reply-rules.sh). Misses are kept per session in the plugin's data folder.
 
 # shellcheck disable=SC2034  # read by the scripts that source this file
 readonly REPLY_MAX_WORDS=180
@@ -65,18 +64,6 @@ asks_fix() {
     && printf '%s' "$prompt_text" | grep -Eq "(^|[^[:alnum:]])(address|handle|resolve|respond to|look at|go through|work through|act on|throws?|threw|returns?|returned|gets?|got|seeing|hits?)([^[:alnum:]]|$)"
 }
 
-# A cause word and a fix word anywhere in the reply, in any order.
-proposes_cause_and_fix() {
-  printf '%s' "$1" | grep -Eiq "(^|[^[:alnum:]])cause[sd]?([^[:alnum:]]|$)" \
-    && printf '%s' "$1" | grep -Eiq "(^|[^[:alnum:]])fix(es|ed)?([^[:alnum:]]|$)"
-}
-
-# True when a reply names how the problem was reproduced: a "Reproduced:" or "Not reproduced:"
-# line, any Markdown emphasis around the label allowed.
-names_reproduction() {
-  printf '%s\n' "$1" | grep -Eiq "(^|[^[:alnum:]])(not )?reproduced[*_]*:"
-}
-
 # True when the prompt is only a question: it ends with `?` and asks for no change (no imperative
 # such as fix, build, add or "do it" anywhere in it). "Can you fix this?" is a request, "why does
 # this fail?" is a question. A "do/does/did" before a subject is a question word, not an order.
@@ -92,7 +79,7 @@ is_only_question() {
 # `await`, VAR=value assignments and runners (sudo, env, time, bunx, npx, bundle exec, pnpm exec and
 # the like) with their flags, and past the directory of the command's own path, so `bin/rspec spec/a.rb`
 # and `./node_modules/.bin/jest a.test.ts` read as `rspec spec/a.rb` and `jest a.test.ts`.
-# Read by guard-unreproduced-cause.sh, and by check-reply-sources.sh through list_command_starts.
+# Read by work-call.sh, and by check-reply-sources.sh through list_command_starts.
 list_stripped_commands() {
   awk '{
     count = split($0, commands, /&&|\|\||;|\|/)

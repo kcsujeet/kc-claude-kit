@@ -157,7 +157,7 @@ Add the marketplace, then install what you want. To get the everyday workflow, t
 /plugin install kc-image-preview@kc-claude-kit
 ```
 
-`kc-gates` brings `kc-conventions` with it, and its hook copies the coding rules into `~/.claude/rules/` on your first prompt (and refreshes that copy after an update), so they load in every project; set `KC_CONVENTIONS_AUTO_INSTALL=0` to opt out. To also commit a copy into one project, run this there:
+`kc-gates` brings `kc-conventions` with it, and its hook copies the pointer rule (which names the skill to load for each kind of work) and the working agreement into `~/.claude/rules/` on your first prompt (and refreshes that copy after an update), so they load in every project; set `KC_CONVENTIONS_AUTO_INSTALL=0` to opt out. To also commit a copy into one project, run this there:
 
 ```
 /kc-conventions:kc-init

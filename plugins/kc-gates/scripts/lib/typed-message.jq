@@ -32,6 +32,6 @@ def get_tool_call_target:
   (.input.file_path // .input.path // .input.command // .input.code // .input.pattern // "") | tostring | gsub("\n"; " ; ");
 
 # A tool call of an assistant entry as one line: the tool's name, a tab, then its target. Empty for any
-# other entry. Read by check-reply-sources.sh and guard-unreproduced-cause.sh.
+# other entry. Read by check-reply-sources.sh.
 def get_tool_call_lines:
   select(.type == "assistant") | .message.content[]? | select(.type == "tool_use") | .name + "\t" + get_tool_call_target;

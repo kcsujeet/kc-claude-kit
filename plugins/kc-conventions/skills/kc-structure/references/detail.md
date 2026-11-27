@@ -1,0 +1,351 @@
+# Structure: examples and edge cases per box
+
+Code-placement and API-shape rules for the diff under review. Covers sixteen independent failure modes: mixed responsibilities inside one unit, wrong-layer co-location, leftover single-file folders and re-export barrels, dead wrappers, branch-selection that should be a lookup, misplaced helpers, missing JSDoc on exported APIs, default exports on new files, literal unions standing in for serialized enums, unflagged breaking changes to a public API, modules sitting in a folder that promises a different kind of module, public exports widened only to share an internal, exports unrelated to their module, new code placed in a home whose subject it does not act on, files exporting several components, non-route files in the routing layer, moved or renamed files graded as old, and providers that reshape what their caller asked for.
+
+### §S1. Separation of concerns
+
+Each unit of code should have one observable responsibility. A reader looking at the name and signature should be able to predict what it does *and what it doesn't do*. Bundling unrelated concerns hides side effects, couples consumers to things they don't need, and makes the unit harder to test or replace.
+
+**The rule of thumb:** if a reader can't tell from the import or call site what categories of work the unit performs (network? state? rendering? pure computation?), the split is wrong.
+
+Common manifestations to flag:
+
+- **A data-reading unit that also bundles formatters or selectors.** A hook or function whose job is "fetch/read X" should return the read result (`{ data, isLoading, error, refetch }` or equivalent) and nothing else. Selectors, formatters, lookups, or any pure transformation over the read shape belong in a plain utility, not folded into the read unit's return. Otherwise every consumer of the formatter drags in the read mechanism too, and the formatter can't be used outside that context.
+- **A utility function that quietly performs side effects.** A `formatX`/`parseX` that secretly writes to a store, fires a network call, or invalidates a cache. Util-shaped names imply pure transformations; side effects should be visible at the call site.
+- **A component bundling fetch + derivation + render.** Split the read into its own unit, push derived values into a plain helper (or a memoized selector at the call site), and let the component render.
+- **A read unit bundling a mutation, or a mutation unit bundling a query.** Flag as a §S1 violation regardless of which framework-specific data layer owns the split.
+- **A single helper that does parsing + validation + business logic.** Split into separately testable units.
+
+**Flag shape:** when a read unit returns `{ data, isLoading, ...somethingElse }`, name what `somethingElse` is and ask whether it belongs at the call site (consumer-derived) or in a plain helper (pure transformation). If it's neither, a concern was missed.
+
+The convention is not "everything must be pure" — state, effects, and async work all have legitimate homes. The convention is that those homes are obvious from the type and name of the unit, not hidden inside it.
+
+**The directory path is part of the contract.** A file under a hooks/read-unit location advertises that it exports that kind of unit; a file under a utils/helpers location advertises pure functions; a file under components advertises components. When a helper is correctly extracted out of a hook (good) but the new file still lands in the hooks location (bad), the path still lies — every importer resolves it from a path that promises a hook. Two checks must both pass:
+
+1. The read unit is lean (returns only its data-shape fields, no helper).
+2. The extracted helper lives where its shape implies, not where it happened to be extracted from.
+
+If (1) is satisfied but the extraction landed in the wrong location anyway, the split is incomplete — flag it as a mechanical move (relocate + update import paths at each call site), not a design problem.
+
+**Where exactly does the extracted helper go?** Don't guess a layout; grep the target repo. Check whether a `utils/`-equivalent folder already exists at the relevant scope (app-level, feature-level, or co-located), and follow whatever grouping convention is already visible for helpers of that kind — the same resource/domain naming the read units already use. Don't invent a new top-level grouping word (e.g. calling something a "feature" when the surrounding code doesn't use that shape) just to house one file.
+
+### §S2. Code placement and co-location
+
+New code should follow the target repo's existing layout — grep for where similar units already live before proposing a location; don't impose a structure the repo hasn't adopted. Old code under a legacy layout should not be flagged just for being there if it's an established, still-in-use pattern for that area — migrations happen gradually, one area at a time.
+
+**Co-location rule: promote to the consumers' nearest common ancestor — judged by consumer *scope*, not raw count.**
+
+- **Exactly one consumer** → keep the helper in the same location as its consumer, no separate subfolder. The clearest example is a paired hook-and-view: a hook that only ever backs one component lives side by side with it.
+- **Multiple consumers** → move it to the **nearest folder that contains all of them**, and no higher. The destination is decided by *coupling and realistic reuse* — how tightly the helper belongs to one set of consumers and whether anything else could plausibly consume it — not by a raw count:
+  - Tightly coupled to one consumer subtree, used only by those consumers, with no realistic external consumer → co-locate at the subtree's shared root, even across sibling subfolders. This is the primary signal on its own. A dependency that only exists inside that subtree (e.g. the helper reads a context/provider mounted only within those consumers) *reinforces* the call but isn't required — sole-use plus tight coupling is enough.
+  - Genuinely cross-boundary, or plausibly reusable standalone → promote. If the helper is consumed by the shared data/resource layer, or by consumers in another feature/domain, move it to that feature's shared subfolder or the app-global shared location.
+- **For a view-bound helper, promotion is YAGNI-gated — pull it out when a real external consumer appears, not before.** Don't relocate a presentation/formatting helper to a shared location on the *speculation* that something might reuse it. Ask "is anything outside this subtree consuming it *today*?" — if no, it stays co-located regardless of consumer count.
+- **Role overrides YAGNI for inherently-shared-layer code.** A unit whose *role* is the shared data/resource layer belongs in the shared location from day one, even with a single current consumer. This is also the one exception to §S17. Its home is dictated by architecture, not by counting consumers — it is by definition the reusable seam other code composes against, so co-locating it next to today's one caller and waiting is wrong. YAGNI gates *view-local* helpers; it does not demote data-layer code out of its layer.
+
+**Worked example (promotion within a feature).** A hook `useRequestPriceSummary`, defined inside one subview's folder, is consumed by two sibling components in that same subview — no promotion needed, it stays. Once a third consumer appears in an unrelated subview of the same feature, promote it to the feature's own shared hooks location — not all the way to the app-global shared location. This is promotion to the nearest sensible shared root, not a jump to the top.
+
+**Counter-example (do not over-promote).** A `useSomeFormatters` presentation hook co-located with one view's components — consumed by several components in that view plus one sibling read-only view — correctly stays put even at five or six consumers: it is tightly coupled to those view components, used only by them, with no realistic chance of being consumed elsewhere. (It may also read a context that only exists within that view subtree — a reinforcing signal, but the coupling alone justifies staying even without it.) Moving it to the app-global shared location, where the resource/actions data-layer hooks live, would falsely imply it's a cross-cutting data hook. It moves only if and when some other feature actually needs it.
+
+**Audit trigger on restructures.** When a PR moves a folder (reshuffle, rename, etc.), every file inside it inherits the new placement. Re-evaluate each one against this rule even if it didn't move *within* the parent — the parent move IS a placement change. Don't give a file a pass just because "it was already there"; a pre-existing violation propagated through a rename becomes the current PR's violation.
+
+**Cross-feature imports** (one feature importing directly from another feature's internals) are a placement smell in any codebase organized by feature — compose at a shared layer instead (boxed in the `react` skill, §R2, for React/TS diffs; for non-React code organized by feature folders, raise it under §S2 with the same compose-at-the-top fix).
+
+### §S3, §S20. File and folder shape
+
+The detail for these two boxes (single-file folders and barrels; where a unit's helpers, constants and types go and what their file is named) is in `${CLAUDE_PLUGIN_ROOT}/skills/kc-structure/references/files.md`. Read it in full before grading either.
+
+### §S4. No dead wrappers
+
+If a wrapper adds no semantic value over the thing it wraps, drop it and use the wrapped value directly. Wrappers earn their place by adding a transformation, a type narrowing, a side effect, a default, or documentation that the wrapped thing cannot provide on its own. A side effect every caller could attach itself (an `onSuccess` callback) does not count. If you cannot name what the wrapper adds, it is dead.
+
+This rule is **absolute** and applies to functions, variables, arrays, objects, hooks, components — anything. Distinct shapes of the same mistake recur across a single PR; catch all of them independently, don't stop at the first.
+
+**Dead wrapper shapes to flag:**
+
+- **Single-item array wrapping a const, only ever spread back out:**
+  ```ts
+  // Bad
+  export const FOO_KEY = [BASE_KEY]
+  // …
+  key: [...FOO_KEY, id]
+
+  // Good
+  key: [BASE_KEY, id]
+  ```
+  Same for any `const FOO_BASE = [X]` followed by `[...FOO_BASE, y]`. Inline it.
+
+- **Async function that only awaits and returns nothing useful:**
+  ```ts
+  // Bad
+  return { refetch: async () => { await refetch() } }
+
+  // Good
+  return { refetch }
+  ```
+  If `refetch` already returns a promise, update the return-type annotation instead of wrapping.
+
+- **Function that destructures-and-reconstructs the arguments it receives:**
+  ```ts
+  // Bad
+  return {
+    callback: (args, { onDone }: CallbackOptions = {}) => callback(args, { onDone })
+  }
+
+  // Good
+  return { callback }
+  ```
+  Calling-convention preservation is not a transformation. If the options type only re-declares fields already on the wrapped function's own options type, drop it and expose the wrapped function directly.
+
+- **Const alias used exactly once at the same scope:**
+  ```ts
+  // Bad
+  const handleClose = onClose
+  return <Dialog onClose={handleClose}>
+
+  // Good
+  return <Dialog onClose={onClose}>
+  ```
+  The alias adds a hop without renaming or transforming.
+
+- **Object spread that reproduces the source verbatim:**
+  ```ts
+  // Bad — the surrounding utility already defaults to identity transforms
+  transformResponse: (res: T) => ({ ...res })
+  ```
+  Drop the option entirely.
+
+- **A value the consumer already independently derives from the same input** (producer = any function, util, hook, provider, component — anything handing a value to a caller): if the producer returns a value computed purely from data the consumer also has, and the consumer separately computes the same thing, that's two derivations, not one source.
+  ```ts
+  // Bad — producer returns it, consumer recomputes it from the same input
+  // producer:  const ready = Boolean(a && b && c)   // …and returns `ready`
+  // consumer:  const ready = Boolean(a && b && c)   // already has a, b, c
+
+  // Good — one place owns the derivation; the other reads it (or keeps its own)
+  ```
+  Distrust the "single source of truth" justification here — a value the consumer can and does recreate is the opposite of a single source. Fix in either direction (drop it from the producer's output, or delete the consumer's copy and read the returned one), never keep both. Diff the two derivations; if they reduce to the same expression over the same inputs, one must go.
+
+- **Promise that wraps another promise** — `Promise.resolve(await x)` is just `x` (or `await x`).
+
+- **Manual await-then-callback when the callee already accepts a callback:**
+  ```ts
+  // Bad
+  const result = await runAsync(input)
+  onSuccess?.(result)
+  return result
+
+  // Good
+  return runAsync(input, { onSuccess })
+  ```
+  (Library-flavored example: a mutation hook that already accepts an `onSuccess` option in its call signature — awaiting the async variant and manually invoking the callback afterward is the same dead wrapper.)
+
+- **A hook or function that returns an inner call's values unchanged:**
+  ```ts
+  // Bad: three keys come straight from useWidgetQuery and are returned untouched
+  const { widget, isLoading, refetch } = useWidgetQuery(widgetId)
+  return { widget, isLoading, refetch, total: getWidgetTotal(widget) }
+
+  // Good: the consumer calls useWidgetQuery itself, or the hook spreads it
+  const widgetQuery = useWidgetQuery(widgetId)
+  return { ...widgetQuery, total: getWidgetTotal(widgetQuery.widget) }
+  ```
+  Re-listing the keys by hand is what lets the surface drift: a key stops being read and nothing says so. The same goes for a value read from a context or settings hook and returned unchanged; the consumer can call that hook too. Enumerate it: per changed hook, the keys returned against the keys taken from inner calls.
+
+- **A wrapper whose only addition is a callback every caller could pass:**
+  ```ts
+  // Bad: each method is `updateWidgetMutation.mutate(widget, { onSuccess: refreshList })`
+  const { updateWidget } = useWidgetListActions()
+
+  // Good: the call site passes the callback
+  updateWidgetMutation.mutate(widget, { onSuccess: refreshList })
+  ```
+  The callback is a side effect, but attaching one is something every caller can already do, so a wrapper that exists only for it is dead.
+
+**Legitimate wrappers (do NOT flag):**
+
+- The wrapper adapts an argument shape the wrapped function does not natively support — e.g. `(opts) => fn(undefined, opts)` when the wrapped function normally expects a first positional argument. Real adaptation.
+- The wrapper adds a transformation step — `(data) => fn(transformRequest(data))`.
+- The wrapper adds a non-trivial default — `(opts = computedDefaults) => fn(opts)`. (`= {}` purely to allow destructuring is not a default.)
+- The wrapper narrows a type the wrapped function cannot.
+- The wrapper introduces a docstring or named identity at a re-export boundary that consumers depend on.
+- A named intermediate that describes a computed value for readability (a named branch or clause); see clarity §C18. Only an alias that renames one existing identifier with nothing added is dead.
+
+**How to spot one fast during review:** if the wrapper body is structurally identical to the call you'd write inline at the call site, the wrapper is dead. Apply the test: "what does this wrapper do that the wrapped thing does not?" If the answer is "nothing," delete.
+
+### §S5. Lookup objects over switch/nested if
+
+More than one level of `if` nesting in a single function is a smell. Prefer:
+- Early-return guard clauses (`if (!x) return`)
+- Extracting the inner branch to a named function
+- A **named key/value lookup object** when the branch is selecting a value/component/config from a fixed set of cases
+
+Avoid `switch` statements when the branches select a value — object lookups are clearer at a glance, exhaustive when typed properly, and trivial to extend. Name lookup objects `xxxMap`, `xxxConfig`, or `xxxLabels`, defined as `const` outside the component/function when the values are static.
+
+Pattern (placeholder domain — one map per kind of selected value):
+
+```ts
+const someProviderFormMap = {
+  [ProviderKind.A]: FormA,
+  [ProviderKind.B]: FormB,
+  [ProviderKind.C]: null
+}
+const FormComponent = someProviderFormMap[providerKind]
+if (!FormComponent) return null
+```
+
+Note: pure styling values (e.g. picking a padding token) are not the right place for this pattern — inline them or use the design system's own scale. The lookup-object pattern is for selecting *behavior*: components, JSX, configs, permissions.
+
+An `if` directly inside another `if` can stay; a third level (an `if` inside that) gets flattened.
+
+**Checklist — walk it on every `switch` and every `if`/`else-if` chain in the diff. Not passing all boxes means the code failed review:**
+
+- [ ] Does the branch just **select one value** (a component, JSX, config object, boolean, string, number) by a discriminator? If yes, it's a key/value lookup, not branching.
+- [ ] **Differing per-branch interpolation or computed args is NOT an exemption.** Use a map of thunks (`Record<K, () => V>`), or compute the shared values once and use a map of objects. "Each branch builds its value a bit differently" is the rule's normal case, not a reason to keep the branching.
+- [ ] A `default` / trailing `else` that returns a value → keep it as the map's fallback (`map[key] ?? fallback`), not a branch.
+- [ ] More than one level of `if` nesting → flatten (guard clause, extracted function, or lookup).
+- [ ] The branch genuinely does **divergent work** (side effects, early returns, several statements that aren't "produce one value") → branching is fine; say so in the finding so the reader knows it was considered, not missed.
+
+**Map entries are plain values by default.** Strings, numbers, config objects, and JSX elements (an element is a cheap descriptor, not a render) go straight into the map. Wrap an entry in `() =>` only when the value closes over a per-call argument, or must be lazy because building it is expensive or has side effects; an unneeded thunk is itself a dead wrapper (§S4). Type the map as `Partial<Record<Key, Value>>` when not every key has an entry, so the `?? fallback` at the lookup is justified by the type rather than defensive.
+
+```ts
+// Flag: thunks around values that need no argument and are cheap
+const titleByView: Record<View, () => string> = { [View.LIST]: () => 'Widgets', [View.GRID]: () => 'Gallery' }
+
+// Prefer: plain values, with the fallback typed in
+const titleByView: Partial<Record<View, string>> = { [View.LIST]: 'Widgets', [View.GRID]: 'Gallery' }
+const title = titleByView[view] ?? DEFAULT_TITLE
+```
+
+**Enumerate chains and nesting by grep, do not eyeball.** Run the `switch-else-if-iife.sh` sweep (see Sweeps): over the diff's added lines, it lists every `switch`, every `else if`, and every IIFE assigned to a value (an IIFE that picks one value from a discriminant is a `switch` in disguise).
+
+Nesting is not visible in added lines alone, so the `nested-ifs.sh` sweep scans the changed files themselves, as checked out in the repo root, with an indentation-aware pass: it reports an `if` opened while an `if` or `else` block at a lower indent is still open, and treats `else if` at the same indent as a sibling, not nesting. It prints only the nested `if` lines the diff adds.
+
+
+The scan is indentation-based, so it is a candidate generator: open each hit, confirm it is a real nesting in a changed region, and give it a verdict against the nesting rule above. It also under-matches (a nested `if` on the same line as its parent, code not indented by the formatter), so still read each changed function's control flow. For another language (`elif`, `case`/`when`, `match`), adapt both patterns and run them by hand, and state which scripts and patterns were run. Print `grepped switch/else-if/IIFE: N hits` and `nested-if scan: N hits`, with `0 hits` stated explicitly.
+
+**Deriving the lookup key from multiple booleans:** the lookup map is correct even when the key has to come from 2+ booleans, but the *key derivation itself* must not be a chained ternary. Break the chain into named single-level intermediates so each `?:` reads as one decision.
+
+Bad — chained ternary collapses three branches into the key:
+```ts
+const mode = flagA ? 'a' : flagB ? 'b' : 'c'
+const value = valueByMode[mode]
+```
+
+Good — each ternary is single-level via a named intermediate:
+```ts
+const innerMode = flagB ? 'b' : 'c'
+const mode = flagA ? 'a' : innerMode
+const value = valueByMode[mode]
+```
+
+**Fixing one violation must not introduce another.** When a reviewer flags the chained ternary, the wrong fixes are:
+- Replacing the map with a helper function that has `if`-early-returns (abandons the lookup-object rule).
+- Collapsing the map into an object-returning ternary chain (still a chained ternary, plus now also no map).
+- Restructuring to ternary-of-objects so the parallel ternaries disappear (still chained, just at a different layer).
+
+The map is the right shape. Only fix the key derivation: extract the inner branch to a named variable so no single line has more than one `?:`. Apply this principle generally — when correcting one violation, keep checking that the new shape doesn't trip a different rule.
+
+### §S6. Code placement, general
+
+Match the conventions already established in the directory the PR is touching:
+
+- Side-effect calls (state updates, removals, setters) defined inside render JSX or inline map/filter callbacks usually want to live in a handler defined above the return, or inside the relevant hook.
+- Helpers used in only one consumer live next to it; helpers used across consumers belong in a shared location matching the target repo's existing shared-code layout.
+
+### §S7, §S8, §S10, §S12, §S13. Exports and public API
+
+The detail for these five boxes (doc comments on exports, named and unnecessary exports, breaking changes, public exports widened for a sibling package, and what a module exports) is in `${CLAUDE_PLUGIN_ROOT}/skills/kc-structure/references/exports.md`. Read it in full before grading any of them.
+
+### §S9. Fixed-value discriminators: string enums, not literal unions
+
+When a field has a closed set of string values that gets compared and assigned at runtime (status, mode, kind, requirement, origin, vendor type, etc.), declare it as a string enum. This rule applies anywhere in the codebase the discriminator gets declared — shared model types, app-local types, feature-scoped types, or inline next to a component. The wire-format-vs-UI distinction governs whether something is a discriminator; the file location does not change the rule.
+
+Placement: grep the target repo for sibling enums and match wherever it already keeps shared/serialized model types. A discriminator that mirrors a backend model/endpoint (its wire-value keys, statuses, etc.) belongs with the other model enums **even when it currently has a single consumer** — co-locating it in a hook file or a generic constants file is drift. "Only consumed here" is not an exemption for a wire-format type. As elsewhere, "following the same pattern as the adjacent file" only holds if that file follows the convention — if the adjacent file is itself the one-off that co-locates its enum, matching it just propagates the drift.
+
+Bad:
+```ts
+export type SomeStatus = 'pending' | 'active' | 'archived'
+```
+
+Good:
+```ts
+export enum SomeStatus {
+  PENDING = 'pending',
+  ACTIVE = 'active',
+  ARCHIVED = 'archived'
+}
+```
+
+Naming:
+- Enum identifier: PascalCase, named after the field's role (`SomeStatus`, `SomeKind`, `SomeRequirement`).
+- Member keys: SCREAMING_SNAKE_CASE.
+- String values: lowercase snake_case matching the backend serialization exactly (the wire format doesn't change when the frontend switches from union to enum).
+
+Reasons:
+1. **Codebase convention.** If every fixed-value discriminator in the shared model types is already an enum, a new literal-union type is inconsistent with the surrounding shape.
+2. **Single source of truth.** Comparisons and assignments use `SomeStatus.PENDING` instead of `'pending'` repeated across files. Renaming a value is one edit at the enum instead of N find-replaces with the risk of touching an unrelated string.
+3. **Typo-safety at call sites.** `'pendin'` (typo) typechecks fine against a bare `string` and only fails once widened to the union — and even then the error points at the call site, not the declaration. `SomeStatus.PENDIN` is a compile error at the typo itself, with autocomplete suggesting the right member.
+4. **Discoverability.** Jump-to-definition on `SomeStatus.ACTIVE` lands on the enum declaration, which lists every legal value in one place. A union scattered across `=== 'active'` checks has no central documentation surface.
+5. **Self-documenting at call sites.** `status === SomeStatus.ARCHIVED` reads as a domain check; `status === 'archived'` reads as a stringly-typed comparison and invites re-deriving the legal set from the comparison sites.
+
+**The test for "is this a discriminator":** would the backend ever return this value? / does this represent a domain state? Yes → enum. No → it's genuinely local UI state and a literal union is fine.
+
+**What to flag (anywhere in the diff):**
+- A new `export type Foo = 'a' | 'b' | 'c'` (or in-file `type Foo = ...`) where the values look like serialized backend states (snake_case strings, statuses, modes, kinds, vendor types). Fix: convert to an enum at the declaration site.
+- An inline literal union on a component prop or function parameter when the same value set already exists on a serialized model. Fix: type the prop against the existing enum instead of duplicating the union.
+- Comparisons or defaults that still use raw string literals (`status === 'pending'`, `default = 'pay_later'`) when an enum already exists for that field. Fix: `Status.PENDING` / `Status.PAY_LATER`.
+- A backend-model/endpoint enum declared inside a hook file or a generic constants file. Fix: move it next to the other model enums for that model, following the target repo's existing placement — single consumer is not an exemption.
+
+**What NOT to flag:**
+- One-off literal unions where the value space is genuinely local UI state (variant strings like `'minimal' | 'full'`, a UI-library prop union, drawer sizes). Apply the backend-value test above.
+- Pre-existing literal unions the PR doesn't substantively edit. Adding a member to an existing union is acceptable; introducing a brand-new union for a serialized value is not.
+
+### §S11. Misplaced-modules sweep
+
+§S1 says the directory is part of the contract. This box enforces it mechanically for the most common miss: a context, hook, or pure helper created inside a components folder because that is where the author was working. Run it over every changed file AND every untracked file, since a newly created misplaced file is the usual case and is not in `git diff` until it is added: the `misplaced-modules.sh` sweep (see Sweeps) does both when run from the repo root. It reports a `createContext(` call under a components folder (belongs with contexts or stores), a hook file there (belongs with hooks), and a non-component `.ts`/`.js` module there (likely a util, type, or context).
+
+If the target repo's layout uses other folder names or extensions (grep where its contexts, hooks, and utils already live), adapt the checks and run them by hand as well. Every hit is a candidate: open the file, confirm what it exports, and name the destination the repo already uses for that kind of module. Print `misplaced-modules sweep: N hits`, with `0 hits` stated explicitly.
+
+### §S14. New code acts on its home's subject
+
+A home (a module, a resource, a folder, a file) is named for one subject, and its members act on it. Before accepting a new member, read the home's name and the members already there, and confirm the new code acts on that same thing. Code that only borrows the home's inputs or helpers belongs elsewhere: a `previewTotals` method added to the order module that creates no order and only prices a cart belongs with the cart. Following the backend's route is not a pass: if the route is misplaced too, flag both.
+
+**The owner, not the neighbour.** The home is the unit that owns the behaviour the new code serves, which is not always the one the diff is open in, where similar code sits, or where a reviewer pointed. Find it by reading: which unit already holds the siblings of this rule, case, key or value, and would a change to the behaviour land there? The same goes for a test (§T5). Examples: a validation added in a form, when the schema already holds every other rule for that field and the form only calls it; a business rule added to a controller, when the model owns that data; a price formatter's cases written in the checkout page's test, when the formatter has its own test file; a style or constant defined in the page that happened to need it, when the component it styles owns it; a rule placed "next to the existing one" at a reviewer's word, when that one is misplaced too.
+
+**A dependency that keeps code out of its home is changed, not obeyed.** Code stays in an odd place because of what it imports: an HTML-to-text helper kept inside an editor extension because it called the editor's sanitizer, when an inert parser (one that builds no live nodes and runs nothing) needs no sanitizer and the helper belongs with the other text helpers; a price formatter kept in a checkout component because it read a value from that component's context, when it can take the value as an argument and sit with the other formatters. Move the code to its home and change the import: pass the value in, swap the parser, point the import at the lower layer. A re-export, an adapter or a second copy at the home leaves the real code where it was.
+
+### §S15. One exported component per file
+
+A component file that exports several components (or exports cells, hooks and style constants so another component can reuse them) is the usual result of a refactor, not of a new file. Split it by kind, the way the repo already places each kind:
+
+- each exported component gets its own file, named after it; the files can share a folder named after the parent component (`widget-table/widget-table.tsx`, `widget-table/widget-table-head.tsx`), with at most an `index.ts` re-exporting the main one (§S3);
+- hooks move out of the component file into their own files and helpers into the unit's `<unit>.utils` file (§S20), placed by §S2 and §S11;
+- a subcomponent with a single consumer stays private in that consumer's file only while it is small, a few lines of markup; a bigger one (its own state, handlers or a screenful of markup; the form a drawer opens is the usual case) gets its own file beside the parent in the unit's folder, so each file reads as one component;
+- no thin file: a component that only wraps one value or element is inlined where it is used.
+
+### §S16. `app/` holds routes only
+
+In a bulletproof-react layout, `app/` is the routing layer: route files the framework reads by name (`page`, `layout`, `route` and equivalents), their tests, route-level actions, and the app's entry, provider and router. Routes compose pieces from the shared folders and `features/`. A component or hook placed beside a page is not reachable by URL, so nothing breaks, but the route folder quietly becomes a feature folder nothing else can reuse from:
+
+```
+app/widgets/
+  page.tsx                 // fine: the route
+  page.test.tsx            // fine: the route's test
+  widget-cards.tsx         // FAIL: a component; belongs in features/widgets/components/
+  use-widget-summary.ts    // FAIL: a hook; belongs in features/widgets/hooks/
+```
+
+A new file added beside legacy helpers that already sit there still fails: moving the old ones is out of scope, but the new one starts outside `app/`.
+
+### §S18. A moved or renamed file is new code
+
+A move is an easy place to carry old habits forward. A module moved to a shared folder keeps the export style the repo has moved away from, an absolute import of a file that now sits beside it, and a doc comment naming its old home; a renamed unit keeps its helper types under the old name. Each is a box a new file would fail, and a diff that shows the file as renamed with a high similarity score invites a reviewer to skip it. Grade the moved file as written fresh, and finish the move: every importer updated, the old path gone, and the names inside it following the new name.
+
+### §S19. The caller asks, the provider serves
+
+The caller knows what it needs; the provider knows what it may give. Mixing the two produces quiet surprises:
+
+- An endpoint drops the related data a client asked for because it is not on an allowlist. The client gets a different response than it requested, and the allowlist drifts from what the endpoint really exposes. Limit what the endpoint declares instead, and let an unsupported request fail visibly.
+- A data-access function always loads three related tables because one caller once needed them. Every other caller pays for it. Load what the caller asks for.
+- A parent's response carries a filtered list of another resource (only the active children, only the viewer's) built just for one screen. The filtering rules now live inside the parent and apply only through that one path. Let the caller ask the children's own provider, with the rules kept there and the parent as an ordinary filter.
+
+In each case the fix is the same split: the caller says what it wants, and the provider serves it within what it declares.

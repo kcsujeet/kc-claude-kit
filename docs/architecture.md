@@ -7,7 +7,7 @@ How the kit is laid out and why. Every decision cites the Claude Code documentat
 ```
 kc-claude-kit/
 ├── .claude-plugin/marketplace.json      # plugin entries carry no "version"
-├── .github/workflows/ci.yml             # validate, rules sync, script tests, eval records
+├── .github/workflows/ci.yml             # validate, rules lint, script tests, eval records
 ├── scripts/export-agent-skills.sh       # copy every skill into another tool's skills directory
 ├── docs/architecture.md                 # this file
 ├── CHANGELOG.md
@@ -15,14 +15,14 @@ kc-claude-kit/
     ├── kc-conventions/
     │   ├── .claude-plugin/plugin.json      # version lives here only
     │   ├── skills/
-    │   │   ├── kc-<topic>/SKILL.md         # one topic = one file: Rules + Review checklist + Review detail
+    │   │   ├── kc-<topic>/SKILL.md         # one topic = one file: Review checklist + Sweeps (the checklist is used when writing and when reviewing)
     │   │   ├── kc-<topic>/scripts/*.sh     # that topic's deterministic sweeps
-    │   │   ├── kc-<topic>/references/*.md  # Review detail moved out to keep SKILL.md under 500 lines
-    │   │   └── kc-init/SKILL.md            # copies the generated rules into a project (on request)
-    │   ├── rules/                          # GENERATED from skills/kc-<topic>/SKILL.md; never edit by hand
-    │   │   └── kc-working-agreement.md     # the one hand-written rule (no topic skill, always loaded)
-    │   ├── scripts/build-rules.sh          # regenerates rules/, --check fails on drift
-    │   ├── scripts/install-rules.sh        # what kc-init and the first-prompt hook run: copies rules/ and writes the version stamp
+    │   │   ├── kc-<topic>/references/*.md  # detail.md: examples and edge cases per box; other files hold clusters moved out of it
+    │   │   └── kc-init/SKILL.md            # copies the rules into a project (on request)
+    │   ├── rules/                          # hand-written, installed by install-rules.sh
+    │   │   ├── kc-conventions.md           # pointer rule: "doing X -> load skill Y", scoped by paths to code and manifests
+    │   │   └── kc-working-agreement.md     # always loaded (no topic skill)
+    │   ├── scripts/install-rules.sh        # what kc-init and the first-prompt hook run: copies rules/, removes stale generated kc-*.md copies, writes the version stamp
     │   ├── tests/                          # sweep and lookup fixtures, their runners, install-rules and mutation-sweep tests
     │   ├── hooks/                          # first prompt: installs or refreshes ~/.claude/rules, reports a stale project copy; PreToolUse guards (source reads through the shell, forks of a large context, investigation write-ups, source writes with no shape file)
     │   └── evals/
@@ -33,12 +33,11 @@ kc-claude-kit/
     │   │   ├── kc-post-review/             # user-invoked only: drafting and posting comments
     │   │   └── kc-ready-for-review/SKILL.md # the one pass before a PR goes to a reviewer
     │   ├── agents/<topic>-gate.md          # one gate agent per topic, plus project-conventions-gate.md and verification-gate.md
-    │   ├── hooks/hooks.json                # hand-off reminder at session start; keeps the marketplace's plugins current and says when the session runs an older kc-gates; blocks unapproved GitHub posts and unreviewed hand-offs; reminds of the look-back after an approval; installs a merged kit change at once; starts each turn with the reply rules and names the last reply's misses (an unchecked claim about instructions, an unchecked account-CLI command, a reply over 180 words); adds a read-first line when the prompt asks where work stands; denies a question's first tool call until text has answered it
-    │   ├── scripts/guard-github-post.sh, guard-hand-off.sh, guard-loop-stop.sh, guard-prose-rule.sh, guard-batched-wait.sh, guard-merge.sh, remind-look-back.sh, remind-look-back-prompt.sh, remind-after-replies.sh, check-reply-sources.sh, check-reply-length.sh, guard-late-answer.sh, remind-reply-rules.sh, update-after-merge.sh, lib/hook-input.sh, lib/reply-misses.sh, lib/typed-message.jq
+    │   ├── hooks/hooks.json                # hand-off reminder at session start; keeps the marketplace's plugins current and says when the session runs an older kc-gates; blocks unapproved GitHub posts and unreviewed hand-offs; reminds of the look-back after an approval; installs a merged kit change at once; starts each turn with the reply rules and names the last reply's misses (an unchecked claim about instructions, an unchecked account-CLI command, a reply over 180 words); adds a read-first line when the prompt asks where work stands
+    │   ├── scripts/guard-github-post.sh, guard-hand-off.sh, guard-loop-stop.sh, guard-prose-rule.sh, guard-batched-wait.sh, guard-merge.sh, remind-look-back.sh, remind-look-back-prompt.sh, remind-after-replies.sh, check-reply-sources.sh, check-reply-length.sh, remind-reply-rules.sh, update-after-merge.sh, lib/hook-input.sh, lib/reply-misses.sh, lib/typed-message.jq
     │   ├── scripts/change-class.sh, approvals-needed.sh  # a small change's lighter path through the guards; every typed phrase ahead in one block
     │   ├── scripts/guard-ask-product-only.sh  # denies a question to the person that holds code or review words or does not say its product, scope, irreversible or intent kind
     │   ├── scripts/remind-better-line.sh, lib/work-call.sh  # PostToolUse: on a turn's first work call, a line to measure and look for a better way
-    │   ├── scripts/guard-unreproduced-cause.sh  # denies the first file change for a reported problem before it was run (PreToolUse)
     │   ├── scripts/guard-review-walk.sh, lib/review-dir.sh  # no verification gate dispatch while the walk receipt fails (PreToolUse)
     │   ├── scripts/guard-unchecked-claim.sh     # PreToolUse: denies a commit message, PR or issue text or tracker write that states a fact about code, data or a tool that nothing in the turn read
     │   ├── scripts/update-marketplace.sh, check-loaded-version.sh  # plugin updates during a session; every plugin links the check
@@ -101,10 +100,8 @@ Autopilot agents, at `plugins/kc-autopilot/agents/<role>.md`, dispatched by `wor
 
 A topic skill's body has these sections, in this order:
 
-1. `## Rules`: the authoring conventions. `scripts/build-rules.sh` copies this section, with the skill's `paths`, into `rules/kc-<topic>.md`.
-2. `## Review checklist`: the `- [ ] §<id> ... (N/A: ...)` boxes a gate agent ticks. Absent for rules-only topics.
-3. `## Review detail`: the per-box sections, examples and evidence requirements. When the skill nears 500 lines, a cluster of these sections moves to `references/<cluster>.md`, linked by its `${CLAUDE_PLUGIN_ROOT}` path; gates read it from there.
-4. `## Sweeps`: the bundled scripts, each run as `bash "${CLAUDE_PLUGIN_ROOT}/skills/kc-<topic>/scripts/<name>.sh" <diff-file>`, printing one `file:line: text` hit per line and nothing else. A lookup, which takes a name or a key instead of a diff (`kc-naming/scripts/name-collisions.sh`, `kc-i18n/scripts/locale-duplicates.sh`), is listed there too and says so.
+1. `## Review checklist`: the `- [ ] §<id> ... (N/A: ...)` boxes, ticked when writing and by a gate agent when reviewing, then one line pointing to `references/detail.md` (examples and edge cases per box, read when a box is unclear). When that file nears 500 lines, a cluster moves to `references/<cluster>.md`, linked by its `${CLAUDE_PLUGIN_ROOT}` path; gates read it from there. Topics with no checklist (dependencies, error-handling, type-safety) keep their `## Rules` as the body.
+2. `## Sweeps`: the bundled scripts, each run as `bash "${CLAUDE_PLUGIN_ROOT}/skills/kc-<topic>/scripts/<name>.sh" <diff-file>`, printing one `file:line: text` hit per line and nothing else. A lookup, which takes a name or a key instead of a diff (`kc-naming/scripts/name-collisions.sh`, `kc-i18n/scripts/locale-duplicates.sh`), is listed there too and says so.
 
 Posting approval token: a GitHub write passes the kc-gates guard only when the same Bash command contains `KC_REVIEW_POST_APPROVED=1`, typed after the user's explicit post signal.
 
@@ -116,11 +113,11 @@ Before this layout, every convention was stated twice, once as a rule and once a
 
 A gate agent loads its topic through the subagent `skills:` field, which injects the full skill content ([subagents](https://code.claude.com/docs/en/sub-agents)). Measured in this repo on Claude Code 2.1.280: a plugin agent preloads a skill from a different plugin by `plugin:skill` and by bare name, and `${CLAUDE_PLUGIN_ROOT}` inside the preloaded skill expands to the owning plugin's directory, which is how gate agents find the sweep scripts.
 
-### Rules stay, generated, because `paths:` skills do not auto-load
+### A pointer rule stays, because `paths:` skills do not auto-load
 
 Skills accept `paths:` ([skills](https://code.claude.com/docs/en/skills)), which suggested the rule copies could go. Measured on 2.1.280: after reading a matching file, a `paths:`-scoped plugin skill's content was not in context; it loads only when the model invokes it. Rules load when a matching file is read ([memory](https://code.claude.com/docs/en/memory)), and plugins cannot ship rules, so `/kc-conventions:kc-init` still copies them into `.claude/rules/`.
 
-What changed is that the rules are generated from the skills, so there is one source, and `init` writes a version stamp that the plugin's hook compares with the installed plugin on a session's first prompt, so stale copies are reported instead of silently kept. The hook also installs the home copy (`~/.claude/rules`) when none exists and refreshes it when stale, since the kit does not work without the copy and asking is a step nobody needs to decide; it never writes a project's files, and `KC_CONVENTIONS_AUTO_INSTALL=0` turns it back to report-only.
+What changed is that the rules shrank to one pointer file, `rules/kc-conventions.md` ("doing X -> load skill Y"), so the conventions have one copy, in the skills. Earlier versions generated a copy of each skill's rules into `rules/kc-<topic>.md`; `install-rules.sh` removes those stale copies. `init` writes a version stamp that the plugin's hook compares with the installed plugin on a session's first prompt, so stale copies are reported instead of silently kept. The hook also installs the home copy (`~/.claude/rules`) when none exists and refreshes it when stale, since the kit does not work without the copy and asking is a step nobody needs to decide; it never writes a project's files, and `KC_CONVENTIONS_AUTO_INSTALL=0` turns it back to report-only.
 
 ### Gates are plugin agents
 

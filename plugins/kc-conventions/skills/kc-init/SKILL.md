@@ -5,9 +5,9 @@ description: "Install the portable convention rules into this project, copying t
 
 # Installing the conventions into a project
 
-Each convention lives in one topic skill (`skills/kc-<topic>/SKILL.md`), and the plugin's `rules/` files are generated from those skills' `## Rules` sections by `scripts/build-rules.sh`. The one exception is `kc-working-agreement.md`, which is hand-written and has no skill.
+Each convention lives in one topic skill (`skills/kc-<topic>/SKILL.md`), and the plugin's `rules/` holds two hand-written files: `kc-conventions.md`, a pointer list naming the skill to load for each kind of work, and `kc-working-agreement.md`, which has no skill.
 
-The skills alone are not enough, because rules and skills load differently. A rule in `.claude/rules/` loads when a file matching its `paths:` is read; a skill loads only when the model invokes it, even with `paths:` set (measured on Claude Code 2.1.280, see the kit's `docs/architecture.md`). And plugins cannot ship rules: a plugin contributes context "through skills, agents, and hooks", and a `CLAUDE.md` at the plugin root "is not loaded as project context". So the generated rule files sit on disk, read by nobody, until something copies them where Claude Code looks.
+The skills alone are not enough, because rules and skills load differently. A rule in `.claude/rules/` loads when a file matching its `paths:` is read; a skill loads only when the model invokes it, even with `paths:` set (measured on Claude Code 2.1.280, see the kit's `docs/architecture.md`). And plugins cannot ship rules: a plugin contributes context "through skills, agents, and hooks", and a `CLAUDE.md` at the plugin root "is not loaded as project context". So the rule files sit on disk, read by nobody, until something copies them where Claude Code looks.
 
 The plugin's hook installs and refreshes the machine-wide copy in `~/.claude/rules/` by itself, on a session's first prompt, so nobody has to decide that step. A project copy it never writes, because it may be committed and shared. This skill is that project copy, on request. It copies the rules into `.claude/rules/`, which is where they load with their `paths:` frontmatter respected, so each one arrives only when a matching file is touched, and it writes a version stamp so a later plugin update can report the copy as stale.
 
@@ -37,6 +37,6 @@ Re-run this skill after the plugin updates; the plugin's hook says, on a session
 
 ## What this does not do
 
-It does not touch `CLAUDE.md`. An `@import` would work, but imports expand into context at launch, which throws away the `paths:` scoping and puts all thirteen files in every session. `.claude/rules/` keeps them deferred.
+It does not touch `CLAUDE.md`. An `@import` would work, but imports expand into context at launch, which throws away the `paths:` scoping and puts every file in every session. `.claude/rules/` keeps them deferred.
 
 The machine-wide copy is not this skill's job: the hook runs `install-rules.sh --dest ~/.claude/rules` when that copy is missing (and no project copy exists) or stale, and prints one line saying so. Set `KC_CONVENTIONS_AUTO_INSTALL=0` in the environment or in `~/.claude/settings.json` `env` to turn that off; the hook then only reports, with the command to run.
