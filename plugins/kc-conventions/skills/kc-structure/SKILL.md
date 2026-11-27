@@ -15,7 +15,7 @@ paths:
 
 ## Review checklist
 
-Tick every box for each construct you add or change. Report each: PASS, FAIL (file:line) or N/A (why).
+- [ ] Tick every box for each construct you add or change. Report each: PASS, FAIL (file:line) or N/A (why).
 
 - [ ] §S1 One observable responsibility per unit (function, hook, component, module): no data-reading unit also bundles a selector, formatter or mutation; no util silently performs a side effect.
 - [ ] §S2 Single-consumer code stays beside its consumer; multi-consumer code sits at their nearest common ancestor; promote only when a real consumer appears; shared-layer code goes there at once.
@@ -40,11 +40,11 @@ Tick every box for each construct you add or change. Report each: PASS, FAIL (fi
 - [ ] §S21 No generated file is edited by hand: changes go through the source and generator and the repo's drift check passes; list changed files that look generated. (N/A: no generated file changed)
 - [ ] §S22 Dependencies flow one way: shared code is used anywhere, features import only from shared, the app imports both; shared code lives at the app level. (N/A: no new import between layers)
 
-Examples and edge cases per box: references/detail.md (read when a box is unclear).
+- Examples and edge cases per box: references/detail.md (read when a box is unclear).
 
 ## Sweeps
 
-Save the diff under review to a file (`gh pr diff <num> > /tmp/review.diff`, or `git diff <default-branch>...HEAD > /tmp/review.diff`) and run each script over it; `-` reads the diff from stdin. Each prints one `path:line: text` hit per line, where `line` is the new-side line number, and nothing else. Give every hit its own verdict, and state each receipt with its count, `0 hits` included.
+- [ ] Save the diff under review to a file (`gh pr diff <num> > /tmp/review.diff`, or `git diff <default-branch>...HEAD > /tmp/review.diff`) and run each script over it; `-` reads the diff from stdin. Each prints one `path:line: text` hit per line, where `line` is the new-side line number, and nothing else. Give every hit its own verdict, and state each receipt with its count, `0 hits` included.
 
 - `added-lines.sh` (citation map): every added line as `path:line: text`, with the source line number at the head SHA. Cite every finding's line from this output or from a sweep hit, never from a position in the diff file.
 
@@ -72,9 +72,9 @@ Save the diff under review to a file (`gh pr diff <num> > /tmp/review.diff`, or 
 
 ### §S17. Shared only when it is shared
 
-Code built or placed for reuse is only worth that shape when two or more units use it today. In class-based code that is a mixin, concern, trait or protocol extension. In functional code it is a higher-order function, or a hook or helper module in a shared folder. With one user it is not shared code: it hides that unit's behaviour somewhere a reader will not look, and splits one unit across two places.
+- Code built or placed for reuse is only worth that shape when two or more units use it today. In class-based code that is a mixin, concern, trait or protocol extension. In functional code it is a higher-order function, or a hook or helper module in a shared folder. With one user it is not shared code: it hides that unit's behaviour somewhere a reader will not look, and splits one unit across two places.
 
-Keep it with its one user, in the same file or a file beside it, as long as that user still passes the simplicity and structure rules. When it would not (§S1: more than one responsibility; or simply too long to read), move the logic into the kind of unit this repo already uses for that sort of code, near its user, and call it from there: a service object, a plain function in its own file, a hook. Find that kind by reading how the codebase handles similar logic. If the repo has none, ask before inventing one.
+- [ ] Keep it with its one user, in the same file or a file beside it, as long as that user still passes the simplicity and structure rules. When it would not (§S1: more than one responsibility; or simply too long to read), move the logic into the kind of unit this repo already uses for that sort of code, near its user, and call it from there: a service object, a plain function in its own file, a hook. Find that kind by reading how the codebase handles similar logic. If the repo has none, ask before inventing one.
 
 ```ruby
 # FAIL: a concern only Storefront includes; its callbacks live in another file
@@ -97,4 +97,4 @@ export const withInvoiceTotals = (Page) => (props) => <Page {...props} totals={u
 const InvoicePage = ({ id }) => { const totals = useTotals(id); ... }
 ```
 
-The exception is code whose role is the shared data or resource layer (§S2's role override): it belongs in its shared layer even with one user today.
+- The exception is code whose role is the shared data or resource layer (§S2's role override): it belongs in its shared layer even with one user today.

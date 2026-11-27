@@ -9,16 +9,16 @@ Claude Code has four places project instructions can live. They differ in **when
 | Skill | Description at session start; body only when invoked or matched | Low until used | Multi-step procedures, reference material |
 | Hook | On a lifecycle event | Zero unless it returns output | Anything that must happen every time |
 
-Nested `CLAUDE.md` files in subdirectories are a fifth option, loading on demand when Claude reads files in that directory. They do the same job as a path-scoped rule; prefer whichever the repo already uses rather than mixing both for the same purpose.
+- Nested `CLAUDE.md` files in subdirectories are a fifth option, loading on demand when Claude reads files in that directory. They do the same job as a path-scoped rule; prefer whichever the repo already uses rather than mixing both for the same purpose.
 
 ## What on-demand loading needs
 
-On-demand loading has two conditions, and a session can miss both without any sign:
+- On-demand loading has two conditions, and a session can miss both without any sign:
 
 - **The working directory.** Only the `CLAUDE.md` files and unscoped rules from the session's own directory upward load at launch. A session started above the repo (a workspace folder holding several repos) treats the repo as a subdirectory, so its `CLAUDE.md` and every rule wait for a file inside it to be opened.
 - **The Read tool.** A path-scoped rule, nested `CLAUDE.md` or subdirectory file loads when the Read tool opens a matching file. A file read through the shell (`cat`, `sed`, `head`, `grep` output) loads nothing, and agents in permissive modes are often told to read files that way.
 
-So an instruction that has to shape a plan, before any code is opened, cannot rely on deferral. Put it where it loads for the directory sessions actually start in, at user scope, or in a SessionStart hook's `additionalContext`. Then tell agents to read code with the Read tool, so the path-scoped rest still arrives. Telling is not enough on its own: an agent that reads through the shell anyway gets no sign it missed anything, so kc-conventions' `guard-shell-source-reads.sh` refuses a shell read of a source file and points to the Read tool.
+- So an instruction that has to shape a plan, before any code is opened, cannot rely on deferral. Put it where it loads for the directory sessions actually start in, at user scope, or in a SessionStart hook's `additionalContext`. Then tell agents to read code with the Read tool, so the path-scoped rest still arrives. Telling is not enough on its own: an agent that reads through the shell anyway gets no sign it missed anything, so kc-conventions' `guard-shell-source-reads.sh` refuses a shell read of a source file and points to the Read tool.
 
 ## Hard numbers
 
@@ -30,11 +30,11 @@ So an instruction that has to shape a plan, before any code is opened, cannot re
 
 ## Load order
 
-Managed policy, then user (`~/.claude/CLAUDE.md`), then project (`./CLAUDE.md` or `./.claude/CLAUDE.md`), then local (`./CLAUDE.local.md`). Files are **concatenated, not overridden**, walking up from the working directory, so the more specific file is read last. Two files that contradict each other do not resolve to the more specific one reliably; Claude may pick either.
+- Managed policy, then user (`~/.claude/CLAUDE.md`), then project (`./CLAUDE.md` or `./.claude/CLAUDE.md`), then local (`./CLAUDE.local.md`). Files are **concatenated, not overridden**, walking up from the working directory, so the more specific file is read last. Two files that contradict each other do not resolve to the more specific one reliably; Claude may pick either.
 
 ## Choosing
 
-Four questions, in order. The first "yes" wins.
+- Four questions, in order. The first "yes" wins.
 
 1. **Must this happen every time, without Claude choosing to?** → hook. An instruction is a request, not a guarantee: "the model choosing to run a formatter is different from the formatter running automatically." Anything phrased "never edit X" or "always run Y before Z" is a guardrail, and prose guardrails fail under pressure.
 2. **Is it a multi-step procedure, or reference material only needed sometimes?** → skill. Roughly: a numbered sequence, or content you would not want resident all session.
@@ -43,11 +43,11 @@ Four questions, in order. The first "yes" wins.
 
 ## Delete rather than move
 
-Content Claude can derive from the codebase earns nothing and costs every request. The official trim check "cuts content Claude can derive from the codebase, such as directory layouts, dependency lists, and architecture overviews, and keeps pitfalls, rationale, and conventions that differ from tool defaults."
+- Content Claude can derive from the codebase earns nothing and costs every request. The official trim check "cuts content Claude can derive from the codebase, such as directory layouts, dependency lists, and architecture overviews, and keeps pitfalls, rationale, and conventions that differ from tool defaults."
 
-So a directory tree, a dependency inventory, or a prose architecture tour is a deletion, not a migration. What survives from those sections is the **rules** they were wrapped around: "routes never talk to the DB directly", "nothing new at the repo root without asking". Those are not derivable, because they describe intent rather than layout.
+- So a directory tree, a dependency inventory, or a prose architecture tour is a deletion, not a migration. What survives from those sections is the **rules** they were wrapped around: "routes never talk to the DB directly", "nothing new at the repo root without asking". Those are not derivable, because they describe intent rather than layout.
 
-A "where things live" table is the judgment call. It is derivable, so the trim check targets it, but it can still pay for itself in a large or unusually-organized repo by preventing repeated searching. Keep it only if the repo's layout genuinely surprises, and keep it short.
+- A "where things live" table is the judgment call. It is derivable, so the trim check targets it, but it can still pay for itself in a large or unusually-organized repo by preventing repeated searching. Keep it only if the repo's layout genuinely surprises, and keep it short.
 
 ## Anti-patterns
 
@@ -68,4 +68,4 @@ A "where things live" table is the judgment call. It is derivable, so the trim c
 - Hooks: https://code.claude.com/docs/en/hooks-guide
 - Decision framework: https://claude.com/blog/steering-claude-code-skills-hooks-rules-subagents-and-more
 
-Re-read these before citing a number. The numbers above were current when this file was written and the product moves; a stale limit quoted with confidence is worse than looking it up.
+- [ ] Re-read these before citing a number. The numbers above were current when this file was written and the product moves; a stale limit quoted with confidence is worse than looking it up.

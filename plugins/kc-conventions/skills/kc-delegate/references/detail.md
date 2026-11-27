@@ -2,13 +2,13 @@
 
 ### Full wording before the steps rewrite
 
-The whole `SKILL.md` body as it was, moved verbatim (headings two levels down). Read the part a step or box points to.
+- The whole `SKILL.md` body as it was, moved verbatim (headings two levels down). Read the part a step or box points to.
 
 ### Delegating work
 
-Delegated work costs about the number of calls times the context each call re-reads. One long-running agent that walks everything makes many calls on a context that keeps growing, so it costs far more than the same work split into small pieces. Examples of the same mistake: a review fan-out where one agent reads every file; a migration sweep run as one agent over a whole codebase; a research agent that keeps every fetched page in context; a session that has run for days and re-reads its whole history on every call. In one measured day, re-reading context beyond the first 200k tokens of each call was a third of all spend.
+- Delegated work costs about the number of calls times the context each call re-reads. One long-running agent that walks everything makes many calls on a context that keeps growing, so it costs far more than the same work split into small pieces. Examples of the same mistake: a review fan-out where one agent reads every file; a migration sweep run as one agent over a whole codebase; a research agent that keeps every fetched page in context; a session that has run for days and re-reads its whole history on every call. In one measured day, re-reading context beyond the first 200k tokens of each call was a third of all spend.
 
-Before handing work off, walk these habits:
+- Before handing work off, walk these habits:
 
 - **Script first.** A deterministic script does the mechanical part: for an audit of a shop's docs, extract every line and the paths and identifiers it cites, and check that each exists. Only what the script flags goes to a model.
 - **Many small agents, not one long one.** One fresh agent per file or small batch (one storefront's config, ten orders' fixtures), with a narrow brief, returning a short table. Never one agent that walks everything. An agent past about 50 calls or 150k tokens of context is split.

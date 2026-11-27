@@ -16,7 +16,7 @@ An expensive check whose result later work will throw away runs once, on the fin
 5. **Review and QA once** (`kc-gates:kc-ready-for-review`) on the committed branch, before its first push.
 6. **Push and open the pull request** from the body file that pass wrote, then hand it to the reviewer; then **look back** (`kc-conventions:kc-look-back`) and write the lessons as one batch.
 
-Delegating any of it: `kc-conventions:kc-delegate`. Stating what code or a tool does: `kc-conventions:kc-check-claims`.
+- Delegating any of it: `kc-conventions:kc-delegate`. Stating what code or a tool does: `kc-conventions:kc-check-claims`.
 
 ## Gate checklist
 

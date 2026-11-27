@@ -2,9 +2,9 @@
 
 The full text of `SKILL.md` before it was cut to steps, moved verbatim (`## ` headings are now `### `, `### ` now `#### `). Read the section a step or box points to.
 
-The reviewer should find nothing the project's rules already say. This pass is where those rules are applied: once per PR, on the committed local branch before its first push and before the PR exists, never per commit or push. A check that runs after the work is published turns its fixes into extra pushes and CI rounds.
+- The reviewer should find nothing the project's rules already say. This pass is where those rules are applied: once per PR, on the committed local branch before its first push and before the PR exists, never per commit or push. A check that runs after the work is published turns its fixes into extra pushes and CI rounds.
 
-The pass converges or stops. Round 1 reviews the whole change. Each later round reviews only the fixes since the round before, plus every use of what those fixes changed (`trace-uses.sh`), so lines a round passed are not read again and each round has less to read. Each round's fixes must be smaller than the round before's, and past round 3 the approach goes back to the user. A pull request merges only on a clean receipt (the last round found nothing and nothing is left open), which `guard-merge.sh` enforces. Scripts still list what a gate would otherwise sample, one writer (you) writes every fix that isn't mechanical, and each fix is held by a test that fails when it is broken.
+- The pass converges or stops. Round 1 reviews the whole change. Each later round reviews only the fixes since the round before, plus every use of what those fixes changed (`trace-uses.sh`), so lines a round passed are not read again and each round has less to read. Each round's fixes must be smaller than the round before's, and past round 3 the approach goes back to the user. A pull request merges only on a clean receipt (the last round found nothing and nothing is left open), which `guard-merge.sh` enforces. Scripts still list what a gate would otherwise sample, one writer (you) writes every fix that isn't mechanical, and each fix is held by a test that fails when it is broken.
 
 ### When it runs
 
@@ -74,7 +74,7 @@ The pass converges or stops. Round 1 reviews the whole change. Each later round 
 
 ### Gate checklist
 
-What the pass must show before its receipt. Each box is held by a script: the receipt refuses a pass that breaks it, or a check lists what breaks it.
+- What the pass must show before its receipt. Each box is held by a script: the receipt refuses a pass that breaks it, or a check lists what breaks it.
 
 - [ ] §H1 Rounds converge: round 1 reviewed the whole diff; each later round reviewed only the fixes since the round before and every use of what they changed; each round's fixes were smaller than the round before's; there were at most 3 rounds; and the last found nothing (`clean=yes`), or the open list went to the user. Held by `ready-receipt.sh` (`--rounds <1-3>`) and `guard-merge.sh`. (N/A: never)
 - [ ] §H2 One writer: only a gate's mechanical edits (a rename, a deletion, a move) were applied as written, the ones `check-gate-fixes.sh` prints as `apply`; every edit it prints as `write` was written by you from the finding. (N/A: round 1 found nothing, or the gates wrote no edits)
@@ -87,19 +87,19 @@ What the pass must show before its receipt. Each box is held by a script: the re
 
 ### The guard
 
-`scripts/guard-hand-off.sh` blocks the first `git push` of a branch (its target isn't on the remote yet), every `gh pr create`, draft or not, `gh pr ready`, `gh pr edit --add-reviewer` and a write to a PR's `requested_reviewers`, until the commit has a pass or `--after` receipt. Pushes to a branch the remote already has (fix rounds, rebases), to the default branch, tags and deletes are not blocked. A hand-off checklist's `drafts: true` front matter is no longer needed: a pass receipt always precedes the PR. A push, PR or hand-off done in a browser or through another tool isn't seen; run the pass before those too.
+- `scripts/guard-hand-off.sh` blocks the first `git push` of a branch (its target isn't on the remote yet), every `gh pr create`, draft or not, `gh pr ready`, `gh pr edit --add-reviewer` and a write to a PR's `requested_reviewers`, until the commit has a pass or `--after` receipt. Pushes to a branch the remote already has (fix rounds, rebases), to the default branch, tags and deletes are not blocked. A hand-off checklist's `drafts: true` front matter is no longer needed: a pass receipt always precedes the PR. A push, PR or hand-off done in a browser or through another tool isn't seen; run the pass before those too.
 
-In a repo with `.claude/hand-off-checklist.md`, the same commands also need the checklist's verdicts (`--verdicts` above): every box PASS or N/A with a reason, else the block names each unmet box, one line each, and gives the command to record them.
+- In a repo with `.claude/hand-off-checklist.md`, the same commands also need the checklist's verdicts (`--verdicts` above): every box PASS or N/A with a reason, else the block names each unmet box, one line each, and gives the command to record them.
 
-`scripts/guard-tracker-transition.sh` guards the same hand-off through a tracker: an MCP call that transitions an issue (a tool named like `transition…Issue`, a generic execute tool running one, or a save or update call on an issue such as `save_issue` whose state or status field is set) to a status matching `review` (`KC_REVIEW_STATUS_REGEX` in the settings `env` changes it) is blocked until the checklist has verdicts: those of the session repo's HEAD, or, outside a repo, the ones recorded with `--task <KEY>` for the issue. A call naming only a transition id can't be read and isn't blocked.
+- `scripts/guard-tracker-transition.sh` guards the same hand-off through a tracker: an MCP call that transitions an issue (a tool named like `transition…Issue`, a generic execute tool running one, or a save or update call on an issue such as `save_issue` whose state or status field is set) to a status matching `review` (`KC_REVIEW_STATUS_REGEX` in the settings `env` changes it) is blocked until the checklist has verdicts: those of the session repo's HEAD, or, outside a repo, the ones recorded with `--task <KEY>` for the issue. A call naming only a transition id can't be read and isn't blocked.
 
-A small change asks less of the user (`scripts/change-class.sh` classes the branch from the default branch). `prose_small`, a few prose lines (Markdown and the like, at most 30 changed lines, plus files the repo lists in `.claude/generated-paths.txt` as regenerated from them and version bumps), needs no pass receipt and no `approve rework`, and merges with no receipt once its checks pass. `code_small` (`pass-size.sh` small, no risk line) needs no pass receipt either, and merges once its checks pass; any `risk:` line makes it `full`. The loop-stop guard leaves out lines the branch's own earlier commits wrote. When a guard still needs the user's words, its block lists every phrase the steps ahead need (`approvals-needed.sh`): ask for them in one message and run those steps in that turn, since each guard reads only the latest message.
+- A small change asks less of the user (`scripts/change-class.sh` classes the branch from the default branch). `prose_small`, a few prose lines (Markdown and the like, at most 30 changed lines, plus files the repo lists in `.claude/generated-paths.txt` as regenerated from them and version bumps), needs no pass receipt and no `approve rework`, and merges with no receipt once its checks pass. `code_small` (`pass-size.sh` small, no risk line) needs no pass receipt either, and merges once its checks pass; any `risk:` line makes it `full`. The loop-stop guard leaves out lines the branch's own earlier commits wrote. When a guard still needs the user's words, its block lists every phrase the steps ahead need (`approvals-needed.sh`): ask for them in one message and run those steps in that turn, since each guard reads only the latest message.
 
-When the user says to skip the pass for a PR, prefix that command with `KC_READY_SKIP=1`. Never add it on your own, and never to get past a pass that found something. The tracker guard takes the same token in the call (a comment field) or the environment, on the same terms.
+- When the user says to skip the pass for a PR, prefix that command with `KC_READY_SKIP=1`. Never add it on your own, and never to get past a pass that found something. The tracker guard takes the same token in the call (a comment field) or the environment, on the same terms.
 
 ### Report
 
-Chat, short:
+- Chat, short:
 
 ```
 #### Ready for review: <PR title>
@@ -121,12 +121,12 @@ Chat, short:
 
 ### After the reviewer comments
 
-Sort each comment the reviewer makes:
+- Sort each comment the reviewer makes:
 
 - **Covered:** a rule already said it. The pass missed it, so fix the check that should have caught it: a sweep that didn't list the construct, a fix whose test passed with the fix broken, a vague box, a rule with no box, a checklist item that wasn't walked. Don't add a second rule.
 - **New:** no rule said it. It becomes a lesson in the rules, with a box on their checklist.
 - **Disagreement:** runs or gates decided it both ways. It is settled once (by the user only when it is a product, scope or irreversible call), and it becomes a rule in the repo's `.claude/review-conventions.md` (kc-code-review's rule for contested calls).
 
-Check a requested change like your own before writing it: where it puts code or a test, what it widens, and what it breaks (a rename colliding with an existing name, a guard that blocks a valid state, a "next to X" when X is misplaced). Following a comment word for word is not a defence, and a request that fails the check is answered with why and what you did instead.
+- [ ] Check a requested change like your own before writing it: where it puts code or a test, what it widens, and what it breaks (a rename colliding with an existing name, a guard that blocks a valid state, a "next to X" when X is misplaced). Following a comment word for word is not a defence, and a request that fails the check is answered with why and what you did instead.
 
-The goal is that "covered" stays at zero. Keep the count so a slipping pass shows as a number: after sorting a reviewer's round, record it with `bash "${CLAUDE_PLUGIN_ROOT}/scripts/review-tally.sh" add <pr-url> <covered> <new> <disagreement>`, and `review-tally.sh report` gives the totals per month. A month whose "covered" rises means the pass is missing what its rules already say; fix the checks before adding rules. A revert is the plainest miss of all: `review-tally.sh reverts <repo-dir> [<since>]` lists the merged PRs reverted on the default branch, and the look-back sorts each one like a reviewer comment (covered, new or disagreement) before it is counted.
+- The goal is that "covered" stays at zero. Keep the count so a slipping pass shows as a number: after sorting a reviewer's round, record it with `bash "${CLAUDE_PLUGIN_ROOT}/scripts/review-tally.sh" add <pr-url> <covered> <new> <disagreement>`, and `review-tally.sh report` gives the totals per month. A month whose "covered" rises means the pass is missing what its rules already say; fix the checks before adding rules. A revert is the plainest miss of all: `review-tally.sh reverts <repo-dir> [<since>]` lists the merged PRs reverted on the default branch, and the look-back sorts each one like a reviewer comment (covered, new or disagreement) before it is counted.

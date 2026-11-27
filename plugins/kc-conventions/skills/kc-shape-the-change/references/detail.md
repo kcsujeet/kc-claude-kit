@@ -2,11 +2,11 @@
 
 ### Full wording before the steps rewrite
 
-The whole `SKILL.md` body as it was, moved verbatim (headings two levels down). Read the part a step or box points to.
+- The whole `SKILL.md` body as it was, moved verbatim (headings two levels down). Read the part a step or box points to.
 
 ### Shape the change
 
-Between "assess" and "build" in `kc-conventions:kc-do-a-task`. Code can be right line by line and be the wrong shape; review rounds then fix lines and the shape stays. Write the design and compare it with another one before any code, so the person approves a shape and not a diff.
+- Between "assess" and "build" in `kc-conventions:kc-do-a-task`. Code can be right line by line and be the wrong shape; review rounds then fix lines and the shape stays. Write the design and compare it with another one before any code, so the person approves a shape and not a diff.
 
 #### Procedure
 
@@ -22,7 +22,7 @@ Between "assess" and "build" in `kc-conventions:kc-do-a-task`. Code can be right
 
 #### A trivial change
 
-A change with no new storage, no new unit and no behaviour move (a typo, a copy change, a bug fix inside one unit) needs no shape. Declare it as the shape file's first line; the guard and the check accept the file and a reviewer reads the line:
+- A change with no new storage, no new unit and no behaviour move (a typo, a copy change, a bug fix inside one unit) needs no shape. Declare it as the shape file's first line; the guard and the check accept the file and a reviewer reads the line:
 
 ```
 trivial: no new storage, no new unit, no behaviour move: fixes the rounding of one displayed total
@@ -30,7 +30,7 @@ trivial: no new storage, no new unit, no behaviour move: fixes the rounding of o
 
 #### Guard
 
-kc-conventions' `guard-shape.sh` denies an edit or write (Edit, Write, MultiEdit, a shell redirect, `sed -i`, `tee`, `cp`, `mv`, a REPL `write(` or `edit(` call) to a non-test source file on a branch whose shape file is missing or fails `check-shape.sh`, with the problems in the reason. The default branch, a detached head, test files and files that are not source code are never blocked. Shell and REPL detection is best effort: it reads the command text, not what a script it starts will write.
+- kc-conventions' `guard-shape.sh` denies an edit or write (Edit, Write, MultiEdit, a shell redirect, `sed -i`, `tee`, `cp`, `mv`, a REPL `write(` or `edit(` call) to a non-test source file on a branch whose shape file is missing or fails `check-shape.sh`, with the problems in the reason. The default branch, a detached head, test files and files that are not source code are never blocked. Shell and REPL detection is best effort: it reads the command text, not what a script it starts will write.
 
 #### The shape file
 
@@ -56,7 +56,7 @@ kc-conventions' `guard-shape.sh` denies an edit or write (Edit, Write, MultiEdit
 
 #### Gate checklist
 
-The shape file's boxes, in order; `check-shape.sh` grades them and `guard-shape.sh` holds source edits until the file passes (or declares the change trivial). (N/A for all: the change adds no source code)
+- The shape file's boxes, in order; `check-shape.sh` grades them and `guard-shape.sh` holds source edits until the file passes (or declares the change trivial). (N/A for all: the change adds no source code)
 
 - [ ] §SH1 Requirement: what the change must do, in the person's terms.
 - [ ] §SH2 Facts: where each fact lives, its source of truth, stored as itself or derived, and why.
@@ -69,7 +69,7 @@ The shape file's boxes, in order; `check-shape.sh` grades them and `guard-shape.
 
 #### Approach checklist
 
-Asked before writing or reviewing any code, with or without a shape file; not boxes of the shape file. (N/A: the change adds no source code)
+- Asked before writing or reviewing any code, with or without a shape file; not boxes of the shape file. (N/A: the change adds no source code)
 
 - [ ] §SH9 Asked whether this is the best and simplest way, assuming a simpler one exists: one mechanism instead of two, an existing tool, doing less.
 - [ ] §SH10 Sketched one other shape and compared it before going line by line: better in a way the person would care about, tell them with its cost; still delivers the ask, take it and say so; changes the ask, the choice is theirs.

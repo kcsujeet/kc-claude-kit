@@ -15,7 +15,7 @@ paths:
 
 ## Review checklist
 
-Tick every box for each construct you add or change. Report each: PASS, FAIL (file:line) or N/A (why).
+- [ ] Tick every box for each construct you add or change. Report each: PASS, FAIL (file:line) or N/A (why).
 
 - [ ] §SEC1 Each action a signed-out visitor or lower role can reach checks in the handler that the caller may act on every record it touches; a loosened auth or CSRF check names who can now reach it.
 - [ ] §SEC2 Ids that must belong together (a payment and its order, a child and its URL parent, a token and its record) are tied by one check; a handler looking each up alone FAILS.
@@ -28,11 +28,11 @@ Tick every box for each construct you add or change. Report each: PASS, FAIL (fi
 - [ ] §SEC9 Every hit of the `request-surface.sh` sweep has a verdict on §SEC1 to §SEC8 and the counts equal; an unjudged hit FAILS. (N/A: 0 hits, stated as `grepped request surface: 0 hits`)
 - [ ] §SEC10 Raw request input (whole params, body, form) never reaches a job, log, cache or event: only the validated, allowlisted output or ids, named in the evidence; `boundary-payloads.sh` swept.
 
-Examples and edge cases per box: references/detail.md (read when a box is unclear).
+- Examples and edge cases per box: references/detail.md (read when a box is unclear).
 
 ## Sweeps
 
-Save the diff under review to a file and run the scripts over it; `-` reads the diff from stdin. Each prints one `path:line: text` hit per line, where `line` is the new-side line number, and nothing else. Give every hit its own verdict, and state each receipt with its count, `0 hits` included.
+- [ ] Save the diff under review to a file and run the scripts over it; `-` reads the diff from stdin. Each prints one `path:line: text` hit per line, where `line` is the new-side line number, and nothing else. Give every hit its own verdict, and state each receipt with its count, `0 hits` included.
 
 - `added-lines.sh` (citation map): every added line as `path:line: text`, with the source line number at the head SHA. Cite every finding's line from this output or from a sweep hit, never from a position in the diff file.
 

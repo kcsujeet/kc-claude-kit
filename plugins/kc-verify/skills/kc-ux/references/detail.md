@@ -2,11 +2,11 @@
 
 ### Full wording before the steps rewrite
 
-The whole `SKILL.md` body as it was, moved verbatim (headings two levels down). Read the part a step or box points to.
+- The whole `SKILL.md` body as it was, moved verbatim (headings two levels down). Read the part a step or box points to.
 
 ### Verifying a change is usable
 
-A screen can match its design in every state and still leave people stuck: a link that opens the wrong part of a page, a step in an order nobody expects, a Discard that already saved, a confirmation whose words don't match what it does. `kc-verify:kc-ui` checks that the change looks right. This checks that a person can use it. A change a person both sees and uses gets both.
+- A screen can match its design in every state and still leave people stuck: a link that opens the wrong part of a page, a step in an order nobody expects, a Discard that already saved, a confirmation whose words don't match what it does. `kc-verify:kc-ui` checks that the change looks right. This checks that a person can use it. A change a person both sees and uses gets both.
 
 #### Hard rules
 
@@ -18,22 +18,22 @@ A screen can match its design in every state and still leave people stuck: a lin
 
 ##### Step 1 — set up as kc-ui does
 
-List the surfaces the change reaches and get real data and a dev-only sign-in in front of them: `kc-verify:kc-ui` Steps 1 and 2.
+- [ ] List the surfaces the change reaches and get real data and a dev-only sign-in in front of them: `kc-verify:kc-ui` Steps 1 and 2.
 
 ##### Step 2 — walk it as someone new to the product
 
-For each changed screen, name the goal it serves (choose a plan, add a storefront, fix a failed order) and reach it from each entry point the way a person who has never seen the product would. Note every place you had to stop and work something out, even where everything works as built:
+- For each changed screen, name the goal it serves (choose a plan, add a storefront, fix a failed order) and reach it from each entry point the way a person who has never seen the product would. Note every place you had to stop and work something out, even where everything works as built:
 
 - an action that lands away from what it names: "Choose a plan" opening the top of a page with the plans out of sight, "Add a storefront" opening the list instead of the form;
 - a screen that doesn't show what it is for or what to do next: an empty list with no way to add the first item, a success message with nowhere to go;
 - a control placed where nobody would look for it, or a step that needs something from another screen the person has to remember, or doesn't have yet;
 - an error that says what went wrong but not what to do, or a dead end with no way back or forward.
 
-Look once the page has finished loading, since content that arrives late (a signed-in header, a banner) can push what matters out of view. A flow people know from other products keeps the order they know (`kc-conventions:kc-simplicity` §P17).
+- [ ] Look once the page has finished loading, since content that arrives late (a signed-in header, a banner) can push what matters out of view. A flow people know from other products keeps the order they know (`kc-conventions:kc-simplicity` §P17).
 
 ##### Step 3 — walk the flows around the change
 
-Each screen can be usable on its own while the path through it breaks. QA by a person finds these first, because a person moves between screens and keeps going. Walk them on every surface the change reaches:
+- Each screen can be usable on its own while the path through it breaks. QA by a person finds these first, because a person moves between screens and keeps going. Walk them on every surface the change reaches:
 
 - **Switch context mid-page.** Change the current tenant, workspace or account while on each changed page. Every panel follows, with no reload; a record that belongs to the previous context shows a clear not-found, not a blank or half-loaded page.
 - **Go where the write shows up.** After each create, edit, archive or delete, visit every other screen that shows something derived from it (a list, a count, a badge, a picker on another page) without reloading, and check it changed, and that it didn't appear where its filters exclude it.
@@ -50,11 +50,11 @@ Each screen can be usable on its own while the path through it breaks. QA by a p
 
 ##### Step 4 — report
 
-Report as `kc-verify:kc-ui` Step 6 does: one line per surface, each finding with the state that produces it and the steps from a fresh page load, and what was not checked. A QA pass on shipped work ends at the report there too. For someone who doesn't know the change, add the walkthrough of kc-ui Step 6b.
+- [ ] Report as `kc-verify:kc-ui` Step 6 does: one line per surface, each finding with the state that produces it and the steps from a fresh page load, and what was not checked. A QA pass on shipped work ends at the report there too. For someone who doesn't know the change, add the walkthrough of kc-ui Step 6b.
 
 #### Gate checklist
 
-Do not report a change usable until every box is ticked:
+- [ ] Do not report a change usable until every box is ticked:
 
 - [ ] Each changed screen was walked toward its goal from each entry point as someone new to the product, after the page finished loading, and every place that made the person stop and work something out (an action landing away from what it names, no clear next step, a control nobody would find, a dead end, an error with no way forward) is reported as a finding.
 - [ ] Every pointer to another screen ("managed in X", a read-only value with a link) was followed: the destination has the field, it saves, the first screen shows the new value without a reload, and the destination matches the design's version. Every read-only value has a screen that edits it, or the report names it as a bug.

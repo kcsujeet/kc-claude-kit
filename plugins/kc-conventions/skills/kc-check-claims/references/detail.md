@@ -1,15 +1,15 @@
 
 ### §CL1
 
-**Checklist wording (moved from SKILL.md):** Text about to be published (a commit message, a pull request or issue body or comment, a tracker comment) states no fact about code, data, a setting or a tool that nothing in the turn read a source for: each such fact was checked in this turn or the text says plainly that it is unverified. Held by `kc-gates` `guard-unchecked-claim.sh`. (N/A: the text states no such fact)
+- **Checklist wording (moved from SKILL.md):** Text about to be published (a commit message, a pull request or issue body or comment, a tracker comment) states no fact about code, data, a setting or a tool that nothing in the turn read a source for: each such fact was checked in this turn or the text says plainly that it is unverified. Held by `kc-gates` `guard-unchecked-claim.sh`. (N/A: the text states no such fact)
 
 ### Full wording before the steps rewrite
 
-The whole `SKILL.md` body as it was, moved verbatim (headings two levels down). Read the part a step or box points to.
+- The whole `SKILL.md` body as it was, moved verbatim (headings two levels down). Read the part a step or box points to.
 
 ### A claim needs a check behind it
 
-Applies to whoever made the claim: you, a review agent or a subagent. Check the source in this turn, then state the claim and cite what you found.
+- Applies to whoever made the claim: you, a review agent or a subagent. Check the source in this turn, then state the claim and cite what you found.
 
 #### Claim kinds
 

@@ -2,7 +2,7 @@
 
 Every box is walked against the repo's actual files, one verdict each: PASS, FAIL, or N/A with its reason. A box is FAIL if **any** file trips it. Findings are reported, never silently fixed; the proposal comes first.
 
-Cite `file:line` for every finding. A box with no receipt is FAIL by default, because "I looked and it was fine" is indistinguishable from not looking.
+- [ ] Cite `file:line` for every finding. A box with no receipt is FAIL by default, because "I looked and it was fine" is indistinguishable from not looking.
 
 ## Size and shape
 
@@ -31,7 +31,7 @@ Cite `file:line` for every finding. A box with no receipt is FAIL by default, be
 
 ## Reporting
 
-Lead with a table, one row per section of each instruction file, because the value of this audit is the mapping and everything else is supporting detail:
+- Lead with a table, one row per section of each instruction file, because the value of this audit is the mapping and everything else is supporting detail:
 
 | File | Section | Lines | Verdict | Destination |
 |---|---|---|---|---|
@@ -40,8 +40,8 @@ Lead with a table, one row per section of each instruction file, because the val
 | `CLAUDE.md` | Type checking | 72-95 | move | rule, `paths: **/*.ts` |
 | `CLAUDE.md` | Naming | 97-120 | keep | — |
 
-Verdicts are exactly: **keep**, **move** (with destination and, for a rule, the glob), **delete** (with why it is derivable), **split** (which part stays, which part moves), or **enforce** (which hook event).
+- Verdicts are exactly: **keep**, **move** (with destination and, for a rule, the glob), **delete** (with why it is derivable), **split** (which part stays, which part moves), or **enforce** (which hook event).
 
-Then: the current always-loaded size versus the projected one, in both lines and bytes, since that number is the whole point. Give bytes as well as lines, because a file of long paragraphs hides its true cost behind a small line count. Then the findings from the correctness boxes, which are bugs rather than restructuring.
+- Then: the current always-loaded size versus the projected one, in both lines and bytes, since that number is the whole point. Give bytes as well as lines, because a file of long paragraphs hides its true cost behind a small line count. Then the findings from the correctness boxes, which are bugs rather than restructuring.
 
-Finish with the file plan: every file to create, edit, or delete, with its `paths:` frontmatter where applicable. **Write nothing until the plan is approved.** Restructuring someone's instructions without consent is the one unrecoverable mistake here: the content is often hand-tuned over months, and a bad split degrades every future session quietly.
+- Finish with the file plan: every file to create, edit, or delete, with its `paths:` frontmatter where applicable. **Write nothing until the plan is approved.** Restructuring someone's instructions without consent is the one unrecoverable mistake here: the content is often hand-tuned over months, and a bad split degrades every future session quietly.

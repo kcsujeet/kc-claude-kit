@@ -15,7 +15,7 @@ paths:
 
 ## Review checklist
 
-Tick every box for each construct you add or change. Report each: PASS, FAIL (file:line) or N/A (why).
+- [ ] Tick every box for each construct you add or change. Report each: PASS, FAIL (file:line) or N/A (why).
 
 - [ ] §P1 DRY: no knowledge duplicated that should have one source (copied logic, re-declared constant, re-implemented helper); a literal moved to a constant leaves no other copy (§P11).
 - [ ] §P2 YAGNI: no unused params or props, no single-caller abstraction built for a hypothetical second, no config option nothing passes, no dead branch.
@@ -37,11 +37,11 @@ Tick every box for each construct you add or change. Report each: PASS, FAIL (fi
 - [ ] §P19 New code has precedent: each `no-precedent.sh` hit (a package, CSS property, global or config pattern no other code uses) FAILS unless the repo's way is used or a comment says why.
 - [ ] §P18 A value a shared unit derives by convention (a name from a name, a default from a pattern) is not made cleverer for one caller; that caller passes an optional override.
 
-Examples and edge cases per box: references/detail.md (read when a box is unclear).
+- Examples and edge cases per box: references/detail.md (read when a box is unclear).
 
 ## Sweeps
 
-Save the diff under review to a file and run the script over it; `-` reads the diff from stdin. Each hit gets its own verdict.
+- [ ] Save the diff under review to a file and run the script over it; `-` reads the diff from stdin. Each hit gets its own verdict.
 
 - `no-precedent.sh` (§P19): tokens the added lines introduce with zero uses in the repo at the base. Receipt: `grepped no precedent: N hits`.
 

@@ -7,9 +7,9 @@ description: "Audit a repo's Claude Code instruction setup (CLAUDE.md, rules, sk
 
 Instructions rot in a specific way. A `CLAUDE.md` starts as ten useful lines, and every correction adds three more, until it is four hundred lines loaded into every session, most of it irrelevant to whatever the current task is. Adherence goes **down** as the file grows, so the file that was supposed to make Claude more reliable makes it less so.
 
-This skill fixes that by sorting content by **when it needs to load**, not by topic.
+- This skill fixes that by sorting content by **when it needs to load**, not by topic.
 
-Read `references/mechanisms.md` for the four mechanisms and the decision order, and `references/audit-checklist.md` for the boxes to walk. Both, in full, before reporting anything.
+- [ ] Read `references/mechanisms.md` for the four mechanisms and the decision order, and `references/audit-checklist.md` for the boxes to walk. Both, in full, before reporting anything.
 
 ## Hard rules
 
@@ -25,7 +25,7 @@ Read `references/mechanisms.md` for the four mechanisms and the decision order, 
 
 ### Step 1 — inventory
 
-Find every file that contributes instructions, and measure it. Do not skip the measuring; line counts are the spine of the report.
+- [ ] Find every file that contributes instructions, and measure it. Do not skip the measuring; line counts are the spine of the report.
 
 ```bash
 # project scope
@@ -43,30 +43,30 @@ ls -la AGENTS.md .cursorrules .cursor/rules .github/copilot-instructions.md 2>/d
 cat .claude/settings.json .claude/settings.local.json 2>/dev/null
 ```
 
-Note which files load at launch and which load on demand: root and ancestor `CLAUDE.md` at launch, subdirectory `CLAUDE.md` on demand, rules at launch unless they carry `paths:`, skill bodies on invocation.
+- [ ] Note which files load at launch and which load on demand: root and ancestor `CLAUDE.md` at launch, subdirectory `CLAUDE.md` on demand, rules at launch unless they carry `paths:`, skill bodies on invocation.
 
 ### Step 2 — classify every section
 
-Walk each instruction file section by section. For each, apply the decision order from `references/mechanisms.md`: hook, then skill, then path-scoped rule, then `CLAUDE.md`. Record the line range, the verdict, and the destination.
+- [ ] Walk each instruction file section by section. For each, apply the decision order from `references/mechanisms.md`: hook, then skill, then path-scoped rule, then `CLAUDE.md`. Record the line range, the verdict, and the destination.
 
-Two things to get right here:
+- Two things to get right here:
 
 - **A section can split.** "Testing" is often one paragraph of always-true rules plus a twenty-line procedure. The paragraph stays; the procedure becomes a skill. Do not force a whole section into one bucket.
 - **The glob matters.** A rule destined for `paths:` is only worth moving if you can name the pattern. "Some backend thing" is not a destination; `paths: api/**/*.ts` is.
 
 ### Step 3 — walk the checklist
 
-Every box in `references/audit-checklist.md`, with a receipt each. The size and shape boxes drive the restructure; the correctness boxes (contradictions, vague instructions, dead commands, duplication) are bugs that are worth fixing whether or not the user takes the restructure.
+- Every box in `references/audit-checklist.md`, with a receipt each. The size and shape boxes drive the restructure; the correctness boxes (contradictions, vague instructions, dead commands, duplication) are bugs that are worth fixing whether or not the user takes the restructure.
 
 ### Step 4 — report
 
-Follow the reporting format in `references/audit-checklist.md`: the mapping table first, then the always-loaded line count now versus projected, then correctness findings, then the file plan.
+- Follow the reporting format in `references/audit-checklist.md`: the mapping table first, then the always-loaded line count now versus projected, then correctness findings, then the file plan.
 
-Give the user the number that matters in one line, for example: "15 KB across 141 lines loads on every session today; 6 KB after this, with the rest arriving when it is relevant." Quote bytes alongside lines, since a file of long paragraphs understates its cost by line count alone.
+- [ ] Give the user the number that matters in one line, for example: "15 KB across 141 lines loads on every session today; 6 KB after this, with the rest arriving when it is relevant." Quote bytes alongside lines, since a file of long paragraphs understates its cost by line count alone.
 
 ### Step 5 — apply, once approved
 
-Only after explicit approval, and then:
+- Only after explicit approval, and then:
 
 - Create rule files with their `paths:` frontmatter. Move content verbatim where possible; rewriting while relocating makes the diff unreviewable.
 - Create skills with a `name` and a `description` carrying real trigger phrases, since a vague description means the skill never loads.
@@ -76,6 +76,6 @@ Only after explicit approval, and then:
 
 ## Scope
 
-This skill audits how instructions are **organized**. It does not judge whether a convention is a good convention: if a repo wants tabs, that is not a finding. The exceptions are the correctness boxes, where an instruction is contradictory, unverifiable, or references something that no longer exists.
+- This skill audits how instructions are **organized**. It does not judge whether a convention is a good convention: if a repo wants tabs, that is not a finding. The exceptions are the correctness boxes, where an instruction is contradictory, unverifiable, or references something that no longer exists.
 
-It also does not write the conventions themselves. A repo with a two-line `CLAUDE.md` and no rules is not failing this audit; it just has little to reorganize. Say so and stop, rather than inventing a setup it never asked for.
+- It also does not write the conventions themselves. A repo with a two-line `CLAUDE.md` and no rules is not failing this audit; it just has little to reorganize. Say so and stop, rather than inventing a setup it never asked for.

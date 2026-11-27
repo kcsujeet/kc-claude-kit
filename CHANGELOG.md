@@ -6,6 +6,11 @@ One line per version per plugin, newest first. Detail lives in the pull request 
 
 ## [Unreleased]
 
+- `kc-gates` 3.24.0: Markdown is bullets and checkboxes, no prose paragraphs (`scripts/check-no-paragraphs.sh`, CI); wording and form only
+- `kc-conventions` 2.13.0: Markdown is bullets and checkboxes, no prose paragraphs (`scripts/check-no-paragraphs.sh`, CI); wording and form only
+- `kc-verify` 2.5.0: Markdown is bullets and checkboxes, no prose paragraphs (`scripts/check-no-paragraphs.sh`, CI); wording and form only
+- `kc-autopilot` 0.5.0: Markdown is bullets and checkboxes, no prose paragraphs (`scripts/check-no-paragraphs.sh`, CI); wording and form only
+- `kc-instructions` 3.4.0: Markdown is bullets and checkboxes, no prose paragraphs (`scripts/check-no-paragraphs.sh`, CI); wording and form only
 - `kc-gates` 3.23.0: review skills are numbered steps with a box checklist; `verify-gate-receipts.sh` checks each trigger group's receipt; the verification gate keeps the judgment boxes; `kc-code-review` is the one QA walk (new §G8), `kc-ready-for-review` no longer walks
   - PR descriptions are short and readable (§H10, §G9); screenshots and video go in them via `gh --attach` (§H9, §G10)
 - `kc-conventions` 2.12.0: process skills are numbered steps plus a checklist; boxes stay one line; `kc-raise-the-bar` gains §RB1 to §RB5

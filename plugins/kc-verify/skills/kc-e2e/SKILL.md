@@ -22,7 +22,7 @@ Unit tests prove each layer alone. They pass while the client sends a field the 
 
 ## Gate checklist
 
-Do not report a flow verified until every box is ticked:
+- [ ] Do not report a flow verified until every box is ticked:
 
 - [ ] §EE1 The path from interaction to durable effect is written down, layer by layer.
 - [ ] §EE2 Every state that changes the flow is listed (from the design when there is one), and the flow was walked in each state the change can reach, in what users get, not only a test harness.

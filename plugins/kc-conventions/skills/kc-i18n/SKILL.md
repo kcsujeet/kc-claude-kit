@@ -18,7 +18,7 @@ paths:
 
 ## Review checklist
 
-Tick every box for each construct you add or change. Report each: PASS, FAIL (file:line) or N/A (why).
+- [ ] Tick every box for each construct you add or change. Report each: PASS, FAIL (file:line) or N/A (why).
 
 - [ ] §I1 Per-key audit table produced: one row per NEW key in the required shape (see §I1); a missing table, or an aggregate ("N keys, all unique"), FAILS. (N/A: no locale files changed)
 - [ ] §I2 Only the source locale was edited; an edit to a machine-generated non-source locale FAILS. (N/A: no locale files changed, or all locales hand-maintained: say which)
@@ -31,11 +31,11 @@ Tick every box for each construct you add or change. Report each: PASS, FAIL (fi
 - [ ] §I9 No grammar attached to a placeholder (`{name}'s`, `{count}th`); the placeholder stands alone or an ordinal is `selectordinal`; swept by `placeholder-grammar.sh`.
 - [ ] §I10 One term, one spelling across the source locale (no `Addons` beside `Add-ons`), touched or not; each word from `term-spellings.sh` gets a verdict. (N/A: no message value added or changed)
 
-Examples and edge cases per box: references/detail.md (read when a box is unclear).
+- Examples and edge cases per box: references/detail.md (read when a box is unclear).
 
 ## Sweeps
 
-Save the diff under review to a file and run `added-lines.sh` over it; `-` reads the diff from stdin. Two diff sweeps and the §I3 lookup. The diff sweeps print one `path:line: text` hit per line; give every hit its own verdict and state each receipt with its count, `0 hits` included.
+- [ ] Save the diff under review to a file and run `added-lines.sh` over it; `-` reads the diff from stdin. Two diff sweeps and the §I3 lookup. The diff sweeps print one `path:line: text` hit per line; give every hit its own verdict and state each receipt with its count, `0 hits` included.
 
 - `locale-duplicates.sh` (§I3, a lookup rather than a diff sweep): takes a locale directory, a value and a leaf key, and runs the two §I3 greps. Run it once per new or touched key.
 

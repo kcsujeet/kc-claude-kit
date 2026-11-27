@@ -2,11 +2,11 @@
 
 ### Full wording before the steps rewrite
 
-The whole `SKILL.md` body as it was, moved verbatim (headings two levels down). Read the part a step or box points to.
+- The whole `SKILL.md` body as it was, moved verbatim (headings two levels down). Read the part a step or box points to.
 
 ### Assess a task
 
-Step 1 of `kc-conventions:kc-do-a-task`. Do this before any code, then present the cause and the fix with the rules the fix follows.
+- Step 1 of `kc-conventions:kc-do-a-task`. Do this before any code, then present the cause and the fix with the rules the fix follows.
 
 #### Procedure
 
@@ -25,7 +25,7 @@ Step 1 of `kc-conventions:kc-do-a-task`. Do this before any code, then present t
 
 #### Examples
 
-Step 1 (assess):
+- Step 1 (assess):
 
 - A fix built, tested and walked in the app for a task assigned to a teammate who already had a pull request open for it.
 - A fix that guarded the one total that broke on a missing price, while a second reader of the same price was left for review to find.
@@ -38,26 +38,26 @@ Step 1 (assess):
 - A shared state filled only after the first render: the patch held the page back until it was filled and said nothing of filling it before the first render, which would stop the next page that reads it early.
 - "Reverted" reports: a layout "reverted" on a staging site, found to be the live build holding a later branch's stale copy of the file; a job that "stopped", found to be running an older release; prices that "changed overnight", found to follow a deploy.
 
-Steps 5 to 7 (existing code, asking, long-held behaviour):
+- Steps 5 to 7 (existing code, asking, long-held behaviour):
 
 - A new sanitizing renderer built for product notes, when every stored rich-text field in the shop already shows through one viewer component.
 - A question to a reviewer, "why is this field required?", when `git log -S` on the field names the commit and its reason.
 - A "price" screen named in a question to someone who only knows the checkout page.
 - A required customer phone number made optional while fixing its error message, a default currency dropped, a list's column order changed: each is a product call for the person, not a tidy-up.
 
-Order of work, in general (an expensive check whose result later work throws away runs once, on the finished work):
+- Order of work, in general (an expensive check whose result later work throws away runs once, on the finished work):
 
 - A small two-file fix reviewed by every gate and walked in the app while uncommitted, then reviewed and walked again at hand-off, so review and QA took two-thirds of the time.
 - Screenshots for a pull request taken before the copy was final.
 - A performance profile taken halfway through the refactor it was meant to judge.
 
-Step 2 (build): say in one line what kind of mistake a fix is for, and check everything the fix adds against it, since a fix often repeats its own mistake in the code written for it. Cases: a lookup per row added while removing another; one hard-coded time zone taken out and a hard-coded locale put in; a line drawn where things usually are replaced by icons drawn where things usually are.
+- Step 2 (build): say in one line what kind of mistake a fix is for, and check everything the fix adds against it, since a fix often repeats its own mistake in the code written for it. Cases: a lookup per row added while removing another; one hard-coded time zone taken out and a hard-coded locale put in; a line drawn where things usually are replaced by icons drawn where things usually are.
 
 #### Overlap by code, not only by task key
 
-Work overlaps by the code it changes, not only by its task key. Besides the tracker's assignee and the pull requests that name the task, look for open pull requests, by anyone, that change the files the fix will change, and for commits to them on the default branch since the failure was reproduced: `task-claims.sh <key> --repo <owner/name> --path <file>... --since <commit>`, with `--since` run in a checkout. When one is open, stop and ask whether to build, review that change, or leave it. Example: a fix built for a task nobody else held, in a shared component that another open pull request, for a different task, had already changed.
+- Work overlaps by the code it changes, not only by its task key. Besides the tracker's assignee and the pull requests that name the task, look for open pull requests, by anyone, that change the files the fix will change, and for commits to them on the default branch since the failure was reproduced: `task-claims.sh <key> --repo <owner/name> --path <file>... --since <commit>`, with `--since` run in a checkout. When one is open, stop and ask whether to build, review that change, or leave it. Example: a fix built for a task nobody else held, in a shared component that another open pull request, for a different task, had already changed.
 
-Run the same check again right before marking the pull request ready, with the commit the work started from: the default branch moves while the work is open. When it already changed or fixed that code, or another open pull request now changes it, ask the person instead of handing off. Example: a pull request ready to hand off after another one merged, rewrote the same component and fixed the bug another way.
+- [ ] Run the same check again right before marking the pull request ready, with the commit the work started from: the default branch moves while the work is open. When it already changed or fixed that code, or another open pull request now changes it, ask the person instead of handing off. Example: a pull request ready to hand off after another one merged, rewrote the same component and fixed the bug another way.
 
 #### Gate checklist
 

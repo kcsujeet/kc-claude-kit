@@ -17,7 +17,7 @@ paths:
 
 ## Review checklist
 
-Tick every box for each construct you add or change. Report each: PASS, FAIL (file:line) or N/A (why).
+- [ ] Tick every box for each construct you add or change. Report each: PASS, FAIL (file:line) or N/A (why).
 
 - [ ] §RL1 Done the way similar code does it: for each changed Ruby file the evidence names ~10 similar files per layer, their pattern and the differences; none named FAILS (see §RL1).
 - [ ] §RL2 Rails conventions: path matches class, conventional pluralisation, every new association declares `dependent:`, a repeated or named filter is a `scope`, callbacks are documented ones.
@@ -45,10 +45,10 @@ Tick every box for each construct you add or change. Report each: PASS, FAIL (fi
 - [ ] §RL7d `db/schema.rb` diff holds only the intended change. (N/A: `db/` untouched)
 - [ ] §RL8 New code acts on the subject of its home: a route, method or constant that only borrows its home's inputs sits where its subject lives. (N/A: nothing added)
 
-Examples and edge cases per box: references/detail.md (read when a box is unclear).
+- Examples and edge cases per box: references/detail.md (read when a box is unclear).
 
 ## Sweeps
 
-The citation map, run first: `bash ${CLAUDE_PLUGIN_ROOT}/scripts/added-lines.sh <diff-file>`.
+- The citation map, run first: `bash ${CLAUDE_PLUGIN_ROOT}/scripts/added-lines.sh <diff-file>`.
 
-The rails gate's receipts are greps over the added lines of `<diff-file>` for the patterns its boxes name (§RL2, §RL3c, §RL3e, §RL4a), each stated with its hit count and a verdict per hit.
+- The rails gate's receipts are greps over the added lines of `<diff-file>` for the patterns its boxes name (§RL2, §RL3c, §RL3e, §RL4a), each stated with its hit count and a verdict per hit.

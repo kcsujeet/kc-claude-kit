@@ -15,7 +15,7 @@ paths:
 
 ## Review checklist
 
-Tick every box for each construct you add or change. Report each: PASS, FAIL (file:line) or N/A (why).
+- [ ] Tick every box for each construct you add or change. Report each: PASS, FAIL (file:line) or N/A (why).
 
 - [ ] §D1 No hand-rolled date/time math (`split(':')` parsing, `new Date(str)`, `getTime()` arithmetic, `+86_400_000`, `padStart` formatting); use the project's date library. (N/A: no date/time logic)
 - [ ] §D2 (soft) A start+end range uses the repo's shared range-formatting helper, not a hand-composed `${format(start)} - ${format(end)}`. (N/A: no range rendered, or no such helper)
@@ -25,11 +25,11 @@ Tick every box for each construct you add or change. Report each: PASS, FAIL (fi
 - [ ] §D6 Timezone, week start and 12/24-hour format come from user/app settings, never hardcoded or inferred from locale alone; earliest/latest uses the library's `max`/`min`.
 - [ ] §D7 No locale formatter (`Intl.DateTimeFormat`, `toLocaleString`, `toLocaleDateString`) runs without an explicit time zone when the app has one configured.
 
-Examples and edge cases per box: references/detail.md (read when a box is unclear).
+- Examples and edge cases per box: references/detail.md (read when a box is unclear).
 
 ## Sweeps
 
-Save the diff under review to a file and run the script over it; `-` reads the diff from stdin. No other sweep is bundled for this topic.
+- [ ] Save the diff under review to a file and run the script over it; `-` reads the diff from stdin. No other sweep is bundled for this topic.
 
 - `added-lines.sh` (citation map): every added line as `path:line: text`, with the source line number at the head SHA. Cite every finding's line from this output or from a sweep hit, never from a position in the diff file.
 

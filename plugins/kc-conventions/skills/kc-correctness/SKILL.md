@@ -15,7 +15,7 @@ paths:
 
 ## Review checklist
 
-Tick every box for each construct you add or change. Report each: PASS, FAIL (file:line) or N/A (why).
+- [ ] Tick every box for each construct you add or change. Report each: PASS, FAIL (file:line) or N/A (why).
 
 - [ ] §B1 Logic is right: no off-by-one, wrong operator, inverted condition, stale closure or state, or wrong dependency array.
 - [ ] §B2 Every added path handles empty, null, zero and boundary values and each record lifecycle state (archived, deleted, expired), content-shape edge cases, and the configured timezone (see §B2).
@@ -36,13 +36,13 @@ Tick every box for each construct you add or change. Report each: PASS, FAIL (fi
 - [ ] §B17 A sibling or parallel path has the original's rules and guards, or a recorded decision per rule (same, differs on purpose, missing); a difference noted only in help text FAILS.
 - [ ] §B18 A reliance on another unit's internal behaviour (`super`, a yielded block, a callback, a template method) names its seam or pinning test; none FAILS (see §B18). (N/A: no such reliance)
 
-**Point, do not double-report.** A removed export or a changed shared prop shape is structure §S10. A cast asserting a type the value does not have, as syntax, is clarity §C17. Duplicated markup, dead imports, or props threaded through and never read after a refactor are simplicity §P9. A locale formatter with no explicit time zone is datetime §D7. When a bug and one of those boxes describe the same line, report it once, under the closer fit, and name the other box in the evidence.
+- **Point, do not double-report.** A removed export or a changed shared prop shape is structure §S10. A cast asserting a type the value does not have, as syntax, is clarity §C17. Duplicated markup, dead imports, or props threaded through and never read after a refactor are simplicity §P9. A locale formatter with no explicit time zone is datetime §D7. When a bug and one of those boxes describe the same line, report it once, under the closer fit, and name the other box in the evidence.
 
-Examples and edge cases per box: references/detail.md (read when a box is unclear).
+- Examples and edge cases per box: references/detail.md (read when a box is unclear).
 
 ## Sweeps
 
-Save the diff under review to a file and run the script over it; `-` reads the diff from stdin. No other sweep is bundled for this topic.
+- [ ] Save the diff under review to a file and run the script over it; `-` reads the diff from stdin. No other sweep is bundled for this topic.
 
 - `added-lines.sh` (citation map): every added line as `path:line: text`, with the source line number at the head SHA. Cite every finding's line from this output or from a sweep hit, never from a position in the diff file.
 

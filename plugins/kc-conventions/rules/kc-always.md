@@ -6,7 +6,7 @@
 - Steps in a screen you can't drive go one screen at a time, each control named by label, then wait for "done".
 - A remark about one detail changes that detail; if it changes what the piece rests on, check every line leaning on it.
 
-Pointers:
+- Pointers:
 - Starting a task -> kc-conventions:kc-do-a-task
 - Before stating what code, a tool or a source does -> kc-conventions:kc-check-claims
 - Before delegating -> kc-conventions:kc-delegate

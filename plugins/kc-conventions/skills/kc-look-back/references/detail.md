@@ -2,11 +2,11 @@
 
 ### Full wording before the steps rewrite
 
-The whole `SKILL.md` body as it was, moved verbatim (headings two levels down). Read the part a step or box points to.
+- The whole `SKILL.md` body as it was, moved verbatim (headings two levels down). Read the part a step or box points to.
 
 ### Look back, then write the lessons
 
-Step 6 of `kc-conventions:kc-do-a-task`.
+- Step 6 of `kc-conventions:kc-do-a-task`.
 
 #### Procedure
 
@@ -24,7 +24,7 @@ Step 6 of `kc-conventions:kc-do-a-task`.
 
 #### Placing a lesson by layer
 
-Put a lesson at the first layer that holds it, and write prose last: a lesson that could be a check but is written as text is the miss, so each lesson's ledger line names the check, or says why none can hold it.
+- [ ] Put a lesson at the first layer that holds it, and write prose last: a lesson that could be a check but is written as text is the miss, so each lesson's ledger line names the check, or says why none can hold it.
 
 
 1. **A check:** a lint rule, type, test or script with a helpful error. It fails without the lesson, so nothing relies on being remembered.
@@ -42,7 +42,7 @@ Put a lesson at the first layer that holds it, and write prose last: a lesson th
 
 #### Gate checklist
 
-The ledger folder carries a ticked copy of this list as `checklist.md` (each box `- [x] §LBn ...`), and `guard-lesson-ledger.sh` blocks `git push`, `gh pr create` and `gh pr merge` on a lesson PR until `feedback-ledger.sh check` passes and every box is ticked.
+- The ledger folder carries a ticked copy of this list as `checklist.md` (each box `- [x] §LBn ...`), and `guard-lesson-ledger.sh` blocks `git push`, `gh pr create` and `gh pr merge` on a lesson PR until `feedback-ledger.sh check` passes and every box is ticked.
 
 - [ ] §LB1 The lesson's class is named without the instance's code tokens: no backticked word, identifier, unit or file name from the feedback item or the fix. Held by `feedback-ledger.sh check`.
 - [ ] §LB2 The ledger line climbs a ladder: `ladder:<instance> -> <mechanism> -> <class>`, asking at each step what other mistakes that step would catch. Held by `feedback-ledger.sh check`.

@@ -18,7 +18,7 @@ paths:
 
 ## Rules
 
-Code is cheap; maintenance is not. Prefer the platform over a package, and a well-established package over rolling your own.
+- Code is cheap; maintenance is not. Prefer the platform over a package, and a well-established package over rolling your own.
 
 - **Ask before adding a dependency.** Never add one as a side effect of another task.
 - Check and state, before installing: healthy download volume, a release in the last six months, more than one maintainer.

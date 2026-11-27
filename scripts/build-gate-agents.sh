@@ -45,7 +45,7 @@ get_extra_section() {
     i18n) cat <<'EOF'
 ## The per-key audit table is mandatory
 
-When the diff touches any locale or translation file, the per-key audit table from the skill's §I1 is the first thing in your evidence: one row per new key, in the exact row shape §I1 gives, every cell filled after actually running the §I3 greps and the ICU and naming checks for that key. Put the table under the `BOXES:` line for §I1, before the other boxes.
+- When the diff touches any locale or translation file, the per-key audit table from the skill's §I1 is the first thing in your evidence: one row per new key, in the exact row shape §I1 gives, every cell filled after actually running the §I3 greps and the ICU and naming checks for that key. Put the table under the `BOXES:` line for §I1, before the other boxes.
 
 - A missing or incomplete table is an automatic gate FAIL.
 - An aggregate report ("checked 7 keys, all unique") is not the table and fails §I1.
