@@ -12,7 +12,7 @@ verifier="$(dirname "$tests_dir")/scripts/verify-gate-blocks.sh"
 
 repo=$work_dir/repo
 git init -q "$repo"
-git -C "$repo" commit -q --allow-empty -m init
+git -C "$repo" -c user.email=fixture@example.com -c user.name=Fixture commit -q --allow-empty -m init
 round=$work_dir/round-2
 mkdir -p "$round/verdicts"
 : > "$round/review.diff"; : > "$round/changed-files.txt"
