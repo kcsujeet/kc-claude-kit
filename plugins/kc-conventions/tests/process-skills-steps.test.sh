@@ -34,6 +34,7 @@ ids() { local prefix=$1 count=$2 i; for i in $(seq 1 "$count"); do printf '%s%s 
 {
   check_skill kc-conventions kc-assess $(ids §AS 9)
   check_skill kc-conventions kc-look-back $(ids §LB 8)
+  check_skill kc-conventions kc-clean-up $(ids §CU 7)
   check_skill kc-conventions kc-investigate $(ids §INV 9)
   check_skill kc-conventions kc-shape-the-change $(ids §SH 12)
   check_skill kc-conventions kc-raise-the-bar $(ids §RB 5)

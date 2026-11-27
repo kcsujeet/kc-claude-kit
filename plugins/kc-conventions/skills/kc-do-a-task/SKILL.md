@@ -14,7 +14,7 @@ An expensive check whose result later work will throw away runs once, on the fin
 3. **Build:** the change and its tests (lint, types, affected tests); no review fan-out or app walk yet.
 4. **Commit locally** once the person approved committing; nothing is pushed and no pull request exists yet.
 5. **Review and QA once** (`kc-gates:kc-ready-for-review`) on the committed branch, before its first push.
-6. **Push and open the pull request** from the body file that pass wrote, then hand it to the reviewer; then **look back** (`kc-conventions:kc-look-back`) and write the lessons as one batch.
+6. **Push and open the pull request** from the body file that pass wrote, then hand it to the reviewer; then **look back** (`kc-conventions:kc-look-back`) and write the lessons as one batch, then **clean up** (`kc-conventions:kc-clean-up`).
 
 - Delegating any of it: `kc-conventions:kc-delegate`. Stating what code or a tool does: `kc-conventions:kc-check-claims`.
 
