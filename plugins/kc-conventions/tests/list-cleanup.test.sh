@@ -50,4 +50,10 @@ if [ "$status" -eq 2 ]; then ok "bad flag exits 2"; else bad "bad flag exit $sta
 bash "$script" >/dev/null 2>&1; status=$?
 if [ "$status" -eq 2 ]; then ok "no arguments exits 2"; else bad "no-argument exit $status"; fi
 
+# Each kc-clean-up box exists in the skill: §CU1 §CU2 §CU3 §CU4 §CU5 §CU6 §CU7
+skill_file="$(cd "$(dirname "$0")/.." && pwd)/skills/kc-clean-up/SKILL.md"
+for box_id in §CU1 §CU2 §CU3 §CU4 §CU5 §CU6 §CU7; do
+  if grep -q -- "- \[ \] $box_id " "$skill_file"; then ok "skill has box $box_id"; else bad "skill lacks box $box_id"; fi
+done
+
 exit "$failures"
