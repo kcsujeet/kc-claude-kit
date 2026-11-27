@@ -4,7 +4,7 @@
 # (`- [ ] ...`) and everything else is a bullet. Allowed outside lists: headings, fenced code, tables,
 # blockquotes, HTML, front matter, indented lines (a list item's continuation), a bare template
 # placeholder line (`{{NAME}}`) and one intro line directly under an H1.
-# Left alone: CHANGELOG.md and anything under evals/ or fixtures/ (test inputs, not instructions).
+# Left alone: CHANGELOG.md and anything under evals/, fixtures/ or tests/ (test inputs, not instructions).
 #
 # Usage: check-no-paragraphs.sh [repo-root]   (default: the current directory; CI runs it at the root)
 # Prints one line per paragraph line and exits 1 when there is any, 0 otherwise.
@@ -13,7 +13,7 @@ set -euo pipefail
 root=${1:-.}
 
 problems=$(git -C "$root" ls-files -z '*.md' \
-  | { grep -zvE '(^|/)(evals|fixtures)/|^CHANGELOG\.md$' || true; } \
+  | { grep -zvE '(^|/)(evals|fixtures|tests)/|^CHANGELOG\.md$' || true; } \
   | (cd "$root" && xargs -0 --no-run-if-empty awk '
       FNR == 1 { in_front_matter = 0; in_fence = 0; after_h1 = 0 }
       FNR == 1 && $0 == "---" { in_front_matter = 1; next }
