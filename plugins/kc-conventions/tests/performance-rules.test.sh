@@ -18,7 +18,7 @@ require_box_text() { grep -qE "^- \[ \] $2 .*$3" "$1" || fail_rule_check "$2 box
 require_box_text "$skill" §PF1 'sized for the receiver'
 require_box_text "$skill" §PF1 'boundary-payloads.sh'
 require_box_text "$skill" §PF1 'grepped boundary payloads: 0 hits'
-grep -qE '^### §PF1\. ' "$skill" || fail_rule_check "§PF1 has a checklist box but no detail section"
+grep -qE '^### §PF1\. ' "${skill%SKILL.md}references/detail.md" || fail_rule_check "§PF1 has a checklist box but no detail section"
 sed -n '/^## Sweeps/,$p' "$skill" | grep -q 'skills/kc-performance/scripts/boundary-payloads.sh' || fail_rule_check "§PF1: Sweeps must list boundary-payloads.sh"
 require_box_text "$security_skill" §SEC10 'Raw request input never reaches a job, log, cache or event'
 require_box_text "$security_skill" §SEC10 'boundary-payloads.sh'
@@ -27,6 +27,5 @@ grep -qx '  - kc-conventions:kc-performance' "$repo_dir/plugins/kc-gates/agents/
   || fail_rule_check "§PF1: the correctness gate must preload kc-performance, or no gate grades the box"
 [ -x "$sweep" ] || fail_rule_check "boundary-payloads.sh must be executable"
 
-bash "$plugin_dir/scripts/build-rules.sh" --check >/dev/null || fail_rule_check "rules/ is stale: run build-rules.sh"
 [ "$failures" -eq 0 ] && echo "ok   performance rules"
 exit "$failures"

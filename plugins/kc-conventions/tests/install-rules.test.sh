@@ -66,16 +66,29 @@ expect_eq "second run: stamp unchanged" "$plugin_version" "$(cat "$project/.clau
 expect_eq "second run: same file set" "$(cd "$project/.claude/rules" && find . -mindepth 1 -maxdepth 1 | sed "s|^\./||" | sort)" \
   "$( { printf '%s\n' "$rule_names"; echo .kc-conventions-version; } | sort)"
 
-echo "local edit" >> "$project/.claude/rules/kc-naming.md"
+echo "local edit" >> "$project/.claude/rules/kc-conventions.md"
 dry_output=$(cd "$project" && bash "$installer" --dry-run)
-expect_eq "dry run: names the locally edited rule" "would replace: kc-naming.md" "$(printf '%s\n' "$dry_output" | grep '^would replace: ')"
-if grep -q 'local edit' "$project/.claude/rules/kc-naming.md"; then
+expect_eq "dry run: names the locally edited rule" "would replace: kc-conventions.md" "$(printf '%s\n' "$dry_output" | grep '^would replace: ')"
+if grep -q 'local edit' "$project/.claude/rules/kc-conventions.md"; then
   record "dry run: leaves the edited rule alone" ok
 else
-  record "dry run: leaves the edited rule alone" fail "kc-naming.md was overwritten"
+  record "dry run: leaves the edited rule alone" fail "kc-conventions.md was overwritten"
 fi
 third_output=$(cd "$project" && bash "$installer")
-expect_eq "rerun: replaces the edited rule" "replaced: kc-naming.md" "$(printf '%s\n' "$third_output" | grep '^replaced: ')"
+expect_eq "rerun: replaces the edited rule" "replaced: kc-conventions.md" "$(printf '%s\n' "$third_output" | grep '^replaced: ')"
+
+# Stale generated copies of the old per-topic rules are removed; other files stay.
+printf -- '---\n---\n<!-- Generated from skills/kc-old/SKILL.md by scripts/build-rules.sh. Edit the skill, not this file. -->\n' > "$project/.claude/rules/kc-old.md"
+echo "mine" > "$project/.claude/rules/kc-mine.md"
+echo "other" > "$project/.claude/rules/team.md"
+stale_dry=$(cd "$project" && bash "$installer" --dry-run)
+expect_eq "dry run: names the stale copy" "would remove: kc-old.md" "$(printf '%s\n' "$stale_dry" | grep '^would remove: ')"
+if [ -f "$project/.claude/rules/kc-old.md" ]; then record "dry run: keeps the stale copy" ok; else record "dry run: keeps the stale copy" fail "kc-old.md was removed"; fi
+stale_run=$(cd "$project" && bash "$installer")
+expect_eq "rerun: removes the stale generated copy" "removed: kc-old.md" "$(printf '%s\n' "$stale_run" | grep '^removed: ')"
+if [ ! -e "$project/.claude/rules/kc-old.md" ]; then record "stale copy is gone" ok; else record "stale copy is gone" fail "kc-old.md still present"; fi
+if [ -f "$project/.claude/rules/kc-mine.md" ] && [ -f "$project/.claude/rules/team.md" ]; then record "files without the generated header stay" ok; else record "files without the generated header stay" fail "a hand-made file was removed"; fi
+rm -f "$project/.claude/rules/kc-mine.md" "$project/.claude/rules/team.md"
 
 custom_dest="$work_dir/custom/rules"
 bash "$installer" --dest "$custom_dest" >/dev/null

@@ -10,8 +10,14 @@ set -euo pipefail
 
 tests_dir=$(cd "$(dirname "$0")" && pwd)
 plugin_dir=$(dirname "$tests_dir")
-i18n="$plugin_dir/skills/kc-i18n/SKILL.md"
-testing="$plugin_dir/skills/kc-testing/SKILL.md"
+combined_skill() {
+  local out
+  out=$(mktemp)
+  cat "$plugin_dir/skills/$1/SKILL.md" "$plugin_dir/skills/$1/references/detail.md" > "$out"
+  echo "$out"
+}
+i18n=$(combined_skill kc-i18n)
+testing=$(combined_skill kc-testing)
 
 failures=0
 fail() { echo "FAIL $1"; failures=$((failures + 1)); }

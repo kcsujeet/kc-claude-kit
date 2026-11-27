@@ -12,7 +12,7 @@
 #
 # When the prompt asks to fix or address something reported (asks_fix), it adds the trigger for
 # kc-assess step 3: reproduce each problem before proposing a cause, and name the evidence on a
-# `Reproduced:` line. guard-unreproduced-cause.sh denies the first edit before it was run.
+# `Reproduced:` line. The person approves the proposal before any build (kc-assess).
 #
 # When the prompt asks where work stands or what is left (asks_status), it adds one line: read the
 # ticket's and pull request's state with a tool before stating it. No line otherwise, so the

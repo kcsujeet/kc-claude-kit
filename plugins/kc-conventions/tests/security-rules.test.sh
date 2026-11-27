@@ -1,13 +1,12 @@
 #!/usr/bin/env bash
 # Checks that the security topic keeps its boxes, and that each box names the failure it grades:
-# kc-security §SEC1 to §SEC9 on its checklist, its sweep in its Sweeps section, and the generated
-# rule file in step with the skill. Fixtures for the sweep itself are under tests/sweeps/kc-security.
+# kc-security §SEC1 to §SEC9 on its checklist, its sweep in its Sweeps section. Fixtures for the sweep itself are under tests/sweeps/kc-security.
 set -euo pipefail
 
 tests_dir=$(cd "$(dirname "$0")" && pwd)
 plugin_dir=$(dirname "$tests_dir")
 skill="$plugin_dir/skills/kc-security/SKILL.md"
-rule="$plugin_dir/rules/kc-security.md"
+detail="$plugin_dir/skills/kc-security/references/detail.md"
 
 failures=0
 fail() { echo "FAIL $1"; failures=$((failures + 1)); }
@@ -34,16 +33,15 @@ require_box_text §SEC9 'grepped request surface: 0 hits'
 
 # §SEC10 (raw request input in jobs, logs, caches and events) has its box and its detail section.
 require_box_text §SEC10 'validated, allowlisted output or ids'
-grep -qE "^### §SEC10\. " "$skill" || fail "§SEC10 has a checklist box but no detail section"
+grep -qE "^### §SEC10\. " "$detail" || fail "§SEC10 has a checklist box but no detail section"
 
 for section in §SEC1 §SEC2 §SEC3 §SEC4 §SEC5 §SEC6 §SEC7 §SEC8 §SEC9; do
-  grep -qE "^### $section\. " "$skill" || fail "$section has a checklist box but no detail section"
+  grep -qE "^### $section\. " "$detail" || fail "$section has a checklist box but no detail section"
 done
-! sed -n '/^### §SEC7\. /,/^### §SEC8\. /p' "$skill" | grep -qE ' \? .+ : ' || fail "§SEC7's Prefer example must not be a ternary (clarity §C15): gates copy it into fixes"
+! sed -n '/^### §SEC7\. /,/^### §SEC8\. /p' "$detail" | grep -qE ' \? .+ : ' || fail "§SEC7's Prefer example must not be a ternary (clarity §C15): gates copy it into fixes"
 sed -n '/^## Sweeps/,$p' "$skill" | grep -q 'skills/kc-security/scripts/request-surface.sh' || fail "Sweeps must list request-surface.sh"
 [ -x "$plugin_dir/skills/kc-security/scripts/request-surface.sh" ] || fail "request-surface.sh must be executable"
-grep -qi 'ids the request supplies that must belong together are checked together' "$rule" || fail "rules/kc-security.md must carry the ids-belong-together rule"
-bash "$plugin_dir/scripts/build-rules.sh" --check >/dev/null || fail "rules/ is stale: run build-rules.sh"
+grep -qi 'ids that must belong together are checked together' "$skill" || fail "kc-security must carry the ids-belong-together box"
 
 [ "$failures" -eq 0 ] && echo "ok   security rules"
 exit "$failures"

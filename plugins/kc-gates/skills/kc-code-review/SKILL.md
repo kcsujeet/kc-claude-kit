@@ -87,7 +87,7 @@ On a later round of `kc-ready-for-review` (the delta of your own fixes), run it 
 
 Dispatch each listed gate with the Agent tool, `subagent_type` set to the agent name below. Phase 1 runs in parallel: issue every listed gate's Agent call in a single message. Phase 2 (verification) runs only after every phase-1 agent has returned, because it audits their returned verdict blocks rather than re-deriving findings.
 
-Each topic gate preloads its `kc-conventions:kc-<topic>` skill, so it already holds that topic's `## Review checklist`, `## Review detail` and `## Sweeps`. You do not paste rules into the prompt.
+Each topic gate preloads its `kc-conventions:kc-<topic>` skill, so it already holds that topic's `## Review checklist` and `## Sweeps`; its `references/detail.md` holds the examples and edge cases per box, and the gate reads it. You do not paste rules into the prompt.
 
 **Phase 1: dispatch the gates `GATES=` lists, in parallel.**
 
@@ -149,7 +149,7 @@ The agents carry this contract in their own definitions; the dispatch prompt sup
 
 Each agent must:
 
-1. Read its topic's `## Review checklist` and `## Review detail` in full.
+1. Read its topic's `## Review checklist` in full, and its `references/detail.md`.
 2. **Sweep the greppable constructs FIRST, before reading the diff for meaning.** Some boxes cover constructs a script can enumerate exactly, and those boxes are graded on whether the hits were **listed**, not on whether they were noticed. The agent runs every script under its topic's `## Sweeps` against the diff file, then gives every hit a `file:line` verdict in the evidence, with the hit count. `0 hits` must be stated explicitly; a box with no receipt is FAIL by default, because silence is indistinguishable from never having looked.
 3. Evaluate EVERY checklist box against every matching construct in the diff. Before failing a box on a convention, grep the target repo to confirm the convention is real (cite 2-3 example paths in the evidence).
 4. Return ONLY this structured verdict:
@@ -314,7 +314,7 @@ This skill is in active iteration. When the user gives feedback ("you missed X",
    - Workflow change, output format change, hard rule → this `SKILL.md`
    - Feedback that is specific to one target repo, not a general rule → suggest the user add it to that repo's own `.claude/review-conventions.md` instead of any file in this kit.
 
-   A topic skill's `## Rules` section is copied into `plugins/kc-conventions/rules/kc-<topic>.md` by `scripts/build-rules.sh`; never edit `rules/` by hand. After changing a `## Rules` section, run `bash plugins/kc-conventions/scripts/build-rules.sh` to regenerate, and `--check` to confirm.
+   A topic skill's `## Review checklist` is the one copy of its convention; `plugins/kc-conventions/rules/kc-conventions.md` only points to the skill, so add a new topic there as one pointer line.
 
 2. Update with a concrete pattern, a *why*, and a canonical file path, rather than abstract rules. Concrete examples that future-Claude can grep for beat general principles every time.
 
@@ -328,7 +328,7 @@ This skill is in active iteration. When the user gives feedback ("you missed X",
 
 5. Keep `SKILL.md` lean. If a section grows beyond a few paragraphs, move it to the agent or topic skill that owns it and replace it with a one-line summary plus pointer.
 
-6. **Hard cap: every `SKILL.md` and agent file stays under 500 lines.** When a topic skill crosses that line, move a cluster of its `## Review detail` into `skills/kc-<topic>/references/<cluster>.md`, linked from the section it replaces by its `${CLAUDE_PLUGIN_ROOT}/skills/kc-<topic>/references/<cluster>.md` path so a gate can read it (examples: `kc-clarity/references/ternaries.md`, `kc-react/references/forms.md`). Keep `## Rules`, `## Review checklist` and `## Sweeps` in `SKILL.md`: `build-rules.sh` reads only `## Rules`, and gates tick only the checklist. Do not let a single file become a kitchen sink.
+6. **Hard cap: every `SKILL.md` and agent file stays under 500 lines.** When a topic skill crosses that line, move a cluster of `references/detail.md` into `skills/kc-<topic>/references/<cluster>.md`, linked from the section it replaces by its `${CLAUDE_PLUGIN_ROOT}/skills/kc-<topic>/references/<cluster>.md` path so a gate can read it (examples: `kc-clarity/references/ternaries.md`, `kc-react/references/forms.md`). Keep `## Review checklist` and `## Sweeps` in `SKILL.md`: gates tick only the checklist. Do not let a single file become a kitchen sink.
 
 7. **Splits group by topic, not by physical proximity.** When the 500-line cap forces a split, factor out a *cluster of related rules*, not a single section, and not a grab-bag of whatever happened to be adjacent. A rule that applies broadly to "any unit of code" or "anywhere in the codebase" belongs in the general topic it was already in, not in a narrower one, just because it sat next to that topic's rules in the source.
 

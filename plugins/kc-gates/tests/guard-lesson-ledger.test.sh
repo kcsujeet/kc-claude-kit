@@ -35,9 +35,11 @@ check_verdict allow "allowed: a push in a repo with no ledger in its checklist" 
 
 check_verdict deny "blocked: a push with no ledger folder" "git push -u origin lesson-branch"
 expect_contains "it names the missing files" "is missing: feedback.tsv ledger.tsv checklist.md" "$last_hook_output"
+expect_contains "it names the user's skip phrase" 'prefix the command with KC_LEDGER_SKIP=1' "$last_hook_output"
 check_verdict deny "blocked: gh pr create with no ledger folder" "gh pr create --fill"
 check_verdict deny "blocked: gh pr merge with no ledger folder" "gh pr merge 5 --squash"
 check_verdict allow "allowed: a push of the default branch" "git push origin main" "$work_dir"
+expect_token_needs_typed_words "$scripts/guard-lesson-ledger.sh" KC_LEDGER_SKIP=1 "skip ledger" "git push -u origin lesson-branch" "$lesson_repo"
 
 mkdir -p "$KC_LEDGER_DIR"
 printf 'F1\ttyped\tnew code had no precedent\n' > "$KC_LEDGER_DIR/feedback.tsv"
