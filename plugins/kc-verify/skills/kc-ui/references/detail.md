@@ -167,3 +167,10 @@
 - [ ] The walkthrough's frames were captured at 2x in a headless browser, not from a downscaled tool screenshot, encoded at their own size, and a frame pulled from the video reads sharp at 100%.
 - [ ] The walkthrough is embedded as a block player, not an inline file chip, and was seen playing on the ticket.
 - [ ] Each walkthrough state was reached through the app's own controls, and every frame was read whole (menus, highlights, badges, overlays), not only the boxed part, before it was sent.
+
+### §UI7
+
+- Put the app, running the change's own code, in every state of the matrix and compare it with the design section by section and element by element. Code and the author's screenshots count for none.
+- The walk receipt's `design` line names the design (a prototype or mock link, or a file), and each browser item carries a capture of the design in the same state as a `design: <capture>` field. With no design, the line says `none: <why>`.
+- `check-walk-receipt.sh` refuses a browser walk without it, so the comparison can't be skipped quietly.
+- Example: a two-column drawer shipped with the alert above both columns and no column divider, while the linked prototype put the alert in the side column. The comparison was a prose box, and nothing asked for the prototype.
