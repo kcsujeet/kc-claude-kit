@@ -33,6 +33,7 @@ run_sweep() {
   fi
 }
 
+lacks() { ! grep -q -- "$1" <<< "$2"; }
 box_names_sweep() { grep -E "^- \[ \] $1 .*$2" "$plugin_dir/skills/$3/SKILL.md"; }
 
 check "§R12 box names pass-through-hooks.sh" box_names_sweep '§R12' 'pass-through-hooks\.sh' kc-react
@@ -42,15 +43,15 @@ check "§N14 box names near-synonym-names.sh" box_names_sweep '§N14' 'near-syno
 output=$(run_sweep kc-react pass-through-hooks)
 check "§R12 flags a hook whose results only reach a child's props, through a derived value too" grep -q 'OrderPanel.tsx:2: .*useOrderReceipt' <<< "$output"
 check "§R12 flags a hook left in place when the diff turns its own use into a prop" grep -q 'RefundPanel.tsx:2: .*useRefund' <<< "$output"
-check "§R12 passes a hook the component reads itself" bash -c '! grep -q useOrderTotals <<< "$1"' _ "$output"
+check "§R12 passes a hook the component reads itself" lacks useOrderTotals "$output"
 
 output=$(run_sweep kc-simplicity near-copies)
 check "§P1 flags a new test helper that near-copies an existing one" grep -q 'enableExpressShipping.ts:1: near copy of tests/enableGiftWrap.ts' <<< "$output"
-check "§P1 passes a new file with no near copy" bash -c '! grep -q formatOrderNumber <<< "$1"' _ "$output"
+check "§P1 passes a new file with no near copy" lacks formatOrderNumber "$output"
 
 output=$(run_sweep kc-naming near-synonym-names)
 check "§N14 flags names in one scope that share a word" grep -q 'hasPaymentError' <<< "$output"
-check "§N14 passes a name sharing no word with its neighbours" bash -c '! grep -q canCancel <<< "$1"' _ "$output"
+check "§N14 passes a name sharing no word with its neighbours" lacks canCancel "$output"
 
 echo "$passes passed, $failures failed"
 [ "$failures" -eq 0 ]
