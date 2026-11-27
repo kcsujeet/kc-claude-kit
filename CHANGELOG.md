@@ -9,7 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ### Changed (topic skills are checklists, one pointer rule)
 
 - `kc-conventions` 2.9.0: each topic skill is its `## Review checklist` (ticked when writing and when reviewing) plus `## Sweeps`, with the examples in `references/detail.md`; `rules/kc-<topic>.md` and `build-rules.sh` are gone, replaced by one pointer rule `rules/kc-conventions.md`; `install-rules.sh` removes the stale generated copies; rule bullets with no box got one (§N12, §N13, §PF2 to §PF6, §T15 to §T20, §S22, §RL8); kc-assess §AS1 is the required `Reproduced:` box.
-- `kc-gates` 3.20.0: `guard-late-answer.sh` and `guard-unreproduced-cause.sh` are removed (false blocks; the prompt-time lines and the kc-assess box do the work); gates read each topic's `references/detail.md`.
+- `kc-gates` 3.20.0: `guard-lesson-ledger.sh` can be waived for one PR: `KC_LEDGER_SKIP=1` passes only when the user's latest typed message says "skip ledger" (`tests/guard-lesson-ledger.test.sh`). `guard-late-answer.sh` and `guard-unreproduced-cause.sh` are removed (false blocks; the prompt-time lines and the kc-assess box do the work); gates read each topic's `references/detail.md`.
 
 ### Changed (no hook reminds or blocks at the end of a turn)
 

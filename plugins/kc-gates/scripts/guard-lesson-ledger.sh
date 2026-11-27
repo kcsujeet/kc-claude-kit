@@ -14,6 +14,10 @@
 # is refused `git commit`, `git push`, `gh pr create` and `gh pr merge` in such a repo until it reloads,
 # and one command that commits then pushes is refused, since this guard reads HEAD before it runs.
 #
+# A command carrying the literal KC_LEDGER_SKIP=1 passes only when the user's latest typed message
+# contains "skip ledger" (user_approved in lib/hook-input.sh): the user may waive the ledger for one
+# PR (one that carries no lesson); the token without those words stays blocked.
+#
 # Output: the PreToolUse deny JSON on a blocked command, nothing otherwise. Always exits 0.
 # KC_GUARD_NO_JQ=1 forces the sed fallback for reading the payload (used by the tests).
 
@@ -21,6 +25,8 @@
 set -u
 
 scripts_dir=$(dirname "$0")
+readonly SKIP_TOKEN='KC_LEDGER_SKIP=1'
+readonly SKIP_PHRASE='skip ledger'
 # shellcheck source=lib/hook-input.sh
 . "$scripts_dir/lib/hook-input.sh"
 
@@ -119,7 +125,7 @@ check_segment() {
   problems=$(get_ledger_problems "$repo_dir" "$ledger_dir")
   [ -n "$problems" ] || return 0
   problem_summary=$(printf '%s' "$problems" | tr '\n' ' ' | sed 's/["\\]//g' | cut -c1-900)
-  print_pretooluse_deny "Blocked by the kc-gates plugin: this is a lesson PR (the repo's hand-off checklist has ledger: true), and its ledger is not complete. $problem_summary"
+  print_pretooluse_deny "Blocked by the kc-gates plugin: this is a lesson PR (the repo's hand-off checklist has ledger: true), and its ledger is not complete. $problem_summary Ask the user: only their typed words approve a skip. Only when the user's latest message says \"$SKIP_PHRASE\", prefix the command with $SKIP_TOKEN; never on your own."
   return 1
 }
 
@@ -128,6 +134,9 @@ main() {
   input="$(cat)"
   command="$(extract_field "$input" command)"
   [ -n "$command" ] || exit 0
+  case "$command" in
+    *"$SKIP_TOKEN"*) ! user_approved "$(extract_field "$input" transcript_path)" "$SKIP_PHRASE" || exit 0 ;;
+  esac
   dir="$(extract_field "$input" cwd)"
   walk_segments "$command" "${dir:-$PWD}" check_segment || true
   exit 0
