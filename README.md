@@ -25,13 +25,13 @@ To stay current, turn on auto-update: `/plugin`, the Marketplaces tab, `kc-claud
 
 | Plugin | What it is for | When you would use it |
 |---|---|---|
-| `kc-gates` | Code review: `kc-code-review`, `kc-ready-for-review`, `kc-post-review`, plus the hooks that guard pushes, merges and posts. | Every PR. |
-| `kc-conventions` | The coding rules (one checklist skill per topic) and the process skills (assess, shape, look back). | Always on; installed with `kc-gates`. |
-| `kc-verify` | QA: the change in the running app, whether a person can use it, end to end. | Any change a person sees. |
-| `kc-instructions` | Audits a repo's Claude setup: what belongs in `CLAUDE.md`, a rule, a skill or a hook. | Once per repo. |
-| `kc-usage-band` | A status row above the prompt: model, branch, context, rate limits, cost. | Always on. Terminal only. |
-| `kc-image-preview` | Thumbnails of images you paste into the prompt. | Always on. Terminal on macOS only. |
-| `kc-autopilot` 🚧 | Work in progress: turns an approved plan into pull requests. | Not ready for everyday use. |
+| [`kc-gates`](plugins/kc-gates) | Code review: `kc-code-review`, `kc-ready-for-review`, `kc-post-review`, plus the hooks that guard pushes, merges and posts. | Every PR. |
+| [`kc-conventions`](plugins/kc-conventions) | The coding rules (one checklist skill per topic) and the process skills (assess, shape, look back). | Always on; installed with `kc-gates`. |
+| [`kc-verify`](plugins/kc-verify) | QA: the change in the running app, whether a person can use it, end to end. | Any change a person sees. |
+| [`kc-instructions`](plugins/kc-instructions) | Audits a repo's Claude setup: what belongs in `CLAUDE.md`, a rule, a skill or a hook. | Once per repo. |
+| [`kc-usage-band`](plugins/kc-usage-band) | A status row above the prompt: model, branch, context, rate limits, cost. | Always on. Terminal only. |
+| [`kc-image-preview`](plugins/kc-image-preview) | Thumbnails of images you paste into the prompt. | Always on. Terminal on macOS only. |
+| [`kc-autopilot`](plugins/kc-autopilot) 🚧 | Work in progress: turns an approved plan into pull requests. | Not ready for everyday use. |
 
 ## How it works
 
@@ -76,15 +76,15 @@ flowchart TD
 
 Most start on their own when the topic comes up; you can type any as `/plugin:skill`.
 
-**`kc-gates`:** `kc-code-review` (review a PR, branch or changes, walking every changed behaviour: the one QA, own PRs and others'), `kc-ready-for-review` (the one review and QA pass on your own PR), `kc-post-review` (draft PR comments and replies, post on your signal).
+**[`kc-gates`](plugins/kc-gates):** [`kc-code-review`](plugins/kc-gates/skills/kc-code-review/SKILL.md) (review a PR, branch or changes, walking every changed behaviour: the one QA, own PRs and others'), [`kc-ready-for-review`](plugins/kc-gates/skills/kc-ready-for-review/SKILL.md) (the one review and QA pass on your own PR), [`kc-post-review`](plugins/kc-gates/skills/kc-post-review/SKILL.md) (draft PR comments and replies, post on your signal).
 
-**`kc-verify`:** `kc-ui` (the change rendered, every state), `kc-ux` (a person can use it), `kc-e2e` (every layer, front to back).
+**[`kc-verify`](plugins/kc-verify):** [`kc-ui`](plugins/kc-verify/skills/kc-ui/SKILL.md) (the change rendered, every state), [`kc-ux`](plugins/kc-verify/skills/kc-ux/SKILL.md) (a person can use it), [`kc-e2e`](plugins/kc-verify/skills/kc-e2e/SKILL.md) (every layer, front to back).
 
-**`kc-conventions`, topics:** `kc-naming`, `kc-clarity`, `kc-structure`, `kc-simplicity`, `kc-correctness`, `kc-testing`, `kc-datetime`, `kc-security`, `kc-i18n`, `kc-react`, `kc-rails`, `kc-type-safety`, `kc-error-handling`, `kc-performance`, `kc-dependencies`.
+**[`kc-conventions`](plugins/kc-conventions), topics:** [`kc-naming`](plugins/kc-conventions/skills/kc-naming/SKILL.md), [`kc-clarity`](plugins/kc-conventions/skills/kc-clarity/SKILL.md), [`kc-structure`](plugins/kc-conventions/skills/kc-structure/SKILL.md), [`kc-simplicity`](plugins/kc-conventions/skills/kc-simplicity/SKILL.md), [`kc-correctness`](plugins/kc-conventions/skills/kc-correctness/SKILL.md), [`kc-testing`](plugins/kc-conventions/skills/kc-testing/SKILL.md), [`kc-datetime`](plugins/kc-conventions/skills/kc-datetime/SKILL.md), [`kc-security`](plugins/kc-conventions/skills/kc-security/SKILL.md), [`kc-i18n`](plugins/kc-conventions/skills/kc-i18n/SKILL.md), [`kc-react`](plugins/kc-conventions/skills/kc-react/SKILL.md), [`kc-rails`](plugins/kc-conventions/skills/kc-rails/SKILL.md), [`kc-type-safety`](plugins/kc-conventions/skills/kc-type-safety/SKILL.md), [`kc-error-handling`](plugins/kc-conventions/skills/kc-error-handling/SKILL.md), [`kc-performance`](plugins/kc-conventions/skills/kc-performance/SKILL.md), [`kc-dependencies`](plugins/kc-conventions/skills/kc-dependencies/SKILL.md).
 
-**`kc-conventions`, process:** `kc-do-a-task` (the order of work, assess to look-back), `kc-assess` (reproduce first, every reader of the broken value), `kc-shape-the-change` (write and compare the design before code; a hook blocks source edits until it passes), `kc-investigate` (production problems from existing records), `kc-look-back` (feedback to lessons), `kc-raise-the-bar` (measure, look for a better way), `kc-check-claims` (check a claim before stating it), `kc-delegate` (hand work to agents without the cost running away), `kc-init` (copy the rules into a project).
+**[`kc-conventions`](plugins/kc-conventions), process:** [`kc-do-a-task`](plugins/kc-conventions/skills/kc-do-a-task/SKILL.md) (the order of work, assess to look-back), [`kc-assess`](plugins/kc-conventions/skills/kc-assess/SKILL.md) (reproduce first, every reader of the broken value), [`kc-shape-the-change`](plugins/kc-conventions/skills/kc-shape-the-change/SKILL.md) (write and compare the design before code; a hook blocks source edits until it passes), [`kc-investigate`](plugins/kc-conventions/skills/kc-investigate/SKILL.md) (production problems from existing records), [`kc-look-back`](plugins/kc-conventions/skills/kc-look-back/SKILL.md) (feedback to lessons), [`kc-raise-the-bar`](plugins/kc-conventions/skills/kc-raise-the-bar/SKILL.md) (measure, look for a better way), [`kc-check-claims`](plugins/kc-conventions/skills/kc-check-claims/SKILL.md) (check a claim before stating it), [`kc-delegate`](plugins/kc-conventions/skills/kc-delegate/SKILL.md) (hand work to agents without the cost running away), [`kc-init`](plugins/kc-conventions/skills/kc-init/SKILL.md) (copy the rules into a project).
 
-**`kc-instructions`:** `kc-audit` (review a repo's Claude instructions). **`kc-autopilot` 🚧:** `kc-init`, `kc-run`.
+**[`kc-instructions`](plugins/kc-instructions):** [`kc-audit`](plugins/kc-instructions/skills/kc-audit/SKILL.md) (review a repo's Claude instructions). **[`kc-autopilot`](plugins/kc-autopilot) 🚧:** [`kc-init`](plugins/kc-autopilot/skills/kc-init/SKILL.md), [`kc-run`](plugins/kc-autopilot/skills/kc-run/SKILL.md).
 
 `kc-usage-band` and `kc-image-preview` have no skills.
 

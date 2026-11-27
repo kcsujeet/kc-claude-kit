@@ -119,5 +119,7 @@ Tick each box, then say PASS, FAIL (file:line) or N/A (why).
 - [ ] §G6 Under the title, `**Does it work / what can it break**` has before and after numbers (or `not measured: <why>`) and the `Uses:` line. Held by `check-review-report.sh`. (N/A: never)
 - [ ] §G7 Every `path:line` finding in `verdicts/*.txt` is in the report or on a `Dropped:` line. Held by `check-report-findings.sh`. (N/A: never)
 - [ ] §G8 QA walked once, here: every state and audience (signed out for a `public or guest path`) via kc-ui and kc-ux; one "after" screenshot per flow. Held by `check-walk-receipt.sh`. (N/A: `WALK=not-required`)
+- [ ] §G9 The PR description is short and readable: what changed and why, how to test, evidence; no process notes, no word counts, no restating the diff. (N/A: never)
+- [ ] §G10 Screenshots and any video are in the PR description, uploaded with `gh pr create --attach <file>` or `gh pr edit <n> --attach <file>`; `gh --version` checked first. (N/A: no visual change)
 
 Full wording of each box, and the hard rules, output examples and iteration notes: `references/detail.md`.

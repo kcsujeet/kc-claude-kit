@@ -99,3 +99,5 @@ Tick each box, then say PASS, FAIL (file:line) or N/A (why). Detail per box: `re
 - [ ] §H4 Each behaviour fix has a test that fails when it is broken; dead code was run through every input state (null, undefined, empty) first; duplication fixed by consolidating to one copy. (N/A: no fix commits)
 - [ ] §H5 Fixes after the pass were reviewed as the next round; a reviewer's change was checked like your own; every PR comment, bot reviewers included, has a reply (`ready-receipt.sh`). (N/A: nothing after the pass)
 - [ ] §H7 Every hand-off box has a verdict (`--verdicts`); no hand-off action ran while one was FAIL or unrecorded. Held by `guard-hand-off.sh`, `guard-tracker-transition.sh`. (N/A: no hand-off checklist)
+- [ ] §H10 The PR description is short and readable: what changed and why, how to test, evidence; no process notes, no word counts, no restating the diff. (N/A: never)
+- [ ] §H9 Screenshots and any video are in the PR description, uploaded with `gh pr create --attach <file>` or `gh pr edit <n> --attach <file>`; `gh --version` checked first. (N/A: no visual change)

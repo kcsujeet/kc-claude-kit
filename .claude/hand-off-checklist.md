@@ -15,6 +15,7 @@ Read by `kc-gates:kc-ready-for-review` before a pull request here is opened or m
 - [ ] The case appears as one example among several, labelled as an example.
 - [ ] An existing rule that should have caught it was widened instead of adding a narrower one beside it.
 - [ ] Every skill, agent, hook and script the PR adds or changes works in a repo with nothing added for the kit: what it runs ships in the plugin, and a repo file it reads is optional, with a default when it is missing (`CLAUDE.md`, "Plugins stand alone").
+- [ ] The PR description is short and readable (what changed and why, how to test, evidence; no process notes or word counts), and screenshots or video are in it via `gh pr create --attach <file>` or `gh pr edit <n> --attach <file>`.
 - [ ] The PR description names the class of mistake in one sentence and two or three other cases the rule catches, from areas other than the one it came from; wording the request suggested was rewritten for the class, not kept because it was given.
 
 ## It comes from the whole look-back
