@@ -93,8 +93,21 @@ parse_git_command() {
   GIT_ARGS=("$@")
 }
 
+# without_commit_message <segment>: the segment with the quoted text of a `git commit` message
+# (-m, -am, --message) emptied, so what a message says (`git push`, `gh pr create`) is not read as a
+# command. Any other segment is unchanged.
+without_commit_message() {
+  local segment=$1
+  if printf '%s' "$segment" | grep -Eq '(^|[^[:alnum:]_.-])git[[:space:]]+(.*[[:space:]])?commit([[:space:]]|$)'; then
+    printf '%s' "$segment" | sed -E -e 's/(-[A-Za-z]*m|--message)([[:space:]]+|=)"([^"\\]|\\.)*"/\1 ""/g' -e "s/(-[A-Za-z]*m|--message)([[:space:]]+|=)'[^']*'/\\1 ''/g"
+  else
+    printf '%s' "$segment"
+  fi
+}
+
 # walk_segments <command> <dir> <callback>: calls <callback> <segment> <dir> for each shell segment of
-# the command, following any `cd` before it (the directory the segment runs in). Stops and fails as
+# the command, following any `cd` before it (the directory the segment runs in), with a commit
+# message's text emptied (without_commit_message). Stops and fails as
 # soon as the callback fails; succeeds when every segment passed.
 walk_segments() {
   local command=$1 dir=$2 callback=$3 segment target
@@ -109,7 +122,7 @@ walk_segments() {
       dir=$target
       continue
     fi
-    "$callback" "$segment" "$dir" || return 1
+    "$callback" "$(without_commit_message "$segment")" "$dir" || return 1
   done <<EOF
 $(split_segments "$command")
 EOF
@@ -271,17 +284,37 @@ get_commit_diff() {
   fi
 }
 
-# user_approved <transcript> <phrase>: succeeds only when the latest message the person typed in the
-# session transcript (a JSONL file) contains <phrase>, case-insensitive. A typed message is read the
+# branch_start_time <dir>: the commit time (epoch seconds) of the oldest commit the repository in <dir>
+# has that the default branch lacks, or nothing when there is none (on the default branch itself, or
+# no default branch).
+branch_start_time() {
+  local dir=$1 base
+  base=$(get_default_branch_ref "$dir")
+  [ -n "$base" ] || return 0
+  git -C "$dir" log --format=%ct "$base..HEAD" 2>/dev/null | sort -n | head -1
+}
+
+# user_approved <transcript> <phrase> [<dir>]: succeeds only when a message the person typed in the
+# session transcript (a JSONL file) contains <phrase>, case-insensitive, and was typed on this branch:
+# at or after the commit time of the first commit the branch has over the default branch in <dir>
+# (branch_start_time), so one typed phrase covers every later command on the branch and a phrase from
+# before the branch existed covers nothing. With no such commit (on the default branch), or when the
+# message has no timestamp, only the latest typed message counts. A typed message is read the
 # way feedback-ledger.sh reads one (lib/typed-message.jq): not a tool result, a relayed or agent
 # message, or a system note. No transcript, no jq, or no typed message (a subagent session) means
 # not approved: only the person's own words approve what a guard blocks.
 user_approved() {
-  local transcript=$1 phrase=$2
+  local transcript=$1 phrase=$2 dir=${3:-.} since
   [ -n "$transcript" ] && [ -r "$transcript" ] && command -v jq >/dev/null 2>&1 || return 1
-  jq -rs -L "$(dirname "${BASH_SOURCE[0]}")" 'include "typed-message";
-    (map(is_typed_message) | rindex(true)) as $last
-    | if $last == null then empty else .[$last] | typed_texts end' "$transcript" 2>/dev/null \
+  since=$(branch_start_time "$dir")
+  jq -rs -L "$(dirname "${BASH_SOURCE[0]}")" --argjson since "${since:-null}" 'include "typed-message";
+    def typed_at: (.timestamp // "") | sub("\\.[0-9]+Z$"; "Z") | try fromdateiso8601 catch 0;
+    if $since == null then
+      (map(is_typed_message) | rindex(true)) as $last
+      | if $last == null then empty else .[$last] | typed_texts end
+    else
+      .[] | select(is_typed_message and typed_at >= $since) | typed_texts
+    end' "$transcript" 2>/dev/null \
     | grep -qiF -- "$phrase"
 }
 

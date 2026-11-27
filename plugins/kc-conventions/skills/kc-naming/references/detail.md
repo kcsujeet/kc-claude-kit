@@ -19,6 +19,8 @@ Also flag function names that describe the trigger (`handleX`) but hide the effe
 
 **Apply this just as hard to inline boolean expressions.** A `&&`/`||` chain inside an `if`, `find`, `filter`, ternary, or guard clause is where naming pays off the most — each operand usually encodes a separate domain concept, and a reader has to decode all of them in their head. Extract named booleans (or a named predicate function) when the chain has 2+ non-obvious conditions. This continues in §N2.
 
+**Checklist wording (moved from SKILL.md):** Role-not-type names: new variables/functions describe the role, not the type (no `data`/`result`/`value`/`temp`/`item`/`obj` for behavior-bearing values); function names describe the effect, not just the trigger. (N/A: no new identifiers)
+
 ### §N2. Inline boolean chains — evaluate the operands, not just the outer name
 
 The rule is about the **operands**, not the variable the chain is assigned to. A `&&`/`||` chain with 2+ non-obvious operands — raw comparisons (`x > 0`), enum (in)equalities (`s !== SomeEnum.FOO`), negations (`!x`), `?.` field access — needs EACH non-obvious operand extracted to its own named boolean.
@@ -103,6 +105,8 @@ const hasElevatedRole = isAdmin || isOwner
 const canShow = hasElevatedRole && hasAccess
 ```
 
+**Checklist wording (moved from SKILL.md):** Inline boolean chains — evaluate the OPERANDS, not just the outer name: any `&&`/`||` chain with 2+ non-obvious operands (raw comparisons, enum (in)equalities, negations, `?.` field access) has EACH non-obvious operand extracted to its own named boolean. Assigning the whole chain to a named boolean does NOT satisfy this. A parenthesized sub-expression in a mixed `&&`/`||` chain (e.g. `(a || b) && c`) also gets its own name — parentheses alone don't pass. Enumerate with the `and-or-chains.sh` sweep, do not eyeball. (N/A: only when `and-or-chains.sh` returns 0 hits, stated as `grepped &&/||: 0 hits`)
+
 ### §N3. A repeated domain check gets a named `isX` from its owner
 
 A domain check answers a question about some data (is this record locked, is this account on a given provider, is this error a conflict) by combining fields or applying a rule the line does not show. When the same check appears 3+ times in the repo, counting the diff's copy, the hook or util that owns the data returns it as a named `isX`, and the diff uses that instead of adding a copy. Grep the repo for the expression and state the count. A local `const isX = ...` only names it for one scope; copies elsewhere drift (one site updates, the other doesn't). The same applies to JSX `&&` chains, `catch` blocks, derived selectors, and hook bodies. Use a type guard (`(x: unknown): x is T => ...`) when narrowing is useful at the call site.
@@ -133,6 +137,8 @@ catch (e) { if (isConflictError(e)) onConflict?.() }
 ```
 
 This box is independent of §N2: a chain can already have all its operands named (§N2 clean) while still repeating the whole predicate at 2+ call sites (§N3 violation), and vice versa. Check both separately.
+
+**Checklist wording (moved from SKILL.md):** Repeated domain check: an expression that answers a domain question by combining fields or hiding a rule the line does not show, and that appears 3+ times in the repo counting the diff's copy, is a named `isX` (a type guard when narrowing helps) returned by the hook or util that owns the data, and the diff uses it instead of adding another copy. One field compared to one enum value (`status === Status.DONE`) and a plain mechanic (a `find` by id) are exempt at any count, and proposing an `isX` for one is itself a miss (simplicity §P11). **Enumerate**: list each domain check the diff adds with its repo-wide count. (N/A: no domain check added)
 
 ### §N4. Names must be honest about what the thing does
 
@@ -176,6 +182,8 @@ export const orgMemberInvitePath = (orgId: string) => `/portal/organization/${or
 Now the subject (`member`) is in the name and the prefix (`group`/`org`) reads as the calling context.
 
 **How to spot during review:** look at any new exported name and rephrase it as a sentence. If you can't say it without inventing missing words, or the inferred sentence doesn't match the body of the function, flag it. Don't accept "the URL/folder/path already says this" — the name has to stand on its own outside that context.
+
+**Checklist wording (moved from SKILL.md):** Honest names: each new or touched name reads as a sentence that matches the actual behavior/subject — no surface-word gluing, no subject elision, no context-as-subject (a helper used by more than one caller, or written to be, named for the first caller's field instead of what it handles: `plainTextToHtml`, not `noteToHtml`), no stale-after-refactor names, no familiar-shaped name hiding a different behavior or constraint, no dropped qualifier (a unit doing the public, archived, cached or admin version of a job named for the plain one, while the rest of its family carries the qualifier), and no qualifier that adds nothing (a prefix or suffix that repeats the owner, type or context the name already sits in: `footerEmail` on a footer-only model, `userUserId`, `orderOrderStatus`). (N/A: no new or touched names)
 
 ### §N5. A name has to be unambiguous where it is READ, not where it is declared
 
@@ -229,6 +237,8 @@ grepped bare-word declarations: 4 hits
 
 `0 hits` must be printed explicitly, so silence can never be read as a pass.
 
+**Checklist wording (moved from SKILL.md):** Unambiguous where READ, not where declared: every new identifier (local, destructured value, parameter, closure, returned key, export) is qualified enough to read at its use site without scrolling back to the declaration. A bare generic verb/noun naming the mechanism rather than the subject (`check`, `run`, `wrap`, `guard`, `handle`, `process`, `filter`, `format`, `validate`, and any other single word of that shape) FAILS even though it is accurate, and so does a boolean prefix on a bare state word (`isOn`, `isOpen`, `isActive`, `isValid`, `hasData`), and a collision with an unrelated declaration elsewhere FAILS on its own. Enumerate with the `bare-word-declarations.sh` sweep, do not eyeball. (N/A: only when the diff adds no identifiers, stated as `grepped bare-word declarations: 0 hits`)
+
 ### §N6. Functions start with a verb
 
 A function name is read at call sites, where a noun phrase looks like a value: `if (sameOwner(a, b))` reads as indexing into something, and `const label = itemLabel(item)` hides that work happens. Lead with the verb that says what the call does.
@@ -254,6 +264,8 @@ grepped unverbed functions: 3 hits
 
 `0 hits` must be printed explicitly.
 
+**Checklist wording (moved from SKILL.md):** Verb-led functions: every new function (declaration, arrow-function const, or object method) starts with a verb that says what calling it does: predicates `is`/`has`/`can`/`should`, value getters `get`/`to`, mutators and handlers `set`/`toggle`/`handle`. A noun-phrase name (`sameOwner`, `itemLabel`, `widgetKey`) reads like a value, not a callable, and FAILS. PascalCase components and `use*` hooks are exempt. Enumerate with the `unverbed-functions.sh` sweep, do not eyeball. (N/A: only when `unverbed-functions.sh` returns 0 hits, stated as `grepped unverbed functions: 0 hits`)
+
 ### §N7. A file name identifies the file without its path
 
 A file's name is what shows in an editor tab, a search result, a stack trace, and a diff header, usually with the path cut off. A name that only means something with its folders attached is a lookup every time someone meets it, and a name shared with another file sends them to the wrong one.
@@ -268,11 +280,15 @@ A file's name is what shows in an editor tab, a search result, a stack trace, an
 
 Every printed file is a collision. A new file it does not print still gets the generic-name read. One line per new file in the evidence, stated as `checked new file names: N files, M collisions`.
 
+**Checklist wording (moved from SKILL.md):** Unique file names: every new file name identifies the file without its path, since tabs, search results, and stack traces show it bare. A basename that already exists elsewhere in the repo FAILS, and so does a generic one (`header.tsx`, `helpers.ts`) deep in a folder whose path carries the only meaning. Framework-mandated names (`index`, `page`, `layout`, `route` and equivalents) are exempt, and a test file is judged by its unit's name. Check collisions with the `file-name-collisions.sh` sweep. (N/A: no new files in diff)
+
 ### §N8. A new file follows its siblings
 
 Before naming and placing a new file, look at 2-3 existing files of the same kind (a hook, a component, a types file, a test) and follow them: the same casing, the same suffix, the same way of carrying the subject, the same kind of folder. Name the siblings in the evidence; precedent is the test, so "looks reasonable" is not a comparison. When the new file cannot sit where its siblings sit, the evidence says why.
 
 Precedent never overrides §N7. If the siblings are `header.tsx` and `helpers.ts` deep in a feature folder, the new file still carries its subject in its name (`widget-list-filters.ts`); follow what the siblings do well (casing, suffix, folder), not the generic basename. Placement follows the structure skill, so a sibling in the wrong layer is not precedent either.
+
+**Checklist wording (moved from SKILL.md):** Sibling comparison recorded: for every new file, the evidence names 2-3 existing files of the same kind (a hook, a component, a types file, a test) and the new file follows their naming pattern (casing, suffix, how the subject is carried) and sits where files of its kind sit, or the evidence says why it cannot. A new file with no named siblings FAILS by default. Siblings with generic basenames do not excuse §N7. (N/A: no new file)
 
 ### §N9. A name says what kind of thing it is and what it belongs to
 
@@ -292,15 +308,21 @@ export const useWidgetFormTypedPrice = () => { /* ... */ }
 
 For each new or renamed export, ask: from the name alone, would a reader guess both the kind and the owner correctly? A wrong guess on either fails.
 
+**Checklist wording (moved from SKILL.md):** Kind and owner read at the import site: every new or renamed export, read with no folder path, lets a reader guess both what kind of thing it is (data hook, form-state hook, component, util, constant, type) and what it belongs to (which form, table, feature). A wrong guess on either FAILS: a hook that only fills one form's fields named like a data hook, a co-located hook carrying the name of a shared data layer, a one-table helper named like an app-wide util. **Enumerate**: every new or renamed export gets a verdict. (N/A: no new or renamed export)
+
 ### §N10. Parts of one unit keep its prefix and end with their kind
 
 The parts of a `WidgetPanel` named `WidgetPanelSummary`, `WidgetPanelSync` and `WidgetPanelSettings` share the right prefix, but with no kind, `WidgetPanelSync` reads like a separate panel for syncing. `WidgetPanelSyncSection` says what it is. Renaming them to `WidgetSyncSection` swaps one problem for another: the kind is back, but nothing ties the file to its panel. Keep both halves, so each name reads right on its own at the import site.
+
+**Checklist wording (moved from SKILL.md):** Parts of one unit keep its prefix AND end with their kind: sibling pieces of `WidgetPanel` are `WidgetPanelSyncSection`, `WidgetPanelRow`. Keeping the prefix but dropping the kind (`WidgetPanelSync`) FAILS, and so does keeping the kind but dropping the prefix (`WidgetSyncSection`). (N/A: no new file or export in a family of sibling parts)
 
 ### §N11. A name follows what its subject became
 
 Names are chosen for what a thing is when it is first written. When a later change alters that (a shop's one storefront becomes many, a single settings page becomes a list with a page per record), the code that changed gets new names and the names around it stay as they were: the route still says `settings/storefront`, the folder `storefront/`, the query key `storefront`, while every other list in settings reads `settings/products` and `settings/orders`. Nothing in the diff is wrong line by line, so line-level review passes it, and the mismatch then ships in URLs and file paths that are expensive to change later.
 
 **How to check.** When the diff changes how many of something there are, or what kind of thing it is, list the names that still describe the old shape: route segments, folder and file names, exported names, API paths, query keys and translation keys. For each one, find 2-3 siblings that already have the new shape and compare. Report a name that no longer matches, even when the diff never touched it. When the rename has to wait (a public URL needs a redirect, another team's code calls the path), say so in the finding; the box passes once that reason is stated.
+
+**Checklist wording (moved from SKILL.md):** A name follows what its subject became: when the diff changes what an existing thing is or holds (one becomes many, a single settings page becomes a list with a page per record, a per-account setting becomes per-item), the evidence lists every name that still describes the old shape (route segments, folders, files, exports, API paths, query keys, translation keys, including ones the diff does not touch) and compares each with 2-3 siblings that already have the new shape. A name that no longer matches FAILS unless the diff renames it or states why the rename has to wait (for example a public URL that needs a redirect first). (N/A: the diff changes no existing thing's cardinality or kind)
 
 ### §N2 evidence requirement: enumerate boolean chains by grep, do not eyeball
 

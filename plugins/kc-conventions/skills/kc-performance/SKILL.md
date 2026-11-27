@@ -12,8 +12,8 @@ paths:
 
 Tick every box for each construct you add or change. Report each: PASS, FAIL (file:line) or N/A (why).
 
-- [ ] §PF1 Data crossing a boundary is sized for the receiver: each hit of the `boundary-payloads.sh` sweep, and each job enqueue, cache write, log line, event, outgoing request or response the diff adds, passes ids or the named fields the receiver reads, not a whole record, a spread or deep copy of state, or raw request input; the evidence names what the receiver reads. Examples: a form that spreads its whole state, linked records and all, into a request body; a handler that queues the raw request parameters instead of the validated values; a cache entry holding a full record where the page reads two fields. **Enumerate with the `boundary-payloads.sh` sweep** (see Sweeps). (N/A: the sweep returns 0 hits and the diff adds no enqueue, cache write, log line, event, outgoing request or response, stated as `grepped boundary payloads: 0 hits`)
-- [ ] §PF2 Filter, sort, aggregate and paginate in the data layer: no rows loaded into application code to filter them there; a list endpoint has a default page size and a hard maximum; no `select *`. (N/A: no query or list endpoint)
+- [ ] §PF1 Data crossing a boundary (enqueue, cache write, log line, event, request, response) passes ids or fields the receiver reads, not a whole record or raw input; `boundary-payloads.sh` swept.
+- [ ] §PF2 Filter, sort, aggregate and paginate in the data layer: no rows loaded to filter in app code; list endpoints have a default page size and hard maximum; no `select *`.
 - [ ] §PF3 No N+1: one query per request path, joined or batched, not one per row. (N/A: no per-row reads)
 - [ ] §PF4 A new query pattern ships with its index in the same change. (N/A: no new query)
 - [ ] §PF5 A feature that reads data got a deliberate pass at the end, stating what was measured, not that it was looked at. (N/A: no data read)

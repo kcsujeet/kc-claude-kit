@@ -26,7 +26,7 @@
 # already on the default branch wrote. full is checked as above.
 #
 # A command containing the literal KC_REWORK_APPROVED=1 passes only when the user's own words approve
-# it: the latest message they typed in the session transcript (the payload's transcript_path)
+# it: a message they typed on this branch in the session transcript (the payload's transcript_path)
 # contains "approve rework" (user_approved in lib/hook-input.sh). The token without those words, no
 # transcript, or a session with no typed message (a subagent) stays blocked.
 #
@@ -135,7 +135,7 @@ find_handed_off_fix() {
 
 # $1 is the earlier fix, $2 the directory.
 deny_edit_of_handed_off_fix() {
-  print_pretooluse_deny "Blocked by the kc-gates plugin: this edits lines an earlier, already-handed-off fix wrote ($1): the loop-stop rule says stop and question the approach; ask the user. Ask the user: only their typed words approve it. When their latest message says \"approve rework\", prefix the command with KC_REWORK_APPROVED=1; the token without those words stays blocked.$(needed_phrases_sentence "$2" "$APPROVAL_PHRASE")"
+  print_pretooluse_deny "Blocked by the kc-gates plugin: this edits lines an earlier, already-handed-off fix wrote ($1): the loop-stop rule says stop and question the approach; ask the user. Ask the user: only their typed words approve it. When a message they typed on this branch says \"approve rework\", prefix the command with KC_REWORK_APPROVED=1; the token without those words stays blocked.$(needed_phrases_sentence "$2" "$APPROVAL_PHRASE")"
 }
 
 # Checks a `git commit`; $1 is the directory, the rest the words after `git`.
@@ -213,10 +213,10 @@ main() {
   input="$(cat)"
   command="$(extract_field "$input" command)"
   [ -n "$command" ] || exit 0
-  case "$command" in
-    *"$APPROVAL_TOKEN"*) ! user_approved "$(extract_field "$input" transcript_path)" "$APPROVAL_PHRASE" || exit 0 ;;
-  esac
   dir="$(extract_field "$input" cwd)"
+  case "$command" in
+    *"$APPROVAL_TOKEN"*) ! user_approved "$(extract_field "$input" transcript_path)" "$APPROVAL_PHRASE" "${dir:-$PWD}" || exit 0 ;;
+  esac
   walk_segments "$command" "${dir:-$PWD}" check_segment || true
   exit 0
 }

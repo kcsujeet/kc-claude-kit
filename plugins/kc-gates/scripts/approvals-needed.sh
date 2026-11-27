@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Lists every phrase the user must type for the steps still ahead on a branch, so a guard that blocks
-# asks for all of them in one message instead of one per block. Each guard reads only the user's
-# latest message, so the steps then run in the same turn as that message.
+# asks for all of them in one message instead of one per block. A guard accepts a phrase typed any time
+# on the branch, so the steps then run after that one message.
 #
 # Usage: approvals-needed.sh [--dir <repo>]
 #

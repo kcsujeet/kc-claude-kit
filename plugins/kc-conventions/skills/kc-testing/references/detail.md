@@ -49,6 +49,8 @@ it('saves the typed name on Enter', async () => {
 })
 ```
 
+**Checklist wording (moved from SKILL.md):** Every new behavior (a feature, prop, option, branch, or bug fix) has a test that exercises it, and a bug fix's test fails without the fix. Each case puts the code in a situation it really meets and fails when the behaviour it names breaks: a case that asserts what its own setup put there (a mock's stub, a constant), covers a state nothing real reaches, or still passes with its line broken FAILS. Each is tested once, at the unit that owns it: a test case the diff adds FAILS when it pins behaviour the diff didn't change, re-tests a shared unit's behaviour through a caller (the caller's test covers only its own wiring), or repeats a case the owning unit's tests already have. **Enumerate**: one line per test case the diff adds, naming the changed behaviour it pins and why this file owns it. Every test, assertion, check or guard the diff deletes, however it arrives (by hand, a restore of an older file, a revert, a merge, a regeneration, a refactor), is listed with the test or check that covers its behaviour now, or the removal is named as intended with its reason; a deletion with neither FAILS, and the behaviour it pinned counts as untested again. **Enumerate** these too: one line per removed test case or assertion in the diff. Code that nothing the repo runs can reach (no runner loads it, shown by a search of the test setup) passes when the pull request records the before and after it was checked with and names the gap; with neither recorded it FAILS. (N/A: no behavior change, no test case added and no test or check removed in the diff)
+
 ### §T2. No class-name assertions as a proxy for behavior
 
 A class name is an implementation detail: the style can change, move to a wrapper, or be merged away by a class-merging helper, and the assertion breaks while the behavior is fine. Worse, the class can be present while the behavior is broken, and the test stays green. In a DOM emulator the stylesheet usually is not even loaded, so the class proves nothing about what renders.
@@ -66,6 +68,8 @@ expect(screen.getByRole('option', { name: 'Widget A' })).toHaveAttribute('aria-s
 **Enumerate by grep, do not eyeball.** Run the `class-assertions.sh` sweep (see Sweeps) over the diff's added test lines.
 
 One line per hit with a verdict, and the count. `0 hits` is printed explicitly.
+
+**Checklist wording (moved from SKILL.md):** No assertion on a class name as the evidence that a state is correct; assert what the user or a consumer observes (role, text, accessible state, a data attribute, an emitted value). A class that is itself the contract (a `className`-style prop the component forwards) is exempt. **Enumerate with the `class-assertions.sh` sweep** (see below). (N/A: only when `class-assertions.sh` returns 0 hits, stated as `grepped class assertions: 0 hits`)
 
 ### §T3. Gates are tested both ways
 
@@ -94,6 +98,8 @@ Component-level tests of the gated thing in isolation do not satisfy this box; t
 
 A surviving mutant on either gets that verdict, not a request for a test.
 
+**Checklist wording (moved from SKILL.md):** Every gate (a condition that mounts, enables, or routes something) is tested both ways: once with the condition met and once without, so deleting the gate fails a test. **Enumerate with the `surviving-mutants.sh` sweep's output** when the dispatch gives it: every surviving mutant, gate or not, gets its own verdict, the test that would fail on it, or no behaviour (the code changes nothing) and its deletion. Without it, or when it printed `not run`, each gate is named with the test covering each side. Two sides need no new case, and their verdict says which applies: the off side of an opt-in the change adds (existing callers' unchanged default), and a guard that only keeps an absent optional input from crashing (`onChange?.(value)`). Neither is a reason to ask for a test. (N/A: no gating logic, condition or early exit added or changed)
+
 ### §T4. Repeated setup becomes a local helper
 
 When 2+ tests repeat the same setup shape and vary one input, the repetition hides what each test is actually about. Extract a helper at the top of the file so each test reads as input and expected output.
@@ -118,6 +124,8 @@ The converse holds too: setup that one test uses stays inline in it. A locator h
 
 Keep the helper local to the test file unless several files genuinely share it. Per-index assertion chains collapse the same way: `expect(result.map((item) => item.offset)).toEqual([0, 25, 50])` over three separate `expect` lines.
 
+**Checklist wording (moved from SKILL.md):** Setup repeated across 2+ tests (the same render-plus-provider boilerplate, fixture literals, or datetime construction) is a local helper, not copy-paste. Setup means more than one plain expression: a repeated one-expression read stays inline at each test (simplicity §P11). A render or mount of the same component (`render(<X …/>)`, `mount(<X …/>)`) in 2+ tests is setup even when each is one call: it gets a local render helper with overrides. **Enumerate with the `repeated-render.sh` sweep** (see below), one verdict per hit. The converse also FAILS: a helper, locator or lazy fixture the diff adds that only one test uses, and a nested `describe` whose group shares no setup its siblings lack. (N/A: no setup, helper or `describe` added in the diff's tests, and `repeated-render.sh` returns 0 hits, stated as `grepped repeated renders: 0 hits`)
+
 ### §T5. A test sits beside its unit
 
 A test file lives next to the unit it covers and is named after it (`widget-list.tsx` beside `widget-list.test.tsx`, or whatever suffix the target repo already uses; grep for it). A test in a distant folder is easy to miss when the unit changes, and a test named after something else hides what it covers.
@@ -125,6 +133,8 @@ A test file lives next to the unit it covers and is named after it (`widget-list
 The unit that owns the behaviour is the one whose change would make the case fail, which is not always the file the diff is open in or the one next to the nearest similar case. A formatter's cases belong in the formatter's test even when only a page calls it today, and the page's test then asserts only that it calls the formatter. A reviewer's "put it next to X" is followed only when X is that owner; when X is itself in the wrong place, the test goes to the owner and the answer says why (§S14).
 
 **Do not flag:** end-to-end or integration suites that the target repo keeps in their own top-level folder by convention; confirm the convention by listing that folder.
+
+**Checklist wording (moved from SKILL.md):** A new or moved test sits beside the unit that owns the behaviour it asserts and is named after it; a caller's test file asserts only the caller's own wiring, never the cases of a unit it calls. Where the diff or a reviewer puts a test ("next to the existing case") is checked against this before it is followed. (N/A: no test file added or moved)
 
 ### §T6. Exact assertions when the value is known
 
@@ -146,6 +156,8 @@ A tolerance is correct where the value is genuinely inexact (floating point, geo
 
 The script knows Jest, Vitest and Bun matcher names. If the target repo's test framework names its matchers differently, run the equivalent pattern by hand as well, and state which script or pattern was used. One line per hit with a verdict, and the count. `0 hits` is printed explicitly.
 
+**Checklist wording (moved from SKILL.md):** Assertions are exact when the value is known (`toBe(3)`, `toEqual([0, 25, 50])`), not bounds or truthiness that a wrong value also satisfies (`toBeGreaterThan(0)`, `toBeTruthy()`, `toBeDefined()`). A tolerance is fine where the value is genuinely inexact (floating point, measured geometry), stated as `toBeCloseTo`. **Enumerate with the `loose-assertions.sh` sweep** (see below). (N/A: only when `loose-assertions.sh` returns 0 hits, stated as `grepped loose assertions: 0 hits`)
+
 ### §T7. A submit is tested per state, by its request body
 
 A save that works when every field is filled in can still break when one is cleared: the field drops out of the payload, or arrives as `''` and fails validation (correctness §B5). For each form or request that saves user input, submit once per field state that behaves differently, at least once after clearing a saved value, and assert the body that went out (from the test's request mock or the recorded call), not only the success message.
@@ -159,6 +171,8 @@ expect(screen.getByText('Saved')).toBeVisible()
 await submitWidgetForm({ note: '' })
 expect(lastRequestBody()).toEqual({ name: 'Widget A', note: null })
 ```
+
+**Checklist wording (moved from SKILL.md):** A submit is tested per state: each form or request that saves user input has a test for every field state that behaves differently (at least clearing a saved value; see correctness §B5), and each test asserts the request body sent, not only the success path. (N/A: the diff adds or changes no submit of user input)
 
 ### §T8. An output is tested by what it contains
 
@@ -177,13 +191,19 @@ expect(response.body.data.attributes).toMatchObject({ number: 'ABC-1', total: 42
 
 Pair this with correctness §B6: a load cycle that empties a class's fields fails no status check, only a content check.
 
+**Checklist wording (moved from SKILL.md):** Every test of an output the diff adds or changes (a response, a rendered page, an export, a message) asserts at least one value inside it that the change is responsible for, so an empty or field-less output fails the test. A test that asserts only a status code, that something rendered, or that no error was raised FAILS. A shared helper or example that checks responses counts as the test, and is held to the same rule. (N/A: the diff adds or changes no output and no test of one)
+
 ### §T9. A test names its expected record
 
 A test that works out its expected value with a query has a second copy of the code's rule, and the two drift. The common form is `scope.first` over an order with ties: a `position` that restarts in each parent group, a `created_at` shared by rows inserted in one statement, or no order at all. The database returns any of the tied rows, and the order can change with the plan, the data volume or a vacuum, so the test flakes. Hold the record the setup created (`let!(:first_stage)`) and assert against it, or order on a unique last key (`reorder(:position, :id)`), the same way the code does.
 
+**Checklist wording (moved from SKILL.md):** Every expected record in a test is named, not re-derived: it is a record the test created and holds, or a lookup whose order ends on a unique key. A `first`/`last`/`take` (or `[0]` on a query result) over an order that can tie FAILS; the evidence names the ordering columns and why they cannot tie. **Enumerate**: grep the test diff for `.first`, `.last`, `.take` and `[0]` on query results, one verdict per hit. (N/A: `grepped first/last/take: 0 hits`)
+
 ### §T10. Time comes from a clock the test can freeze
 
 Test helpers that freeze time (`travel_to`, `freeze_time`, fake timers) move the app's clock only. A query that reads the database's own clock ignores them, so a test of "an action dated today and due at 23:59 hasn't fired" fails whenever the suite runs across 23:59 or midnight, a few minutes a day, and passes on every rerun. Bind the app's current time into the query, and freeze it in the test at a time far from any boundary (noon), with a separate test for the boundary itself.
+
+**Checklist wording (moved from SKILL.md):** Time-dependent behaviour is tested at a frozen time: each test of code that compares against now (due, overdue, today, expiry, local hour) freezes the clock, and the code reads now from that clock, not from the database. A query the diff adds or changes that uses `CURRENT_TIMESTAMP`, `NOW()` or `CURRENT_DATE` for a comparison a test covers FAILS. **Enumerate**: grep the diff for those three, one verdict per hit. (N/A: `grepped database clock: 0 hits` and no time comparison added)
 
 ### §T11. A test pins every input its result depends on
 
@@ -191,14 +211,30 @@ Factories often sample values so that tests see variety: a random type, a random
 
 The shape of a fixture is an input too. A shared fixture written from the type has every key the type requires, so every test built on it sees only records the current code would write. Records saved by an older version, another client or an import can lack a key, hold a null, or carry a number as a string, and code that breaks on them passes every test. Take fixtures from real records (a recorded API response, a sample of rows, the server's schema for which keys are optional), and give a change that handles such data a test with that shape. Examples: an order fixture that always has a discount field, while old orders have none; a profile fixture with a numeric age where the API sends a string.
 
+**Checklist wording (moved from SKILL.md):** Every record a new or changed test builds sets each attribute the code under test branches on; the evidence names the factory and confirms each such attribute is either set in the test or fixed (not sampled) in the factory. A branch-deciding attribute left to a factory that samples it FAILS. When the change handles data saved by older code or another client, a test builds that shape (the key missing, the null, the string), and the evidence names the real record or schema it was taken from. (N/A: the diff adds or changes no test that builds records, and handles no data saved by older code or another client)
+
 ### §T12. A UI test leaves nothing to update outside its waits
 
 A test of a copy-link button clicked it, then awaited `navigator.clipboard.readText()`, then waited for the confirmation toast. The pointer stayed on the button, so its tooltip opened after the hover delay. Locally the clipboard read was instant and the tooltip opened inside the next wait; on CI the read took long enough for the tooltip, and the toast's enter transition, to update outside any wait, and the setup that fails tests on console errors failed it. The first fix waited for the tooltip at the end and passed locally, as the old test had, and CI failed again. Putting a 400 ms delay on the clipboard read reproduced the CI failure in one run; moving the pointer off the button after the click, waiting for the toast first and reading the clipboard inside `waitFor` passed under the same delay.
+
+**Checklist wording (moved from SKILL.md):** In every UI test the diff adds or changes, each `await` between the first user action and the last assertion is the testing library's own (a user event, `findBy*`, `waitFor`); a bare `await` on anything else (`navigator.clipboard.readText()`, a sleep, a direct fetch) FAILS, and so does hover or focus state an action leaves behind without an `unhover`/`blur` or a wait for its effect. A fix for a CI-only failure in such a test names the delay that reproduced it locally. **Enumerate**: grep the test diff for `await ` lines that are not `user.`, `findBy`, `findAllBy` or `waitFor`, one verdict per hit. (N/A: the diff adds or changes no UI test)
 
 ### §T13. A change that moves a value updates every fixture that restates it
 
 Tests that build records by hand restate the values the code decides on. When a change moves one (a feature's category from `beta` to `addon`, a status renamed, a type split), nothing forces those restatements to follow: no test asserts the old value, so the suite stays green while the fixtures describe data that no longer exists. The next test that reads the value, or the next reader copying a setup, inherits the wrong data. Finding them takes one pass: list the literals the change removes, grep the tests and factories for each, and update every hit in the same change. Listing them while assessing the change and leaving them because they pass is the failure, not the exemption. Examples: orders created with a `pending` status the change renamed `open`; a plan fixture on a tier the change retired; a config key renamed in code and still set in a test helper.
 
+**Checklist wording (moved from SKILL.md):** When the diff moves or renames a value (an enum member, a type, a category, a status, a config key, a constant), every test file, factory and setup in the repo that hard-codes the old value is updated in the diff, not only the tests the change broke. A fixture still holding the old value FAILS even when the suite passes, and so does one the author listed and left because it passed. **Enumerate**: list the literals the diff's non-test lines remove or replace, grep every test and factory file for each, one verdict per hit. (N/A: the diff moves or renames no value, stated as `removed literals: none`)
+
 ### §T14. A failing assertion names what is wrong
 
 `expect(items.find(byKey(key))!.category).toBe('addon')` inside a loop over keys fails with "cannot read property of undefined" when one key is missing: the failure says a lookup came back empty and not which key. Compare the found set to the expected one instead, so the failure is a diff that names the key and its wrong value: `expect(categoriesByKey(keys)).toEqual(Object.fromEntries(keys.map((key) => [key, 'addon'])))`, or `expect(rows.map(r => r.id)).toEqual(ids)` before reading fields. The same goes for `find_by(...).attr`, `rows[0].field`, and a `.get()` whose miss raises: a lookup that can miss gets its presence asserted, or is replaced by a comparison of the whole result. When a sibling test already loops over per-item lookups, the finding names this box rather than following the sibling (simplicity §P13).
+
+**Checklist wording (moved from SKILL.md):** Every assertion the diff adds or changes compares the records found to the set expected (the whole collection to the expected one, or presence asserted first), and none dereferences a lookup that can return nothing (`find_by(...).attr`, `list.find(...)!.x`, `rows[0].field`), so a missing or wrong record fails with a message that names it, not a crash on nil or undefined. A sibling test's loop of per-item lookups is not a reason to keep that shape (simplicity §P13 defers to this box). **Enumerate**: grep the test diff for a member access, `!` or `[0]` directly on a lookup result, one verdict per hit. (N/A: the diff adds or changes no assertion on looked-up records)
+
+### §T15
+
+**Checklist wording (moved from SKILL.md):** The failing test came first: it was seen to fail for the right reason, then pass; the project's check and test commands ran after each meaningful edit; after a mechanical edit across files (a rename, a scripted replace, a merge), run lint and the formatter on every file it touched before committing; after changing a shared unit's behaviour, run the full suites of every package that uses it. (N/A: no code change)
+
+### §T20
+
+**Checklist wording (moved from SKILL.md):** When the end-to-end suite runs in a harness or fixture app, each headline user-facing feature also has one test driving the shipped app with its default configuration and seed data. (N/A: no such suite or feature)

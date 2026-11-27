@@ -14,7 +14,7 @@
 # is refused `git commit`, `git push`, `gh pr create` and `gh pr merge` in such a repo until it reloads,
 # and one command that commits then pushes is refused, since this guard reads HEAD before it runs.
 #
-# A command carrying the literal KC_LEDGER_SKIP=1 passes only when the user's latest typed message
+# A command carrying the literal KC_LEDGER_SKIP=1 passes only when a message the user typed on this branch
 # contains "skip ledger" (user_approved in lib/hook-input.sh): the user may waive the ledger for one
 # PR (one that carries no lesson); the token without those words stays blocked.
 #
@@ -160,10 +160,10 @@ main() {
   input="$(cat)"
   command="$(extract_field "$input" command)"
   [ -n "$command" ] || exit 0
-  case "$command" in
-    *"$SKIP_TOKEN"*) ! user_approved "$(extract_field "$input" transcript_path)" "$SKIP_PHRASE" || exit 0 ;;
-  esac
   dir="$(extract_field "$input" cwd)"
+  case "$command" in
+    *"$SKIP_TOKEN"*) ! user_approved "$(extract_field "$input" transcript_path)" "$SKIP_PHRASE" "${dir:-$PWD}" || exit 0 ;;
+  esac
   walk_segments "$command" "${dir:-$PWD}" check_segment || true
   exit 0
 }

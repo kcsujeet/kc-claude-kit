@@ -10,7 +10,9 @@ detail="$plugin_dir/skills/kc-security/references/detail.md"
 
 failures=0
 fail() { echo "FAIL $1"; failures=$((failures + 1)); }
-require_box_text() { grep -qE "^- \[ \] $1 .*$2" "$skill" || fail "$1 box must carry: $2"; }
+# shellcheck source=lib/box-text.sh
+. "$tests_dir/lib/box-text.sh"
+require_box_text() { box_has kc-security "$1" "$2" || fail "$1 box must carry: $2"; }
 
 require_box_text §SEC1 'checks, in the handler, that the caller may act on every record it reads or writes'
 require_box_text §SEC1 'N/A: the diff adds or changes no handler, route, callback or middleware'
@@ -41,7 +43,7 @@ done
 ! sed -n '/^### §SEC7\. /,/^### §SEC8\. /p' "$detail" | grep -qE ' \? .+ : ' || fail "§SEC7's Prefer example must not be a ternary (clarity §C15): gates copy it into fixes"
 sed -n '/^## Sweeps/,$p' "$skill" | grep -q 'skills/kc-security/scripts/request-surface.sh' || fail "Sweeps must list request-surface.sh"
 [ -x "$plugin_dir/skills/kc-security/scripts/request-surface.sh" ] || fail "request-surface.sh must be executable"
-grep -qi 'ids that must belong together are checked together' "$skill" || fail "kc-security must carry the ids-belong-together box"
+box_has kc-security §SEC2 'ids that must belong together' i || fail "kc-security must carry the ids-belong-together box"
 
 [ "$failures" -eq 0 ] && echo "ok   security rules"
 exit "$failures"

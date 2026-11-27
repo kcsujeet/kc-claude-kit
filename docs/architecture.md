@@ -32,7 +32,7 @@ kc-claude-kit/
     │   │   ├── kc-code-review/SKILL.md     # orchestrator: scope, dispatch, aggregate
     │   │   ├── kc-post-review/             # user-invoked only: drafting and posting comments
     │   │   └── kc-ready-for-review/SKILL.md # the one pass before a PR goes to a reviewer
-    │   ├── agents/<topic>-gate.md          # one gate agent per topic, plus project-conventions-gate.md and verification-gate.md
+    │   ├── agents/<topic>-gate.md          # one gate agent per topic (generated from ../gate-agent.template.md by scripts/build-gate-agents.sh), plus project-conventions-gate.md and verification-gate.md
     │   ├── hooks/hooks.json                # hand-off reminder at session start; keeps the marketplace's plugins current and says when the session runs an older kc-gates; blocks unapproved GitHub posts and unreviewed hand-offs; reminds of the look-back after an approval; installs a merged kit change at once; starts each turn with the reply rules and names the last reply's misses (an unchecked claim about instructions, an unchecked account-CLI command, a reply over 180 words); adds a read-first line when the prompt asks where work stands
     │   ├── scripts/guard-github-post.sh, guard-hand-off.sh, guard-loop-stop.sh, guard-prose-rule.sh, guard-batched-wait.sh, guard-merge.sh, remind-look-back.sh, remind-look-back-prompt.sh, remind-after-replies.sh, check-reply-sources.sh, check-reply-length.sh, remind-reply-rules.sh, update-after-merge.sh, lib/hook-input.sh, lib/reply-misses.sh, lib/typed-message.jq
     │   ├── scripts/change-class.sh, approvals-needed.sh  # a small change's lighter path through the guards; every typed phrase ahead in one block
@@ -104,6 +104,10 @@ A topic skill's body has these sections, in this order:
 2. `## Sweeps`: the bundled scripts, each run as `bash "${CLAUDE_PLUGIN_ROOT}/skills/kc-<topic>/scripts/<name>.sh" <diff-file>`, printing one `file:line: text` hit per line and nothing else. A lookup, which takes a name or a key instead of a diff (`kc-naming/scripts/name-collisions.sh`, `kc-i18n/scripts/locale-duplicates.sh`), is listed there too and says so.
 
 Posting approval token: a GitHub write passes the kc-gates guard only when the same Bash command contains `KC_REVIEW_POST_APPROVED=1`, typed after the user's explicit post signal.
+
+Each checklist box is one line of at most 220 characters (`scripts/check-box-length.sh`, CI); longer wording lives in the skill's `references/detail.md` under `### §<id>`.
+
+Typed-phrase approvals (`approve rework`, `skip ledger`, `approve merge`, `approve prose`): the guard passes only when the command carries its `KC_*=1` token and a message the user typed since the branch's first commit over the default branch holds the phrase (`user_approved` in `lib/hook-input.sh`); on the default branch only the latest typed message counts. A phrase typed before the branch existed never counts. `guard-unchecked-claim.sh` counts the staged diff as read for a commit message, and text inside a commit's `-m` is not read as a command by the publish guards (`without_commit_message` in `lib/hook-input.sh`).
 
 ## Decisions
 

@@ -108,7 +108,8 @@ expect_hook_verdict() {
 }
 
 # Transcript entries, as Claude Code writes them, for the tests of guards that read the person's words.
-typed_entry() { jq -nc --arg text "$1" '{type: "user", message: {role: "user", content: $text}}'; }
+typed_entry_at() { jq -nc --arg ts "$1" --arg text "$2" '{type: "user", timestamp: $ts, message: {role: "user", content: $text}}'; }
+typed_entry() { typed_entry_at 2099-01-01T00:00:00.000Z "$1"; }
 tool_result_entry() { jq -nc --arg text "$1" '{type: "user", message: {role: "user", content: [{type: "tool_result", tool_use_id: "t", content: $text}]}}'; }
 agent_message_entry() { jq -nc --arg text "<agent-message>$1</agent-message>" '{type: "user", message: {role: "user", content: $text}}'; }
 relayed_entry() { jq -nc --arg text "Another Claude session sent a message: $1" '{type: "user", isMeta: true, message: {role: "user", content: [{type: "text", text: $text}]}}'; }
@@ -116,7 +117,8 @@ assistant_entry() { jq -nc --arg text "$1" '{type: "assistant", message: {role: 
 
 # expect_token_needs_typed_words <hook script> <token> <phrase> <command> <cwd>: <command> is blocked
 # without the token; with the token it passes only when the latest message the person typed holds
-# <phrase>. Every other place the phrase can appear leaves it blocked.
+# <phrase> in a message typed on this branch (any of them, not only the latest). Every other place the
+# phrase can appear leaves it blocked.
 expect_token_needs_typed_words() {
   local hook_script=$1 token=$2 phrase=$3 command=$4 cwd=$5 transcript="$work_dir/approval-transcript.jsonl" upper
   upper=$(printf '%s' "$phrase" | tr '[:lower:]' '[:upper:]')
@@ -125,8 +127,8 @@ expect_token_needs_typed_words() {
   expect_hook_verdict "$hook_script" allow "$token with the phrase in the latest typed message" "$token $command" "$cwd" "$transcript"
   { typed_entry "please $upper now"; } > "$transcript"
   expect_hook_verdict "$hook_script" allow "$token with the phrase in capitals" "$token $command" "$cwd" "$transcript"
-  { typed_entry "$phrase"; assistant_entry "done"; typed_entry "thanks, keep going"; } > "$transcript"
-  expect_hook_verdict "$hook_script" deny "$token with the phrase only in an older typed message" "$token $command" "$cwd" "$transcript"
+  { typed_entry_at 2000-01-01T00:00:00.000Z "$phrase"; assistant_entry "done"; typed_entry "thanks, keep going"; } > "$transcript"
+  expect_hook_verdict "$hook_script" deny "$token with the phrase only in a message typed before the branch existed" "$token $command" "$cwd" "$transcript"
   expect_contains "the block says only the user's typed words approve it" "only their typed words approve" "$last_hook_output"
   { typed_entry "keep going"; tool_result_entry "$phrase"; } > "$transcript"
   expect_hook_verdict "$hook_script" deny "$token with the phrase only in a tool result" "$token $command" "$cwd" "$transcript"
@@ -144,6 +146,38 @@ expect_token_needs_typed_words() {
   expect_hook_verdict "$hook_script" deny "$token with a transcript that is not there" "$token $command" "$cwd" "$work_dir/missing.jsonl"
   { typed_entry "$phrase"; } > "$transcript"
   expect_hook_verdict "$hook_script" deny "the phrase typed but the command has no token" "$command" "$cwd" "$transcript"
+  expect_token_phrase_scoped_to_branch "$@"
+}
+
+# expect_token_phrase_scoped_to_branch <the same arguments>: on a copy of <cwd> whose branch has a commit
+# over the default branch, a phrase typed two messages ago after the branch began passes, and one typed
+# before the branch existed stays blocked.
+expect_token_phrase_scoped_to_branch() {
+  local hook_script=$1 token=$2 phrase=$3 command=$4 cwd=$5 transcript="$work_dir/approval-transcript.jsonl" branch_repo="$work_dir/approval-branch-repo" base_ref ref
+  rm -rf "$branch_repo"
+  cp -R "$cwd" "$branch_repo"
+  if ! git -C "$branch_repo" rev-parse -q --verify HEAD > /dev/null 2>&1; then
+    git -C "$branch_repo" init -q -b main
+    run_git_in "$branch_repo" commit -q --allow-empty -m base
+  fi
+  # A copy already ahead of its default branch keeps that base; otherwise the current HEAD becomes it.
+  base_ref=""
+  for ref in origin/main main master; do
+    git -C "$branch_repo" rev-parse -q --verify "$ref^{commit}" > /dev/null 2>&1 && { base_ref=$ref; break; }
+  done
+  if [ -z "$base_ref" ] || [ -z "$(git -C "$branch_repo" log --format=%h "$base_ref..HEAD" | head -1)" ]; then
+    git -C "$branch_repo" update-ref refs/remotes/origin/main HEAD
+    git -C "$branch_repo" symbolic-ref -q --delete refs/remotes/origin/HEAD 2> /dev/null || true
+  fi
+  # commit-tree, not commit: the staged changes under test stay staged.
+  git -C "$branch_repo" update-ref HEAD "$(run_git_in "$branch_repo" commit-tree 'HEAD^{tree}' -p HEAD -m "first commit on the branch")"
+  { typed_entry_at 2099-01-01T00:00:00.000Z "$phrase"; assistant_entry "done"; typed_entry_at 2099-01-01T00:00:01.000Z "thanks"; typed_entry_at 2099-01-01T00:00:02.000Z "keep going"; } > "$transcript"
+  expect_hook_verdict "$hook_script" allow "$token with the phrase typed two messages ago on this branch" "$token $command" "$branch_repo" "$transcript"
+  { typed_entry_at 2000-01-01T00:00:00.000Z "$phrase"; typed_entry_at 2099-01-01T00:00:00.000Z "keep going"; } > "$transcript"
+  expect_hook_verdict "$hook_script" deny "$token with the phrase typed before the branch existed" "$token $command" "$branch_repo" "$transcript"
+  { typed_entry_at 2099-01-01T00:00:00.000Z "keep going"; jq -nc --arg text "$phrase" '{type: "user", message: {role: "user", content: $text}}'; } > "$transcript"
+  expect_hook_verdict "$hook_script" deny "$token with the phrase in a message that has no timestamp" "$token $command" "$branch_repo" "$transcript"
+  expect_hook_verdict "$hook_script" deny "no token on this branch: still blocked" "$command" "$branch_repo" "$transcript"
 }
 
 finish() {
