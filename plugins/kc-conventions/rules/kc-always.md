@@ -11,3 +11,4 @@
 - Before stating what code, a tool or a source does -> kc-conventions:kc-check-claims
 - Before delegating -> kc-conventions:kc-delegate
 - When work is handed off -> kc-conventions:kc-look-back
+- Task handed off or merged -> kc-conventions:kc-clean-up
