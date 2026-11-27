@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 # UserPromptSubmit hook: when the person's message says a pull request was merged or approved,
-# reminds Claude that the look-back is due (the working agreement's "Order of work on a task",
-# step 6). remind-look-back.sh only sees a merge or an approval this session runs or reads; a pull
+# reminds Claude that the look-back is due (kc-do-a-task step 6). remind-look-back.sh only sees a merge or an approval this session runs or reads; a pull
 # request merged on GitHub by someone else reaches the session only as the person saying so, and
 # the cleanup that follows then starts without the look-back.
 #
@@ -37,7 +36,7 @@ main() {
   text="$(prompt_without_unreached "$prompt")"
   printf '%s' "$text" | grep -Eq "(pr|pull request|pull-request)[^.!?]{0,40}(merged|approved)|(^|[^[:alnum:]])(it|that|this|review)('s| is| was| has been| got| had been)( now| just| already)?( been)? (merged|approved)|(merged|approved) (it|the pr|my pr|this pr|the pull request)([^[:alnum:]]|$)" || exit 0
   cat <<EOF
-{"hookSpecificOutput":{"hookEventName":"UserPromptSubmit","additionalContext":"kc-gates: the person says a pull request was merged or approved, so its task is handed off and the look-back is due now (working agreement, Order of work on a task, step 6), before the cleanup or the next step. List every piece of feedback the session got (feedback-ledger.sh list over its transcript), give each one a verdict, and write the lessons that pass step 6's bar, without being asked. $LOOK_BACK_TRACKING"}}
+{"hookSpecificOutput":{"hookEventName":"UserPromptSubmit","additionalContext":"kc-gates: the person says a pull request was merged or approved, so its task is handed off and the look-back is due now (kc-do-a-task step 6), before the cleanup or the next step. List every piece of feedback the session got (feedback-ledger.sh list over its transcript), give each one a verdict, and write the lessons that pass step 6's bar, without being asked. $LOOK_BACK_TRACKING"}}
 EOF
   exit 0
 }

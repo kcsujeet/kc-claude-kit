@@ -18,7 +18,6 @@
 # ticket's and pull request's state with a tool before stating it. No line otherwise, so the
 # claim is checked before the reply, not corrected after it.
 #
-# It also clears the session's once-per-turn marker for remind-better-line.sh (lib/reply-misses.sh).
 #
 # Input: the UserPromptSubmit payload on stdin (its session_id and prompt). Output: the reminder,
 # which Claude Code adds to the turn as context; the misses file is removed once named. Always
@@ -50,8 +49,6 @@ fi
 
 command -v jq >/dev/null 2>&1 || exit 0
 session_id=$(printf '%s' "$input" | jq -r '.session_id // empty' 2>/dev/null)
-# A new turn: remind-better-line.sh may speak again on its first work call.
-marker_file=$(better_line_marker_file "$session_id") && rm -f "$marker_file"
 misses_file=$(reply_misses_file "$session_id")
 [ -s "$misses_file" ] || exit 0
 

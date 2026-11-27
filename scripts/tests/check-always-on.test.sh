@@ -55,8 +55,8 @@ printf '#!/usr/bin/env bash\nif grep -q "\\"Read\\""; then echo speaks-on-read-o
 printf '#!/usr/bin/env bash\ncat >/dev/null\nhead -c 25 /dev/zero | tr "\\0" e >&2\n' > "$plugin/scripts/stderr.sh"
 printf '#!/usr/bin/env bash\nhead -c 999 /dev/zero | tr "\\0" z\n' > "$plugin/scripts/update-after.sh"
 # shellcheck disable=SC2016 # the hook's text, written to a file
-# once: a once-per-turn reminder; speaks on an Edit only when it has a data folder with no marker yet.
-printf '#!/usr/bin/env bash\nif grep -q "\\"Edit\\"" && [ -n "${CLAUDE_PLUGIN_DATA:-}" ] && [ ! -e "$CLAUDE_PLUGIN_DATA/m" ]; then touch "$CLAUDE_PLUGIN_DATA/m"; head -c 33 /dev/zero | tr "\\0" o; fi\n' > "$plugin/scripts/once.sh"
+# once: a hand-off reminder; speaks only on a git push.
+printf '#!/usr/bin/env bash\nif grep -q "git push"; then head -c 33 /dev/zero | tr "\\0" o; fi\n' > "$plugin/scripts/once.sh"
 mkdir -p "$plugin/skills/s/references"
 head -c 900 /dev/zero | tr '\0' 'r' > "$plugin/skills/s/references/ref.md"
 chmod +x "$plugin"/scripts/*.sh
@@ -71,11 +71,11 @@ check "tool hooks: a hook printing on every call is measured" 0 "40 p/chatty.sh 
 check "tool hooks: the worst of the four payloads is reported, not the last" 0 "20 p/read-only.sh (PreToolUse)"
 check "tool hooks: stderr counts" 0 "25 p/stderr.sh (PostToolUse)"
 check "tool hooks: update-*.sh is skipped" 0 "max: 40 bytes per ordinary call"
-check "tool hooks: a once-per-turn reminder is silent on ordinary calls" 0 "0 p/once.sh (PostToolUse)"
-check "once-per-turn: the first work call's bytes are reported" 0 "33 p/once.sh (PostToolUse)"
-check "once-per-turn: a hook silent on the first call is not listed" 0 "Once-per-turn tool-hook output (first work call of a turn, bytes printed; report only):
+check "tool hooks: a hand-off reminder is silent on ordinary calls" 0 "0 p/once.sh (PostToolUse)"
+check "hand-off: a git push's bytes are reported" 0 "33 p/once.sh (PostToolUse)"
+check "hand-off: a hook silent on a push is not listed" 0 "Hand-off tool-hook output (a git push, bytes printed; report only):
   33"
-check "once-per-turn: a silent hook is not listed under the reminder's name" 0 "Once-per-turn tool-hook output (first work call of a turn, bytes printed; report only):
+check "hand-off: a silent hook is not listed under the reminder's name" 0 "Hand-off tool-hook output (a git push, bytes printed; report only):
   33 p/once.sh (PostToolUse)
 "
 check "tool hooks budget met" 0 "Per-tool-call" --budget-tool-hooks 40

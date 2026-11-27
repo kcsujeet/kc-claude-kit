@@ -12,7 +12,7 @@
 #
 # Also removes stale generated copies: a `kc-*.md` in the destination that no longer exists in
 # rules/ and carries the old "Generated from skills/" header (the per-topic rules this plugin
-# used to ship). Other files are never touched.
+# used to ship), and the retired kc-working-agreement.md, whatever its header. Other files are never touched.
 #
 # Output: one line per rule, `new: <file>`, `unchanged: <file>` or
 # `replaced: <file>` (the installed copy differed and is overwritten; with
@@ -77,7 +77,8 @@ remove_stale() {
     [ -f "$stale_file" ] || continue
     stale_name=$(basename "$stale_file")
     [ -e "$rules_dir/$stale_name" ] && continue
-    head -n 8 "$stale_file" | grep -q 'Generated from skills/' || continue
+    # kc-working-agreement.md was split into skills and has no generated header.
+    [ "$stale_name" = kc-working-agreement.md ] || head -n 8 "$stale_file" | grep -q 'Generated from skills/' || continue
     if [ "$dry_run" = true ]; then
       echo "would remove: $stale_name"
     else

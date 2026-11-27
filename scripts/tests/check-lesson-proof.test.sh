@@ -58,7 +58,7 @@ git -C "$repo" init -q -b main
 write_repo_file plugins/shop/skills/checkout/SKILL.md 'A total includes tax.\n'
 write_repo_file plugins/shop/skills/checkout/references/rounding.md 'Round half up.\n\n- [ ] §T1 Totals round half up.\n- [ ] §T12 Refunds round down.\n'
 write_repo_file plugins/shop/agents/totals-gate.md 'Grade totals.\n'
-write_repo_file plugins/shop/rules/kc-working-agreement.md 'Ask first.\n'
+write_repo_file plugins/shop/rules/kc-always.md 'Ask first.\n'
 write_repo_file plugins/shop/rules/kc-checkout.md 'Generated.\n'
 write_repo_file CHANGELOG.md '# Changelog\n'
 write_repo_file plugins/shop/tests/old.test.sh 'grep tax\ngrep total # §T2\n'
@@ -77,7 +77,7 @@ echo "Generated again." > "$repo/plugins/shop/rules/kc-checkout.md"
 commit_change "generated rule only"
 expect_verdict pass "a generated rule file alone is not a rule edit"
 
-for rule in skills/checkout/SKILL.md skills/checkout/references/rounding.md agents/totals-gate.md rules/kc-working-agreement.md; do
+for rule in skills/checkout/SKILL.md skills/checkout/references/rounding.md agents/totals-gate.md rules/kc-always.md; do
   create_branch "alone-${rule//\//-}"
   echo "and more" >> "$repo/plugins/shop/$rule"
   commit_change "edit $rule"
@@ -247,7 +247,7 @@ expect_verdict fail "another file's removals don't make new prose a reword" 'wor
 expect_output "it names the file that grew" "plugins/shop/skills/checkout/SKILL.md (gains 1 lines, loses 0)"
 expect_verdict pass "the grown file held by a test" $'wording-only: tidies\nheld-by: plugins/shop/tests/totals.test.sh'
 
-for boxless in agents/totals-gate.md rules/kc-working-agreement.md; do
+for boxless in agents/totals-gate.md rules/kc-always.md; do
   create_branch "prose-in-${boxless//\//-}"
   echo "Check shipping too." >> "$repo/plugins/shop/$boxless"
   write_repo_file plugins/shop/tests/totals.test.sh 'grep shipping\n'

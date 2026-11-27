@@ -49,7 +49,7 @@ if [ -n "$session_cwd" ] && [ -d "$session_cwd" ]; then
   cd "$session_cwd" || exit 0
 fi
 
-readonly RULE_FILE=kc-working-agreement.md
+readonly RULE_FILE=kc-always.md
 project_rules_dir=".claude/rules"
 # From a subfolder, the copy that counts is the nearest one above it, up to the project's root
 # (the folder holding .git). The notice then names that folder, since /kc-conventions:kc-init

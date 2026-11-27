@@ -5,7 +5,7 @@ description: Before handing over work that works: measure it, find a better way,
 
 # Raise the bar
 
-Working is the floor, not the finish. This is when to look for better and whether to take it; `kc-simplicity`, `kc-performance`, `kc-delegation` and `kc-investigate` are how, and are not repeated here.
+Working is the floor, not the finish. This is when to look for better and whether to take it; `kc-simplicity`, `kc-performance`, `kc-delegate` and `kc-investigate` are how, and are not repeated here.
 
 ## Procedure
 

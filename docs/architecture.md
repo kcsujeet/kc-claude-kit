@@ -21,7 +21,7 @@ kc-claude-kit/
     │   │   └── kc-init/SKILL.md            # copies the rules into a project (on request)
     │   ├── rules/                          # hand-written, installed by install-rules.sh
     │   │   ├── kc-conventions.md           # pointer rule: "doing X -> load skill Y", scoped by paths to code and manifests
-    │   │   └── kc-working-agreement.md     # always loaded (no topic skill)
+    │   │   └── kc-always.md                # always loaded: reply rules and pointers to kc-do-a-task, kc-check-claims, kc-delegate, kc-look-back
     │   ├── scripts/install-rules.sh        # what kc-init and the first-prompt hook run: copies rules/, removes stale generated kc-*.md copies, writes the version stamp
     │   ├── tests/                          # sweep and lookup fixtures, their runners, install-rules and mutation-sweep tests
     │   ├── hooks/                          # first prompt: installs or refreshes ~/.claude/rules, reports a stale project copy; PreToolUse guards (source reads through the shell, forks of a large context, investigation write-ups, source writes with no shape file)
@@ -37,10 +37,10 @@ kc-claude-kit/
     │   ├── scripts/guard-github-post.sh, guard-hand-off.sh, guard-loop-stop.sh, guard-prose-rule.sh, guard-batched-wait.sh, guard-merge.sh, remind-look-back.sh, remind-look-back-prompt.sh, remind-after-replies.sh, check-reply-sources.sh, check-reply-length.sh, remind-reply-rules.sh, update-after-merge.sh, lib/hook-input.sh, lib/reply-misses.sh, lib/typed-message.jq
     │   ├── scripts/change-class.sh, approvals-needed.sh  # a small change's lighter path through the guards; every typed phrase ahead in one block
     │   ├── scripts/guard-ask-product-only.sh  # denies a question to the person that holds code or review words or does not say its product, scope, irreversible or intent kind
-    │   ├── scripts/remind-better-line.sh, lib/work-call.sh  # PostToolUse: on a turn's first work call, a line to measure and look for a better way
+    │   ├── scripts/remind-better-line.sh  # PostToolUse: on git push, gh pr create or gh pr ready, a line to measure and look for a better way
     │   ├── scripts/guard-review-walk.sh, lib/review-dir.sh  # no verification gate dispatch while the walk receipt fails (PreToolUse)
     │   ├── scripts/guard-unchecked-claim.sh     # PreToolUse: denies a commit message, PR or issue text or tracker write that states a fact about code, data or a tool that nothing in the turn read
-    │   ├── scripts/update-marketplace.sh, check-loaded-version.sh  # plugin updates during a session; every plugin links the check
+    │   ├── scripts/update-marketplace.sh, check-loaded-version.sh  # plugin updates during a session; the one check of the loaded version, for the whole kit
     │   ├── scripts/*.sh                    # gather-review, scope-facts, review-threads, build-comment-payloads, check-draft-names
     │   ├── tests/
     │   └── evals/

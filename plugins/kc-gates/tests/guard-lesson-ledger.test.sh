@@ -48,7 +48,7 @@ printf -- '- [x] §LB1 named without tokens\n- [x] §LB2 ladder\n- [ ] §LB3 exa
 check_verdict deny "blocked: a Gate checklist box that is not ticked" "git push -u origin lesson-branch"
 expect_contains "it names the box" "box §LB3 of the kc-look-back Gate checklist is not ticked" "$last_hook_output"
 
-printf -- '- [x] §LB1 a\n- [x] §LB2 b\n- [x] §LB3 c\n- [x] §LB4 d\n- [x] §LB5 e\n' > "$KC_LEDGER_DIR/checklist.md"
+printf -- '- [x] §LB1 a\n- [x] §LB2 b\n- [x] §LB3 c\n- [x] §LB4 d\n- [x] §LB5 e\n- [x] §LB6 f\n- [x] §LB7 g\n- [x] §LB8 h\n' > "$KC_LEDGER_DIR/checklist.md"
 printf 'F1\tone-off\tthis one is settled for one file\nF9\tone-off\tnot on the list\n' > "$KC_LEDGER_DIR/ledger.tsv"
 check_verdict deny "blocked: a ledger that fails feedback-ledger.sh check" "git push -u origin lesson-branch"
 expect_contains "it names the ledger problem" "feedback-ledger.sh check:" "$last_hook_output"
@@ -60,16 +60,34 @@ check_verdict allow "allowed: gh pr merge with a complete ledger" "gh pr merge 5
 
 # A repo with no base branch still reaches the ledger check (an empty argument list under set -u).
 nobase_repo="$work_dir/nobase"
-git init -q -b feature "$nobase_repo"
+git init -q -b lesson-feature "$nobase_repo"
 mkdir -p "$nobase_repo/.claude"
 printf -- '---\nledger: true\n---\n' > "$nobase_repo/.claude/hand-off-checklist.md"
 run_git_in "$nobase_repo" add .
 run_git_in "$nobase_repo" commit -q -m base
 printf 'F1\tone-off\tx\nF9\tone-off\tnot on the list\n' > "$KC_LEDGER_DIR/ledger.tsv"
-check_verdict deny "blocked: a failing ledger is still checked in a repo with no base branch" "git push -u origin feature" "$nobase_repo"
+check_verdict deny "blocked: a failing ledger is still checked in a repo with no base branch" "git push -u origin lesson-feature" "$nobase_repo"
 expect_contains "it names the ledger problem" "feedback-ledger.sh check:" "$last_hook_output"
 printf 'F1\tone-off\tx\n' > "$KC_LEDGER_DIR/ledger.tsv"
-check_verdict allow "allowed: a complete ledger in a repo with no base branch" "git push -u origin feature" "$nobase_repo"
+check_verdict allow "allowed: a complete ledger in a repo with no base branch" "git push -u origin lesson-feature" "$nobase_repo"
+
+# Armed only on a branch that carries lessons: a name starting with lesson, or an added box line.
+complete_ledger=$KC_LEDGER_DIR
+export KC_LEDGER_DIR="$work_dir/ledger-none"
+run_git_in "$lesson_repo" switch -q -c add-widget main
+check_verdict allow "allowed: a push of a branch that is not a lesson branch and adds no box" "git push -u origin add-widget"
+check_verdict allow "allowed: a PR from a non-lesson branch with no new box" "gh pr create --fill"
+printf -- '- [x] ticked already\n- [ ] §LB1 a changed line\n' > "$lesson_repo/notes.md"
+run_git_in "$lesson_repo" add notes.md
+run_git_in "$lesson_repo" commit -q -m "add a box"
+check_verdict deny "blocked: a push of a branch whose diff adds a box line, with no ledger" "git push -u origin add-widget"
+run_git_in "$lesson_repo" switch -q lesson-branch
+run_git_in "$lesson_repo" branch -q -D add-widget
+run_git_in "$lesson_repo" switch -q -c lessons/two main
+check_verdict deny "blocked: a lessons/ branch with no ledger" "git push -u origin lessons/two"
+run_git_in "$lesson_repo" switch -q lesson-branch
+run_git_in "$lesson_repo" branch -q -D lessons/two
+export KC_LEDGER_DIR=$complete_ledger
 
 # Front matter that never closes does not make a lesson repo.
 unclosed_repo="$work_dir/unclosed"

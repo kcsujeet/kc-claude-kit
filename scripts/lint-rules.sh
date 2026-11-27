@@ -13,8 +13,8 @@
 #      CLAUDE.md, docs/*.md and plugins/**/*.md resolves to a file (anchors after `#` are ignored,
 #      http and mailto links and `<placeholder>` targets skipped; plugin text may name docs paths
 #      of the repos that install it, so the backticked form is checked outside plugins/ only).
-#   6. A citation of the working agreement's step ("working agreement's step 6", "Order of work on
-#      a task, step 6") names a step in that rule's "Order of work on a task" numbered list.
+#   6. A citation of kc-do-a-task's step ("kc-do-a-task step 6", "working agreement's step 6",
+#      "Order of work on a task, step 6") names a step in that skill's "Order of work" numbered list.
 #
 # Prints one line per problem and exits 1 when there is any, 0 otherwise.
 set -euo pipefail
@@ -110,16 +110,16 @@ while IFS= read -r line; do
   [ -n "$line" ] && report "$line"
 done < "$work_file"
 
-# 6. Citations of the working agreement's steps that name a step it does not have.
-agreement=plugins/kc-conventions/rules/kc-working-agreement.md
+# 6. Citations of kc-do-a-task's steps that name a step it does not have.
+agreement=plugins/kc-conventions/skills/kc-do-a-task/SKILL.md
 if [ -f "$agreement" ]; then
-  last_step=$(awk '/^## Order of work on a task/ { inside = 1; next } /^## / { inside = 0 } inside && /^[0-9]+\. / { n = $1 + 0; if (n > last) last = n } END { print last + 0 }' "$agreement")
+  last_step=$(awk '/^## Order of work/ { inside = 1; next } /^## / { inside = 0 } inside && /^[0-9]+\. / { n = $1 + 0; if (n > last) last = n } END { print last + 0 }' "$agreement")
   # shellcheck disable=SC2086,SC2013
-  for citation in $(grep -ohE "(Order of work on a task\"?[^A-Za-z0-9]{1,4}|working agreement('s)? )step [0-9]+" $markdown_files 2>/dev/null | grep -oE 'step [0-9]+$' | sort -u | tr ' ' '_'); do
+  for citation in $(grep -ohE "(Order of work on a task\"?[^A-Za-z0-9]{1,4}|working agreement('s)? |kc-do-a-task('s)? )step [0-9]+" $markdown_files 2>/dev/null | grep -oE 'step [0-9]+$' | sort -u | tr ' ' '_'); do
     step_number=${citation#step_}
     if [ "$step_number" -lt 1 ] || [ "$step_number" -gt "$last_step" ]; then
-      first_use=$(grep -lE "(Order of work on a task\"?[^A-Za-z0-9]{1,4}|working agreement('s)? )step ${step_number}([^0-9]|$)" $markdown_files | head -n 1)
-      report "$first_use: cites the working agreement's step $step_number, but its Order of work on a task has $last_step steps"
+      first_use=$(grep -lE "(Order of work on a task\"?[^A-Za-z0-9]{1,4}|working agreement('s)? |kc-do-a-task('s)? )step ${step_number}([^0-9]|$)" $markdown_files | head -n 1)
+      report "$first_use: cites kc-do-a-task's step $step_number, but its Order of work has $last_step steps"
     fi
   done
 fi

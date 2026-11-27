@@ -2,7 +2,7 @@
 # PostToolUse hook for Bash: after a command that changes the installed plugins (`claude plugin
 # install`, `update`, `enable`, or `claude plugin marketplace update`), reminds Claude that this
 # session still runs the versions it loaded, so the person is asked for /reload-plugins at once,
-# as the turn's one question, before any other work (working agreement, "Ask before assuming").
+# as the turn's one question, before any other work (kc-assess §AS9).
 #
 # The prompt-time notice (`check-loaded-version.sh`) says the same on the person's next message,
 # but only if that hook runs then; a session that installed the update itself knows right away
@@ -44,7 +44,7 @@ EOF
         exit 0
       fi
       cat <<'EOF'
-{"hookSpecificOutput":{"hookEventName":"PostToolUse","additionalContext":"kc-gates: this changed the installed plugins, and this session still runs the versions it loaded, so the newer rules are not active here, and the person must never be left guessing whether to reload. Ask the person for /reload-plugins now, as the turn's one question in the host's question box with an answer to click, before any other work (working agreement, Ask before assuming); a line about it inside a longer message is not asking."}}
+{"hookSpecificOutput":{"hookEventName":"PostToolUse","additionalContext":"kc-gates: this changed the installed plugins, and this session still runs the versions it loaded, so the newer rules are not active here, and the person must never be left guessing whether to reload. Ask the person for /reload-plugins now, as the turn's one question in the host's question box with an answer to click, before any other work (kc-assess §AS9); a line about it inside a longer message is not asking."}}
 EOF
       exit 0
     fi

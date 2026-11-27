@@ -5,7 +5,7 @@ description: "Install the portable convention rules into this project, copying t
 
 # Installing the conventions into a project
 
-Each convention lives in one topic skill (`skills/kc-<topic>/SKILL.md`), and the plugin's `rules/` holds two hand-written files: `kc-conventions.md`, a pointer list naming the skill to load for each kind of work, and `kc-working-agreement.md`, which has no skill.
+Each convention lives in one topic skill (`skills/kc-<topic>/SKILL.md`), and the plugin's `rules/` holds two hand-written files: `kc-conventions.md`, a pointer list naming the skill to load for each kind of work, and `kc-always.md`, a short always-loaded rule of reply habits with pointers to the process skills (`kc-do-a-task`, `kc-check-claims`, `kc-delegate`, `kc-look-back`).
 
 The skills alone are not enough, because rules and skills load differently. A rule in `.claude/rules/` loads when a file matching its `paths:` is read; a skill loads only when the model invokes it, even with `paths:` set (measured on Claude Code 2.1.280, see the kit's `docs/architecture.md`). And plugins cannot ship rules: a plugin contributes context "through skills, agents, and hooks", and a `CLAUDE.md` at the plugin root "is not loaded as project context". So the rule files sit on disk, read by nobody, until something copies them where Claude Code looks.
 
@@ -27,7 +27,7 @@ If the script exits non-zero, relay its message and stop: missing rules or an un
 
 ## Report
 
-- Which files were installed, the version stamped, and the always-loaded cost: `kc-working-agreement.md` is unscoped and loads every session; the rest carry `paths:` and stay out of context until a matching file is read.
+- Which files were installed, the version stamped, and the always-loaded cost: `kc-always.md` is unscoped and loads every session; the rest carry `paths:` and stay out of context until a matching file is read.
 - That `/context` in a **new** session is how to verify it, since rules load at session start.
 - Whether `.claude/rules/` should be committed. It usually should, so the project carries its own conventions and anyone else cloning it gets them. Ask rather than deciding: a repo shared with people who have their own conventions is a different call from a personal project.
 

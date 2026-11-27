@@ -56,7 +56,7 @@ home_stale="The portable coding conventions in $work_dir/home/.claude/rules are 
 expect_output "missing: no rules installed" "$not_installed" "$(run_hook_from "$work_dir/project" "")"
 
 mkdir -p "$work_dir/project/.claude/rules"
-touch "$work_dir/project/.claude/rules/kc-working-agreement.md"
+touch "$work_dir/project/.claude/rules/kc-always.md"
 expect_output "stale: rules without a version stamp" \
   "The portable coding conventions in .claude/rules carry no version stamp, so they may predate kc-conventions plugin 9.8.7. Run /kc-conventions:kc-init to refresh them." \
   "$(run_hook_from "$work_dir/project" "")"
@@ -97,7 +97,7 @@ expect_output "current: nothing said with a payload either" \
 # A copy in the home folder serves every project; it is checked where there is no project copy,
 # in a folder with no .git too, and the notice names the command that refreshes it in place.
 mkdir -p "$work_dir/home/.claude/rules"
-touch "$work_dir/home/.claude/rules/kc-working-agreement.md"
+touch "$work_dir/home/.claude/rules/kc-always.md"
 echo "1.0.2" > "$work_dir/home/.claude/rules/.kc-conventions-version"
 expect_output "home copy: stale, in a folder that is no project" \
   "$home_stale" "$(run_hook_from "$work_dir/spare" "$(payload_for s4 "$work_dir/spare")")"
@@ -157,12 +157,12 @@ mkdir -p "$work_dir/repo/src/pages"
 expect_output "subfolder of a project, nothing installed: told, naming the folder to install from" \
   "The portable coding conventions are not installed in this project. Run /kc-conventions:kc-init from $work_dir/repo to copy them into .claude/rules/, or say so if this project should not have them." "$(run_hook_from "$work_dir/spare" "$(payload_for s11 "$work_dir/repo/src/pages")")"
 mkdir -p "$work_dir/repo/.claude/rules"
-touch "$work_dir/repo/.claude/rules/kc-working-agreement.md"
+touch "$work_dir/repo/.claude/rules/kc-always.md"
 echo "1.0.2" > "$work_dir/repo/.claude/rules/.kc-conventions-version"
 expect_output "subfolder of a project: the copy at the project's root is checked and named" \
   "The portable coding conventions in $work_dir/repo/.claude/rules are from kc-conventions plugin 1.0.2, but 9.8.7 is installed: the older rules may lack steps the newer plugins rely on. Run /kc-conventions:kc-init from $work_dir/repo to refresh them." "$(run_hook_from "$work_dir/spare" "$(payload_for s12 "$work_dir/repo/src/pages")")"
 mkdir -p "$work_dir/repo/src/.claude/rules"
-touch "$work_dir/repo/src/.claude/rules/kc-working-agreement.md"
+touch "$work_dir/repo/src/.claude/rules/kc-always.md"
 echo "9.8.7" > "$work_dir/repo/src/.claude/rules/.kc-conventions-version"
 expect_output "subfolder with a copy of its own: that copy is the one checked" \
   "" "$(run_hook_from "$work_dir/spare" "$(payload_for s13 "$work_dir/repo/src")")"
@@ -178,7 +178,7 @@ expect_output "worktree, nothing installed: told" \
 auto_setting=""
 mkdir -p "$work_dir/plugin/scripts" "$work_dir/plugin/rules"
 cp "$(dirname "$tests_dir")/scripts/install-rules.sh" "$work_dir/plugin/scripts/"
-echo "always on" > "$work_dir/plugin/rules/kc-working-agreement.md"
+echo "always on" > "$work_dir/plugin/rules/kc-always.md"
 echo "scoped" > "$work_dir/plugin/rules/kc-naming.md"
 fresh_home() { rm -rf "$work_dir/h" && mkdir -p "$work_dir/h" && home_dir="$work_dir/h"; }
 installed_line() {
@@ -189,7 +189,7 @@ installed_line() {
 fresh_home
 rm -rf "$work_dir/project/.claude"
 expect_output "auto: nothing installed, installs into the home folder and says so"   "$(installed_line)" "$(run_hook_from "$work_dir/project" "$(payload_for a1 "$work_dir/project")")"
-expect_output "auto: the home copy has both rules and the stamp"   "9.8.7 kc-naming.md kc-working-agreement.md"   "$(cat "$work_dir/h/.claude/rules/.kc-conventions-version") $(cd "$work_dir/h/.claude/rules" && find . -maxdepth 1 -name "*.md" -exec basename {} \; | sort | tr "\n" " " | sed "s/ $//")"
+expect_output "auto: the home copy has both rules and the stamp"   "9.8.7 kc-always.md kc-naming.md"   "$(cat "$work_dir/h/.claude/rules/.kc-conventions-version") $(cd "$work_dir/h/.claude/rules" && find . -maxdepth 1 -name "*.md" -exec basename {} \; | sort | tr "\n" " " | sed "s/ $//")"
 expect_output "auto: nothing is written into the project" "" "$(find "$work_dir/project" -mindepth 1 -maxdepth 1 ! -name .git -exec basename {} \;)"
 expect_output "auto: current afterwards, silent" "" "$(run_hook_from "$work_dir/project" "$(payload_for a2 "$work_dir/project")")"
 fresh_home
@@ -199,19 +199,19 @@ expect_output "auto: said once per session" "" "$(rm -rf "$work_dir/h/.claude"; 
 # Stale or unstamped home copy: refreshed in place.
 fresh_home
 mkdir -p "$work_dir/h/.claude/rules"
-echo "old" > "$work_dir/h/.claude/rules/kc-working-agreement.md"
+echo "old" > "$work_dir/h/.claude/rules/kc-always.md"
 echo "1.0.2" > "$work_dir/h/.claude/rules/.kc-conventions-version"
 expect_output "auto: stale home copy is refreshed and says so"   "$(installed_line | sed 's/^Installed/Refreshed/')" "$(run_hook_from "$work_dir/spare" "$(payload_for a4 "$work_dir/spare")")"
-expect_output "auto: the refreshed home copy matches the plugin"   "always on 9.8.7" "$(cat "$work_dir/h/.claude/rules/kc-working-agreement.md") $(cat "$work_dir/h/.claude/rules/.kc-conventions-version")"
+expect_output "auto: the refreshed home copy matches the plugin"   "always on 9.8.7" "$(cat "$work_dir/h/.claude/rules/kc-always.md") $(cat "$work_dir/h/.claude/rules/.kc-conventions-version")"
 rm "$work_dir/h/.claude/rules/.kc-conventions-version"
 expect_output "auto: unstamped home copy is refreshed"   "$(installed_line | sed 's/^Installed/Refreshed/')" "$(run_hook_from "$work_dir/spare" "$(payload_for a5 "$work_dir/spare")")"
 
 # Stale project copy: reported as before, files untouched; the stale home copy beside it is refreshed.
 mkdir -p "$work_dir/project/.claude/rules"
-echo "project edit" > "$work_dir/project/.claude/rules/kc-working-agreement.md"
+echo "project edit" > "$work_dir/project/.claude/rules/kc-always.md"
 echo "1.0.2" > "$work_dir/project/.claude/rules/.kc-conventions-version"
 expect_output "auto: stale project copy is reported, not rewritten" "$project_stale"   "$(run_hook_from "$work_dir/project" "$(payload_for a6 "$work_dir/project")")"
-expect_output "auto: the project's files are untouched"   "project edit 1.0.2" "$(cat "$work_dir/project/.claude/rules/kc-working-agreement.md") $(cat "$work_dir/project/.claude/rules/.kc-conventions-version")"
+expect_output "auto: the project's files are untouched"   "project edit 1.0.2" "$(cat "$work_dir/project/.claude/rules/kc-always.md") $(cat "$work_dir/project/.claude/rules/.kc-conventions-version")"
 echo "1.0.2" > "$work_dir/h/.claude/rules/.kc-conventions-version"
 expect_output "auto: stale project copy and stale home copy: project reported, home refreshed"   "$project_stale
 $(installed_line | sed 's/^Installed/Refreshed/')" "$(run_hook_from "$work_dir/project" "$(payload_for a7 "$work_dir/project")")"
@@ -224,13 +224,13 @@ auto_setting=0
 expect_output "opt-out: nothing installed is reported, not installed" "$not_installed"   "$(run_hook_from "$work_dir/project" "$(payload_for a9 "$work_dir/project")")"
 expect_output "opt-out: nothing written to the home folder" "" "$(ls -A "$work_dir/h")"
 mkdir -p "$work_dir/h/.claude/rules"
-echo "old" > "$work_dir/h/.claude/rules/kc-working-agreement.md"
+echo "old" > "$work_dir/h/.claude/rules/kc-always.md"
 echo "1.0.2" > "$work_dir/h/.claude/rules/.kc-conventions-version"
 old_home="$work_dir/home"
 new_home="$work_dir/h"
 expected_stale=${home_stale//"$old_home"/"$new_home"}
 expect_output "opt-out: stale home copy is reported with the manual command" "$expected_stale"   "$(run_hook_from "$work_dir/spare" "$(payload_for a10 "$work_dir/spare")")"
-expect_output "opt-out: stale home copy left as it was" "old 1.0.2"   "$(cat "$work_dir/h/.claude/rules/kc-working-agreement.md") $(cat "$work_dir/h/.claude/rules/.kc-conventions-version")"
+expect_output "opt-out: stale home copy left as it was" "old 1.0.2"   "$(cat "$work_dir/h/.claude/rules/kc-always.md") $(cat "$work_dir/h/.claude/rules/.kc-conventions-version")"
 
 # A failed install says so with the manual command, writes nothing, and exits 0.
 auto_setting=""

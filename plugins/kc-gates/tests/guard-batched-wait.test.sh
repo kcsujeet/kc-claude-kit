@@ -2,7 +2,7 @@
 # shellcheck disable=SC2016  # the REPL scripts hold JavaScript backtick templates, not shell expansions
 # Tests scripts/guard-batched-wait.sh: a Bash or REPL call that starts two CI watches, or one with a
 # timeout over 10 minutes, is denied; a single watch with a short timeout and other commands pass.
-# Holds kc-delegation §D1.
+# Holds kc-delegate §D1.
 set -euo pipefail
 
 tests_dir=$(cd "$(dirname "$0")" && pwd)

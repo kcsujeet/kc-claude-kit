@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Tests scripts/check-loaded-version.sh against a throwaway Claude config whose
-# installed_plugins.json the tests rewrite, and checks that every plugin in the kit runs it.
+# installed_plugins.json the tests rewrite, and checks that only kc-gates runs it, for the whole kit.
 set -euo pipefail
 
 tests_dir=$(cd "$(dirname "$0")" && pwd)
@@ -80,14 +80,18 @@ expect_eq "--print-stale: a copy loaded from a clone prints nothing" "" "$(print
 write_installed_plugins 3.1.2 3.1.0
 expect_eq "--print-stale: installed at two scopes, one the loaded copy, prints nothing" "" "$(print_stale "$cache/3.1.0")"
 
-# Every plugin in the kit registers the hook, and its copy of the script is kc-gates' file.
+# One check for the kit: kc-gates registers it, and no other plugin carries a copy or registers one.
 for plugin_dir in "$repo_root"/plugins/*/; do
   plugin=$(basename "$plugin_dir")
   registered=$(jq -r '[.hooks.UserPromptSubmit[]?.hooks[].command] | any(contains("scripts/check-loaded-version.sh"))' \
     "$plugin_dir/hooks/hooks.json" 2>/dev/null || echo false)
-  expect_eq "$plugin registers the check on each message" true "$registered"
-  expect_eq "$plugin's script is kc-gates' file" true \
-    "$(cmp -s "$plugin_dir/scripts/check-loaded-version.sh" "$script" && echo true || echo false)"
+  if [ "$plugin" = kc-gates ]; then
+    expect_eq "$plugin registers the check on each message" true "$registered"
+  else
+    expect_eq "$plugin does not register its own copy of the check" false "$registered"
+    expect_eq "$plugin carries no copy of the script" false \
+      "$([ -e "$plugin_dir/scripts/check-loaded-version.sh" ] && echo true || echo false)"
+  fi
 done
 
 finish

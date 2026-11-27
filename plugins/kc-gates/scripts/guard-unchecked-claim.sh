@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # PreToolUse guard: blocks text that is about to be published when it states a fact about code,
 # data, a setting or a tool and nothing in the turn looked at a source that mentions what the fact
-# is about (kc-conventions:kc-claims: "check the source in this turn before stating what code
+# is about (kc-conventions:kc-check-claims: "check the source in this turn before stating what code
 # does"). Memory of the rule did not hold, so a hook holds it, at the actions that publish text:
 #
 #   - Bash: a `git commit` (its message), `gh pr create|edit|comment|review`, `gh issue
@@ -189,5 +189,5 @@ quoted=""
 for sentence in "${unchecked[@]:0:$MAX_QUOTED_CLAIMS}"; do
   quoted="$quoted \"$(printf '%s' "$sentence" | cut -c1-"$QUOTE_WIDTH")\""
 done
-print_pretooluse_deny "Blocked by the kc-gates plugin: this text states facts about code, data or a tool that nothing this turn looked at:$quoted. Check each now (Read, Grep, a query or a command that names what it is about), then publish it corrected, or say plainly in the text that it is unverified (kc-conventions:kc-claims)."
+print_pretooluse_deny "Blocked by the kc-gates plugin: this text states facts about code, data or a tool that nothing this turn looked at:$quoted. Check each now (Read, Grep, a query or a command that names what it is about), then publish it corrected, or say plainly in the text that it is unverified (kc-conventions:kc-check-claims)."
 exit 0
