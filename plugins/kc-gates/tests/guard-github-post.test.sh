@@ -513,6 +513,15 @@ check allow "report: a comment with no verdict is not held to the findings" "$wa
 rm -rf "$review_folder/verdicts"
 check allow "report: no verdicts folder, nothing to check" "$walk_token gh pr comment 12 -b '$ok_report'"
 
+# §PC13: a reply that ends on a softener or carries an emoji is denied, whatever a repo's example shows.
+check deny "tone §PC13: a softener close is denied" "$walk_token gh api -X POST repos/acme/shop/pulls/12/comments/9/replies -f body='I kept the whole sentence as one key, if that is okay.'"
+expect_last_reason "tone: the denial names the softener" "stock softener"
+check deny "tone: an emoji is denied" "$walk_token gh pr comment 12 -b 'Fixed in abc1234 🙂'"
+expect_last_reason "tone: the denial names the emoji" "an emoji"
+check deny "tone: hope this helps is denied" "$walk_token gh pr comment 12 -b 'Renamed it. Hope this helps.'"
+check allow "tone: a plain reply posts" "$walk_token gh api -X POST repos/acme/shop/pulls/12/comments/9/replies -f body='Done in abc1234.'"
+check allow "tone: okay in another sense posts" "$walk_token gh pr comment 12 -b 'The okay button now closes the dialog.'"
+
 cd "$tests_dir"
 rm -rf "$rb_repo"
 TMPDIR=$base_tmp

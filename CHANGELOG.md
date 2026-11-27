@@ -6,6 +6,8 @@ One line per version per plugin, newest first. Detail lives in the pull request 
 
 ## [Unreleased]
 
+- `kc-gates` 3.25.2: `guard-github-post.sh` denies a posted comment or reply with an emoji or a softener close (§PC13)
+- `kc-conventions` 2.14.1: sweeps `pass-through-hooks.sh` (§R12), `near-copies.sh` (§P1) and `near-synonym-names.sh` (new §N14)
 - `kc-gates` 3.25.1: `guard-loop-stop.sh` is armed only while a review pass is open on the branch, and blocks only a fix that rewrites lines an earlier round of that pass wrote
 - `kc-gates` 3.25.0: new `guard-publish-noise.sh` hook refuses publishing a file that holds a command-line tool's own notice; `check-walk-receipt.sh` needs a `design` line and a design capture per browser item; `guard-loop-stop.sh` counts only the branch task's own merged pull requests; `verify-gate-blocks.sh` no longer misreads a large receipt or stops on a byte the locale can't read
 - `kc-verify` 2.5.1: §UI7 names the walk receipt's design capture (`check-walk-receipt.sh`)

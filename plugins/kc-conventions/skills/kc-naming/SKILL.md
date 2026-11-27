@@ -30,6 +30,7 @@ paths:
 - [ ] §N11 When the diff changes what a thing is or holds (one becomes many), every name still describing the old shape (routes, files, exports, API paths, keys) is listed and compared with siblings.
 - [ ] §N12 One word per concept: a new name for a thing the codebase already names (`reservation` where it says `booking`) reuses the existing word. (N/A: no new names)
 - [ ] §N13 Casing follows the language and the siblings: `snake_case` SQL columns and plural tables, `UpperCamelCase` types, `kebab-case` plural route nouns and file names. (N/A: nothing new named)
+- [ ] §N14 Names in one scope sharing a word (`hasFailedPayment`, `hasPaymentError`) each say what they test, so a reader tells them apart; `near-synonym-names.sh`, one verdict per group.
 
 - Examples and edge cases per box: references/detail.md (read when a box is unclear).
 
@@ -65,6 +66,12 @@ paths:
 
   ```bash
   bash "${CLAUDE_PLUGIN_ROOT}/skills/kc-naming/scripts/unverbed-functions.sh" <diff-file>
+  ```
+
+- `near-synonym-names.sh` (§N14): added boolean-shaped names in one file that share a content word; one verdict per group (each name says what it tests, or rename). Receipt: `grepped near-synonym names: N hits`.
+
+  ```bash
+  bash "${CLAUDE_PLUGIN_ROOT}/skills/kc-naming/scripts/near-synonym-names.sh" <diff-file>
   ```
 
 - `file-name-collisions.sh` (§N7): new and untracked files whose basename another file in the repo already has. It reads repository state, so run it from the repo root, or pass the root as a second argument. Receipt: `checked new file names: N files, M collisions`.

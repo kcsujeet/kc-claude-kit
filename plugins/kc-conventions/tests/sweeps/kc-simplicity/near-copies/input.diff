@@ -1,0 +1,25 @@
+diff --git a/tests/enableExpressShipping.ts b/tests/enableExpressShipping.ts
+new file mode 100644
+--- /dev/null
++++ b/tests/enableExpressShipping.ts
+@@ -0,0 +1,12 @@
++import { act } from 'test-lib'
++import useCartStore from '@/store/cart'
++
++/** Turns on express shipping for the test store. */
++export const enableExpressShipping = () => {
++  act(() => {
++    useStoreContext.getState().setSelectedStore(mockStore)
++    useCartStore.setState({
++      options: { expressShipping: [mockStore.id] }
++    })
++  })
++}
+diff --git a/src/formatOrderNumber.ts b/src/formatOrderNumber.ts
+new file mode 100644
+--- /dev/null
++++ b/src/formatOrderNumber.ts
+@@ -0,0 +1,3 @@
++export const formatOrderNumber = (order: Order) => {
++  return order.prefix + String(order.sequence).padStart(6, '0')
++}

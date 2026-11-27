@@ -1,0 +1,6 @@
+src/orders/OrderStatusBanner.tsx:3:   const isAwaitingPayment = order.status === Status.AWAITING_PAYMENT
+src/orders/OrderStatusBanner.tsx:4:   const hasFailedPayment = order.paymentReason === Reason.PAYMENT_FAILED
+src/orders/OrderStatusBanner.tsx:5:   const hasPaymentError = isAwaitingPayment && hasFailedPayment
+app/refunds/refund_state.py:2:     has_failed_refund = refund.failed
+app/refunds/refund_state.py:3:     is_refund_open = refund.open
+app/refunds/refund_state.py:4:     is_open = refund.open

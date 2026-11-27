@@ -17,7 +17,7 @@ paths:
 
 - [ ] Tick every box for each construct you add or change. Report each: PASS, FAIL (file:line) or N/A (why).
 
-- [ ] §P1 DRY: no knowledge duplicated that should have one source (copied logic, re-declared constant, re-implemented helper); a literal moved to a constant leaves no other copy (§P11).
+- [ ] §P1 DRY: no knowledge duplicated that should have one source (copied logic, re-declared constant, re-implemented helper, a new file near-copying one, tests included: `near-copies.sh`).
 - [ ] §P2 YAGNI: no unused params or props, no single-caller abstraction built for a hypothetical second, no config option nothing passes, no dead branch.
 - [ ] §P3 KISS: no materially simpler equivalent left: a lookup object beats nested conditionals, an early return beats nesting, an existing util or stdlib call beats a hand-roll.
 - [ ] §P4 A new hand-rolled capability was checked against a prop or slot in use, a shared hook or util, a component variant and existing state; types and components are grepped by shape.
@@ -42,6 +42,12 @@ paths:
 ## Sweeps
 
 - [ ] Save the diff under review to a file and run the script over it; `-` reads the diff from stdin. Each hit gets its own verdict.
+
+- `near-copies.sh` (§P1): each added file that shares at least half its code shape with another file of the repo, tests included; give each pair a verdict (consolidate, or why both stay). Receipt: `checked near copies: N hits`.
+
+  ```bash
+  bash "${CLAUDE_PLUGIN_ROOT}/skills/kc-simplicity/scripts/near-copies.sh" <diff-file> <repo-root>
+  ```
 
 - `no-precedent.sh` (§P19): tokens the added lines introduce with zero uses in the repo at the base. Receipt: `grepped no precedent: N hits`.
 

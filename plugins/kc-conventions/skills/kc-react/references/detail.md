@@ -370,6 +370,8 @@ const COLUMNS = [{ key: 'name' }, { key: 'size' }]
 
 - **Checklist wording (moved from SKILL.md):** Fetch ownership re-evaluated for every read hook added/moved: the fetch lives with the actual consumer; a parent/page doesn't duplicate a fetch its child already owns (especially with different params); no full-list fetch added only to derive a boolean. (N/A: no read hook added/moved)
 
+- **Results only handed on:** a component that calls a read hook and only passes what it returns to one child as props (directly, or through a value derived from it) holds a fetch that belongs in that child. Move the call into the child, with any fallback that shapes the result (an order panel fetching a receipt only for `<ReceiptView receipt={receipt} />`). `pass-through-hooks.sh` lists each such call, from the whole changed file, so a hook the diff left in place is judged when the diff changes how its results are used.
+
 ### §R13
 
 - **Checklist wording (moved from SKILL.md):** Query invalidation is a last resort (cache-patch → surgical update → invalidate, in that order); `mutate` + callbacks preferred over `mutateAsync` + `await` when the resolved value only drives a side effect; mechanical sweep — run `mutate-async.sh` over the diff's added lines, give every hit a verdict, state `grepped mutateAsync: 0 hits` explicitly when none found. (N/A: no invalidation or mutation in diff)

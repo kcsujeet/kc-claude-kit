@@ -30,7 +30,7 @@ paths:
 - [ ] §R9 Conditional element assembly is a named local component with early returns, not a `let` then `if/else` or a multi-line ternary building JSX.
 - [ ] §R10 No side-effect-only component (`useEffect` + `return null`), no skip-via-ternary in `map` callbacks, no inline `renderXxx()` functions. (N/A: none of the three)
 - [ ] §R11 Reads and writes live in separate hooks; no raw `fetch`/`axios`/`useMutation`/`useQuery` call inside a component — grep how sibling features do it. (N/A: no data call in diff)
-- [ ] §R12 Fetch ownership re-checked for every read hook added or moved: it lives with its real consumer, no parent duplicates a child's fetch, no full-list fetch to derive a boolean.
+- [ ] §R12 Fetch ownership re-checked for every read hook added or moved: it lives with its real consumer; no parent duplicates a child's fetch or fetches only to pass results down (`pass-through-hooks.sh`).
 - [ ] §R13 Invalidation is a last resort (cache patch, then surgical update, then invalidate); prefer `mutate` + callbacks over `mutateAsync` + `await`; run `mutate-async.sh`, one verdict per hit.
 - [ ] §R14 The form is the single source of truth (no `useState` shadowing a form value); hand-rolled validation is checked against the validation library's API. (N/A: no form or schema)
 - [ ] §R15 New state lives at the lowest common ancestor of its real consumers, never lifted for a parent that "might" want it; order-dependent state mutations carry a rationale comment.
@@ -74,6 +74,12 @@ paths:
 
   ```bash
   bash "${CLAUDE_PLUGIN_ROOT}/skills/kc-react/scripts/mutate-async.sh" <diff-file>
+  ```
+
+- `pass-through-hooks.sh` (§R12): hook calls whose results the component only hands on as props, read from the whole changed file (pass the repo root second when not running from it). Receipt: `checked pass-through hooks: N hits`.
+
+  ```bash
+  bash "${CLAUDE_PLUGIN_ROOT}/skills/kc-react/scripts/pass-through-hooks.sh" <diff-file> [repo-root]
   ```
 
 - `memo-hooks.sh` (§R16): added lines calling `useMemo` or `useCallback`. Receipt: `grepped memo hooks: N hits`.
