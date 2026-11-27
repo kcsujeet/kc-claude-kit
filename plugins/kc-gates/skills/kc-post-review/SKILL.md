@@ -39,6 +39,9 @@ Before producing the first draft, paste this checklist in chat with each box exp
 - [ ] §PC8 Author's words read first: every draft carries `"covered"`: what you read of the author's own words (pull request description, linked ticket, their replies and code comments) and why they do not already answer the point. A point they already decided or explained is dropped, not raised. `check-draft-format.sh` refuses a draft without it.
 - [ ] §PC9 Plain clauses: no stretch of 14 or more words without a comma, colon, semicolon, parenthesis or dash; break it into short clauses, the way a person says it. Held by `check-draft-format.sh`.
 - [ ] §PC7 Linked, not bare: a ticket or pull request a drafted comment or reply names is a markdown link, `[ABC-1](https://tracker.example/ABC-1)`, `[#42](https://github.com/acme/shop/pull/42)`, so the reader can open it. `check-draft-format.sh` fails a draft naming a tracker id, `#42`, `PR 42` or `pull request 42` outside a link, a URL or code. Replies and messages: `check-reply-length.sh` and `check-reply-sources.sh` are the reply checks and do not hold this.
+- [ ] §PC10 Re-read before written to: anything shared (a pull request body, ticket, document, sheet) was fetched again just before the write, and a row was found by its content, not its old number.
+- [ ] §PC11 When the change alters someone else's work, the pull request says up front what of theirs is kept and what changed and why, with command output.
+- [ ] §PC12 Content handed to a tool that transforms it (editor, formatter, importer) is shaped to survive it and read back afterwards.
 ```
 
 Skipping this checklist (or producing it perfunctorily and then writing long drafts anyway) is the documented failure mode. The discipline only sticks when the checklist precedes the drafts in chat.

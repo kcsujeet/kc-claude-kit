@@ -18,6 +18,10 @@
 # contains "skip ledger" (user_approved in lib/hook-input.sh): the user may waive the ledger for one
 # PR (one that carries no lesson); the token without those words stays blocked.
 #
+# Armed only on a branch that carries lessons (branch_carries_lessons): its name starts with "lesson",
+# or its changes since the base branch add a new checklist box line (`+- [ ] §`). Any other branch
+# of a ledger repo is allowed.
+#
 # Output: the PreToolUse deny JSON on a blocked command, nothing otherwise. Always exits 0.
 # KC_GUARD_NO_JQ=1 forces the sed fallback for reading the payload (used by the tests).
 
@@ -52,6 +56,28 @@ get_gate_checklist_ids() {
   done
 }
 
+# Prints the first of the usual base branches that exists in the repo $1, or nothing.
+get_base_ref() {
+  local base_ref
+  for base_ref in origin/HEAD origin/main origin/master main master; do
+    if git -C "$1" rev-parse --verify -q "$base_ref" > /dev/null; then
+      echo "$base_ref"
+      return 0
+    fi
+  done
+}
+
+# True when branch $2 of the repo $1 carries lessons: its name starts with "lesson" (lesson-x,
+# lessons/x), or its changes since the base branch (staged ones too) add a checklist box line.
+branch_carries_lessons() {
+  local dir=$1 branch=$2 base_ref merge_base
+  case "$branch" in lesson*) return 0 ;; esac
+  base_ref=$(get_base_ref "$dir")
+  [ -n "$base_ref" ] || return 1
+  merge_base=$(git -C "$dir" merge-base "$base_ref" HEAD 2>/dev/null) || return 1
+  git -C "$dir" diff "$merge_base" 2>/dev/null | grep -Eq '^\+- \[ \] §'
+}
+
 # Prints each problem with the ledger folder $2 of the repo $1 on its own line.
 get_ledger_problems() {
   local dir=$1 ledger_dir=$2 base_ref merge_base diff_file check_output check_summary check_args=() box_id missing_files="" file_name
@@ -62,10 +88,7 @@ get_ledger_problems() {
     echo "the ledger folder $ledger_dir is missing:$missing_files (run feedback-ledger.sh list, give each item a verdict, and tick the kc-look-back Gate checklist in checklist.md)"
     return 0
   fi
-  for base_ref in origin/HEAD origin/main origin/master main master; do
-    git -C "$dir" rev-parse --verify -q "$base_ref" > /dev/null && break
-    base_ref=""
-  done
+  base_ref=$(get_base_ref "$dir")
   diff_file=$(mktemp)
   if [ -n "$base_ref" ]; then
     merge_base=$(git -C "$dir" merge-base "$base_ref" HEAD 2>/dev/null || echo "$base_ref")
@@ -106,6 +129,10 @@ check_segment() {
   if printf '%s' "$segment" | grep -Eq "${GH_COMMAND_START}pr[[:space:]]+create([[:space:]]|$)" || is_merge_segment "$segment"; then is_target=true; fi
   $is_target || $is_commit || return 0
   is_lesson_repo "$repo_dir" || return 0
+  # Armed only on a branch that carries lessons; any other branch of the repo is allowed.
+  branch=$(git -C "$repo_dir" rev-parse --abbrev-ref HEAD 2>/dev/null) || return 0
+  # A command that switches branch and then pushes is judged on a branch from before it: armed.
+  if ! { $is_target && $CHAIN_MOVED_HEAD; } && ! branch_carries_lessons "$repo_dir" "$branch"; then return 0; fi
   # A session that never reloaded runs older guards than the repo's rules need.
   installed_versions=$(bash "$scripts_dir/check-loaded-version.sh" --print-stale 2>/dev/null)
   if [ -n "$installed_versions" ]; then
@@ -119,7 +146,6 @@ check_segment() {
   fi
   # A commit is subject to the stale-session check above only.
   $is_target || return 0
-  branch=$(git -C "$repo_dir" rev-parse --abbrev-ref HEAD 2>/dev/null) || return 0
   case "$branch" in main | master | HEAD) return 0 ;; esac
   ledger_dir=${KC_LEDGER_DIR:-$(git -C "$repo_dir" rev-parse --absolute-git-dir)/kc-ledger/${branch//\//-}}
   problems=$(get_ledger_problems "$repo_dir" "$ledger_dir")

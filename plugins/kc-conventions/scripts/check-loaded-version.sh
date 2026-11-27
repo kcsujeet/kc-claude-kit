@@ -1,1 +1,0 @@
-../../kc-gates/scripts/check-loaded-version.sh

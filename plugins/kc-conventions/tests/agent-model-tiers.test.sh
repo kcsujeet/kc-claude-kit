@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Checks every plugin agent file against kc-delegation's tree: each names its model, a deciding
+# Checks every plugin agent file against kc-delegate's tree: each names its model, a deciding
 # agent runs on the strongest tier, and every other agent (gates, workers, script runners) on a mid
 # one. A new agent is executing until it is added to deciding_agents below, so none lands on a tier
 # by accident. Usage: agent-model-tiers.test.sh [<plugins dir>] (default: this repo's plugins/).

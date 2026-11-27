@@ -72,7 +72,7 @@ expect_prompt quiet ""
 
 # --- the reminder's text -------------------------------------------------------------------------
 reminder=$(build_payload "the PR has been merged" | bash "$hook")
-expect_contains "the reminder points to step 6" "Order of work on a task, step 6" "$reminder"
+expect_contains "the reminder points to step 6" "kc-do-a-task step 6" "$reminder"
 expect_contains "the reminder says to list the feedback with the ledger" "feedback-ledger.sh list" "$reminder"
 expect_contains "the reminder says it stays on the task list until the ledger check passes" "stays on the visible task list until feedback-ledger.sh check passes" "$reminder"
 expect_contains "the reminder says an earlier look-back does not cover later feedback" "does not cover feedback that arrived after it" "$reminder"

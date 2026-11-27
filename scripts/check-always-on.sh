@@ -158,6 +158,7 @@ payload_ls="{\"cwd\":\"$work_dir\",\"session_id\":\"budget\",\"tool_name\":\"Bas
 payload_git="{\"cwd\":\"$work_dir\",\"session_id\":\"budget\",\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"git status\"},\"tool_response\":{\"stdout\":\"nothing to commit\",\"stderr\":\"\"}}"
 payload_read="{\"cwd\":\"$work_dir\",\"session_id\":\"budget\",\"tool_name\":\"Read\",\"tool_input\":{\"file_path\":\"$work_dir/a.txt\"},\"tool_response\":{\"file\":{\"filePath\":\"$work_dir/a.txt\"}}}"
 payload_edit="{\"cwd\":\"$work_dir\",\"session_id\":\"budget\",\"tool_name\":\"Edit\",\"tool_input\":{\"file_path\":\"$work_dir/a.txt\",\"old_string\":\"a\",\"new_string\":\"b\"},\"tool_response\":{\"filePath\":\"$work_dir/a.txt\"}}"
+payload_push="{\"cwd\":\"$work_dir\",\"session_id\":\"budget\",\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"git push\"},\"tool_response\":{\"stdout\":\"\",\"stderr\":\"\"}}"
 echo hello > "$work_dir/a.txt"
 
 tool_hooks_max=0
@@ -197,11 +198,10 @@ done
 sort -rn "$scratch/tool-hooks" | sed 's/^/  /'
 echo "  max: $tool_hooks_max bytes per ordinary call"
 
-# A once-per-turn reminder (remind-better-line.sh) stays silent on the ordinary calls above, so it is
-# run once more against the Edit payload with a fresh plugin data folder, as a turn's first work call.
-# Report only: it is paid once per turn, not on every call.
+# A hand-off reminder (remind-better-line.sh) stays silent on the ordinary calls above, so it is
+# run once more against a `git push` payload. Report only: it is paid once per hand-off, not on every call.
 echo
-echo "Once-per-turn tool-hook output (first work call of a turn, bytes printed; report only):"
+echo "Hand-off tool-hook output (a git push, bytes printed; report only):"
 for hooks_file in "$root"/plugins/*/hooks/hooks.json; do
   [ -f "$hooks_file" ] || continue
   plugin_dir=$(dirname "$(dirname "$hooks_file")")
@@ -211,9 +211,9 @@ for hooks_file in "$root"/plugins/*/hooks/hooks.json; do
     case "$command" in */update-*.sh*) continue ;; esac
     size=$(
       cd "$work_dir" &&
-        printf '%s' "$payload_edit" |
+        printf '%s' "$payload_push" |
         env -i PATH="$bin_dir" HOME="$home_dir" CLAUDE_CONFIG_DIR="$home_dir" \
-          CLAUDE_PLUGIN_ROOT="$plugin_dir" CLAUDE_PROJECT_DIR="$work_dir" CLAUDE_PLUGIN_DATA="$(mktemp -d "$scratch/data.XXXXXX")" \
+          CLAUDE_PLUGIN_ROOT="$plugin_dir" CLAUDE_PROJECT_DIR="$work_dir" \
           "$bin_dir/bash" -c "$command" 2>&1 | wc -c | tr -d ' '
     ) || size=0
     name=${command##*/}

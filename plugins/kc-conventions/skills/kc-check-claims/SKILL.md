@@ -1,5 +1,5 @@
 ---
-name: kc-claims
+name: kc-check-claims
 description: Use before stating what code, a tool, a platform, an instruction, a source, a number or a requirement is or can do, before saying "I can't confirm" or "can't be done here", and before a recommendation or an example.
 ---
 
@@ -39,3 +39,8 @@ Applies to whoever made the claim: you, a review agent or a subagent. Check the 
 ## Review checklist
 
 - [ ] §CL1 Text about to be published (a commit message, a pull request or issue body or comment, a tracker comment) states no fact about code, data, a setting or a tool that nothing in the turn read a source for: each such fact was checked in this turn or the text says plainly that it is unverified. Held by `kc-gates` `guard-unchecked-claim.sh`. (N/A: the text states no such fact)
+- [ ] §CL2 Never reported success on a red loop: when tests fail, say so and show the output.
+- [ ] §CL3 A skipped step or one that could not be run is named with why; silence reads as done.
+- [ ] §CL4 A number given about your own work (agents run, tests passed, rows changed, time spent) is counted from the record; an estimate says it is one.
+- [ ] §CL5 A search or audit handed off reports what it kept as well as what it found, and the kept items are checked like findings, since "left on purpose" is a claim too.
+- [ ] §CL6 A recommendation names its evidence, and the evidence is checked again before the recommendation moves under pushback.

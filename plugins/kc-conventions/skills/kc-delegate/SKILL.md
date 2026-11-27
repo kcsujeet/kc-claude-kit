@@ -1,5 +1,5 @@
 ---
-name: kc-delegation
+name: kc-delegate
 description: Use before delegating work to subagents, parallel agents or a workflow, before a sweep, audit or migration across many files, and before starting parallel or long-running sessions. Keeps work cheap: script first, small agents and sessions, cheapest model per step, capped context, results in files.
 ---
 
@@ -34,3 +34,4 @@ Before handing work off, walk these habits:
 ## Gate checklist
 
 - [ ] §D1 Each independent result is waited on by its own short poll, acted on as it lands: no one call waits on several (two deploys, three test runs, two CI watches in a `Promise.all` or a chain), since it returns only when the slowest ends and a hung one hides, and no wait has a timeout over 10 minutes on a check that takes seconds. Held by kc-gates `guard-batched-wait.sh`, which denies a call with two CI watches or one with a timeout over 10 minutes. (N/A: the work waits on nothing)
+- [ ] §D2 Files the person will use (screenshots, reports, exports) are saved in the session's workspace, never a temporary folder. (N/A: no files for the person)

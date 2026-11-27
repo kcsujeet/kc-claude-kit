@@ -2,7 +2,7 @@
 # Stop hook: notes a reply that stated something nothing in its turn checked, for the next turn's
 # reminder (remind-reply-rules.sh) to name. It never blocks: by the time a Stop hook runs, the
 # person has already seen the reply, so a block only shows them a second copy of it. It is the
-# trigger for the working agreement's "A claim needs a check behind it", for the two kinds of
+# trigger for kc-conventions:kc-check-claims, for the two kinds of
 # claim a script can tell from the turn's own tool calls:
 #
 #   - What instructions say (the kit, a working agreement, a checklist, CLAUDE.md, a rule or
@@ -25,7 +25,7 @@
 # API, command, plugin, library, service and the like) is noted unless its turn looked it up: a web
 # or docs lookup (WebFetch, WebSearch, a docs or search MCP tool), or a call other than an edit whose
 # command or path (not the tool's name) names a word of that sentence, on word boundaries (`shopctl export --help` for "shopctl can't export").
-# A capability claim from memory is out of date or wrong as often as not (kc-claims).
+# A capability claim from memory is out of date or wrong as often as not (kc-check-claims).
 #
 # And two things a reply must open with or check first:
 #
@@ -132,7 +132,7 @@ if [ -n "$capability_sentences" ]; then
     done
   fi
   if [ "$looked_up" = false ]; then
-    misses+=("It said a tool, CLI or API can't do something with no lookup that turn. That is a claim too: check the version that will run it, in its own docs, its --help or by trying it, then say what you found (kc-conventions:kc-claims).")
+    misses+=("It said a tool, CLI or API can't do something with no lookup that turn. That is a claim too: check the version that will run it, in its own docs, its --help or by trying it, then say what you found (kc-conventions:kc-check-claims).")
   fi
 fi
 

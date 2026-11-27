@@ -5,7 +5,7 @@ description: Use when a task is handed off (your pull request merged or with its
 
 # Look back, then write the lessons
 
-Step 6 of the working agreement's "Order of work on a task".
+Step 6 of `kc-conventions:kc-do-a-task`.
 
 ## Procedure
 
@@ -48,3 +48,6 @@ The ledger folder carries a ticked copy of this list as `checklist.md` (each box
 - [ ] §LB3 Three or more unlike examples, from different areas and none sharing a token with the instance, each held as a test fixture.
 - [ ] §LB4 An existing rule, script or box was widened before a new one was added (name it in the PR description), or the description says why none could be.
 - [ ] §LB5 The check catches the class, not only the token that bit: fixtures from unlike areas pass and fail it, and the instance's own case is one of them.
+- [ ] §LB6 A correction, or something about the codebase written down nowhere, became one imperative line describing the correct behaviour, in the repo file that acts on it: how to write, run or test code there in its `CLAUDE.md` (or the instructions file it uses); what a review there should flag or accept in `.claude/review-conventions.md` (graded by kc-code-review's project-conventions gate; a rule a review can check goes here, since nothing grades `CLAUDE.md`; create it when missing); what a pull request must carry before hand-off in `.claude/hand-off-checklist.md` (graded by kc-ready-for-review).
+- [ ] §LB7 The line is specific to that repo: general advice belongs in the portable rules, written by their maintainer; others use `~/.claude/CLAUDE.md`. A procedure, not a rule, belongs in a skill and the project file only links to it.
+- [ ] §LB8 Those lines were written in the look-back with the task's other lessons and mentioned in the summary; auto memory already records corrections and preferences, so only what it would not derive is written down.

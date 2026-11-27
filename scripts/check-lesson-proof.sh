@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# Fails when a change since <base> edits a rule (a skill, a skill reference, an agent or the working
-# agreement) without proof that the rule catches something: an eval case or a script test changed in
+# Fails when a change since <base> edits a rule (a skill, a skill reference, an agent or the always-on rule
+# kc-always.md) without proof that the rule catches something: an eval case or a script test changed in
 # the same change. A lesson is a checklist box (`- [ ] §X1`): every box the change adds or rewrites
 # is named, by its id, in one of those eval or test files, so the proof is tied to that rule, and a
 # rule file that gains lines with no box added or rewritten in it gained prose no gate walks. A file
-# with no boxes at all (an agent, the working agreement) is the same. Either way, a change that only
+# with no boxes at all (an agent, kc-always.md) is the same. Either way, a change that only
 # moves words says so in the pull request description, on a line of its own: `wording-only: <why>`.
 # That line alone covers a reword or a removal. When the rule files gain more lines than they lose,
 # the change adds something, and the description also names what holds it, one or more lines
@@ -42,7 +42,7 @@ merge_base=$(git merge-base "$base" HEAD) || {
 # Paths as they are, not quoted, so a non-ASCII name still matches the patterns.
 changed_files=$(git -c core.quotePath=false diff --name-only "$merge_base" HEAD)
 
-changed_rule_files=$(printf '%s\n' "$changed_files" | grep -E '^plugins/[^/]+/(skills/.+\.md|agents/[^/]+\.md|rules/kc-working-agreement\.md)$' || true)
+changed_rule_files=$(printf '%s\n' "$changed_files" | grep -E '^plugins/[^/]+/(skills/.+\.md|agents/[^/]+\.md|rules/kc-always\.md)$' || true)
 if [ -z "$changed_rule_files" ]; then
   echo "ok   no rule changed"
   exit 0

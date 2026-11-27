@@ -6,11 +6,10 @@
 # (https://code.claude.com/docs/en/plugins/loading#when-auto-update-runs), so CLAUDE_PLUGIN_ROOT is
 # the version this session runs; installed_plugins.json records the installed ones.
 #
-# Every plugin in the kit runs this file: the others link to kc-gates' copy, and Claude Code copies
-# a link within the marketplace into each plugin's cache
-# (https://code.claude.com/docs/en/plugins/host-marketplace#share-files-within-a-marketplace-with-symlinks).
-# It says so once per session and installed version, reading the hook payload's session_id from
-# stdin. Without jq it stays quiet. Always exits 0.
+# Only kc-gates runs this file, for the whole kit: the plugins of one marketplace update and reload
+# together, so kc-gates' loaded version stands for the others (a hook sees only its own
+# CLAUDE_PLUGIN_ROOT, never another plugin's loaded copy). It says so once per session and installed
+# version, reading the hook payload's session_id from stdin. Without jq it stays quiet. Always exits 0.
 #
 # With --print-stale it only prints the installed versions (comma separated) when this session's
 # loaded copy is not among them, and nothing otherwise: guard-lesson-ledger.sh uses it to refuse a

@@ -50,7 +50,7 @@ heroku_reply=$(printf 'Run this:\n\n```bash\nheroku config:set PRICE=15 --app sh
 expect_eq "a claim about the kit with nothing read is noted" noted "$(run_hook "$kit_claim")"
 expect_reason "it says nothing was read" "without reading them first"
 
-{ write_typed_message "will these hold?"; write_tool_call Read file_path "/home/me/kit/plugins/kc-conventions/rules/kc-working-agreement.md"; write_tool_result; } > "$transcript"
+{ write_typed_message "will these hold?"; write_tool_call Read file_path "/home/me/kit/plugins/kc-conventions/rules/kc-always.md"; write_tool_result; } > "$transcript"
 expect_eq "a claim about the kit after reading a rule file goes out" out "$(run_hook "$kit_claim")"
 
 { write_typed_message "will these hold?"; write_tool_call Bash command "git grep -n lesson origin/main -- CLAUDE.md"; write_tool_result; } > "$transcript"

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Lists every piece of feedback a session received, and checks the look-back's ledger of them, so
-# the look-back (the working agreement's "Order of work on a task", step 6) starts from a list
+# the look-back (kc-do-a-task step 6) starts from a list
 # instead of from what the agent remembers. A look-back written from memory keeps the corrections
 # that were memorable and drops the rest, the same miss as a review that never lists its units.
 #

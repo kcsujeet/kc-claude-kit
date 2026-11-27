@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Checks kc-delegation's delegation tree: each role keeps its model tier (deciding roles on the
+# Checks kc-delegate's delegation tree: each role keeps its model tier (deciding roles on the
 # strongest, executing roles on a mid model), sessions keep their effort, and the README's graph
 # of the tree agrees.
 set -euo pipefail
@@ -7,7 +7,7 @@ set -euo pipefail
 tests_dir=$(cd "$(dirname "$0")" && pwd)
 plugin_dir=$(dirname "$tests_dir")
 repo_root=$(dirname "$(dirname "$plugin_dir")")
-skill="$plugin_dir/skills/kc-delegation/SKILL.md"
+skill="$plugin_dir/skills/kc-delegate/SKILL.md"
 readme="$repo_root/README.md"
 
 failures=0
@@ -21,9 +21,9 @@ expect_tier() {
   local role=$1 tier=$2 other model
   other=$([ "$tier" = strongest ] && echo mid || echo strongest)
   model=$(model_of "$role")
-  if [ -z "$model" ]; then fail "kc-delegation tree: no row for \"$role\""; return; fi
-  case "$model" in *"$tier"*) ;; *) fail "kc-delegation tree: \"$role\" is not on the $tier model ($model)" ;; esac
-  case "$model" in *"$other"*) fail "kc-delegation tree: \"$role\" also names the $other model ($model)" ;; esac
+  if [ -z "$model" ]; then fail "kc-delegate tree: no row for \"$role\""; return; fi
+  case "$model" in *"$tier"*) ;; *) fail "kc-delegate tree: \"$role\" is not on the $tier model ($model)" ;; esac
+  case "$model" in *"$other"*) fail "kc-delegate tree: \"$role\" also names the $other model ($model)" ;; esac
 }
 
 expect_tier "Orchestrating (main) session" strongest
@@ -37,10 +37,10 @@ effort_of() { awk -F'|' -v role="$1" 'index($2, " " role) == 1 { gsub(/ /, "", $
 for role_effort in "Orchestrating (main) session=high" "Child session that decides=medium" "Mechanical session=medium"; do
   role=${role_effort%=*}
   effort=$(effort_of "$role")
-  [ "$effort" = "${role_effort#*=}" ] || fail "kc-delegation tree: \"$role\" effort is \"$effort\", not ${role_effort#*=}"
+  [ "$effort" = "${role_effort#*=}" ] || fail "kc-delegate tree: \"$role\" effort is \"$effort\", not ${role_effort#*=}"
 done
 
-grep -q 'Whatever decides .* runs on the strongest model' "$skill" || fail "kc-delegation: the decide-on-strongest rule is missing"
+grep -q 'Whatever decides .* runs on the strongest model' "$skill" || fail "kc-delegate: the decide-on-strongest rule is missing"
 
 # The README graph: deciding nodes in the decide class, executing nodes in the execute class.
 for node in M T U; do
@@ -49,7 +49,7 @@ done
 for node in X H G; do
   grep -qE "^ *class [A-Z,]*${node}[A-Z,]* execute$" "$readme" || fail "README graph: node $node is not styled as executing"
 done
-grep -q 'skills/kc-delegation/SKILL.md' "$readme" || fail "README graph: no link to kc-delegation"
+grep -q 'skills/kc-delegate/SKILL.md' "$readme" || fail "README graph: no link to kc-delegate"
 
 [ "$failures" -eq 0 ] && echo "ok   delegation tree"
 exit "$failures"

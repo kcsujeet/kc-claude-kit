@@ -1,19 +1,5 @@
 {
   "modules": [
     "./register.tsx"
-  ],
-  "hooks": {
-    "UserPromptSubmit": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "\"${CLAUDE_PLUGIN_ROOT}/scripts/check-loaded-version.sh\"",
-            "shell": "bash",
-            "timeout": 10
-          }
-        ]
-      }
-    ]
-  }
+  ]
 }

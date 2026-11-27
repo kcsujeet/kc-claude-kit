@@ -100,19 +100,19 @@ printf 'Use the repo template in `docs/pull_request_template.md`.\n' >> "$work_d
 check "lint: a docs path in plugin text names the installing repo's file and is not flagged" lint-rules.sh "$work_dir/plugin-docs-path" clean
 
 new_agreement() {
-  mkdir -p "$1/plugins/kc-conventions/rules"
-  printf '## Order of work on a task\n\n1. **Assess.** x\n2. **Build.** y\n3. **Look back.** z\n\n## Report honestly\n\n4. not a step\n' > "$1/plugins/kc-conventions/rules/kc-working-agreement.md"
+  mkdir -p "$1/plugins/kc-conventions/skills/kc-do-a-task"
+  printf '## Order of work\n\n1. **Assess.** x\n2. **Build.** y\n3. **Look back.** z\n\n## Report honestly\n\n4. not a step\n' > "$1/plugins/kc-conventions/skills/kc-do-a-task/SKILL.md"
 }
 
 new_kit "$work_dir/step-ok"
 new_agreement "$work_dir/step-ok"
-printf 'Passes the working agreement'"'"'s step 3 bar; see Order of work on a task, step 2.\n' > "$work_dir/step-ok/CLAUDE.md"
-check "lint: citations of steps the working agreement has are clean" lint-rules.sh "$work_dir/step-ok" clean
+printf 'Passes kc-do-a-task'"'"'s step 3 bar; see Order of work on a task, step 2.\n' > "$work_dir/step-ok/CLAUDE.md"
+check "lint: citations of steps kc-do-a-task has are clean" lint-rules.sh "$work_dir/step-ok" clean
 
 new_kit "$work_dir/step-stale"
 new_agreement "$work_dir/step-stale"
-printf 'Passes the working agreement'"'"'s step 6 bar.\n' > "$work_dir/step-stale/CLAUDE.md"
-check "lint: a citation of a step the working agreement no longer has is flagged" lint-rules.sh "$work_dir/step-stale" "cites the working agreement's step 6, but its Order of work on a task has 3 steps"
+printf 'Passes kc-do-a-task'"'"'s step 6 bar.\n' > "$work_dir/step-stale/CLAUDE.md"
+check "lint: a citation of a step kc-do-a-task does not have is flagged" lint-rules.sh "$work_dir/step-stale" "cites kc-do-a-task's step 6, but its Order of work has 3 steps"
 
 new_kit "$work_dir/step-stale-heading"
 new_agreement "$work_dir/step-stale-heading"

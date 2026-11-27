@@ -40,5 +40,5 @@ case "$repo" in
 esac
 [ -n "$user" ] || exit 0
 
-echo "You maintain this kit ($repo). Feedback you act on that passes the look-back's bar becomes a kit lesson, unasked: working agreement \"Order of work on a task\" step 6, skill kc-conventions:kc-look-back; the kit's CLAUDE.md says how to write it."
+echo "You maintain this kit ($repo). Feedback you act on that passes the look-back's bar becomes a kit lesson, unasked: kc-do-a-task step 6, skill kc-conventions:kc-look-back; the kit's CLAUDE.md says how to write it."
 exit 0

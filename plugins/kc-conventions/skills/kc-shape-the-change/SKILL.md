@@ -5,7 +5,7 @@ description: Use after kc-assess and before code that stores something new, adds
 
 # Shape the change
 
-Between "assess" and "build" in the working agreement's "Order of work on a task". Code can be right line by line and be the wrong shape; review rounds then fix lines and the shape stays. Write the design and compare it with another one before any code, so the person approves a shape and not a diff.
+Between "assess" and "build" in `kc-conventions:kc-do-a-task`. Code can be right line by line and be the wrong shape; review rounds then fix lines and the shape stays. Write the design and compare it with another one before any code, so the person approves a shape and not a diff.
 
 ## Procedure
 
@@ -65,3 +65,12 @@ The shape file's boxes, in order; `check-shape.sh` grades them and `guard-shape.
 - [ ] §SH6 Rollout: a flag line per change (yes or no, the reason, who decided); a reason that only covers a data or deploy gap fails.
 - [ ] §SH7 Failure modes: each way it breaks and the signal that shows it.
 - [ ] §SH8 Approval: the person's words, quoted.
+
+## Approach checklist
+
+Asked before writing or reviewing any code, with or without a shape file; not boxes of the shape file. (N/A: the change adds no source code)
+
+- [ ] §SH9 Asked whether this is the best and simplest way, assuming a simpler one exists: one mechanism instead of two, an existing tool, doing less.
+- [ ] §SH10 Sketched one other shape and compared it before going line by line: better in a way the person would care about, tell them with its cost; still delivers the ask, take it and say so; changes the ask, the choice is theirs.
+- [ ] §SH11 The first idea, yours included, was doubted: code can be right line by line and the wrong shape. In a review, a materially simpler design is the first finding and the line findings it deletes go under it.
+- [ ] §SH12 Used the access already had: before starting work somewhere new (a folder, permission, sign-in, second tool), checked whether what is permitted does it, reaching files by path.

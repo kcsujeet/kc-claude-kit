@@ -90,6 +90,12 @@ if [ ! -e "$project/.claude/rules/kc-old.md" ]; then record "stale copy is gone"
 if [ -f "$project/.claude/rules/kc-mine.md" ] && [ -f "$project/.claude/rules/team.md" ]; then record "files without the generated header stay" ok; else record "files without the generated header stay" fail "a hand-made file was removed"; fi
 rm -f "$project/.claude/rules/kc-mine.md" "$project/.claude/rules/team.md"
 
+# The retired working agreement has no generated header and is removed by name.
+echo "# Working agreement" > "$project/.claude/rules/kc-working-agreement.md"
+retired_run=$(cd "$project" && bash "$installer")
+expect_eq "rerun: removes the retired working agreement" "removed: kc-working-agreement.md" "$(printf '%s\n' "$retired_run" | grep '^removed: ')"
+if [ ! -e "$project/.claude/rules/kc-working-agreement.md" ]; then record "retired working agreement is gone" ok; else record "retired working agreement is gone" fail "kc-working-agreement.md still present"; fi
+
 custom_dest="$work_dir/custom/rules"
 bash "$installer" --dest "$custom_dest" >/dev/null
 expect_eq "--dest: installs into the given directory" "$plugin_version" "$(cat "$custom_dest/.kc-conventions-version")"

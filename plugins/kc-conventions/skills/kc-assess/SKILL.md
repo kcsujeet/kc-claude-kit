@@ -5,7 +5,7 @@ description: Use at the start of a task, before building a fix: claims check, re
 
 # Assess a task
 
-Step 1 of the working agreement's "Order of work on a task". Do this before any code, then present the cause and the fix with the rules the fix follows.
+Step 1 of `kc-conventions:kc-do-a-task`. Do this before any code, then present the cause and the fix with the rules the fix follows.
 
 ## Procedure
 
@@ -20,7 +20,7 @@ Step 1 of the working agreement's "Order of work on a task". Do this before any 
 9. **List every reader of the broken value or input** (a grep for the field or call): what each does with the bad case and whether the fix covers it, so review confirms the list instead of finding the rest.
 10. **For each reader a person reaches, state the state they are in** when the bad case gets there (which options are picked, what is shown and hidden), read from the conditions that show or hide each part or walked in the app. Check the fix against what they see in that state: a fix that blocks an action or reports an error works only if that error shows in that state.
 11. **When the fix changes how something looks or reads** and people already hold it up against a reference (an official form or template, a standard symbol, the layout a trade uses), open that reference first and show the person a picture of the change on a real case beside it before building it out. A look judged wrong at first sight costs a sketch to learn from, or a finished change.
-12. **Stop for approval** when the fix makes a call that is the person's (see "Ask before assuming") or they asked to see it first. Otherwise state the cause and the fix in a few lines. A change that stores something new, adds a unit or moves behaviour or data gets its shape written and approved first (`kc-conventions:kc-shape-the-change`); then build.
+12. **Stop for approval** when the fix makes a call that is the person's (§AS2 to §AS7) or they asked to see it first. Otherwise state the cause and the fix in a few lines. A change that stores something new, adds a unit or moves behaviour or data gets its shape written and approved first (`kc-conventions:kc-shape-the-change`); then build.
 
 ## Examples
 
@@ -61,3 +61,11 @@ Run the same check again right before marking the pull request ready, with the c
 ## Gate checklist
 
 - [ ] §AS1 Reproduced: <reporter's entry point, environment, data, what was seen>, or Not reproduced: <why>, in every cause-and-fix proposal; a copy of one layer (a template rendered alone, another browser version, a fixture) does not count. (N/A: the task reports no problem)
+- [ ] §AS2 Asked only what is the person's to decide (what they want when there are two readings, a product call, scope past the request, an irreversible action or one that reaches others), in the host's question box or as the first thing in the message, ending the turn before the dependent work; a request buried in the body is a note, not an ask.
+- [ ] §AS3 Any other choice of approach was made: the one with the fewest lines and moving parts that a test or run can prove, said in a line with why, and no options offered that you could rank.
+- [ ] §AS4 Asked before changing a public API shape, a database schema or a shared contract package, and before choosing which kind of gate a change goes behind (paid entitlement, developers-only flag, support-switchable flag) and at what level.
+- [ ] §AS5 No invented product decisions, user-facing copy or acceptance criteria: text written from the person's own words claims no more than they said, and each specific added was checked against their words or cut.
+- [ ] §AS6 Scope not widened: the adjacent problem is noted and offered as its own follow-up, not fixed or folded into the plan; a shared file (config, lockfile, hosts file) was edited with an exact edit of your own entry, never a pattern replace, and its diff read afterwards.
+- [ ] §AS7 An unresolved assumption is said at the top of the summary; narrowing (a check or audit covering part of the set) says which part and why before it runs, and the result is reported as about that part.
+- [ ] §AS8 The convention skills for each topic the change touches were read and the plan checked against them before code was written; review is the second check, not the first.
+- [ ] §AS9 After a command that installs or updates plugins, the person was asked for `/reload-plugins` before the next step; where the host reloads itself, the reply's first line says so (kc-gates checks).

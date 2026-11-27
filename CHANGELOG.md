@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+### Changed (working agreement split into skills, quieter hooks)
+
+- `kc-conventions` 2.10.0: `rules/kc-working-agreement.md` is split into the skills that own each part (new `kc-do-a-task` holds the order of work and its boxes §DT1 to §DT10; boxes added to `kc-assess`, `kc-shape-the-change`, `kc-check-claims`, `kc-delegate`, `kc-look-back`) and replaced by the ~150-word `rules/kc-always.md`; `kc-claims` is renamed `kc-check-claims` and `kc-delegation` `kc-delegate`; `install-rules.sh` removes the installed working agreement; the plugin no longer ships its own `check-loaded-version.sh`.
+- `kc-gates` 3.21.0: `guard-lesson-ledger.sh` arms only on a branch named `lesson*` or whose diff adds a new `- [ ] §` box line; `remind-better-line.sh` fires only on `git push`, `gh pr create` and `gh pr ready` (no per-turn marker, `lib/work-call.sh` removed); `check-loaded-version.sh` is the one check for the kit; `kc-post-review` gains §PC10 to §PC12.
+- `kc-autopilot` 0.4.0: drops its own `check-loaded-version.sh` hook; kc-gates checks the loaded version for the kit.
+- `kc-verify` 2.3.0: drops its own `check-loaded-version.sh` hook; kc-gates checks the loaded version for the kit.
+- `kc-instructions` 3.3.0: drops its own `check-loaded-version.sh` hook; kc-gates checks the loaded version for the kit.
+- `kc-usage-band` 2.2.0: drops its own `check-loaded-version.sh` hook; kc-gates checks the loaded version for the kit.
+- `kc-image-preview` 2.2.0: drops its own `check-loaded-version.sh` hook; kc-gates checks the loaded version for the kit.
+
 ### Changed (topic skills are checklists, one pointer rule)
 
 - `kc-conventions` 2.9.0: each topic skill is its `## Review checklist` (ticked when writing and when reviewing) plus `## Sweeps`, with the examples in `references/detail.md`; `rules/kc-<topic>.md` and `build-rules.sh` are gone, replaced by one pointer rule `rules/kc-conventions.md`; `install-rules.sh` removes the stale generated copies; rule bullets with no box got one (§N12, §N13, §PF2 to §PF6, §T15 to §T20, §S22, §RL8); kc-assess §AS1 is the required `Reproduced:` box.

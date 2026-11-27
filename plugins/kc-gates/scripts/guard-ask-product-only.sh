@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # PreToolUse hook (AskUserQuestion): a question to the person is only for what is theirs to decide
 # (a product, scope or irreversible call, or which of two readings they meant). A code-level choice
-# is the agent's: the working agreement says "Any other choice of approach is yours". It denies a
+# is the agent's: kc-assess §AS3 says any other choice of approach is yours. It denies a
 # question that
 #   - holds code or review words (the regex below: backtick, path, file name, section id, kc- name,
 #     a gate's name), since it then does not stand alone for someone who has not read the review; or

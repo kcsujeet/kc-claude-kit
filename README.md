@@ -60,7 +60,7 @@ The rest of the kit supports these three: the rules they check against, and the 
 
 ## Who runs on which model
 
-Strongest model decides; mid model executes work it is handed. Details in [`kc-delegation`](plugins/kc-conventions/skills/kc-delegation/SKILL.md).
+Strongest model decides; mid model executes work it is handed. Details in [`kc-delegate`](plugins/kc-conventions/skills/kc-delegate/SKILL.md).
 
 ```mermaid
 flowchart TD
@@ -120,13 +120,14 @@ Most skills start on their own when the topic comes up. You can also type any of
 | `kc-error-handling` | Errors that are caught, reported and explained. |
 | `kc-performance` | Queries and renders that stay fast, and data sized for whatever receives it. |
 | `kc-dependencies` | Adding a library only when it earns its place. |
-| `kc-delegation` | Handing work to subagents or a workflow without the cost running away. |
+| `kc-do-a-task` | The order of work on a task (assess, shape, build, commit, review and QA once, PR, look-back) and the skill that holds each step. |
+| `kc-delegate` | Handing work to subagents or a workflow without the cost running away. |
 | `kc-assess` | Assessing a task before building: claims check, reproduce first, every reader of the broken value. |
 | `kc-shape-the-change` | Writing the design down before code that stores something new, adds a unit or moves behaviour: where each fact lives, two shapes compared, rollout and who decided it, failure modes, approval. A hook blocks source edits until the file passes. |
 | `kc-investigate` | Investigating a production problem from the records that already exist, hop by hop, before building a probe or a fix. |
 | `kc-look-back` | The look-back at hand-off: list the feedback, a verdict each, lessons as one batch, where a lesson belongs. |
 | `kc-raise-the-bar` | Working is the floor: measure what was done, look for a better way that deletes before it adds, apply it or record what was tried. |
-| `kc-claims` | Checking a claim against its source before stating it. |
+| `kc-check-claims` | Checking a claim against its source before stating it. |
 | `kc-init` | Copies the rules into a project, to commit them there. The home copy installs itself. |
 
 **`kc-instructions`**
@@ -157,7 +158,7 @@ Add the marketplace, then install what you want. To get the everyday workflow, t
 /plugin install kc-image-preview@kc-claude-kit
 ```
 
-`kc-gates` brings `kc-conventions` with it, and its hook copies the pointer rule (which names the skill to load for each kind of work) and the working agreement into `~/.claude/rules/` on your first prompt (and refreshes that copy after an update), so they load in every project; set `KC_CONVENTIONS_AUTO_INSTALL=0` to opt out. To also commit a copy into one project, run this there:
+`kc-gates` brings `kc-conventions` with it, and its hook copies the pointer rule (which names the skill to load for each kind of work) and the always-on rule (reply habits and pointers to the process skills) into `~/.claude/rules/` on your first prompt (and refreshes that copy after an update), so they load in every project; set `KC_CONVENTIONS_AUTO_INSTALL=0` to opt out. To also commit a copy into one project, run this there:
 
 ```
 /kc-conventions:kc-init
