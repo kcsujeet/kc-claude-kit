@@ -43,6 +43,7 @@ expect_quiet "git log" Bash command "git log --oneline"
 expect_quiet "gh pr view" Bash command "gh pr view 12"
 expect_quiet "gh pr checks" Bash command "gh pr checks 12 --watch"
 expect_quiet "an echo that names a push" Bash command "echo git push is next"
+# shellcheck disable=SC2016 # literal REPL code, not meant to expand
 expect_quiet "a REPL call" REPL code 'await $`ls`.text()'
 
 # The output is additionalContext for PostToolUse, short, and keeps it out of the reply.
