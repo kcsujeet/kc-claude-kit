@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # PreToolUse guard for Bash: a pull request merges only when every problem its review found is
 # solved. On `gh pr merge`, for a pull request the signed-in user authored, it blocks unless the
-# head commit has a clean kc-ready-for-review receipt (ready-receipt.sh check <sha> --clean): the
+# head commit has a clean kc-ready-for-human-review receipt (ready-receipt.sh check <sha> --clean): the
 # last gate round found nothing, nothing was left open, and the head is that round's head.
 # Someone else's pull request is theirs to merge by their own rules, so it is not checked.
 #
@@ -106,7 +106,7 @@ check_segment() {
   fi
   # In the pull request's repo: a merge of the default branch into a clean head counts as clean.
   (cd "$dir" && bash "$scripts_dir/ready-receipt.sh" check "$head" --clean >/dev/null 2>&1) && return 0
-  print_pretooluse_deny "Blocked by the kc-gates plugin: this pull request's head (${head:0:$SHORT_SHA_LENGTH}) has no clean review receipt: a pull request merges only when its last gate round found nothing and nothing is left open. Fix what is open and review the fixes as the next round (kc-ready-for-review), or, when the rounds are used up, ask the user about the approach. Ask the user: only their typed words approve a merge with problems left. When a message they typed on this branch says \"approve merge\", prefix the command with KC_MERGE_APPROVED=1; the token without those words stays blocked.$(needed_phrases_sentence "$dir" "$APPROVAL_PHRASE")"
+  print_pretooluse_deny "Blocked by the kc-gates plugin: this pull request's head (${head:0:$SHORT_SHA_LENGTH}) has no clean review receipt: a pull request merges only when its last gate round found nothing and nothing is left open. Fix what is open and review the fixes as the next round (kc-self-correct on the delta, then kc-ready-for-human-review for the receipt), or, when the rounds are used up, ask the user about the approach. Ask the user: only their typed words approve a merge with problems left. When a message they typed on this branch says \"approve merge\", prefix the command with KC_MERGE_APPROVED=1; the token without those words stays blocked.$(needed_phrases_sentence "$dir" "$APPROVAL_PHRASE")"
   return 1
 }
 

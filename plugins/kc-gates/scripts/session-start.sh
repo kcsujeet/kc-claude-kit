@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # SessionStart hook: what every session should know from kc-gates, printed as context.
 #
-# 1. Everyone: run kc-ready-for-review on the committed branch before its first push and PR.
+# 1. Everyone: kc-self-correct reviews and fixes your own change; kc-ready-for-human-review gates the hand-off.
 # 2. Everyone: lessons are checks first, prose last.
 # 3. The kit's maintainer only: turn feedback worth keeping into kit lessons, shipped as merged
 #    PRs. The maintainer is the GitHub user signed in to gh when that user owns the repo this copy
@@ -12,7 +12,7 @@
 
 set -u
 
-echo 'Before a branch'"'"'s first push and its PR, run /kc-gates:kc-ready-for-review once on the committed branch, without asking: rounds on fixes until one is clean. It also gates marking ready, a reviewer request and a move to review.'
+echo 'Review your own change with /kc-gates:kc-self-correct; /kc-gates:kc-ready-for-human-review gates the first push, PR, ready, reviewer request and review status. Order of work: kc-do-a-task.'
 
 echo "Lessons are checks first: a lint rule, test, script or hook; prose only when no check can hold it (feedback-ledger.sh check enforces it)."
 

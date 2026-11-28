@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 # PreToolUse guard for Bash: the loop-stop rule as a block, armed only inside an agent's review/fix
-# loop. A kc-ready-for-review pass reviews the change in rounds, and each round's fixes are
+# loop. A kc-ready-for-human-review pass reviews the change in rounds, and each round's fixes are
 # reviewed by the next; a fix that rewrites lines an earlier round's fix wrote is where that loop
 # starts going in circles, so such a commit stops until the user says to go on.
 #
 # The guard is armed while a pass is open on the branch: a pass folder
 # (${KC_PASS_ROOT:-${TMPDIR:-/tmp}}/kc-pass-*/round-1/meta.env) whose round-1 head (HEAD_SHA) is HEAD or
-# an ancestor of it, with no kc-ready-for-review receipt on that head or any commit after it (the
+# an ancestor of it, with no kc-ready-for-human-review receipt on that head or any commit after it (the
 # receipt ends the pass). With no open pass it never blocks: a person's edits, a reviewer's
 # requested changes after the hand-off, and lines other work merged are no agent loop.
 #
@@ -86,7 +86,7 @@ list_blamed_old_lines() {
   print_blame_of_file
 }
 
-# True when commit $2 (in directory $1) has a kc-ready-for-review receipt.
+# True when commit $2 (in directory $1) has a kc-ready-for-human-review receipt.
 has_receipt() { bash "$scripts_dir/ready-receipt.sh" check "$2" >/dev/null 2>&1; }
 
 # Prints the round-1 head of the review pass open on the branch in $1, or nothing: the newest pass

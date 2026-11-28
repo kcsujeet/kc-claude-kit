@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Tests scripts/guard-merge.sh: `gh pr merge` of the user's own pull request is denied unless its
-# head has a clean kc-ready-for-review receipt (clean=yes), or the command carries
+# head has a clean kc-ready-for-human-review receipt (clean=yes), or the command carries
 # KC_MERGE_APPROVED=1 and the user typed "approve merge". Someone else's pull request, and a
 # lookup that fails, are not blocked. The stub gh in lib/ answers the lookups; each case runs twice,
 # once with jq and once through the sed fallback.

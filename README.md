@@ -25,7 +25,7 @@ A personal [Claude Code](https://code.claude.com/docs) toolkit that works in any
 
 | Plugin | What it is for | When you would use it |
 |---|---|---|
-| [`kc-gates`](plugins/kc-gates) | Code review: `kc-code-review`, `kc-ready-for-review`, `kc-post-review`, plus the hooks that guard pushes, merges and posts. | Every PR. |
+| [`kc-gates`](plugins/kc-gates) | Code review: `kc-code-review`, `kc-self-correct`, `kc-ready-for-human-review`, `kc-post-review`, plus the hooks that guard pushes, merges and posts. | Every PR. |
 | [`kc-conventions`](plugins/kc-conventions) | The coding rules (one checklist skill per topic) and the process skills (assess, shape, look back). | Always on; installed with `kc-gates`. |
 | [`kc-verify`](plugins/kc-verify) | QA: the change in the running app, whether a person can use it, end to end. | Any change a person sees. |
 | [`kc-instructions`](plugins/kc-instructions) | Audits a repo's Claude setup: what belongs in `CLAUDE.md`, a rule, a skill or a hook. | Once per repo. |
@@ -39,13 +39,14 @@ A personal [Claude Code](https://code.claude.com/docs) toolkit that works in any
 - **A pointer rule loads the skill.** "Doing X, load skill Y" is the only rule text loaded while you work; the skill loads when the work needs it.
 - **Review is one agent per topic.** `kc-code-review` runs the gate agents, scripts count every receipt, and the result is one PASSED or FAILED in chat. Nothing is posted without your say-so.
 - **Hooks hold what must not be skipped.** A guard blocks an unreviewed push, an unapproved post or a merge on a red round; it costs nothing until it fires.
-- **One pass before a human sees the PR.** `kc-ready-for-review` runs `kc-code-review` (which includes the one QA walk), your repo's hand-off checklist and CI's commands once, fixes what it finds and proves each fix with a test.
+- **Your own change is reviewed and fixed by you first.** `kc-self-correct` runs `kc-code-review` (which includes the one QA walk) on your change, committed or not, fixes every finding in rounds and proves each fix with a test. `kc-ready-for-human-review` then answers whether a human reviewer can take it: the review matches the content, the hand-off checklist and CI's commands pass, a receipt is written.
 
 ## Start here
 
 | When | Type or say | What happens |
 |---|---|---|
-| Your PR is about to go to a reviewer | `/kc-gates:kc-ready-for-review` | One review and QA pass on your own PR, fixes with tests, a short list left for you. |
+| You want your own change reviewed and fixed | `/kc-gates:kc-self-correct` | Review and QA of your change, committed or not, fixes with tests until clean, a short list left for you. |
+| Your PR is about to go to a reviewer | `/kc-gates:kc-ready-for-human-review` | Is it ready for a human reviewer: the review matches the content, the hand-off graded, the receipt written. |
 | You review a PR (or want yours checked) | "review this PR" | `kc-code-review` reports PASSED or FAILED, one line per finding. |
 | You want findings as PR comments | `/kc-gates:kc-post-review` | Drafts short comments, shows them, posts only after you say so. |
 
@@ -76,7 +77,7 @@ flowchart TD
 
 - Most start on their own when the topic comes up; you can type any as `/plugin:skill`.
 
-- **[`kc-gates`](plugins/kc-gates):** [`kc-code-review`](plugins/kc-gates/skills/kc-code-review/SKILL.md) (review a PR, branch or changes, walking every changed behaviour: the one QA, own PRs and others'), [`kc-ready-for-review`](plugins/kc-gates/skills/kc-ready-for-review/SKILL.md) (the one review and QA pass on your own PR), [`kc-post-review`](plugins/kc-gates/skills/kc-post-review/SKILL.md) (draft PR comments and replies, post on your signal).
+- **[`kc-gates`](plugins/kc-gates):** [`kc-code-review`](plugins/kc-gates/skills/kc-code-review/SKILL.md) (review a PR, branch or changes, walking every changed behaviour: the one QA, own PRs and others'), [`kc-ready-for-human-review`](plugins/kc-gates/skills/kc-ready-for-human-review/SKILL.md) (is this change ready for a human reviewer: receipt and hand-off), [`kc-self-correct`](plugins/kc-gates/skills/kc-self-correct/SKILL.md) (review and QA your own change and fix every finding until clean), [`kc-post-review`](plugins/kc-gates/skills/kc-post-review/SKILL.md) (draft PR comments and replies, post on your signal).
 
 - **[`kc-verify`](plugins/kc-verify):** [`kc-ui`](plugins/kc-verify/skills/kc-ui/SKILL.md) (the change rendered, every state), [`kc-ux`](plugins/kc-verify/skills/kc-ux/SKILL.md) (a person can use it), [`kc-e2e`](plugins/kc-verify/skills/kc-e2e/SKILL.md) (every layer, front to back).
 

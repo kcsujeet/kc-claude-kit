@@ -6,7 +6,7 @@ public: true
 
 # Hand-off checklist
 
-Read by `kc-gates:kc-ready-for-review` before a pull request here is opened or merged. This repo is public and its rules apply to any codebase, so most kit PRs carry a lesson learned on some other project: these boxes check the lesson left that project behind. The rules behind them are in `CLAUDE.md`.
+Read by `kc-gates:kc-ready-for-human-review` before a pull request here is opened or merged. This repo is public and its rules apply to any codebase, so most kit PRs carry a lesson learned on some other project: these boxes check the lesson left that project behind. The rules behind them are in `CLAUDE.md`.
 
 ## The lesson is general
 

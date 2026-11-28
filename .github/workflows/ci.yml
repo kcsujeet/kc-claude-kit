@@ -71,7 +71,7 @@ jobs:
       # (--budget-rules, --budget-descriptions, --max-description, --budget-hooks, --budget-tool-hooks,
       # --max-skill-body, --max-agent-body).
       - name: Always-on size report
-        run: bash scripts/check-always-on.sh --budget-rules 960 --budget-descriptions 11520 --max-description 320 --budget-hooks 1000 --budget-tool-hooks 0 --max-skill-body 25000 --max-agent-body 8000
+        run: bash scripts/check-always-on.sh --budget-rules 960 --budget-descriptions 11660 --max-description 320 --budget-hooks 1000 --budget-tool-hooks 0 --max-skill-body 25000 --max-agent-body 8000
 
   scripts:
     name: Shell scripts and their tests
@@ -106,6 +106,14 @@ jobs:
 
       - name: Box length check tests
         run: bash scripts/tests/check-box-length.test.sh
+
+      # The order of work (when review, commit, push and hand-off happen) is stated only in
+      # kc-do-a-task; the old name of kc-ready-for-human-review stays only in the CHANGELOG.
+      - name: Order of work is stated once
+        run: bash scripts/check-single-order.sh
+
+      - name: Single-order check tests
+        run: bash scripts/tests/check-single-order.test.sh
 
       - name: Paragraph check tests
         run: bash scripts/tests/check-no-paragraphs.test.sh

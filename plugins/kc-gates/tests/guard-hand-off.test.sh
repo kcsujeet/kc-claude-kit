@@ -330,4 +330,32 @@ printf '%b' '- [PASS] The shop total is documented in the README for readers.\n'
 check allow "allowed: a small code branch with every checklist box PASS, no pass receipt" \
   "git push -u origin small-tool" "$small_checklist_repo"
 
+# Content, not a commit (kc-self-correct's tree-keyed record): the block names what is missing, and a
+# receipt kept for a tree answers for another commit of the same content.
+export KC_SELF_CORRECT_DIR="$work_dir/self-correct"
+tree_repo="$work_dir/tree-repo"
+make_repo "$tree_repo" first
+git -C "$tree_repo" checkout -q -b feature-tree
+tree_head=$(git -C "$tree_repo" rev-parse HEAD)
+tree_hash=$(git -C "$tree_repo" rev-parse 'HEAD^{tree}')
+tree_block() { build_payload 'gh pr create --fill' "$tree_repo" | bash "$scripts/guard-hand-off.sh" 2>/dev/null; }
+expect_contains "no record for the content: the block says to run kc-self-correct" "/kc-gates:kc-self-correct" "$(tree_block)"
+expect_contains "and names the tree" "$tree_hash" "$(tree_block)"
+mkdir -p "$KC_SELF_CORRECT_DIR"
+printf 'tree=%s\nrounds=1\nopen=0\nclean=yes\n' "$tree_hash" > "$KC_SELF_CORRECT_DIR/$tree_hash"
+expect_contains "a record but no receipt: the block says to run kc-ready-for-human-review" "/kc-gates:kc-ready-for-human-review: it confirms the self-correct record matches" "$(tree_block)"
+expect_not_contains "and no longer asks for kc-self-correct" "run /kc-gates:kc-self-correct" "$(tree_block)"
+printf 'sha=%s\nrounds=1\nopen=0\nclean=yes\ntree=%s\n' "$(printf 'f%.0s' {1..40})" "$tree_hash" > "$KC_READY_DIR/tree-$tree_hash"
+check allow "allowed: a commit with no receipt of its own whose content has one (an amend, a rebase)" \
+  "gh pr create --fill" "$tree_repo"
+git -C "$tree_repo" -c user.name=t -c user.email=t@example.test commit -q --allow-empty --amend -m "first, reworded"
+expect_eq "the amend is another commit" different "$([ "$(git -C "$tree_repo" rev-parse HEAD)" != "$tree_head" ] && echo different || echo same)"
+check allow "allowed: the amended commit, same tree" \
+  "gh pr create --fill" "$tree_repo"
+printf 'changed\n' > "$tree_repo/new.txt"
+git -C "$tree_repo" add new.txt
+git -C "$tree_repo" -c user.name=t -c user.email=t@example.test commit -q -m "changed content"
+check deny  "blocked: changed content has neither a receipt nor a kept one" \
+  "gh pr create --fill" "$tree_repo"
+
 finish

@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Keeps the count kc-ready-for-review aims to hold at zero: how many of a
+# Keeps the count kc-ready-for-human-review aims to hold at zero: how many of a
 # reviewer's comments a rule already covered, so a slipping pass shows up as a
 # number instead of a feeling. One line per PR in
-# ${KC_READY_DIR:-$HOME/.claude/kc-ready-for-review}/tally.tsv.
+# ${KC_READY_DIR:-$HOME/.claude/kc-ready-for-human-review}/tally.tsv.
 #
 #   review-tally.sh add <pr-url> <covered> <new> <disagreement>
 #       After sorting a reviewer's round (the skill's "After the reviewer
@@ -16,7 +16,7 @@
 #       is the plainest miss review can have; the look-back sorts each like a reviewer comment.
 set -euo pipefail
 
-tally_file=${KC_READY_DIR:-$HOME/.claude/kc-ready-for-review}/tally.tsv
+tally_file=${KC_READY_DIR:-$HOME/.claude/kc-ready-for-human-review}/tally.tsv
 
 usage() {
   sed -n '7,16s/^# \{0,1\}//p' "$0" >&2

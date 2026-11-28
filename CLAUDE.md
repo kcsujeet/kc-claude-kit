@@ -70,7 +70,7 @@ This repo is public. Anyone can install and read these plugins.
 
 ## Before a PR
 
-- [ ] Run `/kc-gates:kc-ready-for-review`. It walks `.claude/hand-off-checklist.md`, which checks the rules above and the version bump.
+- [ ] Run `/kc-gates:kc-self-correct` on the change, then `/kc-gates:kc-ready-for-human-review`. It walks `.claude/hand-off-checklist.md`, which checks the rules above and the version bump.
 
 ## Developing
 

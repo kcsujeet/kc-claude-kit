@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# kc-ready-for-review's first step: sizes the pass from the diff, by script, never by judgment.
+# kc-ready-for-human-review's first step: sizes the pass from the diff, by script, never by judgment.
 # A small, low-risk change gets round 1 only; anything else gets the full pass. Also says
 # whether the mutation sweep has anything to break.
 #

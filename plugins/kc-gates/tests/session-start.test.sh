@@ -33,7 +33,7 @@ expect_contains "the lessons line points to step 6 and the look-back skill" \
 expect_eq "cached copy, another user: reminder and checks-first line" 2 "$(lines_for "$cached" routes-other.tsv)"
 expect_contains "every session is told lessons are checks first" "Lessons are checks first: a lint rule, test, script or hook; prose only when no check can hold it (feedback-ledger.sh check enforces it)" \
   "$(KC_GH_ROUTES="$fixtures/routes-other.tsv" CLAUDE_CONFIG_DIR="$config" CLAUDE_PLUGIN_ROOT="$cached" bash "$script")"
-expect_contains "the reminder names the pass, on the committed branch, run without asking" "kc-ready-for-review once on the committed branch, without asking" \
+expect_contains "the reminder names self-correct and the hand-off gate" "/kc-gates:kc-self-correct; /kc-gates:kc-ready-for-human-review gates the first push" \
   "$(KC_GH_ROUTES="$fixtures/routes-other.tsv" CLAUDE_CONFIG_DIR="$config" CLAUDE_PLUGIN_ROOT="$cached" bash "$script")"
 
 printf '{"shop-kit":{"source":{"source":"github","repo":"shop-owner/kit"}}}' \
