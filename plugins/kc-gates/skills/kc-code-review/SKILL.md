@@ -23,7 +23,7 @@ Orchestrate one gate agent per convention topic over a diff and report one PASSE
 
 ## Step 2: select and dispatch the gates
 
-1. Select by script, never by judgment: `bash "${CLAUDE_PLUGIN_ROOT}/scripts/select-gates.sh" "$DIFF_FILE" "$CHANGED_FILES"`. It prints `GATES=`, a reason per gate, and `WALK=`. On a later round of `kc-ready-for-review` add `--later-round`.
+1. Select by script, never by judgment: `bash "${CLAUDE_PLUGIN_ROOT}/scripts/select-gates.sh" "$DIFF_FILE" "$CHANGED_FILES"`. It prints `GATES=`, a reason per gate, and `WALK=`. On a later round of `kc-self-correct` add `--later-round`.
 2. When `WALK=required`, this review is also the QA: walk each `walk-item` on its surface with `kc-verify:kc-ui`, `kc-verify:kc-ux` and the project's QA rules, every state, every audience, and save `walk-receipt.tsv`. Keep one "after" screenshot per flow (§G8). `bash "${CLAUDE_PLUGIN_ROOT}/scripts/check-walk-receipt.sh" <select-gates output> <walk-receipt.tsv>` must pass before any verdict.
 3. Phase 1: one Agent call per listed gate, all in one message. Give each `HEAD_SHA`, `DIFF_FILE`, `CHANGED_FILES` and the repo root; add `uses.txt` for correctness.
 

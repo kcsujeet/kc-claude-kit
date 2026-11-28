@@ -303,4 +303,52 @@ use_gh_fixtures "$merge_fixtures"
 no_merge_output=$(cd "$repo" && bash "$gather" 12 --since "$base_sha" --out-dir "$work_dir/out-no-merge")
 expect_not_contains "merge: a delta with no merge has no MERGES_EXCLUDED" "MERGES_EXCLUDED" "$no_merge_output"
 
+# --- working-tree mode: your own change before it is committed ---------------
+# The diff is the working tree (edits, deletions, untracked files) against where the branch left the
+# base; meta.env names the content read (TREE) so a record can be keyed on it.
+repo="$work_dir/repo-worktree"
+make_repo "$repo" main
+printf 'one\ntwo\nthree\n' > "$repo/a.txt"
+printf 'untracked\n' > "$repo/c.txt"
+git -C "$repo" rm -q --cached b.txt
+rm "$repo/b.txt"
+worktree_out="$work_dir/out-worktree"
+worktree_output=$(cd "$repo" && bash "$gather" --worktree main --out-dir "$worktree_out")
+worktree_tree=$(cd "$repo" && bash "$(dirname "$gather")/tree-hash.sh")
+expect_contains "worktree: meta.env names the mode" "MODE=worktree" "$worktree_output"
+expect_contains "worktree: meta.env names the content read" "TREE=$worktree_tree" "$worktree_output"
+expect_eq "worktree: changed files hold the edit and the untracked file; a file the branch added and the tree deleted nets to nothing" "a.txt
+c.txt" "$(sort "$worktree_out/changed-files.txt")"
+expect_contains "worktree: the diff holds the uncommitted edit" "+three" "$(cat "$worktree_out/review.diff")"
+expect_contains "worktree: the diff holds the untracked file" "+untracked" "$(cat "$worktree_out/review.diff")"
+expect_contains "worktree: the diff holds the work committed on the branch too" "+two" "$(cat "$worktree_out/review.diff")"
+expect_not_contains "worktree: the deleted file is not in it" "b.txt" "$(cat "$worktree_out/review.diff")"
+expect_eq "worktree: nothing was staged" "b.txt" "$(git -C "$repo" diff --cached --name-only)"
+expect_eq "worktree: the untracked file is still untracked" "c.txt" "$(git -C "$repo" ls-files --others --exclude-standard)"
+
+# A later round: only what changed since the tree the round before read.
+printf 'four\n' >> "$repo/a.txt"
+since_out="$work_dir/out-worktree-since"
+since_output=$(cd "$repo" && bash "$gather" --worktree main --since-tree "$worktree_tree" --out-dir "$since_out")
+expect_contains "worktree: a later round names the tree it starts from" "SINCE_TREE=$worktree_tree" "$since_output"
+expect_eq "worktree: a later round lists only what the fixes changed" "a.txt" "$(cat "$since_out/changed-files.txt")"
+expect_contains "worktree: and its diff holds the fix" "+four" "$(cat "$since_out/review.diff")"
+expect_not_contains "worktree: and not the first round's content" "+untracked" "$(cat "$since_out/review.diff")"
+
+# On a clean tree it is the branch's diff, and the tree is the commit's.
+clean_repo="$work_dir/repo-worktree-clean"
+make_repo "$clean_repo" main
+clean_out="$work_dir/out-worktree-clean"
+(cd "$clean_repo" && bash "$gather" --worktree main --out-dir "$clean_out" > /dev/null)
+(cd "$clean_repo" && bash "$gather" --branch main --out-dir "$work_dir/out-branch-clean" > /dev/null)
+expect_file "worktree: a clean tree gives the branch's diff" "$work_dir/out-branch-clean/review.diff" "$clean_out/review.diff"
+expect_contains "worktree: a clean tree's TREE is the commit's tree" "TREE=$(git -C "$clean_repo" rev-parse 'HEAD^{tree}')" "$(cat "$clean_out/meta.env")"
+expect_not_contains "branch mode writes no TREE" "TREE=" "$(cat "$work_dir/out-branch-clean/meta.env")"
+
+# Usage errors.
+since_status=ok; (cd "$repo" && bash "$gather" --branch main --since-tree "$worktree_tree" --out-dir "$work_dir/out-bad" > /dev/null 2>&1) && since_status=fail
+record "worktree: --since-tree without --worktree is a usage error" "$since_status"
+unknown_since_status=ok; (cd "$repo" && bash "$gather" --worktree main --since-tree "$(printf 'e%.0s' {1..40})" --out-dir "$work_dir/out-bad2" > /dev/null 2>&1) && unknown_since_status=fail
+record "worktree: an unknown --since-tree is refused" "$unknown_since_status"
+
 finish

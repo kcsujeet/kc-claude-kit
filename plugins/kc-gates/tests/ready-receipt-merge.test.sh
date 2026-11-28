@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Tests the merge handling of scripts/ready-receipt.sh and guard-merge.sh (kc-ready-for-review §H5):
+# Tests the merge handling of scripts/ready-receipt.sh and guard-merge.sh (kc-ready-for-human-review §H5):
 # a head that merges the default branch into a commit with a clean receipt is clean with no new pass
 # when the merge is what git makes of the two parents on its own (a conflict in a plugin manifest's
 # version and in CHANGELOG entries resolved by renumbering is allowed), and not clean when the

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Tests scripts/guard-loop-stop.sh: armed only while a kc-ready-for-review pass is open on the
+# Tests scripts/guard-loop-stop.sh: armed only while a kc-ready-for-human-review pass is open on the
 # branch, it denies a `git commit` that rewrites lines an earlier fix round of that pass wrote,
 # unless the command carries KC_REWORK_APPROVED=1 and the user typed "approve rework". Outside a
 # pass, after its receipt, or for lines the pass did not write, it never blocks. Real repos in a temp

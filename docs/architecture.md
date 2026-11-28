@@ -34,10 +34,11 @@ kc-claude-kit/
     │   ├── skills/
     │   │   ├── kc-code-review/             # orchestrator as numbered steps and a checklist; references/ hold the long wording
     │   │   ├── kc-post-review/             # drafting and posting comments, posted only on the user's signal
-    │   │   └── kc-ready-for-review/        # the one pass before a PR goes to a reviewer
+    │   │   ├── kc-self-correct/            # review and QA of your own change, fixed in rounds until clean; its record is keyed on the content's tree hash
+    │   │   └── kc-ready-for-human-review/  # is this change ready for a human reviewer: record match, hand-off grade, receipt
     │   ├── agents/<topic>-gate.md          # one gate agent per topic (generated from ../gate-agent.template.md by scripts/build-gate-agents.sh), plus project-conventions-gate.md and verification-gate.md (the judgment half; scripts count the rest)
     │   ├── hooks/hooks.json                # session-start hand-off reminder; plugin updates and the loaded-version check; guards for GitHub posts, hand-offs, merges, loop stops and unchecked claims; look-back reminders; per-turn reply rules naming the last reply's misses
-    │   ├── scripts/guard-github-post.sh, guard-hand-off.sh, guard-loop-stop.sh, guard-prose-rule.sh, guard-batched-wait.sh, guard-merge.sh, remind-look-back.sh, remind-look-back-prompt.sh, remind-after-replies.sh, check-reply-sources.sh, check-reply-length.sh, remind-reply-rules.sh, update-after-merge.sh, lib/hook-input.sh, lib/reply-misses.sh, lib/typed-message.jq
+    │   ├── scripts/tree-hash.sh, self-correct-record.sh, gather-review.sh (--worktree), guard-github-post.sh, guard-hand-off.sh, guard-loop-stop.sh, guard-prose-rule.sh, guard-batched-wait.sh, guard-merge.sh, remind-look-back.sh, remind-look-back-prompt.sh, remind-after-replies.sh, check-reply-sources.sh, check-reply-length.sh, remind-reply-rules.sh, update-after-merge.sh, lib/hook-input.sh, lib/reply-misses.sh, lib/typed-message.jq
     │   ├── scripts/change-class.sh, approvals-needed.sh  # a small change's lighter path through the guards; every typed phrase ahead in one block
     │   ├── scripts/guard-ask-product-only.sh  # denies a question to the person that holds code or review words or does not say its product, scope, irreversible or intent kind
     │   ├── scripts/remind-better-line.sh  # PostToolUse: on git push, gh pr create or gh pr ready, a line to measure and look for a better way
@@ -107,7 +108,7 @@ kc-claude-kit/
 
 1. `## Review checklist`: the `- [ ] §<id> ... (N/A: ...)` boxes, ticked when writing and by a gate agent when reviewing, then one line pointing to `references/detail.md` (examples and edge cases per box, read when a box is unclear). When that file nears 500 lines, a cluster moves to `references/<cluster>.md`, linked by its `${CLAUDE_PLUGIN_ROOT}` path; gates read it from there. Topics with no checklist (dependencies, error-handling, type-safety) keep their `## Rules` as the body.
 
-- A process or review skill (`kc-assess`, `kc-look-back`, `kc-code-review`, `kc-ready-for-review`, `kc-ui`, and the like) is numbered steps, each one action or script call, ending in a checklist of boxes to tick. Its long wording and examples live in `references/detail.md` under `### Step N` or `### §<id>`, read when a step is unclear; target at most 2,000 words in the `SKILL.md`.
+- A process or review skill (`kc-assess`, `kc-look-back`, `kc-code-review`, `kc-self-correct`, `kc-ready-for-human-review`, `kc-ui`, and the like) is numbered steps, each one action or script call, ending in a checklist of boxes to tick. Its long wording and examples live in `references/detail.md` under `### Step N` or `### §<id>`, read when a step is unclear; target at most 2,000 words in the `SKILL.md`.
 2. `## Sweeps`: the bundled scripts, each run as `bash "${CLAUDE_PLUGIN_ROOT}/skills/kc-<topic>/scripts/<name>.sh" <diff-file>`, printing one `file:line: text` hit per line and nothing else. A lookup, which takes a name or a key instead of a diff (`kc-naming/scripts/name-collisions.sh`, `kc-i18n/scripts/locale-duplicates.sh`), is listed there too and says so.
 
 - Posting approval token: a GitHub write passes the kc-gates guard only when the same Bash command contains `KC_REVIEW_POST_APPROVED=1`, typed after the user's explicit post signal.

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # PreToolUse guard for Bash: blocks publishing a branch, or handing a PR to
-# review, before kc-ready-for-review has passed its head commit. The pass runs
-# on the committed local branch, before its first push and before the PR exists.
+# review, until the head commit has a kc-ready-for-human-review receipt (which in turn needs a
+# kc-self-correct record for the same content, its git tree).
 #
 # Blocked until the commit has a receipt:
 #   - the first push of a branch: a `git push` whose target branch is not on
@@ -20,7 +20,7 @@
 # winning, so `--draft=false` is not a draft. The guard finds the commit
 # (gh pr view for an existing PR; for a new one the --head branch on GitHub,
 # or HEAD of the directory the command runs in, following any `cd` before it)
-# and passes only when ready-receipt.sh has a pass or --after receipt for it
+# and passes only when ready-receipt.sh has a pass or --after receipt for it or its content
 # (one for the checklist alone doesn't count). A command containing the
 # literal KC_READY_SKIP=1 passes: the skill adds it only when the user has
 # said to skip the pass for that PR.
@@ -53,7 +53,7 @@
 
 set -u
 
-scripts_dir=$(dirname "$0")
+scripts_dir=$(cd "$(dirname "$0")" && pwd)
 # shellcheck source=lib/hook-input.sh
 . "$scripts_dir/lib/hook-input.sh"
 
@@ -161,8 +161,21 @@ print_deny_reason() {
   printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Blocked by the kc-gates plugin: %s%s"}}\n' "$1" "$skip_hint"
 }
 
+# What to run next, by what is missing for the content of commit $1 (read in directory $2): the
+# kc-self-correct record keyed on its tree, or only the receipt.
+describe_next_step() {
+  local tree=""
+  if [ -n "${1:-}" ]; then tree=$(git -C "${2:-.}" rev-parse -q --verify "$1^{tree}" 2>/dev/null) || tree=""; fi
+  if [ -n "$tree" ] && ! bash "$scripts_dir/self-correct-record.sh" check "$tree" > /dev/null 2>&1; then
+    printf 'Its content (tree %s) has no kc-self-correct record: run /kc-gates:kc-self-correct on it (on what changed, when it changed since a record), then /kc-gates:kc-ready-for-human-review, which writes a receipt for the content the PR will show.' "$tree"
+  else
+    printf 'Run /kc-gates:kc-ready-for-human-review: it confirms the self-correct record matches this content and ends in a receipt for the commit the PR will show.'
+  fi
+}
+
+# $1 is the reason, $2 the head commit and $3 the directory it is read in, when known.
 print_deny() {
-  print_deny_reason "$1 Run /kc-gates:kc-ready-for-review on the committed branch before its first push: one pass of review and QA, ending in a receipt for the commit the PR will show."
+  print_deny_reason "$1 $(describe_next_step "${2:-}" "${3:-}")"
 }
 
 # Denies when the commit's hand-off checklist has unmet boxes (see the header).
@@ -281,8 +294,8 @@ check_push() {
         ;;
     esac
     change_class=$(read_change_class "$dir" --head "$sha")
-    if ! is_small_class "$change_class" && ! bash "$scripts_dir/ready-receipt.sh" check "$sha" --pass >/dev/null 2>&1; then
-      print_deny_reason "this is the first push of branch '$dst', and its commit $sha has no kc-ready-for-review receipt. Run /kc-gates:kc-ready-for-review on the committed branch before its first push (and before the PR): one pass of review and QA, ending in a receipt for that commit."
+    if ! is_small_class "$change_class" && ! (cd "$dir" 2>/dev/null && bash "$scripts_dir/ready-receipt.sh" check "$sha" --pass) >/dev/null 2>&1; then
+      print_deny_reason "this is the first push of branch '$dst', and its commit $sha has no kc-ready-for-human-review receipt. $(describe_next_step "$sha" "$dir")"
       return 1
     fi
     check_checklist "$sha" "$dir" || return 1
@@ -337,8 +350,8 @@ main() {
       exit 0
     fi
     change_class=$(read_change_class "$dir" --head "$head")
-    if ! is_small_class "$change_class" && ! bash "$scripts_dir/ready-receipt.sh" check "$head" --pass >/dev/null 2>&1; then
-      print_deny "this command opens or hands over a PR, and its head commit $head has no kc-ready-for-review receipt."
+    if ! is_small_class "$change_class" && ! (cd "$dir" 2>/dev/null && bash "$scripts_dir/ready-receipt.sh" check "$head" --pass) >/dev/null 2>&1; then
+      print_deny "this command opens or hands over a PR, and its head commit $head has no kc-ready-for-human-review receipt." "$head" "$dir"
       exit 0
     fi
     check_checklist "$head" "$dir" || exit 0

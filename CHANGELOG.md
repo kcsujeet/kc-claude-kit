@@ -6,6 +6,9 @@ One line per version per plugin, newest first. Detail lives in the pull request 
 
 ## [Unreleased]
 
+- `kc-gates` 4.0.0: new `kc-self-correct` reviews and QAs your own change, committed or not, and fixes every finding until clean, recording the content it reviewed by tree hash (`tree-hash.sh`, `self-correct-record.sh`, `gather-review.sh --worktree`); `kc-ready-for-review` is renamed `kc-ready-for-human-review` (migration: the skill name and the receipts folder change, `~/.claude/kc-ready-for-review` becomes `~/.claude/kc-ready-for-human-review`; earlier receipts are not read) and only answers whether the change is ready for a human reviewer; receipts and the hand-off guard match on the content's tree
+- `kc-conventions` 2.14.2: `kc-do-a-task` is the one place that states the order of work (build, self-correct, the person looks, commit, ready for human review, push); new §DT11
+- `kc-autopilot` 0.5.1: depends on `kc-gates` ^4.0.0
 - `kc-gates` 3.25.2: `guard-github-post.sh` denies a posted comment or reply with an emoji or a softener close (§PC13)
 - `kc-conventions` 2.14.1: sweeps `pass-through-hooks.sh` (§R12), `near-copies.sh` (§P1) and `near-synonym-names.sh` (new §N14)
 - `kc-gates` 3.25.1: `guard-loop-stop.sh` is armed only while a review pass is open on the branch, and blocks only a fix that rewrites lines an earlier round of that pass wrote

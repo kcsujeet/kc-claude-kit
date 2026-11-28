@@ -2,7 +2,7 @@
 # Step 1 of kc-code-review: saves the diff under review, its changed-file list and
 # its metadata to one directory, so every gate reads the same files.
 #
-# Usage: gather-review.sh (<pr-number> [--since <sha> | --whole] | --branch [<base>]) [--out-dir <dir>]
+# Usage: gather-review.sh (<pr-number> [--since <sha> | --whole] | --branch [<base>] | --worktree [<base>] [--since-tree <tree>]) [--out-dir <dir>]
 #
 #   <pr-number>      PR mode: `gh pr view <n> --json headRefOid,baseRefName,
 #                    title,files,url` and `gh pr diff <n>`, for the repository
@@ -26,6 +26,14 @@
 #   --branch [base]  Branch mode: `git diff <base>...HEAD` in the current repo.
 #                    The base is <base> when given, else origin/HEAD, else
 #                    main, else master.
+#   --worktree [base]  Working-tree mode, for reviewing your own change before it is committed: the
+#                    working tree as it is now (edits, deletions and untracked files that are not
+#                    ignored, hashed by tree-hash.sh) against the base, from the point the branch left
+#                    it (`git diff $(git merge-base <base> HEAD) <tree>`). The base is chosen as in
+#                    --branch; pass origin/<base>. On a clean tree it is the branch's diff. meta.env
+#                    adds MODE=worktree and TREE=<tree hash>, the content this gather read.
+#   --since-tree <tree>  With --worktree, for a later round: only what changed from <tree>, the TREE
+#                    the round before read, to the working tree now. meta.env adds SINCE_TREE=<tree>.
 #   --out-dir <dir>  Where to write (default: ${TMPDIR:-/tmp}/kc-review-<sha>, outside any
 #                    checkout). A folder inside a git checkout or its .git gets a warning on
 #                    stderr: Claude Code loads a folder's CLAUDE.md and path-scoped rules the
@@ -49,7 +57,7 @@ set -euo pipefail
 
 script_name=$(basename "$0")
 usage() {
-  echo "usage: $script_name (<pr-number> [--since <sha> | --whole] | --branch [<base>]) [--out-dir <dir>]" >&2
+  echo "usage: $script_name (<pr-number> [--since <sha> | --whole] | --branch [<base>] | --worktree [<base>] [--since-tree <tree>]) [--out-dir <dir>]" >&2
   exit 2
 }
 fail() {
@@ -112,6 +120,9 @@ drop_base_merge_changes() {
 
 pr_number=""
 branch_mode=false
+worktree_mode=false
+since_tree=""
+tree_hash=""
 base_arg=""
 out_dir=""
 since_sha=""
@@ -127,6 +138,19 @@ while [ "$#" -gt 0 ]; do
         base_arg=$2
         shift
       fi
+      ;;
+    --worktree)
+      branch_mode=true
+      worktree_mode=true
+      if [ "$#" -ge 2 ] && [ "${2#-}" = "$2" ]; then
+        base_arg=$2
+        shift
+      fi
+      ;;
+    --since-tree)
+      if [ "$#" -lt 2 ] || [ -z "$2" ]; then usage; fi
+      since_tree=$2
+      shift
       ;;
     --since)
       if [ "$#" -lt 2 ] || [ -z "$2" ]; then usage; fi
@@ -151,6 +175,7 @@ if [ "$branch_mode" = true ] && [ -n "$pr_number" ]; then usage; fi
 if [ "$branch_mode" = false ] && [ -z "$pr_number" ]; then usage; fi
 if [ "$branch_mode" = true ] && { [ -n "$since_sha" ] || [ "$whole_diff" = true ]; }; then usage; fi
 if [ "$whole_diff" = true ] && [ -n "$since_sha" ]; then usage; fi
+if [ -n "$since_tree" ] && [ "$worktree_mode" = false ]; then usage; fi
 
 tmp_root=${TMPDIR:-/tmp}
 tmp_root=${tmp_root%/}
@@ -183,8 +208,20 @@ if [ "$branch_mode" = true ]; then
   review_title=$(git rev-parse --abbrev-ref HEAD)
   # Explicit prefixes and no external diff tool, whatever the user's git config
   # says, so the sweeps always read `a/` and `b/` paths.
-  git diff --no-color --no-ext-diff --src-prefix=a/ --dst-prefix=b/ "$review_base...HEAD" > "$diff_tmp"
-  git diff --no-ext-diff --name-only "$review_base...HEAD" > "$files_tmp"
+  if [ "$worktree_mode" = true ]; then
+    tree_hash=$(bash "$(dirname "$0")/tree-hash.sh") || fail "could not hash the working tree"
+    if [ -n "$since_tree" ]; then
+      git cat-file -e "$since_tree^{tree}" 2>/dev/null || fail "--since-tree $since_tree is not a tree in this clone"
+      diff_from=$since_tree
+    else
+      diff_from=$(git merge-base "$review_base" HEAD 2>/dev/null) || fail "no common history between $review_base and HEAD"
+    fi
+    git diff --no-color --no-ext-diff --src-prefix=a/ --dst-prefix=b/ "$diff_from" "$tree_hash" > "$diff_tmp"
+    git diff --no-ext-diff --name-only "$diff_from" "$tree_hash" > "$files_tmp"
+  else
+    git diff --no-color --no-ext-diff --src-prefix=a/ --dst-prefix=b/ "$review_base...HEAD" > "$diff_tmp"
+    git diff --no-ext-diff --name-only "$review_base...HEAD" > "$files_tmp"
+  fi
 else
   # headRefOid, baseRefName, url and title (one line each), then one path per
   # changed file. Field names: https://cli.github.com/manual/gh_pr_view
@@ -228,7 +265,7 @@ else
   fi
 fi
 
-[ -n "$out_dir" ] || out_dir="$tmp_root/kc-review-$head_sha"
+[ -n "$out_dir" ] || out_dir="$tmp_root/kc-review-${tree_hash:-$head_sha}"
 mkdir -p "$out_dir"
 out_dir=$(cd "$out_dir" && pwd)
 if [ "$(git -C "$out_dir" rev-parse --is-inside-work-tree 2>/dev/null)" = true ] || [ "$(git -C "$out_dir" rev-parse --is-inside-git-dir 2>/dev/null)" = true ]; then
@@ -252,6 +289,11 @@ cp "$files_tmp" "$changed_files"
   print_env_line CHANGED_FILES "$changed_files"
   if [ -n "$fetch_command" ]; then print_env_line FETCH "$fetch_command"; fi
   if [ -n "$base_stale" ]; then print_env_line BASE_STALE "$base_stale"; fi
+  if [ "$worktree_mode" = true ]; then
+    print_env_line MODE worktree
+    print_env_line TREE "$tree_hash"
+    if [ -n "$since_tree" ]; then print_env_line SINCE_TREE "$since_tree"; fi
+  fi
   if [ -n "$merges_excluded" ]; then print_env_line MERGES_EXCLUDED "$merges_excluded"; fi
   if [ -n "$since_skipped" ]; then
     print_env_line SINCE_SKIPPED "$since_skipped"

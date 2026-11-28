@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Writes and checks the receipts of kc-ready-for-review: one file per commit
-# the pass ended on, named by its full SHA, under
-# ${KC_READY_DIR:-$HOME/.claude/kc-ready-for-review}. guard-hand-off.sh lets a
+# Writes and checks the receipts of kc-ready-for-human-review: one file per commit
+# handed over, named by its full SHA, under
+# ${KC_READY_DIR:-$HOME/.claude/kc-ready-for-human-review}. guard-hand-off.sh lets a
 # PR go to review only when its head commit has one.
 #
 #   ready-receipt.sh write <sha> --rounds <1-3> --open <n> --pass <dir>
@@ -10,7 +10,13 @@
 #       user, the pass folder, and the size pass-size.sh gave it. The receipt
 #       records clean=yes only when the last round found nothing, <sha> is its
 #       head and nothing is open; guard-merge.sh merges only a clean head.
-#       Refused unless the pass folder shows the pass ran (see below).
+#       Refused unless the pass folder shows the pass ran (see below) and
+#       kc-self-correct left a record for <sha>'s content (self-correct-record.sh
+#       check <tree of sha>): a commit's tree is the content, so a record made
+#       before the commit, on the working tree, matches the commit. The receipt
+#       names the tree (tree=), and is also kept under tree-<tree>: another commit
+#       of the same content (an amend, a rebase, a squash) finds it, so check
+#       answers for content, not only for the one SHA.
 #   ready-receipt.sh write <sha> --after <pass-sha>
 #       After commits that only hold fixes to that pass: the ones the user
 #       picked from its open list, or a reviewer asked for. It lets the PR
@@ -119,7 +125,7 @@
 set -euo pipefail
 
 preflight=false
-receipts_dir=${KC_READY_DIR:-$HOME/.claude/kc-ready-for-review}
+receipts_dir=${KC_READY_DIR:-$HOME/.claude/kc-ready-for-human-review}
 scripts_dir=$(cd "$(dirname "$0")" && pwd)
 # shellcheck source=lib/hook-input.sh
 . "$scripts_dir/lib/hook-input.sh"
@@ -305,6 +311,24 @@ get_review_head() {
   sed -nE "s/^HEAD_SHA='?([0-9a-f]{40})'?$/\1/p" "$pass_dir/$1/meta.env" | head -n 1
 }
 
+# Prints a meta.env value of a review ($1 the review, $2 the key), or nothing.
+get_review_meta() {
+  sed -nE "s/^$2='?([^']*)'?$/\1/p" "$pass_dir/$1/meta.env" | head -n 1
+}
+
+# Prints what a review read, as something git diff accepts: the TREE a working-tree gather read, else
+# its HEAD_SHA.
+get_review_ref() {
+  local tree
+  tree=$(get_review_meta "$1" TREE)
+  if [ -n "$tree" ]; then printf '%s\n' "$tree"; else get_review_head "$1"; fi
+}
+
+# Succeeds when $1 (a commit or a tree) is the content of $sha.
+is_content_of_sha() {
+  [ "$1" = "$sha" ] || [ "$1" = "$(git -C "$repo_root" rev-parse -q --verify "$sha^{tree}" 2>/dev/null)" ]
+}
+
 # Prints the commit a review's BASE names: origin's copy of a branch first, as
 # gather-review.sh's PR mode names a bare branch the clone may hold stale.
 get_review_base_commit() {
@@ -319,7 +343,7 @@ get_review_base_commit() {
 # The round needs every gate its diff lists, verification and a SCOPE: block. The project-conventions gate is needed only when the repo had
 # .claude/review-conventions.md at the review's head.
 check_review() {
-  local review=$1 with_scope=${2:-scope} dir=$pass_dir/$1 summary gate_report gates gate required head base_commit select_args=() verification_file
+  local review=$1 with_scope=${2:-scope} dir=$pass_dir/$1 summary gate_report gates gate required head base_commit select_args=() verification_file is_worktree=false
   review_usable=false
   if [ ! -d "$dir" ]; then
     record_problem "$review: no $review/ folder in the pass folder"
@@ -337,12 +361,14 @@ check_review() {
     record_problem "$review: meta.env names no HEAD_SHA this clone has"
     return
   fi
+  [ "$(get_review_meta "$review" MODE)" != worktree ] || is_worktree=true
   base_commit=$(get_review_base_commit "$review")
-  if [ -z "$base_commit" ]; then
+  if [ -z "$base_commit" ] && ! $is_worktree; then
     record_problem "$review: meta.env names no BASE this clone has"
     return
   fi
-  if $preflight; then
+  # A working-tree gather read content no commit holds yet, so its saved diff is the record.
+  if $preflight || $is_worktree; then
     cp "$dir/review.diff" "$regenerated_dir/$review.diff"
     cp "$dir/changed-files.txt" "$regenerated_dir/$review.files"
   else
@@ -449,7 +475,7 @@ check_final_settlement() {
     record_problem "round $MAX_ROUNDS still found $finding_count finding(s): settle each in final.txt (fixed, dismissed or asked), or ask the user about the approach"
     return
   fi
-  fix_files=$(git -C "$repo_root" -c core.quotePath=false diff --name-only "$last_head" "$sha")
+  fix_files=$(git -C "$repo_root" -c core.quotePath=false diff --name-only "$last_ref" "$sha")
   while IFS=$'\t' read -r status finding detail || [ -n "$status" ]; do
     [ -n "$status" ] || continue
     line_count=$((line_count + 1))
@@ -465,7 +491,7 @@ check_final_settlement() {
     esac
   done < "$record"
   [ "$line_count" -ge "$finding_count" ] || record_problem "final.txt settles $line_count finding(s); round $MAX_ROUNDS found $finding_count"
-  git -C "$repo_root" diff --no-color --no-ext-diff "$last_head" "$sha" > "$regenerated_dir/final.diff"
+  git -C "$repo_root" diff --no-color --no-ext-diff "$last_ref" "$sha" > "$regenerated_dir/final.diff"
   fix_size=$(count_changed_lines "$regenerated_dir/final.diff")
   [ "$fix_size" -lt "$last_round_size" ] || record_problem "the final fixes change $fix_size lines, round $MAX_ROUNDS changed $last_round_size: too big to land without a gate round; ask the user about the approach"
 }
@@ -481,19 +507,26 @@ count_broken_uses() {
 # last_head to the last round's head. Not run in a subshell: its problems must
 # reach the caller's list.
 check_fix_rounds() {
-  local rounds=$1 previous_head=$2 round head base_commit size previous_size="" has_previous_round did_not_shrink
+  local rounds=$1 previous_head=$2 previous_ref=$3 round head base_commit size previous_size="" has_previous_round did_not_shrink is_worktree since_tree
   for ((round = 2; round <= rounds; round++)); do
     check_review "round-$round" no-scope
     # A round whose folder can't be read has no head to chain the next round from: it and the
     # checks that need the chain are skipped, and its own problems are already listed.
     if ! $review_usable; then
       previous_head=""
+      previous_ref=""
       previous_size=""
       continue
     fi
     head=$(get_review_head "round-$round")
     base_commit=$(get_review_base_commit "round-$round")
-    if [ -n "$previous_head" ]; then
+    is_worktree=false
+    [ "$(get_review_meta "round-$round" MODE)" != worktree ] || is_worktree=true
+    if $is_worktree; then
+      since_tree=$(get_review_meta "round-$round" SINCE_TREE)
+      [ -z "$previous_ref" ] || [ "$since_tree" = "$previous_ref" ] \
+        || record_problem "round-$round: reviews from tree '$since_tree', not round $((round - 1))'s content $previous_ref: gather it with --worktree --since-tree $previous_ref"
+    elif [ -n "$previous_head" ]; then
       [ "$base_commit" = "$previous_head" ] \
         || record_problem "round-$round: reviews from $base_commit, not round $((round - 1))'s head $previous_head: gather it with --branch $previous_head"
       git -C "$repo_root" merge-base --is-ancestor "$previous_head" "$head" 2>/dev/null \
@@ -509,8 +542,10 @@ check_fix_rounds() {
     fi
     previous_size=$size
     previous_head=$head
+    previous_ref=$(get_review_ref "round-$round")
   done
   last_head=$previous_head
+  last_ref=$previous_ref
 }
 
 # Paths of test files, as the conventions' sweeps read them.
@@ -519,12 +554,12 @@ readonly TEST_PATHS='(\.(test|spec)\.[A-Za-z0-9]+$|_(test|spec)\.[A-Za-z0-9]+$|(
 # Checks fixes.txt, the record of what became of each round-1 finding, against
 # the fix commits (round 1's head to <sha>) and --open.
 check_fixes_record() {
-  local round_one_head=$1 open=$2 record=$pass_dir/fixes.txt fix_files line_number=0 open_lines=0 status finding detail
+  local round_one_ref=$1 open=$2 record=$pass_dir/fixes.txt fix_files line_number=0 open_lines=0 status finding detail
   if [ ! -f "$record" ]; then
     record_problem "no fixes.txt in the pass folder: the commits since round 1 hold fixes, and each needs its line (fixed, mechanical or open)"
     return
   fi
-  fix_files=$(git -C "$repo_root" -c core.quotePath=false diff --name-only "$round_one_head" "$sha")
+  fix_files=$(git -C "$repo_root" -c core.quotePath=false diff --name-only "$round_one_ref" "$sha")
   while IFS=$'\t' read -r status finding detail || [ -n "$status" ]; do
     line_number=$((line_number + 1))
     [ -n "$status" ] || continue
@@ -572,11 +607,11 @@ list_risk_kinds() {
 # A fix inside an auth or payments change asks nothing new. Paths are quoted as
 # gather-review.sh quotes round 1's list.
 get_widened_footprint() {
-  local round_one_head=$1 round_one_files=$regenerated_dir/round-1.files fix_diff fix_files outside round_one_risks fix_risks new_risks
+  local round_one_ref=$1 round_one_files=$regenerated_dir/round-1.files fix_diff fix_files outside round_one_risks fix_risks new_risks
   fix_diff=$(mktemp)
   fix_files=$(mktemp)
-  git -C "$repo_root" diff --no-color --no-ext-diff --src-prefix=a/ --dst-prefix=b/ "$round_one_head" "$sha" > "$fix_diff"
-  git -C "$repo_root" diff --name-only "$round_one_head" "$sha" > "$fix_files"
+  git -C "$repo_root" diff --no-color --no-ext-diff --src-prefix=a/ --dst-prefix=b/ "$round_one_ref" "$sha" > "$fix_diff"
+  git -C "$repo_root" diff --name-only "$round_one_ref" "$sha" > "$fix_files"
   outside=$(grep -vxF -f "$round_one_files" "$fix_files" | grep -vE "$TEST_PATHS")
   round_one_risks=$(list_risk_kinds "$regenerated_dir/round-1.diff" "$round_one_files")
   fix_risks=$(list_risk_kinds "$fix_diff" "$fix_files")
@@ -587,7 +622,7 @@ get_widened_footprint() {
 }
 
 write_pass_receipt() {
-  local rounds=$1 open=$2 size=$3 scope_approved=$4 line round_one_head=""
+  local rounds=$1 open=$2 size=$3 scope_approved=$4 line round_one_head="" round_one_ref="" last_ref="" sha_tree=""
   local widened="" last_head="" clean=no is_sha_in_clone=true round_one_usable=false last_round_usable=false
   printf '%s' "$rounds" | grep -Eqx '[1-9][0-9]*' || { echo "ready-receipt: --rounds is a count of gate rounds" >&2; exit 2; }
   [ "$rounds" -le "$MAX_ROUNDS" ] || { echo "ready-receipt: --rounds is at most $MAX_ROUNDS: past round $MAX_ROUNDS the fixes keep making findings, so stop and ask the user whether the approach is wrong" >&2; exit 2; }
@@ -607,28 +642,35 @@ write_pass_receipt() {
   git -C "$repo_root" cat-file -e "$sha^{commit}" 2>/dev/null || { record_problem "commit $sha is not in this clone"; is_sha_in_clone=false; }
   if $round_one_usable; then
     round_one_head=$(get_review_head round-1)
+    round_one_ref=$(get_review_ref round-1)
     last_head=$round_one_head
+    last_ref=$round_one_ref
+  fi
+  if sha_tree=$(git -C "$repo_root" rev-parse -q --verify "$sha^{tree}" 2>/dev/null); then
+    if ! bash "$scripts_dir/self-correct-record.sh" check "$sha_tree" > /dev/null 2>&1; then
+      record_problem "no kc-self-correct record for this content (tree $sha_tree): run /kc-gates:kc-self-correct on it, or on what changed since its last record, then write the receipt"
+    fi
   fi
   if [ "$rounds" -gt 1 ]; then
-    check_fix_rounds "$rounds" "$round_one_head"
+    check_fix_rounds "$rounds" "$round_one_head" "$round_one_ref"
     last_round_usable=$review_usable
   fi
   if $is_sha_in_clone && [ -n "$last_head" ]; then
     git -C "$repo_root" merge-base --is-ancestor "$last_head" "$sha" 2>/dev/null \
       || record_problem "$sha does not descend from round $rounds's head (a rebase or reset since): that round reviewed another diff; run the pass again"
   fi
-  if $is_sha_in_clone && [ -n "$round_one_head" ] && { [ "$round_one_head" != "$sha" ] || [ "$open" != 0 ]; }; then
-    check_fixes_record "$round_one_head" "$open"
+  if $is_sha_in_clone && [ -n "$round_one_ref" ] && { ! is_content_of_sha "$round_one_ref" || [ "$open" != 0 ]; }; then
+    check_fixes_record "$round_one_ref" "$open"
   fi
   if $is_sha_in_clone && $round_one_usable && ! $preflight; then
-    widened=$(get_widened_footprint "$round_one_head")
+    widened=$(get_widened_footprint "$round_one_ref")
     if [ -n "$widened" ] && [ -z "$scope_approved" ]; then
       record_problem "the fixes reach past round 1's diff; show the user these and pass their words as --scope-approved \"<their words>\":"
       while IFS= read -r line; do record_problem "  $line"; done <<< "$widened"
     fi
   fi
   local is_last_round_head=false has_nothing_open=false last_round_found_nothing=false failing_blocks broken_uses has_no_failing_blocks=false has_no_broken_uses=false is_settled_after_last_round=false is_last_allowed_round=false has_final_record=false finding_count last_round_size problems_before_settlement
-  [ "$sha" = "$last_head" ] && is_last_round_head=true
+  if $is_sha_in_clone && [ -n "$last_ref" ] && is_content_of_sha "$last_ref"; then is_last_round_head=true; fi
   [ "$open" = 0 ] && has_nothing_open=true
   if $last_round_usable; then
     failing_blocks=$(count_failing_blocks "round-$rounds")
@@ -660,11 +702,13 @@ write_pass_receipt() {
     clean=yes
   fi
   {
-    printf 'sha=%s\ndate=%s\nrounds=%s\nopen=%s\nclean=%s\npass=%s\n' "$sha" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$rounds" "$open" "$clean" "$pass_dir"
+    printf 'sha=%s\ndate=%s\nrounds=%s\nopen=%s\nclean=%s\npass=%s\ntree=%s\n' "$sha" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$rounds" "$open" "$clean" "$pass_dir" "$sha_tree"
     [ -z "$size" ] || printf 'size=%s\n' "$size"
     ! $is_settled_after_last_round || printf 'settled=final.txt\n'
     [ -z "$widened" ] || printf 'scope_approved=%s\n' "$scope_approved"
   } > "$receipts_dir/$sha"
+  # Kept by content too, so another commit of the same tree finds it (see check_receipt).
+  cp "$receipts_dir/$sha" "$receipts_dir/tree-$sha_tree"
 }
 
 # Records a problem per PR comment its author has not answered (nothing when there is no PR or no
@@ -753,13 +797,30 @@ is_clean_default_merge() {
 }
 
 # Succeeds when <sha> has a receipt that is clean.
-has_clean_receipt() { [ -f "$receipts_dir/$1" ] && grep -qx 'clean=yes' "$receipts_dir/$1"; }
+has_clean_receipt() {
+  local file
+  file=$(find_receipt_file "$1") || return 1
+  grep -qx 'clean=yes' "$file"
+}
+
+# Prints the path of <sha>'s pass receipt: its own file, else the one kept for the same content (its
+# tree) under another commit. Fails when there is neither.
+find_receipt_file() {
+  local tree
+  if [ -f "$receipts_dir/$1" ]; then
+    printf '%s\n' "$receipts_dir/$1"
+    return 0
+  fi
+  tree=$(git rev-parse -q --verify "$1^{tree}" 2>/dev/null) || return 1
+  [ -f "$receipts_dir/tree-$tree" ] || return 1
+  printf '%s\n' "$receipts_dir/tree-$tree"
+}
 
 # Prints <sha>'s receipt, or fails when it has none or, with --pass, when it
 # is for the checklist alone. With --clean, a merge of the default branch that
 # adds nothing to a clean head is clean with no receipt of its own.
 check_receipt() {
-  local receipt=$receipts_dir/$1 pass_only=false clean_only=false
+  local receipt pass_only=false clean_only=false
   case "${*:2}" in
     '') ;;
     --pass) pass_only=true ;;
@@ -771,7 +832,7 @@ check_receipt() {
     printf 'sha=%s\nclean=yes\nmerged=default-branch\n' "$1"
     return 0
   fi
-  [ -f "$receipt" ] || return 1
+  receipt=$(find_receipt_file "$1") || return 1
   if $pass_only && grep -qx 'checklist=walked' "$receipt"; then
     return 1
   fi

@@ -14,6 +14,7 @@ tests_dir=$(cd "$(dirname "$0")" && pwd)
 . "$tests_dir/lib/harness.sh"
 scripts="$(dirname "$tests_dir")/scripts"
 export KC_READY_DIR="$work_dir/receipts"
+export KC_SELF_CORRECT_DIR="$work_dir/self-correct"
 # A stub gh with no PR for the branch, so a receipt write never reaches the network; the unanswered-comment
 # cases below point KC_GH_ROUTES at a PR with comments.
 gh_fixtures="$tests_dir/fixtures/unanswered-pr-comments"
@@ -116,9 +117,17 @@ edit_scope() {
 
 # Runs a write for <sha> and checks the verdict; the output stays in $last_output.
 last_output=""
+# Leaves a clean kc-self-correct record for <sha>'s content, as the pass before the receipt does.
+seed_record() {
+  local tree
+  tree=$(git -C "$repo" rev-parse -q --verify "$1^{tree}" 2>/dev/null) || return 0
+  mkdir -p "$KC_SELF_CORRECT_DIR"
+  printf 'tree=%s\nrounds=1\nopen=0\nclean=yes\n' "$tree" > "$KC_SELF_CORRECT_DIR/$tree"
+}
 expect_write() {
   local expectation=$1 label=$2 sha=$3 actual=written
   shift 3
+  seed_record "$sha"
   last_output=$(cd "$repo" && bash "$scripts/ready-receipt.sh" write "$sha" "$@" 2>&1) || actual=refused
   expect_eq "$label" "$expectation" "$actual"
 }
@@ -149,8 +158,8 @@ expect_write refused "an --after write is refused while the PR has an unanswered
 expect_said "it names the unanswered comment" "src/total.ts:12 @review-bot[bot]"
 export KC_GH_ROUTES="$gh_fixtures/none/routes.tsv"
 
-# The fixes are held by their record: a fix names a test its commits changed (§H4), and what is
-# left open says why and numbers --open (§H3). Rounds after the first are tested at the end.
+# The fixes are held by their record: a fix names a test its commits changed (§SC4), and what is
+# left open says why and numbers --open (§SC3). Rounds after the first are tested at the end.
 build_pass
 
 rm "$pass_dir/fixes.txt"
@@ -620,7 +629,7 @@ verdict_check "$with_checklist"
 expect_eq "and the verdicts" 0 "$verdict_status"
 expect_write refused "a graded file that does not exist is refused" "$with_checklist" --verdicts "$work_dir/nope.md"
 
-# Rounds converge or stop (§H1). Round 1 reviews the whole change; each later round reviews only
+# Rounds converge or stop (§SC1). Round 1 reviews the whole change; each later round reviews only
 # the fixes since the round before, records a verdict per use of what they changed, and must be
 # smaller than the round before. Past round 3 the approach goes back to the user. The receipt is
 # clean only when the last round found nothing, the receipt's commit is its head and nothing is open.
@@ -875,5 +884,57 @@ if [ "$timing_seconds" -le 30 ]; then
 else
   record "9,000 uses checked in ${timing_seconds}s (limit 30s)" fail "the uses check is not linear"
 fi
+
+# kc-self-correct's record: a pass receipt needs a record for the commit's content (its tree), and the
+# receipt then answers for the content, whichever commit holds it.
+build_repo
+build_pass
+rm -rf "$KC_SELF_CORRECT_DIR"
+rm -f "$KC_READY_DIR"/*
+last_output=$(cd "$repo" && bash "$scripts/ready-receipt.sh" write "$fixed_head" --rounds 1 --open 0 --size full --pass "$pass_dir" 2>&1) && actual=written || actual=refused
+expect_eq "a pass with no kc-self-correct record for its content is refused" refused "$actual"
+expect_said "it names the missing record and the skill" "no kc-self-correct record for this content"
+expect_said "it names the tree" "$(git -C "$repo" rev-parse "$fixed_head^{tree}")"
+expect_write written "with the record the same pass is written" "$fixed_head" --rounds 1 --open 0 --size full --pass "$pass_dir"
+expect_contains "the receipt names the tree it covers" "tree=$(git -C "$repo" rev-parse "$fixed_head^{tree}")" "$(cat "$KC_READY_DIR/$fixed_head")"
+expect_eq "the receipt is kept by content too" yes "$([ -f "$KC_READY_DIR/tree-$(git -C "$repo" rev-parse "$fixed_head^{tree}")" ] && echo yes || echo no)"
+run_git commit -q --amend -m "round 1 fixes, reworded"
+amended_head=$(git -C "$repo" rev-parse HEAD)
+expect_eq "an amend gives another commit" different "$([ "$amended_head" != "$fixed_head" ] && echo different || echo same)"
+expect_eq "with no receipt file of its own" absent "$([ -e "$KC_READY_DIR/$amended_head" ] && echo present || echo absent)"
+expect_contains "also for a plain pass check" "rounds=1" "$(cd "$repo" && bash "$scripts/ready-receipt.sh" check "$amended_head" --pass)"
+printf 'echo drift\n' >> "$repo/shop/tax.sh"
+changed_head=$(commit_all "content changed since")
+(cd "$repo" && bash "$scripts/ready-receipt.sh" check "$changed_head" --pass >/dev/null 2>&1) && actual=found || actual=none
+expect_eq "changed content finds no receipt" none "$actual"
+
+# A pass on uncommitted work: round 1 gathers the working tree, the record is written for its content,
+# and the commit made afterwards (and an amend of it) is covered, with no fix commits to name.
+repo="$work_dir/repo-uncommitted"
+git init -q -b main "$repo"
+mkdir -p "$repo/shop"
+printf '#!/bin/sh\necho base1\necho base2\n' > "$repo/shop/total.sh"
+base=$(commit_all base)
+printf 'echo wt1\n' >> "$repo/shop/total.sh"
+printf '#!/bin/sh\necho new1\necho new2\n' > "$repo/shop/new.sh"
+pass_dir="$work_dir/pass-uncommitted"
+(cd "$repo" && bash "$scripts/gather-review.sh" --worktree main --out-dir "$pass_dir/round-1" > /dev/null)
+mkdir -p "$pass_dir/round-1/verdicts"
+save_verdicts round-1 scope
+rm -rf "$KC_SELF_CORRECT_DIR"
+(cd "$repo" && bash "$scripts/self-correct-record.sh" write --rounds 1 --open 0 --size full --pass "$pass_dir" > /dev/null 2>&1) && actual=written || actual=refused
+expect_eq "the record is written for the uncommitted content" written "$actual"
+uncommitted_head=$(commit_all "the reviewed work")
+expect_eq "the commit holds the content the record was written for" "$(sed -n 's/^tree=//p' "$KC_SELF_CORRECT_DIR/"*)" "$(git -C "$repo" rev-parse "$uncommitted_head^{tree}")"
+last_output=$(cd "$repo" && bash "$scripts/ready-receipt.sh" write "$uncommitted_head" --rounds 1 --open 0 --size full --pass "$pass_dir" 2>&1) && actual=written || actual=refused
+expect_eq "the receipt is written for the commit, with no fixes.txt: the content did not change after round 1" written "$actual"
+expect_contains "and it is clean" "clean=yes" "$(cat "$KC_READY_DIR/$uncommitted_head")"
+run_git commit -q --amend -m "the reviewed work, reworded"
+expect_contains "an amend of the reviewed commit keeps its clean receipt, found by content" "clean=yes" "$(cd "$repo" && bash "$scripts/ready-receipt.sh" check "$(git -C "$repo" rev-parse HEAD)" --clean)"
+printf 'echo after\n' >> "$repo/shop/new.sh"
+later_head=$(commit_all "an edit after the review")
+last_output=$(cd "$repo" && bash "$scripts/ready-receipt.sh" write "$later_head" --rounds 1 --open 0 --size full --pass "$pass_dir" 2>&1) && actual=written || actual=refused
+expect_eq "content edited after the review has no record: refused" refused "$actual"
+expect_said "it says to review the delta" "kc-self-correct"
 
 finish
